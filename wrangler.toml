@@ -1,0 +1,56 @@
+name = "hashbin-worker"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Development environment
+[env.development]
+name = "hashbin-worker-dev"
+vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
+
+# Production environment
+[env.production]
+name = "hashbin-worker-prod"
+route = { pattern = "hashbin.org/*", zone_name = "hashbin.org" }
+vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
+
+# Durable Objects bindings
+[[durable_objects.bindings]]
+name = "CONTENT_METADATA"
+class_name = "ContentMetadata"
+script_name = "hashbin-worker"
+
+[[durable_objects.bindings]]
+name = "USER_PROFILES"
+class_name = "UserProfile"
+script_name = "hashbin-worker"
+
+[[durable_objects.bindings]]
+name = "PAYMENT_RECORDS"
+class_name = "PaymentRecord"
+script_name = "hashbin-worker"
+
+[[durable_objects.bindings]]
+name = "CONTEST_RECORDS"
+class_name = "ContestRecord"
+script_name = "hashbin-worker"
+
+[[durable_objects.bindings]]
+name = "MESSAGE_THREADS"
+class_name = "MessageThread"
+script_name = "hashbin-worker"
+
+# R2 bucket bindings
+[[r2_buckets]]
+binding = "CONTENT_BUCKET"
+bucket_name = "hashbin-content-prod"
+preview_bucket_name = "hashbin-content-dev"
+
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "hashbin-backups-prod"
+preview_bucket_name = "hashbin-backups-dev"
+
+# Durable Objects migrations
+[[migrations]]
+tag = "v1"
+new_classes = ["ContentMetadata", "UserProfile", "PaymentRecord", "ContestRecord", "MessageThread"]
