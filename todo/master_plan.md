@@ -238,7 +238,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Evidence upload and storage (R2)
 - **Evidence-based removal** (see Decision #20):
   - Contesters provide compelling evidence
-  - Evidence visible to moderators and payers
+  - **Evidence immediately visible** to moderators and payers upon filing
   - Removal only when evidence is sufficiently compelling
 - Status tracking and notifications
 - Content takedown process (R2 deletion + metadata update)
@@ -249,14 +249,17 @@ HashBin.org is a content distribution platform using 256t hash-based content add
   - Payers can contact contesters
   - Messages stored in Durable Objects
   - Messaging UI in user dashboard
+  - **Email notifications** for new messages
+  - **Message limits** (character count, message count)
+  - **Admin moderation service** (on paid request)
 - DMCA compliance (24-48 hour response time)
 
 **Sub-Plans:**
 - `todo/contestation_system.md` - Dispute resolution workflow
-- `todo/content_moderation.md` - Review and moderation tools
+- `todo/content_moderation.md` - Review and moderation tools, messaging limits, admin pricing
 
 **Technologies:**
-- Cloudflare Workers (contest API)
+- Cloudflare Workers (contest API, email notifications)
 - Durable Objects (contest records, messages)
 - R2 (evidence storage)
 
@@ -772,7 +775,9 @@ The following key decisions have been made to guide implementation:
 - Contesters receive notifications of messages
 - Messages stored in Durable Objects
 - Basic messaging UI in user dashboard
-- Optional: Email notifications of new messages (without revealing addresses)
+- **Email notifications:** Users receive email when new messages arrive (without revealing addresses)
+- **Message limits:** Character and message count limits to prevent abuse (specific limits TBD in Phase 6)
+- **Admin moderation:** Available on paid request (pricing and scope TBD in Phase 6)
 
 **Access control:**
 - Payers can message contesters about their paid content
@@ -783,12 +788,13 @@ The following key decisions have been made to guide implementation:
 ---
 
 ### 20. Contest Resolution: Evidence-Based Removal
-**Decision:** Content removal requires compelling evidence supplied by contester, which is visible to affected parties.
+**Decision:** Content removal requires compelling evidence supplied by contester, which is visible to affected parties immediately upon filing.
 
 **Rationale:**
 - Balances copyright protection with false claim prevention
 - Transparency in dispute resolution
 - Allows payers to understand and potentially challenge removals
+- Immediate visibility enables faster resolution
 - Defers detailed resolution procedures until operational experience is gained
 
 **Implementation:**
@@ -796,7 +802,7 @@ The following key decisions have been made to guide implementation:
   - Claim type (copyright, illegal content, abuse)
   - Evidence (documents, links, explanations)
   - Contact information (for messaging system)
-- Evidence is visible to:
+- **Evidence visibility:** Immediately available upon contest filing to:
   - Platform moderators (for review)
   - Payers who paid for the contested content
   - NOT visible publicly (privacy protection)
@@ -812,6 +818,8 @@ The following key decisions have been made to guide implementation:
 - Review timelines and escalation paths
 - Appeals process for wrongful removals
 - Counter-claim procedures
+- Message size and count limits for messaging system
+- Admin moderation service pricing and scope
 - Will be documented in `todo/content_moderation.md`
 
 ---
