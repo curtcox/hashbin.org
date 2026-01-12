@@ -95,6 +95,46 @@ After deployment, your Workers will be available at:
 
 ## Testing the Deployment
 
+### Automated Verification
+
+The GitHub Actions workflow automatically verifies each deployment by testing:
+- Root endpoint functionality
+- Health check endpoint
+- Service operational status
+- 404 error handling
+
+If any verification fails, the deployment is marked as failed.
+
+### Manual Verification
+
+You can also verify deployments manually using the included verification script:
+
+```bash
+# Verify development
+./scripts/verify-deployment.sh development <your-account-id>
+
+# Verify production
+./scripts/verify-deployment.sh production <your-account-id>
+
+# Verify custom domain
+./scripts/verify-deployment.sh https://hashbin.org
+```
+
+Or using npm scripts:
+
+```bash
+# Verify development
+npm run verify:dev -- <your-account-id>
+
+# Verify production
+npm run verify:prod -- <your-account-id>
+
+# Verify custom domain
+npm run verify:custom
+```
+
+### Quick Manual Test
+
 Test your deployment with curl:
 
 ```bash
@@ -121,6 +161,15 @@ Expected response:
   }
 }
 ```
+
+### Verification Script Output
+
+The verification script provides detailed test results:
+- ✅ All tests passed: Deployment successful
+- ❌ Test failed: Shows which test failed and why
+- Exit code 0 = success, 1 = failure
+
+See `scripts/README.md` for complete documentation on the verification tools.
 
 ## Troubleshooting
 

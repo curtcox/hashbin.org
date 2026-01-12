@@ -7,6 +7,9 @@
     "dev": "wrangler dev",
     "deploy:dev": "wrangler deploy --env development",
     "deploy:prod": "wrangler deploy --env production",
+    "verify:dev": "scripts/verify-deployment.sh development",
+    "verify:prod": "scripts/verify-deployment.sh production",
+    "verify:custom": "scripts/verify-deployment.sh https://hashbin.org",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [

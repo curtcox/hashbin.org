@@ -65,6 +65,69 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Wait for deployment propagation
+        run: sleep 10
+
+      - name: Verify deployment - Root endpoint
+        run: |
+          echo "Testing root endpoint..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-dev.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev/)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "HTTP Status Code: $HTTP_CODE"
+          echo "Response Body: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Root endpoint returned HTTP $HTTP_CODE (expected 200)"
+            exit 1
+          fi
+
+          if ! echo "$BODY" | grep -q "HashBin.org API"; then
+            echo "❌ Response does not contain expected service name"
+            exit 1
+          fi
+
+          echo "✅ Root endpoint verified"
+
+      - name: Verify deployment - Health endpoint
+        run: |
+          echo "Testing health endpoint..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-dev.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev/health)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "HTTP Status Code: $HTTP_CODE"
+          echo "Response Body: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Health endpoint returned HTTP $HTTP_CODE (expected 200)"
+            exit 1
+          fi
+
+          if ! echo "$BODY" | grep -q '"status":"healthy"'; then
+            echo "❌ Health check failed - status not healthy"
+            exit 1
+          fi
+
+          if ! echo "$BODY" | grep -q '"environment":"development"'; then
+            echo "❌ Wrong environment returned"
+            exit 1
+          fi
+
+          echo "✅ Health endpoint verified"
+
+      - name: Deployment verification summary
+        run: |
+          echo "=========================================="
+          echo "✅ Development Deployment Successful"
+          echo "=========================================="
+          echo "Worker URL: https://hashbin-worker-dev.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev"
+          echo "Root endpoint: VERIFIED"
+          echo "Health endpoint: VERIFIED"
+          echo "Environment: development"
+          echo "=========================================="
+
   deploy-prod:
     name: Deploy to Production
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -100,5 +163,69 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Post-deployment notification
-        run: echo "✅ Deployed to production at https://hashbin.org"
+      - name: Wait for deployment propagation
+        run: sleep 10
+
+      - name: Verify deployment - Workers.dev URL
+        run: |
+          echo "Testing production worker on workers.dev..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-prod.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev/health)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "HTTP Status Code: $HTTP_CODE"
+          echo "Response Body: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Health endpoint returned HTTP $HTTP_CODE (expected 200)"
+            exit 1
+          fi
+
+          if ! echo "$BODY" | grep -q '"status":"healthy"'; then
+            echo "❌ Health check failed - status not healthy"
+            exit 1
+          fi
+
+          if ! echo "$BODY" | grep -q '"environment":"production"'; then
+            echo "❌ Wrong environment returned"
+            exit 1
+          fi
+
+          echo "✅ Workers.dev URL verified"
+
+      - name: Verify deployment - Custom domain
+        continue-on-error: true
+        run: |
+          echo "Testing custom domain hashbin.org..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin.org/health || echo "")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          if [ -z "$RESPONSE" ] || [ "$HTTP_CODE" != "200" ]; then
+            echo "⚠️  Custom domain not yet configured or DNS not propagated"
+            echo "This is expected on first deployment"
+            echo "Configure custom domain in Cloudflare dashboard: Workers & Pages → hashbin-worker-prod → Settings → Domains"
+            exit 0
+          fi
+
+          if echo "$BODY" | grep -q '"status":"healthy"'; then
+            echo "✅ Custom domain verified"
+          else
+            echo "⚠️  Custom domain responding but health check failed"
+          fi
+
+      - name: Deployment verification summary
+        run: |
+          echo "=========================================="
+          echo "✅ Production Deployment Successful"
+          echo "=========================================="
+          echo "Workers URL: https://hashbin-worker-prod.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev"
+          echo "Custom domain: https://hashbin.org"
+          echo "Health endpoint: VERIFIED"
+          echo "Environment: production"
+          echo ""
+          echo "Next steps:"
+          echo "1. Configure custom domain in Cloudflare dashboard if not already done"
+          echo "2. Verify DNS is pointing to Cloudflare"
+          echo "3. Test: curl https://hashbin.org/health"
+          echo "=========================================="
