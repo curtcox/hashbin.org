@@ -114,7 +114,10 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Cloudflare account and domain configuration
 - R2 bucket creation and configuration
 - Durable Objects setup and configuration
-- Backup and disaster recovery strategy (see Open Question #1)
+- **Backup and disaster recovery** (see Decision #15):
+  - Event sourcing: Log all state changes to R2
+  - Daily snapshots: Full Durable Objects state to R2
+  - Multi-region replication evaluation
 - GitHub Actions CI/CD pipeline
 - Development, staging, and production environments
 - Basic monitoring and logging
@@ -125,7 +128,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 
 **Technologies:**
 - Cloudflare Workers (API layer)
-- Cloudflare R2 (content storage)
+- Cloudflare R2 (content storage and backups)
 - Cloudflare Durable Objects (metadata storage)
 - GitHub Actions (deployment)
 - Cloudflare Pages (frontend hosting)
@@ -154,42 +157,58 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 **Goal:** Implement secure user authentication with multiple providers
 
 **Deliverables:**
-- OAuth integration via unified provider (see Open Question #3)
+- **Clerk integration** for unified OAuth (see Decision #17)
   - Google
   - Apple
   - Microsoft
   - GitHub
-- Session management
-- JWT token generation and validation
+- Clerk JavaScript SDK in frontend
+- Clerk API integration in Cloudflare Workers
+- Session management (handled by Clerk)
+- JWT token generation and validation (handled by Clerk)
 - API key generation for programmatic access
-- User profile storage in Durable Objects
+- User profile storage in Durable Objects (sync from Clerk)
 - R2-based rate limiting (no custom implementation needed)
 
 **Sub-Plans:**
 - `todo/user_authorization.md` - Multi-provider authentication system
 
+**Technologies:**
+- Clerk (authentication provider)
+- Cloudflare Workers (API integration)
+- Durable Objects (user profile storage)
+
 **Note:** No email/password auth - OAuth only for security and simplicity
 
 ### Phase 4: Payment System
-**Goal:** Integrate multiple payment providers for uploads and retention
+**Goal:** Integrate payment processing for uploads and retention
 
 **Deliverables:**
-- Payment provider integration (see Open Question #4 - recommend starting with Stripe)
+- **Stripe integration** (see Decisions #16, #18)
   - Credit/debit cards
   - Apple Pay, Google Pay
   - ACH transfers
-  - Cryptocurrency support (if available)
-- Pricing calculator: `Size (GB) × Duration (months) × Constant`
-  - Constant value to be determined (see Open Question #2)
-- Payment webhook handlers for async confirmation
+  - Cryptocurrency support (via Stripe Crypto partners)
+- **Pricing implementation:** `Cost = Size (GB) × Duration (months) × $0.03`
+  - $1.00 minimum payment
+  - Display payment processing fees separately when possible
+  - Show breakdown: Storage cost + Processing fee = Total
+- Stripe Checkout for payment flow
+- Stripe Webhooks for payment confirmation
 - Receipt generation and email delivery
-- Payment history storage and accounting
+- Payment history storage and accounting in Durable Objects
 - Financial analytics (revenue, costs, profit/loss)
 - **No refunds** - All payments final (see Decision #13)
 
 **Sub-Plans:**
-- `todo/payments.md` - Multi-provider payment integration
+- `todo/payments.md` - Stripe payment integration
 - `todo/pricing_model.md` - Storage pricing and calculations
+
+**Technologies:**
+- Stripe (payment processor)
+- Stripe Checkout (payment UI)
+- Cloudflare Workers (webhook handlers)
+- Durable Objects (payment records)
 
 ### Phase 5: Retention & Expiration Management
 **Goal:** Automate content lifecycle management
@@ -217,16 +236,29 @@ HashBin.org is a content distribution platform using 256t hash-based content add
   - Automated checks (hash matching, file type validation)
   - Manual review for copyright claims
 - Evidence upload and storage (R2)
+- **Evidence-based removal** (see Decision #20):
+  - Contesters provide compelling evidence
+  - Evidence visible to moderators and payers
+  - Removal only when evidence is sufficiently compelling
 - Status tracking and notifications
 - Content takedown process (R2 deletion + metadata update)
 - Appeals process
 - Public contest record publication
-- **Contester contact mechanism** for payers (see Open Question #5)
+- **Built-in messaging system** (see Decision #19):
+  - Message threads tied to contest records
+  - Payers can contact contesters
+  - Messages stored in Durable Objects
+  - Messaging UI in user dashboard
 - DMCA compliance (24-48 hour response time)
 
 **Sub-Plans:**
 - `todo/contestation_system.md` - Dispute resolution workflow
 - `todo/content_moderation.md` - Review and moderation tools
+
+**Technologies:**
+- Cloudflare Workers (contest API)
+- Durable Objects (contest records, messages)
+- R2 (evidence storage)
 
 ### Phase 7: Public Records & Transparency
 **Goal:** Provide public visibility into system operations
@@ -623,173 +655,176 @@ The following key decisions have been made to guide implementation:
 
 ---
 
+### 15. Backup and Disaster Recovery: Combination Approach
+**Decision:** Use a combination of backup strategies for Durable Objects.
+
+**Rationale:**
+- Multiple layers of protection for critical metadata
+- Balance between cost, complexity, and reliability
+- R2 provides 11-nines durability for content
+- Durable Objects need explicit backup for metadata
+
+**Implementation approach:**
+1. **Event sourcing:** Log all state changes to R2 for point-in-time recovery
+2. **Periodic snapshots:** Daily full snapshots of all Durable Objects state to R2
+3. **Multi-region consideration:** Evaluate Durable Objects jurisdictional features for replication
+
+**Recovery capabilities:**
+- RPO (Recovery Point Objective): 1 hour or less (via event log)
+- RTO (Recovery Time Objective): 1-4 hours (replay events or restore snapshot)
+- Cost: Minimal (R2 storage for logs and snapshots)
+
+---
+
+### 16. Pricing Structure: $0.03/GB/month with $1.00 Minimum
+**Decision:** Pricing constant of $0.03/GB/month (100% markup over R2 costs) with $1.00 minimum payment.
+
+**Formula:** `Cost = Size (GB) × Duration (months) × $0.03`
+
+**Rationale:**
+- 100% markup is standard for cloud services
+- Covers R2 costs ($0.015/GB/month) plus operational overhead
+- Accounts for Durable Objects, Workers, payment fees, moderation costs
+- $1.00 minimum covers payment processing fees (typically 2.9% + $0.30)
+
+**Example pricing:**
+- 1GB for 1 year: $0.36 → **$1.00 minimum**
+- 10GB for 1 year: $3.60
+- 100GB for 1 month: $3.00
+- 1GB for 1 month: $0.03 → **$1.00 minimum**
+
+**Payment transparency:**
+- Display payment processing fees separately when possible
+- Show: Storage cost + Processing fee = Total
+- Example: $3.00 storage + $0.30 fee = $3.30 total (when itemization supported by provider)
+
+**Edge cases:**
+- Retention extensions: Add to existing expiration, no minimum on extensions
+- Very small files: Still subject to $1.00 minimum for initial upload
+
+---
+
+### 17. Authentication Provider: Clerk
+**Decision:** Use Clerk for unified OAuth authentication.
+
+**Rationale:**
+- Excellent Cloudflare Workers integration
+- Modern developer experience (very low complexity)
+- Supports all required providers (Google, Apple, Microsoft, GitHub)
+- Competitive pricing (Free tier → $25+/month)
+- Good documentation and community support
+- Built-in session management and JWT handling
+
+**Implementation:**
+- Clerk JavaScript SDK in frontend
+- Clerk API integration in Cloudflare Workers
+- OAuth providers: Google, Apple, Microsoft, GitHub
+- API key generation for programmatic access
+- User profile storage in Durable Objects
+
+**Free tier limits:**
+- 10,000 monthly active users
+- All authentication features
+- Sufficient for launch and early growth
+
+---
+
+### 18. Payment Provider: Stripe Only
+**Decision:** Start with Stripe as the sole payment provider.
+
+**Rationale:**
+- Single integration reduces complexity
+- Supports all required payment methods:
+  - Credit/debit cards
+  - Apple Pay, Google Pay
+  - ACH transfers
+  - Cryptocurrency (via Stripe Crypto partner integrations)
+- Fast to implement for MVP
+- Proven reliability and fraud detection
+- Excellent API and documentation
+- Can add other providers later based on user demand
+
+**Implementation:**
+- Stripe Checkout for payment flow
+- Stripe Webhooks for payment confirmation
+- Stripe Dashboard for financial reporting
+- Display payment processing fees transparently in UI
+
+**Future expansion:**
+- Phase 4.5 (optional): Add PayPal if user demand warrants
+- Phase 5+ (optional): Add crypto-native providers if needed
+
+---
+
+### 19. Contester Contact: Built-in Messaging System
+**Decision:** Implement a built-in platform messaging system for payers to contact contesters.
+
+**Rationale:**
+- Protects privacy of both parties
+- Prevents harassment via direct email exposure
+- Maintains records of communications for dispute resolution
+- Integrated with existing authentication and user system
+- Better user experience than external email
+
+**Implementation:**
+- Message threads tied to specific contest records
+- Only payers (users who paid for content) can initiate contact
+- Contesters receive notifications of messages
+- Messages stored in Durable Objects
+- Basic messaging UI in user dashboard
+- Optional: Email notifications of new messages (without revealing addresses)
+
+**Access control:**
+- Payers can message contesters about their paid content
+- Contesters can respond to payers
+- Platform admins can view messages for moderation
+- Messages are NOT public (part of contest resolution process)
+
+---
+
+### 20. Contest Resolution: Evidence-Based Removal
+**Decision:** Content removal requires compelling evidence supplied by contester, which is visible to affected parties.
+
+**Rationale:**
+- Balances copyright protection with false claim prevention
+- Transparency in dispute resolution
+- Allows payers to understand and potentially challenge removals
+- Defers detailed resolution procedures until operational experience is gained
+
+**Implementation:**
+- Contesters must provide:
+  - Claim type (copyright, illegal content, abuse)
+  - Evidence (documents, links, explanations)
+  - Contact information (for messaging system)
+- Evidence is visible to:
+  - Platform moderators (for review)
+  - Payers who paid for the contested content
+  - NOT visible publicly (privacy protection)
+- Content removed only when evidence is "sufficiently compelling"
+- Definition of "sufficiently compelling" will be refined through:
+  - Operational experience
+  - Legal guidance
+  - Community feedback
+  - Documented in moderation guidelines (created during Phase 6)
+
+**Detailed procedures to be determined:**
+- Specific evidence requirements per claim type
+- Review timelines and escalation paths
+- Appeals process for wrongful removals
+- Counter-claim procedures
+- Will be documented in `todo/content_moderation.md`
+
+---
+
 ## Critical Open Questions
 
-### 1. Backup and Disaster Recovery
-**Question:** How should we handle backups and disaster recovery for Durable Objects?
+**All architectural decisions have been made.** Implementation can proceed with the following understanding:
 
-**Context:**
-- R2 has built-in 99.999999999% (11 nines) durability
-- Durable Objects provide strong consistency but need backup strategy
-- Metadata is critical for operations
+- Contest resolution details (Decision #20) will be refined during Phase 6 based on operational needs
+- Detailed moderation guidelines will be developed in `todo/content_moderation.md`
+- Other implementation details will be worked out in phase-specific sub-plans
 
-**Options:**
-- **Export to R2:** Periodically export Durable Objects state to R2
-- **Multi-region replication:** Use Durable Objects' jurisdictional restrictions with replication
-- **Event sourcing:** Log all state changes, replay from event log
-- **Snapshot-based:** Periodic full snapshots of all DO state
-
-**Considerations:**
-- Recovery Point Objective (RPO): How much data can we afford to lose?
-- Recovery Time Objective (RTO): How fast must we recover?
-- Cost of backup storage and operations
-- Complexity of backup/restore procedures
-
-**Decision needed by:** Phase 1
-
----
-
-### 2. Pricing Constant Value
-**Question:** What should the constant multiplier be in the pricing formula?
-
-**Formula:** `Cost = Size (GB) × Duration (months) × Constant`
-
-**R2 costs:**
-- Storage: $0.015/GB/month
-- Class A operations (write): $4.50 per million
-- Class B operations (read): $0.36 per million
-
-**Additional costs to cover:**
-- Durable Objects operations
-- Workers compute time
-- Payment processing fees (typically 2.9% + $0.30)
-- Operational overhead (support, moderation, infrastructure)
-- Profit margin
-
-**Options to consider:**
-- **$0.02/GB/month:** 33% markup (minimal margin)
-- **$0.03/GB/month:** 100% markup (common for cloud services)
-- **$0.05/GB/month:** 233% markup (higher margin, covers risks)
-
-**Example pricing at $0.03/GB/month:**
-- 1GB for 1 year: $0.36
-- 100GB for 1 month: $3.00
-- 10GB for 6 months: $1.80
-
-**Minimum payment:** Should there be a minimum transaction amount (e.g., $1.00)?
-
-**Decision needed by:** Phase 4
-
----
-
-### 3. Authentication Provider Selection
-**Question:** Which unified authentication provider should we integrate?
-
-**Options:**
-- **Auth0:** Mature, widely used, supports all required providers
-- **Clerk:** Modern, developer-friendly, good DX
-- **WorkOS:** Enterprise-focused, SAML support
-- **Supabase Auth:** Open source, includes database
-- **Custom OAuth integration:** Direct integration with each provider
-
-**Comparison:**
-
-| Provider   | Pricing (monthly) | Supported Auth | Complexity | Cloudflare Integration |
-|------------|-------------------|----------------|------------|------------------------|
-| Auth0      | Free tier → $35+  | Google, Apple, Microsoft, GitHub, more | Low | Good |
-| Clerk      | Free tier → $25+  | Google, Apple, Microsoft, GitHub, more | Very Low | Excellent |
-| WorkOS     | Free tier → $125+ | Google, Apple, Microsoft, GitHub, SAML | Low | Good |
-| Supabase   | Free tier → $25+  | Google, Apple, Microsoft, GitHub | Medium | Fair |
-| Custom     | $0                | As implemented | High | Native |
-
-**Considerations:**
-- Development speed (integrated vs. custom)
-- Long-term costs
-- Vendor lock-in
-- Cloudflare Workers compatibility
-- Open source preference
-
-**Decision needed by:** Phase 3
-
----
-
-### 4. Payment Provider Priority
-**Question:** Should we start with Stripe only, or integrate multiple payment providers from the start?
-
-**Option A: Stripe only**
-- Supports credit cards, Apple Pay, Google Pay, ACH, crypto (via partner)
-- Single integration
-- Fast to implement
-- Proven reliability
-
-**Option B: Stripe + PayPal**
-- Broader user coverage
-- Redundancy if one provider has issues
-- More complex integration
-- Dual webhook handling
-
-**Option C: Stripe + Crypto-native**
-- Traditional payments + crypto
-- Appeals to web3 users
-- Additional compliance complexity
-- Examples: Coinbase Commerce, BTCPay Server
-
-**Recommendation:** Start with Stripe (Option A), add others in Phase 4.5 based on user demand.
-
-**Decision needed by:** Phase 4
-
----
-
-### 5. Contester Contact Mechanism
-**Question:** How should payers contact contesters about disputed content?
-
-**Context:** Payers should be able to contact contesters to discuss/resolve disputes.
-
-**Options:**
-- **Email address:** Store and reveal contester email to payers
-- **Messaging system:** Built-in platform messaging
-- **Proxy email:** System forwards messages without revealing addresses
-- **Public forum:** Contest-specific discussion threads
-- **DMCA agent:** All communication goes through designated agent
-
-**Considerations:**
-- Privacy of contesters
-- Harassment prevention
-- DMCA compliance (requires contact info)
-- Implementation complexity
-- User experience
-
-**Decision needed by:** Phase 6
-
----
-
-### 6. User Identification Model
-**Question:** How are users identified internally vs. externally?
-
-**Clarification needed on "anonymity: none":**
-
-**Internal (database):**
-- UUID user_id (primary key)
-- Auth provider + external ID (for login)
-- Email (from OAuth, optional)
-
-**External (API responses, public records):**
-- Show user_id (pseudonymous)?
-- Show username (if we collect it)?
-- Show nothing (fully anonymous)?
-
-**For contestation:**
-- What information do payers see about contesters?
-- What information do contesters need to provide?
-
-**Example scenarios:**
-1. **Pseudonymous:** Public records show `user_a3f8c2` uploaded content
-2. **Anonymous:** Public records show no user identification
-3. **Semi-public:** Public records show "GitHub user" without specifics
-
-**Which model should we implement?**
-
-**Decision needed by:** Phase 3 & 7
+No blocking questions remain for beginning implementation.
 
 ---
 
@@ -843,23 +878,46 @@ The following key decisions have been made to guide implementation:
 
 ## Next Steps
 
-1. **Resolve remaining open questions** - 6 questions need answers (see Critical Open Questions)
-2. **Create detailed sub-plans** - Start with `todo/site_creation.md` for infrastructure
-3. **Set up project tracking** - GitHub Projects or similar for task management
-4. **Begin Phase 1 implementation** - Cloudflare account, R2, Durable Objects setup
-5. **Establish development environment** - Local testing, staging environment
+**All architectural decisions have been finalized.** The project is ready to begin implementation.
 
-### Immediate Priorities
+### Immediate Actions
 
-**Before starting implementation:**
-1. Answer backup/disaster recovery question (#1)
-2. Decide on pricing constant (#2)
-3. Select authentication provider (#3)
+1. **Create detailed sub-plans** - Start with Phase 1 infrastructure
+2. **Set up project tracking** - GitHub Projects or similar for task management
+3. **Begin Phase 1 implementation** - Cloudflare account, R2, Durable Objects setup
+4. **Establish development environment** - Local testing with Wrangler, staging environment
 
-**First sub-plans to create:**
-1. `todo/site_creation.md` - Infrastructure and deployment (Phase 1)
-2. `todo/256t_integration.md` - Hash generation library (Phase 2 prerequisite)
-3. `todo/user_authorization.md` - Auth system (Phase 3)
+### First Sub-Plans to Create (in order)
+
+1. **`todo/site_creation.md`** - Infrastructure and deployment (Phase 1)
+   - Cloudflare account setup
+   - R2 bucket configuration
+   - Durable Objects setup
+   - Backup strategy implementation
+   - GitHub Actions CI/CD
+
+2. **`todo/256t_integration.md`** - Hash generation library (Phase 2 prerequisite)
+   - JavaScript implementation of 256t spec
+   - Hash generation and validation
+   - Testing with reference implementations
+
+3. **`todo/user_authorization.md`** - Authentication system (Phase 3)
+   - Clerk integration
+   - OAuth flow setup
+   - API key generation
+
+4. **`todo/payments.md`** - Payment processing (Phase 4)
+   - Stripe integration
+   - Pricing calculator
+   - Webhook handlers
+
+### Development Environment Setup
+
+Before creating sub-plans, set up local development tools:
+- Install [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) for local Workers development
+- Set up Cloudflare account
+- Configure GitHub repository for Actions
+- Install Node.js and npm for JavaScript development
 
 ## Sub-Plans to Create
 
@@ -885,6 +943,6 @@ The following detailed implementation plans should be created as we answer the o
 
 ---
 
-**Document Version:** 2.0
+**Document Version:** 3.0
 **Last Updated:** 2026-01-12
-**Status:** In Progress - 14 of 20 architectural decisions made, 6 open questions remaining
+**Status:** Complete - All 20 architectural decisions made, ready for implementation
