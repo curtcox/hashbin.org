@@ -251,7 +251,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
   - Messaging UI in user dashboard
   - **Email notifications** for new messages
   - **Message limits** (character count, message count)
-  - **Admin moderation service** (on paid request)
+  - **Admin moderation service** where users pay for admin review/moderation of message threads
 - DMCA compliance (24-48 hour response time)
 
 **Sub-Plans:**
@@ -777,7 +777,9 @@ The following key decisions have been made to guide implementation:
 - Basic messaging UI in user dashboard
 - **Email notifications:** Users receive email when new messages arrive (without revealing addresses)
 - **Message limits:** Character and message count limits to prevent abuse (specific limits TBD in Phase 6)
-- **Admin moderation:** Available on paid request (pricing and scope TBD in Phase 6)
+- **Admin moderation service:** Users can pay for admins to moderate/review message threads
+  - Helps resolve disputes faster with official intervention
+  - Pricing and specific service scope TBD in Phase 6
 
 **Access control:**
 - Payers can message contesters about their paid content
