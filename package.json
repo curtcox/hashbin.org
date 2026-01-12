@@ -1,0 +1,22 @@
+{
+  "name": "hashbin-org",
+  "version": "0.1.0",
+  "description": "Content distribution platform using 256t hash-based addressing",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy:dev": "wrangler deploy --env development",
+    "deploy:prod": "wrangler deploy --env production",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "256t",
+    "cloudflare-workers",
+    "content-storage"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
