@@ -91,19 +91,19 @@ if [ "$HTTP_CODE" != "200" ]; then
 fi
 
 # Check for healthy or degraded (both are acceptable for deployment)
-if echo "$BODY" | grep -q '"status":"unhealthy"'; then
+if echo "$BODY" | grep -q '"status"[[:space:]]*:[[:space:]]*"unhealthy"'; then
   echo "❌ FAILED: Health status is 'unhealthy'"
   echo "Response: $BODY"
   exit 1
 fi
 
-if echo "$BODY" | grep -q '"status":"degraded"'; then
+if echo "$BODY" | grep -q '"status"[[:space:]]*:[[:space:]]*"degraded"'; then
   echo "⚠️  WARNING: Health status is 'degraded' (some services may have issues)"
 fi
 
 # Verify environment matches (if not custom URL)
 if [ "$ENV_NAME" != "custom" ]; then
-  if ! echo "$BODY" | grep -q "\"environment\":\"$ENV_NAME\""; then
+  if ! echo "$BODY" | grep -q "\"environment\"[[:space:]]*:[[:space:]]*\"$ENV_NAME\""; then
     echo "⚠️  WARNING: Environment mismatch (expected $ENV_NAME)"
   fi
 fi
