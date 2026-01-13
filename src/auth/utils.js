@@ -22,14 +22,32 @@ export function generateApiKey(environment) {
 
 /**
  * Generate cryptographically secure random string
+ * Uses rejection sampling to avoid modulo bias
  */
 function generateRandomString(length) {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const randomBytes = crypto.getRandomValues(new Uint8Array(length));
+  const charsLength = chars.length;
+  
+  // Use rejection sampling to avoid modulo bias
+  // Generate enough random bytes to avoid bias
+  const maxValidValue = 256 - (256 % charsLength);
+  
   let result = '';
-  for (let i = 0; i < length; i++) {
-    result += chars[randomBytes[i] % chars.length];
+  let bytesNeeded = length;
+  
+  while (bytesNeeded > 0) {
+    const randomBytes = crypto.getRandomValues(new Uint8Array(bytesNeeded * 2));
+    
+    for (let i = 0; i < randomBytes.length && result.length < length; i++) {
+      // Reject bytes that would cause bias
+      if (randomBytes[i] < maxValidValue) {
+        result += chars[randomBytes[i] % charsLength];
+      }
+    }
+    
+    bytesNeeded = length - result.length;
   }
+  
   return result;
 }
 
