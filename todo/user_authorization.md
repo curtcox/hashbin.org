@@ -48,9 +48,60 @@ This document outlines the plan for implementing user authorization in HashBin.o
 | Level | Description | Can Access |
 |-------|-------------|------------|
 | **Anonymous** | No authentication | `GET /`, `GET /health`, `GET /api/content/{hash}` |
-| **Authenticated** | Valid Clerk session or API key | Upload content, view own uploads, manage API keys |
+| **Authenticated** | Valid Clerk session or API key | Upload content, view own uploads, manage API keys, delete own account |
 | **Payer** | Authenticated + has paid for specific content | View contester contact info for their content |
-| **Admin** | Platform administrator | Moderate contests, view logs, manage users |
+
+**Note**: There is no admin role. The system operates without administrative users. Contest moderation and other traditionally admin functions are handled through automated processes or external mechanisms.
+
+---
+
+## Decisions
+
+The following decisions have been made for this implementation:
+
+### Authentication
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Multiple OAuth account linking | **Yes, supported** | Users can link Google, Apple, Microsoft, GitHub to single account via Clerk |
+| OAuth provider account deleted | **Keep HashBin account** | User retains access via other linked providers or can re-link |
+| Anonymous uploads | **Not supported** | Account required for all uploads (simplifies billing and accountability) |
+
+### API Keys
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Maximum keys per user | **25** | Sufficient for multiple integrations without enabling abuse |
+| Default/maximum expiration | **5 years** | Long-lived for convenience; users can set shorter if desired |
+| API key scopes | **No scopes, full access** | Simplicity; all keys have same permissions as user |
+| Key name uniqueness | **Allow duplicates** | Users may want multiple keys with same purpose |
+
+### Rate Limiting
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Rate limits | **Anonymous: 100/min, Authenticated: 1000/min** | Prevents abuse while allowing legitimate use |
+| Limit scope | **Both per-user AND per-key** | User has 1000/min total; each key has individual 500/min limit |
+
+### Operations
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Admin users | **None** | System operates without admins; automated processes handle moderation |
+| 2FA requirement | **User self-deletion only** | Only action requiring extra verification is account deletion |
+
+### Error Handling
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Auth error details | **Specific reason codes** | Helps debugging while using codes (not messages) to avoid info leaks |
+
+### Data Retention
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Revoked key retention | **5 years** | Audit trail for security investigations |
+| Post-deletion retention | **Payment records only** | Legal/financial compliance; all other data deleted |
 
 ---
 
@@ -63,13 +114,15 @@ This document outlines the plan for implementing user authorization in HashBin.o
 - [ ] Implement session validation middleware
 - [ ] Create `/api/auth/session` endpoint for session info
 - [ ] Handle Clerk webhooks for user events
+- [ ] Configure multi-provider account linking in Clerk
 
 ### Phase 3.2: User Profile Storage
 
 - [ ] Implement UserProfile Durable Object methods
-- [ ] Store user metadata from Clerk (id, provider, created_at)
+- [ ] Store user metadata from Clerk (id, linked providers, created_at)
 - [ ] Track upload history per user
 - [ ] Track payment history per user
+- [ ] Support multiple linked OAuth providers per user
 
 ### Phase 3.3: API Key System
 
@@ -77,8 +130,9 @@ This document outlines the plan for implementing user authorization in HashBin.o
 - [ ] Store API keys in UserProfile DO (hashed)
 - [ ] Implement API key validation
 - [ ] Create API key management endpoints
-- [ ] Support multiple API keys per user
+- [ ] Support up to 25 API keys per user
 - [ ] Implement API key revocation
+- [ ] Set 5-year maximum expiration
 
 ### Phase 3.4: Authorization Middleware
 
@@ -86,6 +140,14 @@ This document outlines the plan for implementing user authorization in HashBin.o
 - [ ] Support both Clerk sessions and API keys
 - [ ] Inject user context into request
 - [ ] Protect endpoints based on authorization level
+- [ ] Implement rate limiting (per-user and per-key)
+
+### Phase 3.5: Account Management
+
+- [ ] Implement self-service account deletion
+- [ ] Require 2FA confirmation for account deletion
+- [ ] Retain payment records after deletion
+- [ ] Delete all other user data on account deletion
 
 ---
 
@@ -102,11 +164,21 @@ POST /api/auth/callback
 GET /api/auth/session
   - Returns current session info
   - Requires: Clerk session
-  - Response: { user_id, provider, created_at }
+  - Response: { user_id, providers: [], created_at }
 
 POST /api/auth/logout
   - Invalidates Clerk session
   - Requires: Clerk session
+
+POST /api/auth/link
+  - Links additional OAuth provider to account
+  - Requires: Clerk session
+  - Handled by Clerk SDK
+
+DELETE /api/auth/account
+  - Deletes user account (requires 2FA)
+  - Requires: Clerk session + 2FA confirmation
+  - Retains: Payment records only
 ```
 
 ### API Key Management
@@ -116,12 +188,13 @@ POST /api/auth/apikeys
   - Creates a new API key
   - Requires: Clerk session
   - Request: { name: string, expires_at?: timestamp }
+  - Constraints: max 25 keys, max 5 year expiration
   - Response: { key_id, api_key (shown once), name, created_at, expires_at }
 
 GET /api/auth/apikeys
   - Lists user's API keys (without revealing key values)
   - Requires: Clerk session
-  - Response: [{ key_id, name, created_at, expires_at, last_used_at }]
+  - Response: [{ key_id, name, created_at, expires_at, last_used_at, revoked }]
 
 DELETE /api/auth/apikeys/{key_id}
   - Revokes an API key
@@ -150,17 +223,24 @@ GET /api/content/{hash}
 ```javascript
 {
   user_id: string,           // Clerk user ID
-  provider: string,          // OAuth provider (google, apple, etc.)
+  providers: [               // Linked OAuth providers
+    {
+      provider: string,      // google, apple, microsoft, github
+      provider_user_id: string,
+      linked_at: timestamp
+    }
+  ],
   created_at: timestamp,
   updated_at: timestamp,
+  deleted_at: timestamp | null,  // Soft delete for retention
 
   api_keys: [
     {
       key_id: string,        // UUID for identification
       key_hash: string,      // SHA-256 hash of the API key
-      name: string,          // User-provided description
+      name: string,          // User-provided description (duplicates allowed)
       created_at: timestamp,
-      expires_at: timestamp | null,
+      expires_at: timestamp, // Max 5 years from creation
       last_used_at: timestamp | null,
       revoked_at: timestamp | null
     }
@@ -188,6 +268,19 @@ hb_test_<32-character-random-string>
 - 32 characters of cryptographically random alphanumeric
 - Total length: 40 characters
 
+### Auth Error Codes
+
+| Code | Description |
+|------|-------------|
+| `AUTH_MISSING` | No authentication provided |
+| `AUTH_INVALID_FORMAT` | Malformed token or key |
+| `AUTH_EXPIRED` | Token or key has expired |
+| `AUTH_REVOKED` | API key has been revoked |
+| `AUTH_USER_DELETED` | User account has been deleted |
+| `AUTH_ENV_MISMATCH` | Test key in prod or vice versa |
+| `AUTH_RATE_LIMITED` | Rate limit exceeded |
+| `AUTH_KEY_LIMIT` | Maximum API keys reached |
+
 ---
 
 ## Security Considerations
@@ -195,9 +288,11 @@ hb_test_<32-character-random-string>
 1. **API Key Storage**: Keys are hashed using SHA-256 before storage
 2. **API Key Transmission**: Keys shown only once at creation time
 3. **Session Security**: Clerk handles session tokens and CSRF protection
-4. **Rate Limiting**: Applied per-user to prevent abuse
+4. **Rate Limiting**: Per-user (1000/min) and per-key (500/min) limits
 5. **Key Rotation**: Users can create new keys and revoke old ones
-6. **Expiration**: Optional expiration dates for API keys
+6. **Expiration**: Maximum 5-year expiration on all API keys
+7. **Account Deletion**: Requires 2FA confirmation
+8. **Error Codes**: Specific codes without leaking sensitive details
 
 ---
 
@@ -210,12 +305,24 @@ hb_test_<32-character-random-string>
 | Test ID | Test Case | Input | Expected Output |
 |---------|-----------|-------|-----------------|
 | CLERK-01 | Valid Clerk JWT is accepted | Valid JWT in Authorization header | Request proceeds with user context |
-| CLERK-02 | Expired Clerk JWT is rejected | Expired JWT | 401 Unauthorized |
-| CLERK-03 | Malformed Clerk JWT is rejected | Invalid JWT format | 401 Unauthorized |
-| CLERK-04 | Missing Authorization header for protected route | No header | 401 Unauthorized |
+| CLERK-02 | Expired Clerk JWT is rejected | Expired JWT | 401 with `AUTH_EXPIRED` |
+| CLERK-03 | Malformed Clerk JWT is rejected | Invalid JWT format | 401 with `AUTH_INVALID_FORMAT` |
+| CLERK-04 | Missing Authorization header for protected route | No header | 401 with `AUTH_MISSING` |
 | CLERK-05 | Clerk webhook creates new user profile | `user.created` webhook | UserProfile DO created |
 | CLERK-06 | Clerk webhook updates existing user | `user.updated` webhook | UserProfile DO updated |
 | CLERK-07 | Clerk webhook handles user deletion | `user.deleted` webhook | UserProfile DO marked deleted |
+
+#### Account Linking Tests
+
+| Test ID | Test Case | Input | Expected Output |
+|---------|-----------|-------|-----------------|
+| LINK-01 | Link second OAuth provider | User with Google adds GitHub | Both providers in profile |
+| LINK-02 | Link all four OAuth providers | Add Google, Apple, Microsoft, GitHub | All four providers linked |
+| LINK-03 | Unlink provider with multiple linked | Remove one of several | Provider removed, others remain |
+| LINK-04 | Cannot unlink last provider | Try to unlink only provider | 400 Bad Request (must have one) |
+| LINK-05 | Login with any linked provider | User with Google+GitHub logs in via GitHub | Same user session |
+| LINK-06 | Duplicate provider link rejected | Link Google twice | 400 Bad Request |
+| LINK-07 | Provider already linked to other user | Link GitHub already on another account | 400 Bad Request with clear error |
 
 #### API Key Generation Tests
 
@@ -226,26 +333,29 @@ hb_test_<32-character-random-string>
 | KEYGEN-03 | Generated key is unique | Generate 1000 keys | All keys are unique |
 | KEYGEN-04 | Key generation stores hash, not plaintext | Generate key | Only hash stored in DO |
 | KEYGEN-05 | Generate key with expiration | `expires_at` in request | Key has expiration set |
-| KEYGEN-06 | Generate key without expiration | No `expires_at` | Key has null expiration |
-| KEYGEN-07 | Cannot generate key without authentication | No session | 401 Unauthorized |
+| KEYGEN-06 | Generate key without expiration | No `expires_at` | Key defaults to 5 year expiration |
+| KEYGEN-07 | Cannot generate key without authentication | No session | 401 with `AUTH_MISSING` |
 | KEYGEN-08 | Key name is required | Empty name | 400 Bad Request |
 | KEYGEN-09 | Key name length is validated | Name > 255 chars | 400 Bad Request |
-| KEYGEN-10 | Maximum keys per user enforced | User at key limit | 400 Bad Request with limit message |
+| KEYGEN-10 | Maximum 25 keys per user enforced | User at 25 keys | 400 with `AUTH_KEY_LIMIT` |
+| KEYGEN-11 | Expiration beyond 5 years rejected | `expires_at` > 5 years | 400 Bad Request |
+| KEYGEN-12 | Duplicate key names allowed | Create two keys with same name | Both keys created |
+| KEYGEN-13 | Key 25 succeeds, key 26 fails | Create 26 keys | Keys 1-25 succeed, 26 fails |
 
 #### API Key Validation Tests
 
 | Test ID | Test Case | Input | Expected Output |
 |---------|-----------|-------|-----------------|
 | KEYVAL-01 | Valid API key is accepted | Valid key in header | Request proceeds with user context |
-| KEYVAL-02 | Non-existent API key is rejected | Unknown key | 401 Unauthorized |
-| KEYVAL-03 | Revoked API key is rejected | Revoked key | 401 Unauthorized |
-| KEYVAL-04 | Expired API key is rejected | Expired key | 401 Unauthorized |
-| KEYVAL-05 | API key for deleted user is rejected | Key for deleted user | 401 Unauthorized |
-| KEYVAL-06 | Malformed API key is rejected | Invalid format | 401 Unauthorized |
-| KEYVAL-07 | Empty API key is rejected | Empty string | 401 Unauthorized |
-| KEYVAL-08 | API key with wrong prefix is rejected | `wrong_prefix_xxx` | 401 Unauthorized |
-| KEYVAL-09 | Test key rejected in production | `hb_test_xxx` in prod | 401 Unauthorized |
-| KEYVAL-10 | Live key rejected in test environment | `hb_live_xxx` in test | 401 Unauthorized |
+| KEYVAL-02 | Non-existent API key is rejected | Unknown key | 401 with `AUTH_INVALID_FORMAT` |
+| KEYVAL-03 | Revoked API key is rejected | Revoked key | 401 with `AUTH_REVOKED` |
+| KEYVAL-04 | Expired API key is rejected | Expired key | 401 with `AUTH_EXPIRED` |
+| KEYVAL-05 | API key for deleted user is rejected | Key for deleted user | 401 with `AUTH_USER_DELETED` |
+| KEYVAL-06 | Malformed API key is rejected | Invalid format | 401 with `AUTH_INVALID_FORMAT` |
+| KEYVAL-07 | Empty API key is rejected | Empty string | 401 with `AUTH_MISSING` |
+| KEYVAL-08 | API key with wrong prefix is rejected | `wrong_prefix_xxx` | 401 with `AUTH_INVALID_FORMAT` |
+| KEYVAL-09 | Test key rejected in production | `hb_test_xxx` in prod | 401 with `AUTH_ENV_MISMATCH` |
+| KEYVAL-10 | Live key rejected in test environment | `hb_live_xxx` in test | 401 with `AUTH_ENV_MISMATCH` |
 | KEYVAL-11 | `last_used_at` updated on successful validation | Valid key used | Timestamp updated |
 
 #### API Key Management Tests
@@ -259,6 +369,7 @@ hb_test_<32-character-random-string>
 | KEYMGMT-05 | Cannot revoke another user's key | Other user's key_id | 404 Not Found |
 | KEYMGMT-06 | Cannot revoke already-revoked key | Revoked key_id | 400 Bad Request |
 | KEYMGMT-07 | Revoke non-existent key | Invalid key_id | 404 Not Found |
+| KEYMGMT-08 | Revoked keys retained for 5 years | Check after revocation | Key record still present |
 
 #### UserProfile Durable Object Tests
 
@@ -267,10 +378,24 @@ hb_test_<32-character-random-string>
 | UPDO-01 | Create new user profile | User data from Clerk | Profile stored successfully |
 | UPDO-02 | Retrieve existing user profile | Valid user_id | Profile data returned |
 | UPDO-03 | Update user profile | Updated user data | Profile updated |
-| UPDO-04 | Delete user profile | Delete request | Profile marked as deleted |
+| UPDO-04 | Soft delete user profile | Delete request | Profile `deleted_at` set |
 | UPDO-05 | Add upload to user history | Upload record | Upload linked to user |
 | UPDO-06 | Retrieve user's upload history | Valid user_id | List of uploads |
 | UPDO-07 | User profile not found | Non-existent user_id | 404 Not Found |
+| UPDO-08 | Deleted profile returns deleted status | Query deleted user | 401 with `AUTH_USER_DELETED` |
+| UPDO-09 | Multiple providers stored | User with 3 providers | All providers retrievable |
+
+#### Account Deletion Tests
+
+| Test ID | Test Case | Input | Expected Output |
+|---------|-----------|-------|-----------------|
+| DEL-01 | Delete account without 2FA fails | Delete request, no 2FA | 403 Forbidden |
+| DEL-02 | Delete account with 2FA succeeds | Delete request + 2FA | Account marked deleted |
+| DEL-03 | Payment records retained after deletion | Query after deletion | Payment records exist |
+| DEL-04 | API keys invalidated after deletion | Use key after deletion | 401 with `AUTH_USER_DELETED` |
+| DEL-05 | Upload history deleted | Query after deletion | No upload records |
+| DEL-06 | User profile soft-deleted | Check DO after deletion | `deleted_at` timestamp set |
+| DEL-07 | Cannot re-register with deleted email | Same OAuth after delete | New account created (not restored) |
 
 #### Authorization Middleware Tests
 
@@ -278,14 +403,27 @@ hb_test_<32-character-random-string>
 |---------|-----------|-------|-----------------|
 | AUTHMW-01 | Anonymous access to public endpoint | No auth, GET / | 200 OK |
 | AUTHMW-02 | Anonymous access to public content | No auth, GET /api/content/{hash} | 200 OK (if exists) |
-| AUTHMW-03 | Anonymous access to protected endpoint | No auth, POST /api/content | 401 Unauthorized |
+| AUTHMW-03 | Anonymous access to protected endpoint | No auth, POST /api/content | 401 with `AUTH_MISSING` |
 | AUTHMW-04 | Clerk session provides user context | Valid Clerk session | Request has `user` object |
 | AUTHMW-05 | API key provides user context | Valid API key | Request has `user` object |
 | AUTHMW-06 | Both auth methods present uses Clerk | Both provided | Clerk session takes precedence |
 | AUTHMW-07 | Auth header with Bearer scheme | `Bearer <token>` | Parsed as Clerk JWT |
 | AUTHMW-08 | Auth header with ApiKey scheme | `ApiKey <key>` | Parsed as API key |
 | AUTHMW-09 | X-API-Key header accepted | `X-API-Key: <key>` | Parsed as API key |
-| AUTHMW-10 | Invalid auth scheme rejected | `Basic <creds>` | 401 Unauthorized |
+| AUTHMW-10 | Invalid auth scheme rejected | `Basic <creds>` | 401 with `AUTH_INVALID_FORMAT` |
+
+#### Rate Limiting Tests
+
+| Test ID | Test Case | Input | Expected Output |
+|---------|-----------|-------|-----------------|
+| RATE-01 | Anonymous under limit succeeds | 99 requests/min | All succeed |
+| RATE-02 | Anonymous at limit returns 429 | 101 requests/min | 101st returns 429 |
+| RATE-03 | Authenticated under limit succeeds | 999 requests/min | All succeed |
+| RATE-04 | Authenticated at limit returns 429 | 1001 requests/min | 1001st returns 429 |
+| RATE-05 | Per-key limit enforced | 501 requests/min on one key | 501st returns 429 |
+| RATE-06 | Multiple keys share user limit | 600 req on key A, 600 on key B | Some rejected (user limit 1000) |
+| RATE-07 | Rate limit resets after window | Wait 1 minute | Requests succeed again |
+| RATE-08 | Rate limit response includes retry-after | Exceed limit | Header `Retry-After` present |
 
 ### Integration Tests
 
@@ -294,13 +432,15 @@ hb_test_<32-character-random-string>
 | INT-01 | Full OAuth login flow | 1. Redirect to Clerk 2. Complete OAuth 3. Callback received | User session created |
 | INT-02 | Upload content with session | 1. Login 2. Upload content | Content stored, linked to user |
 | INT-03 | Upload content with API key | 1. Create API key 2. Use key to upload | Content stored, linked to user |
-| INT-04 | API key lifecycle | 1. Create key 2. Use key 3. Revoke key 4. Use revoked key | Steps 1-3 succeed, step 4 fails |
+| INT-04 | API key lifecycle | 1. Create key 2. Use key 3. Revoke key 4. Use revoked key | Steps 1-3 succeed, step 4 fails with `AUTH_REVOKED` |
 | INT-05 | Multiple API keys | 1. Create key A 2. Create key B 3. Use both | Both keys work independently |
-| INT-06 | User deletion cascade | 1. Delete user in Clerk 2. Webhook received 3. Try API key | Webhook processed, key rejected |
-| INT-07 | Session expiration | 1. Login 2. Wait for expiry 3. Make request | Request rejected after expiry |
+| INT-06 | User deletion cascade | 1. Delete account with 2FA 2. Try API key 3. Check payment records | Key rejected, payments retained |
+| INT-07 | Session expiration | 1. Login 2. Wait for expiry 3. Make request | Request rejected with `AUTH_EXPIRED` |
 | INT-08 | Concurrent key creation | Create 10 keys simultaneously | All keys created with unique IDs |
-| INT-09 | Rate limiting per user | Exceed rate limit | 429 Too Many Requests |
+| INT-09 | Rate limiting per user | Exceed user rate limit | 429 with `AUTH_RATE_LIMITED` |
 | INT-10 | Cross-user isolation | User A cannot access User B's keys | 404 for other user's resources |
+| INT-11 | Link multiple providers | 1. Login Google 2. Link GitHub 3. Logout 4. Login GitHub | Same user session |
+| INT-12 | Provider account deleted, other works | 1. Link Google+GitHub 2. Delete Google account 3. Login GitHub | Access maintained via GitHub |
 
 ### Edge Case Tests
 
@@ -312,17 +452,20 @@ hb_test_<32-character-random-string>
 | EDGE-04 | Unicode in API key name | Emoji and special chars in name | Properly stored and displayed |
 | EDGE-05 | Very long user ID from Clerk | 256+ character user ID | Handled correctly |
 | EDGE-06 | Simultaneous key revocation | Same key revoked twice concurrently | One succeeds, one fails gracefully |
-| EDGE-07 | Upload during user deletion | Upload while delete webhook processing | Upload fails or succeeds atomically |
+| EDGE-07 | Upload during user deletion | Upload while delete processing | Upload fails or succeeds atomically |
 | EDGE-08 | Clock skew with expiration | Server time differs from client | Server time is authoritative |
-| EDGE-09 | API key with null bytes | Key containing `\x00` | Rejected as malformed |
+| EDGE-09 | API key with null bytes | Key containing `\x00` | Rejected with `AUTH_INVALID_FORMAT` |
 | EDGE-10 | Header injection attempt | `Authorization: Bearer x\r\nX-Admin: true` | Parsed safely, no injection |
+| EDGE-11 | 25th key at exact limit | User has 24 keys, creates 25th | Succeeds, 26th fails |
+| EDGE-12 | Key expires during request | Key expires mid-request | Request completes or fails atomically |
+| EDGE-13 | Link provider during deletion | Link OAuth while delete in progress | One operation fails cleanly |
 
 ### Security Tests
 
 | Test ID | Test Case | Attack Vector | Expected Protection |
 |---------|-----------|---------------|---------------------|
 | SEC-01 | Timing attack on key validation | Measure response time for valid vs invalid | Constant-time comparison |
-| SEC-02 | Key enumeration | Brute force API keys | Rate limiting, no info leak |
+| SEC-02 | Key enumeration | Brute force API keys | Rate limiting, generic error codes |
 | SEC-03 | JWT signature bypass | `alg: none` attack | Signature required |
 | SEC-04 | Session fixation | Pre-set session token | Clerk prevents this |
 | SEC-05 | CSRF on key creation | Cross-site request | CSRF token required |
@@ -331,83 +474,50 @@ hb_test_<32-character-random-string>
 | SEC-08 | Key in URL parameter | `?api_key=xxx` | Keys only in headers |
 | SEC-09 | Key logging prevention | Ensure keys not logged | Keys redacted in logs |
 | SEC-10 | Webhook signature validation | Forged Clerk webhook | Signature verified |
+| SEC-11 | 2FA bypass on deletion | Skip 2FA step | 403 Forbidden |
+| SEC-12 | Delete other user's account | Attempt with wrong user_id | 403/404 (no access) |
 
 ---
 
 ## Open Questions
 
-### Authentication
+### Contest Moderation (NEW - requires decision)
 
-1. **Q: Should we support multiple OAuth accounts linking to one user?**
-   - Example: User logs in with Google, later wants to add GitHub
-   - Impact: UserProfile schema, Clerk configuration
-   - Options: (a) No linking, separate accounts (b) Allow linking via Clerk
+1. **Q: Who moderates contests if there are no admin users?**
+   - The master plan mentions contest resolution as an admin function
+   - Options:
+     - (a) Fully automated moderation (algorithm-based)
+     - (b) External moderation service
+     - (c) Community-based moderation with reputation system
+     - (d) Remove contest feature entirely
+     - (e) Other approach?
 
-2. **Q: What happens if a user's OAuth provider account is deleted?**
-   - Impact: User access, data retention
-   - Options: (a) Keep HashBin account (b) Delete HashBin account (c) Mark as orphaned
+2. **Q: How are DMCA takedown requests handled without admins?**
+   - Legal requirement for hosting platforms
+   - Options:
+     - (a) Automated processing with email verification
+     - (b) External legal service integration
+     - (c) Public form with automatic content flagging
+     - (d) Other approach?
 
-3. **Q: Should we support anonymous uploads with payment only (no account)?**
-   - Impact: User model, payment flow
-   - Options: (a) Require account (b) Allow anonymous with payment token
+3. **Q: What happens to orphaned content if only provider is deleted?**
+   - User has single OAuth provider (e.g., only Google)
+   - That provider account gets deleted
+   - Decision was to "keep HashBin account" but user cannot log in
+   - Options:
+     - (a) Content remains accessible, account frozen
+     - (b) Content expires normally, no action needed
+     - (c) Allow account recovery via support email
+     - (d) Other approach?
 
-### API Keys
-
-4. **Q: What is the maximum number of API keys per user?**
-   - Impact: Storage, abuse prevention
-   - Suggested: 10-25 keys per user
-
-5. **Q: What is the default/maximum API key expiration?**
-   - Impact: Security, user experience
-   - Options: (a) No default, user chooses (b) 1 year default, 2 year max
-
-6. **Q: Should API keys have scopes/permissions?**
-   - Example: Read-only key, upload-only key
-   - Impact: API design, authorization logic
-   - Options: (a) No scopes, full access (b) Scopes per key
-
-7. **Q: Should API key names be unique per user?**
-   - Impact: UX, key identification
-   - Options: (a) Allow duplicates (b) Enforce uniqueness
-
-### Rate Limiting
-
-8. **Q: What are the rate limits per authorization level?**
-   - Impact: Abuse prevention, legitimate use
-   - Suggested limits:
-     - Anonymous: 100 requests/minute
-     - Authenticated: 1000 requests/minute
-     - API key: 1000 requests/minute
-
-9. **Q: Are rate limits per-user or per-API-key?**
-   - Impact: Multi-key usage patterns
-   - Options: (a) Per-user total (b) Per-key individual (c) Both with different limits
-
-### Admin Access
-
-10. **Q: How are admin users designated?**
-    - Impact: Admin bootstrap, security
-    - Options: (a) Clerk role (b) Env var whitelist (c) Separate admin auth
-
-11. **Q: What admin operations require authentication vs 2FA?**
-    - Impact: Security, operations friction
-    - Examples: User deletion, contest resolution, system config
-
-### Error Handling
-
-12. **Q: What error details should be exposed for auth failures?**
-    - Impact: Security, debugging
-    - Options: (a) Generic "Unauthorized" (b) Specific reason codes
-
-### Data Retention
-
-13. **Q: How long do we keep records of revoked API keys?**
-    - Impact: Storage, audit trail
-    - Options: (a) Forever (b) 90 days (c) Until user deletion
-
-14. **Q: What user data is retained after account deletion?**
-    - Impact: Privacy, legal compliance
-    - Options: (a) None (b) Anonymized records (c) Payment records only
+4. **Q: How is abuse/spam handled without admin review?**
+   - Malicious uploads, spam content, TOS violations
+   - Options:
+     - (a) Rate limiting only (already decided)
+     - (b) Automated content scanning
+     - (c) User reporting with automated action
+     - (d) Accept that content is hash-only access (low discoverability)
+     - (e) Other approach?
 
 ---
 
@@ -425,11 +535,14 @@ hb_test_<32-character-random-string>
 ## Success Criteria
 
 1. Users can authenticate via any supported OAuth provider
-2. Users can generate, list, and revoke API keys
-3. Protected endpoints reject unauthenticated requests
-4. Both Clerk sessions and API keys provide equivalent access
-5. All tests pass
-6. Security audit reveals no critical vulnerabilities
+2. Users can link multiple OAuth providers to one account
+3. Users can generate, list, and revoke up to 25 API keys
+4. Protected endpoints reject unauthenticated requests with specific error codes
+5. Both Clerk sessions and API keys provide equivalent access
+6. Rate limiting works at both per-user and per-key levels
+7. Account deletion requires 2FA and retains only payment records
+8. All tests pass
+9. Security audit reveals no critical vulnerabilities
 
 ---
 
@@ -438,3 +551,4 @@ hb_test_<32-character-random-string>
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-01-13 | Claude | Initial draft |
+| 0.2 | 2026-01-13 | Claude | Added decisions, removed admin role, added account linking, new follow-up questions |
