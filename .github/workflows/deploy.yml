@@ -117,12 +117,12 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$BODY" | grep -q '"status":"healthy"'; then
+          if ! echo "$BODY" | grep -q '"status"[[:space:]]*:[[:space:]]*"healthy"'; then
             echo "❌ Health check failed - status not healthy"
             exit 1
           fi
 
-          if ! echo "$BODY" | grep -q '"environment":"development"'; then
+          if ! echo "$BODY" | grep -q '"environment"[[:space:]]*:[[:space:]]*"development"'; then
             echo "❌ Wrong environment returned"
             exit 1
           fi
@@ -205,12 +205,12 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$BODY" | grep -q '"status":"healthy"'; then
+          if ! echo "$BODY" | grep -q '"status"[[:space:]]*:[[:space:]]*"healthy"'; then
             echo "❌ Health check failed - status not healthy"
             exit 1
           fi
 
-          if ! echo "$BODY" | grep -q '"environment":"production"'; then
+          if ! echo "$BODY" | grep -q '"environment"[[:space:]]*:[[:space:]]*"production"'; then
             echo "❌ Wrong environment returned"
             exit 1
           fi
@@ -240,7 +240,7 @@ jobs:
             exit 0
           fi
 
-          if echo "$BODY" | grep -q '"status":"healthy"'; then
+          if echo "$BODY" | grep -q '"status"[[:space:]]*:[[:space:]]*"healthy"'; then
             echo "✅ Workers.dev URL verified"
           else
             echo "⚠️  Workers.dev responding but health check failed"
