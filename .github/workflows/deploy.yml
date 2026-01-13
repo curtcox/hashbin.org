@@ -33,7 +33,7 @@ jobs:
 
   deploy-dev:
     name: Deploy to Development
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/develop' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: test
     runs-on: ubuntu-latest
     environment:
@@ -131,7 +131,7 @@ jobs:
 
   deploy-prod:
     name: Deploy to Production
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     needs: test
     runs-on: ubuntu-latest
     environment:
