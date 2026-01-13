@@ -582,55 +582,44 @@ hb_test_<32-character-random-string>
 
 ---
 
+## Escalation System Decisions
+
+The following decisions have been made for the escalation system:
+
+### Escalation Triggers
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Tier 1 → Tier 2 triggers | **All conditions apply** | Escalate when: (a) no pattern match in rule set, (b) confidence score below threshold, OR (c) specific content types flag for AI review |
+| Tier 2 → Tier 3 triggers | **All conditions apply** | Escalate when: (a) AI confidence below threshold, (b) AI explicitly flags "needs human review", (c) content value above threshold, OR (d) user requests human review |
+
+### Notification & SLAs
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Owner notification method | **Webhook** | External webhook integration allows flexible routing to owner's preferred notification system |
+| Tier 1 SLA | **Immediate** | Automated processing completes in milliseconds |
+| Tier 2 SLA | **Hours** | AI review should complete within hours; allows for retries and queue processing |
+| Tier 3 SLA | **Days** | Owner review is async; provides reasonable time for manual human review |
+
+### Timeout & Appeals
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Default action on SLA expiry | **No action** | If owner doesn't respond within SLA, no action is taken; content status remains unchanged |
+| Appeal process | **Next tier** | One appeal allowed per decision; appeals escalate to the next tier for re-review |
+
+### AI Service
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| AI service for Tier 2 | **OpenRouter** | OpenRouter provides access to multiple models with a unified API; allows flexibility in model selection |
+
+---
+
 ## Open Questions
 
-### Escalation System Details
-
-1. **Q: What triggers escalation from Tier 1 to Tier 2?**
-   - Need to define specific rules for when automated processing cannot resolve
-   - Options:
-     - (a) No pattern match in rule set
-     - (b) Confidence score below threshold
-     - (c) Specific content types always escalate
-     - (d) All of the above?
-
-2. **Q: What triggers escalation from Tier 2 (AI) to Tier 3 (Owner)?**
-   - Options:
-     - (a) AI confidence below X% (what threshold?)
-     - (b) AI explicitly flags as "needs human review"
-     - (c) Content value above $X
-     - (d) User explicitly requests human review
-
-3. **Q: How is the owner notified for Tier 3 review?**
-   - Options:
-     - (a) Email only
-     - (b) SMS + Email
-     - (c) Dashboard + Email
-     - (d) Webhook to external system
-
-4. **Q: What is the SLA for each escalation tier?**
-   - Tier 1 (Automated): Immediate?
-   - Tier 2 (AI): Minutes? Hours?
-   - Tier 3 (Owner): Hours? Days?
-   - What happens if SLA exceeded?
-
-5. **Q: What is the default action if owner doesn't respond (SLA expired)?**
-   - For contests: (a) Approve contest (b) Reject contest (c) Extend deadline
-   - For DMCA: (a) Remove content (b) Keep content (c) Suspend pending review
-
-6. **Q: Can users appeal automated or AI decisions?**
-   - Options:
-     - (a) No appeals
-     - (b) One appeal allowed, goes to next tier
-     - (c) Appeals always go to owner
-     - (d) Paid appeals only
-
-7. **Q: Which AI model/service for Tier 2 review?**
-   - Options:
-     - (a) Claude API
-     - (b) OpenAI API
-     - (c) Self-hosted model
-     - (d) Multiple models with consensus
+No open questions remain. All decisions have been made.
 
 ---
 
@@ -638,12 +627,12 @@ hb_test_<32-character-random-string>
 
 - **Phase 2 (Content Operations)**: Authorization depends on having content endpoints to protect
 - **Clerk Account**: Must set up Clerk application before implementation
-- **AI Service**: Required for Tier 2 escalation (model TBD)
+- **AI Service**: OpenRouter API for Tier 2 escalation
 - **Environment Variables**:
   - `CLERK_PUBLISHABLE_KEY`
   - `CLERK_SECRET_KEY`
   - `CLERK_WEBHOOK_SECRET`
-  - `AI_API_KEY` (for Tier 2)
+  - `OPENROUTER_API_KEY` (for Tier 2)
   - `OWNER_NOTIFICATION_EMAIL`
 
 ---
@@ -671,3 +660,4 @@ hb_test_<32-character-random-string>
 | 0.1 | 2026-01-13 | Claude | Initial draft |
 | 0.2 | 2026-01-13 | Claude | Added decisions, removed admin role, added account linking |
 | 0.3 | 2026-01-13 | Claude | Added escalation system, orphaned account handling, new tests |
+| 0.4 | 2026-01-13 | Claude | Resolved all escalation open questions |
