@@ -34,12 +34,25 @@ This document outlines the plan for implementing user authorization in HashBin.o
 └─────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
+### Escalation Flow (Contests & DMCA)
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Request   │───▶│  Automated  │───▶│     AI      │───▶│    Owner    │
+│   Received  │    │  (No AI)    │    │   Review    │    │   Review    │
+└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
+                         │                  │                  │
+                         ▼                  ▼                  ▼
+                    Auto-resolve       AI-resolve        Manual decision
+```
+
 ### Components
 
 1. **Clerk SDK Integration** - OAuth provider management
 2. **Auth Middleware** - Request validation and user context injection
 3. **UserProfile Durable Object** - User data and API key storage
 4. **API Key Manager** - Generation, validation, and revocation
+5. **Escalation Engine** - Tiered processing for contests and DMCA
 
 ---
 
@@ -51,7 +64,7 @@ This document outlines the plan for implementing user authorization in HashBin.o
 | **Authenticated** | Valid Clerk session or API key | Upload content, view own uploads, manage API keys, delete own account |
 | **Payer** | Authenticated + has paid for specific content | View contester contact info for their content |
 
-**Note**: There is no admin role. The system operates without administrative users. Contest moderation and other traditionally admin functions are handled through automated processes or external mechanisms.
+**Note**: There is no admin role. The system operates without administrative users. Contest moderation and DMCA requests are handled through a tiered automated escalation system (automated → AI → owner).
 
 ---
 
@@ -87,7 +100,7 @@ The following decisions have been made for this implementation:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Admin users | **None** | System operates without admins; automated processes handle moderation |
+| Admin users | **None** | System operates without admins; automated escalation handles moderation |
 | 2FA requirement | **User self-deletion only** | Only action requiring extra verification is account deletion |
 
 ### Error Handling
@@ -102,6 +115,53 @@ The following decisions have been made for this implementation:
 |----------|--------|-----------|
 | Revoked key retention | **5 years** | Audit trail for security investigations |
 | Post-deletion retention | **Payment records only** | Legal/financial compliance; all other data deleted |
+
+### Moderation & Content
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Contest moderation | **Automated escalation: No-AI → AI → Owner** | Three-tier system handles disputes without permanent admins |
+| DMCA handling | **Automated escalation: No-AI → AI → Owner** | Same three-tier escalation for legal compliance |
+| Orphaned accounts | **Content expires normally** | If user can't log in, content follows standard retention/expiration |
+| Abuse/spam handling | **Rate limiting only** | Content is hash-only access (low discoverability); rate limits prevent abuse |
+
+---
+
+## Escalation System
+
+The escalation system handles contests and DMCA requests without requiring admin users.
+
+### Tier 1: Automated (No AI)
+
+- Pattern matching for obvious cases (exact hash matches, known bad actors)
+- Validation of required fields (valid email, proper format)
+- Auto-reject malformed or incomplete requests
+- Auto-approve clear-cut cases matching predefined rules
+
+### Tier 2: AI Review
+
+- Cases that don't match Tier 1 patterns are reviewed by AI
+- AI evaluates evidence, compares claims, assesses validity
+- AI can approve, reject, or escalate to owner
+- All AI decisions are logged with reasoning
+
+### Tier 3: Owner Review
+
+- Complex cases requiring human judgment
+- Edge cases where AI confidence is low
+- Appeals of Tier 1 or Tier 2 decisions
+- Owner receives notification and makes final decision
+
+### Escalation States
+
+| State | Description |
+|-------|-------------|
+| `PENDING_TIER1` | Awaiting automated processing |
+| `PENDING_TIER2` | Awaiting AI review |
+| `PENDING_TIER3` | Awaiting owner review |
+| `APPROVED` | Request approved, action taken |
+| `REJECTED` | Request rejected with reason |
+| `EXPIRED` | No response within SLA, default action taken |
 
 ---
 
@@ -148,6 +208,14 @@ The following decisions have been made for this implementation:
 - [ ] Require 2FA confirmation for account deletion
 - [ ] Retain payment records after deletion
 - [ ] Delete all other user data on account deletion
+
+### Phase 3.6: Escalation System (Note: May be Phase 6)
+
+- [ ] Implement escalation state machine
+- [ ] Build Tier 1 automated rules engine
+- [ ] Integrate AI for Tier 2 review
+- [ ] Build owner notification system
+- [ ] Create escalation tracking and logging
 
 ---
 
@@ -425,6 +493,35 @@ hb_test_<32-character-random-string>
 | RATE-07 | Rate limit resets after window | Wait 1 minute | Requests succeed again |
 | RATE-08 | Rate limit response includes retry-after | Exceed limit | Header `Retry-After` present |
 
+#### Escalation System Tests
+
+| Test ID | Test Case | Input | Expected Output |
+|---------|-----------|-------|-----------------|
+| ESC-01 | Malformed contest auto-rejected at Tier 1 | Missing required fields | State: `REJECTED`, reason logged |
+| ESC-02 | Clear-cut contest auto-approved at Tier 1 | Exact hash match, valid claim | State: `APPROVED` |
+| ESC-03 | Ambiguous contest escalates to Tier 2 | No pattern match | State: `PENDING_TIER2` |
+| ESC-04 | AI approves contest at Tier 2 | AI confidence high, approve | State: `APPROVED`, AI reasoning logged |
+| ESC-05 | AI rejects contest at Tier 2 | AI confidence high, reject | State: `REJECTED`, AI reasoning logged |
+| ESC-06 | AI escalates to Tier 3 | AI confidence low | State: `PENDING_TIER3` |
+| ESC-07 | Owner approves at Tier 3 | Owner clicks approve | State: `APPROVED` |
+| ESC-08 | Owner rejects at Tier 3 | Owner clicks reject | State: `REJECTED` |
+| ESC-09 | DMCA auto-validated at Tier 1 | Valid format, verified email | Proceeds to Tier 2 |
+| ESC-10 | DMCA missing required fields rejected | Incomplete request | State: `REJECTED` |
+| ESC-11 | DMCA escalates to owner | AI uncertain | State: `PENDING_TIER3` |
+| ESC-12 | Escalation timeout defaults action | No response in SLA | State: `EXPIRED`, default action |
+| ESC-13 | Appeal triggers re-review | User appeals Tier 1 decision | Re-enters at Tier 2 |
+| ESC-14 | All escalation decisions logged | Any state transition | Full audit trail stored |
+
+#### Orphaned Account Tests
+
+| Test ID | Test Case | Input | Expected Output |
+|---------|-----------|-------|-----------------|
+| ORPH-01 | Single provider deleted, no other linked | Google account deleted, only provider | Account becomes inaccessible |
+| ORPH-02 | Orphaned user content expires normally | Content with standard retention | Content expires per retention policy |
+| ORPH-03 | Orphaned user cannot create new sessions | Try to log in | No valid provider, cannot auth |
+| ORPH-04 | Orphaned user API keys still work until expiry | Use existing API key | Key works until expiration |
+| ORPH-05 | New OAuth login creates new account | Same email, new registration | Fresh account created |
+
 ### Integration Tests
 
 | Test ID | Test Case | Steps | Expected Outcome |
@@ -441,6 +538,8 @@ hb_test_<32-character-random-string>
 | INT-10 | Cross-user isolation | User A cannot access User B's keys | 404 for other user's resources |
 | INT-11 | Link multiple providers | 1. Login Google 2. Link GitHub 3. Logout 4. Login GitHub | Same user session |
 | INT-12 | Provider account deleted, other works | 1. Link Google+GitHub 2. Delete Google account 3. Login GitHub | Access maintained via GitHub |
+| INT-13 | Full escalation flow - contest | 1. Submit contest 2. Tier 1 processes 3. Escalates 4. Owner decides | Contest resolved |
+| INT-14 | Full escalation flow - DMCA | 1. Submit DMCA 2. Auto-validate 3. AI review 4. Content action | DMCA processed |
 
 ### Edge Case Tests
 
@@ -459,6 +558,8 @@ hb_test_<32-character-random-string>
 | EDGE-11 | 25th key at exact limit | User has 24 keys, creates 25th | Succeeds, 26th fails |
 | EDGE-12 | Key expires during request | Key expires mid-request | Request completes or fails atomically |
 | EDGE-13 | Link provider during deletion | Link OAuth while delete in progress | One operation fails cleanly |
+| EDGE-14 | Escalation during system maintenance | Submit while AI unavailable | Queued, processed when available |
+| EDGE-15 | Owner unavailable for Tier 3 | Owner doesn't respond | SLA expires, default action taken |
 
 ### Security Tests
 
@@ -476,48 +577,60 @@ hb_test_<32-character-random-string>
 | SEC-10 | Webhook signature validation | Forged Clerk webhook | Signature verified |
 | SEC-11 | 2FA bypass on deletion | Skip 2FA step | 403 Forbidden |
 | SEC-12 | Delete other user's account | Attempt with wrong user_id | 403/404 (no access) |
+| SEC-13 | Fake DMCA submission | Fraudulent takedown request | Email verification, audit trail |
+| SEC-14 | Escalation manipulation | Try to skip tiers | Tier progression enforced |
 
 ---
 
 ## Open Questions
 
-### Contest Moderation (NEW - requires decision)
+### Escalation System Details
 
-1. **Q: Who moderates contests if there are no admin users?**
-   - The master plan mentions contest resolution as an admin function
+1. **Q: What triggers escalation from Tier 1 to Tier 2?**
+   - Need to define specific rules for when automated processing cannot resolve
    - Options:
-     - (a) Fully automated moderation (algorithm-based)
-     - (b) External moderation service
-     - (c) Community-based moderation with reputation system
-     - (d) Remove contest feature entirely
-     - (e) Other approach?
+     - (a) No pattern match in rule set
+     - (b) Confidence score below threshold
+     - (c) Specific content types always escalate
+     - (d) All of the above?
 
-2. **Q: How are DMCA takedown requests handled without admins?**
-   - Legal requirement for hosting platforms
+2. **Q: What triggers escalation from Tier 2 (AI) to Tier 3 (Owner)?**
    - Options:
-     - (a) Automated processing with email verification
-     - (b) External legal service integration
-     - (c) Public form with automatic content flagging
-     - (d) Other approach?
+     - (a) AI confidence below X% (what threshold?)
+     - (b) AI explicitly flags as "needs human review"
+     - (c) Content value above $X
+     - (d) User explicitly requests human review
 
-3. **Q: What happens to orphaned content if only provider is deleted?**
-   - User has single OAuth provider (e.g., only Google)
-   - That provider account gets deleted
-   - Decision was to "keep HashBin account" but user cannot log in
+3. **Q: How is the owner notified for Tier 3 review?**
    - Options:
-     - (a) Content remains accessible, account frozen
-     - (b) Content expires normally, no action needed
-     - (c) Allow account recovery via support email
-     - (d) Other approach?
+     - (a) Email only
+     - (b) SMS + Email
+     - (c) Dashboard + Email
+     - (d) Webhook to external system
 
-4. **Q: How is abuse/spam handled without admin review?**
-   - Malicious uploads, spam content, TOS violations
+4. **Q: What is the SLA for each escalation tier?**
+   - Tier 1 (Automated): Immediate?
+   - Tier 2 (AI): Minutes? Hours?
+   - Tier 3 (Owner): Hours? Days?
+   - What happens if SLA exceeded?
+
+5. **Q: What is the default action if owner doesn't respond (SLA expired)?**
+   - For contests: (a) Approve contest (b) Reject contest (c) Extend deadline
+   - For DMCA: (a) Remove content (b) Keep content (c) Suspend pending review
+
+6. **Q: Can users appeal automated or AI decisions?**
    - Options:
-     - (a) Rate limiting only (already decided)
-     - (b) Automated content scanning
-     - (c) User reporting with automated action
-     - (d) Accept that content is hash-only access (low discoverability)
-     - (e) Other approach?
+     - (a) No appeals
+     - (b) One appeal allowed, goes to next tier
+     - (c) Appeals always go to owner
+     - (d) Paid appeals only
+
+7. **Q: Which AI model/service for Tier 2 review?**
+   - Options:
+     - (a) Claude API
+     - (b) OpenAI API
+     - (c) Self-hosted model
+     - (d) Multiple models with consensus
 
 ---
 
@@ -525,10 +638,13 @@ hb_test_<32-character-random-string>
 
 - **Phase 2 (Content Operations)**: Authorization depends on having content endpoints to protect
 - **Clerk Account**: Must set up Clerk application before implementation
+- **AI Service**: Required for Tier 2 escalation (model TBD)
 - **Environment Variables**:
   - `CLERK_PUBLISHABLE_KEY`
   - `CLERK_SECRET_KEY`
   - `CLERK_WEBHOOK_SECRET`
+  - `AI_API_KEY` (for Tier 2)
+  - `OWNER_NOTIFICATION_EMAIL`
 
 ---
 
@@ -541,8 +657,10 @@ hb_test_<32-character-random-string>
 5. Both Clerk sessions and API keys provide equivalent access
 6. Rate limiting works at both per-user and per-key levels
 7. Account deletion requires 2FA and retains only payment records
-8. All tests pass
-9. Security audit reveals no critical vulnerabilities
+8. Escalation system processes contests and DMCA requests through all tiers
+9. Orphaned accounts have content expire normally
+10. All tests pass
+11. Security audit reveals no critical vulnerabilities
 
 ---
 
@@ -551,4 +669,5 @@ hb_test_<32-character-random-string>
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 0.1 | 2026-01-13 | Claude | Initial draft |
-| 0.2 | 2026-01-13 | Claude | Added decisions, removed admin role, added account linking, new follow-up questions |
+| 0.2 | 2026-01-13 | Claude | Added decisions, removed admin role, added account linking |
+| 0.3 | 2026-01-13 | Claude | Added escalation system, orphaned account handling, new tests |
