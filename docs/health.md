@@ -420,8 +420,8 @@ Planned for Phase 2 and beyond:
 ## See Also
 
 - [Deployment Guide](deployment.md) - Complete deployment instructions
-- [Health Validation Mapping](../todo/health.md) - Detailed validation coverage
-- [Site Creation Plan](../todo/site_creation.md) - Infrastructure setup tasks
+- [Health Validation Mapping](../done/health_validation.md) - Detailed validation coverage
+- [Site Creation Plan](../done/site_creation.md) - Infrastructure setup tasks (complete)
 - [Verification Script](../scripts/verify-deployment.sh) - Automated testing
 
 ---

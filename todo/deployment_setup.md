@@ -1,6 +1,9 @@
 # Deployment Setup Instructions
 
-This document describes how to configure GitHub secrets and Cloudflare for automated deployment.
+**Type:** Quick Reference Guide
+**Status:** Active - use for new deployments
+
+This document describes how to configure GitHub secrets and Cloudflare for automated deployment. For the complete deployment guide, see `docs/deployment.md`.
 
 ## Prerequisites
 
