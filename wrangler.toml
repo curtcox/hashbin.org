@@ -13,7 +13,37 @@ name = "hashbin-worker-prod"
 route = { pattern = "hashbin.org/*", zone_name = "hashbin.org" }
 vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
 
-# Durable Objects bindings
+# Production Durable Objects bindings
+[[env.production.durable_objects.bindings]]
+name = "CONTENT_METADATA"
+class_name = "ContentMetadata"
+
+[[env.production.durable_objects.bindings]]
+name = "USER_PROFILES"
+class_name = "UserProfile"
+
+[[env.production.durable_objects.bindings]]
+name = "PAYMENT_RECORDS"
+class_name = "PaymentRecord"
+
+[[env.production.durable_objects.bindings]]
+name = "CONTEST_RECORDS"
+class_name = "ContestRecord"
+
+[[env.production.durable_objects.bindings]]
+name = "MESSAGE_THREADS"
+class_name = "MessageThread"
+
+# Production R2 bucket bindings
+[[env.production.r2_buckets]]
+binding = "CONTENT_BUCKET"
+bucket_name = "hashbin-content-prod"
+
+[[env.production.r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "hashbin-backups-prod"
+
+# Durable Objects bindings (top-level for local dev)
 [[durable_objects.bindings]]
 name = "CONTENT_METADATA"
 class_name = "ContentMetadata"
