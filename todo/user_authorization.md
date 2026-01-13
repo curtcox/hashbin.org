@@ -590,30 +590,57 @@ The following decisions have been made for the escalation system:
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Tier 1 → Tier 2 triggers | **All conditions apply** | Escalate when: (a) no pattern match in rule set, (b) confidence score below threshold, OR (c) specific content types flag for AI review |
-| Tier 2 → Tier 3 triggers | **All conditions apply** | Escalate when: (a) AI confidence below threshold, (b) AI explicitly flags "needs human review", (c) content value above threshold, OR (d) user requests human review |
+| Tier 1 → Tier 2 triggers | **All conditions apply** | Escalate when: (a) no pattern match in rule set, (b) confidence score below 80%, OR (c) specific content types flag for AI review |
+| Tier 2 → Tier 3 triggers | **All conditions apply** | Escalate when: (a) AI confidence below 70%, (b) AI explicitly flags "needs human review", (c) content value above $50, OR (d) user requests human review |
+| Tier 1 confidence threshold | **80%** | Automated rules must have 80%+ confidence to resolve without AI |
+| Tier 2 confidence threshold | **70%** | AI must have 70%+ confidence to resolve without owner |
+| Content value threshold | **$50** | Content valued above $50 automatically escalates to owner review |
 
 ### Notification & SLAs
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Owner notification method | **Webhook** | External webhook integration allows flexible routing to owner's preferred notification system |
+| Owner notification method | **Webhook only** | External webhook integration; no backup notification method |
 | Tier 1 SLA | **Immediate** | Automated processing completes in milliseconds |
-| Tier 2 SLA | **Hours** | AI review should complete within hours; allows for retries and queue processing |
-| Tier 3 SLA | **Days** | Owner review is async; provides reasonable time for manual human review |
+| Tier 2 SLA | **4 hours** | AI review completes within 4 hours; allows for retries and queue processing |
+| Tier 3 SLA | **7 days** | Owner has 7 days for manual review |
+| Webhook backup | **None** | If webhook fails, no alternative notification is sent |
+
+### Webhook Payload
+
+The owner notification webhook includes all relevant information:
+
+```json
+{
+  "event_type": "escalation_tier3",
+  "escalation_id": "esc_xxx",
+  "request_type": "contest | dmca",
+  "content_hash": "256t_xxx",
+  "content_value": 75.00,
+  "submitter_email": "user@example.com",
+  "submission_timestamp": "2026-01-13T10:00:00Z",
+  "tier1_result": { "action": "escalated", "reason": "no_pattern_match" },
+  "tier2_result": { "action": "escalated", "confidence": 0.65, "reasoning": "..." },
+  "evidence": { ... },
+  "action_url": "https://hashbin.org/admin/escalation/esc_xxx"
+}
+```
 
 ### Timeout & Appeals
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| Default action on SLA expiry | **No action** | If owner doesn't respond within SLA, no action is taken; content status remains unchanged |
+| Default action on SLA expiry | **No action** | If owner doesn't respond within 7 days, no action is taken; content status unchanged |
+| DMCA SLA expiry | **No action** | Same policy for DMCA; content remains unchanged if no response |
 | Appeal process | **Next tier** | One appeal allowed per decision; appeals escalate to the next tier for re-review |
+| Tier 3 appeals | **Final** | Owner decisions cannot be appealed; Tier 3 is the final decision |
 
 ### AI Service
 
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
-| AI service for Tier 2 | **OpenRouter** | OpenRouter provides access to multiple models with a unified API; allows flexibility in model selection |
+| AI service for Tier 2 | **OpenRouter** | OpenRouter provides access to multiple models with a unified API |
+| Model selection | **Configurable** | Model is configurable via environment variable; may change over time |
 
 ---
 
@@ -633,7 +660,8 @@ No open questions remain. All decisions have been made.
   - `CLERK_SECRET_KEY`
   - `CLERK_WEBHOOK_SECRET`
   - `OPENROUTER_API_KEY` (for Tier 2)
-  - `OWNER_NOTIFICATION_EMAIL`
+  - `OPENROUTER_MODEL` (configurable model ID, e.g., "anthropic/claude-3-sonnet")
+  - `OWNER_WEBHOOK_URL` (for Tier 3 notifications)
 
 ---
 
@@ -661,3 +689,4 @@ No open questions remain. All decisions have been made.
 | 0.2 | 2026-01-13 | Claude | Added decisions, removed admin role, added account linking |
 | 0.3 | 2026-01-13 | Claude | Added escalation system, orphaned account handling, new tests |
 | 0.4 | 2026-01-13 | Claude | Resolved all escalation open questions |
+| 0.5 | 2026-01-13 | Claude | Added specific thresholds, SLAs, webhook payload, and finalized appeals |
