@@ -190,10 +190,10 @@ jobs:
       - name: Wait for deployment propagation
         run: sleep 10
 
-      - name: Verify deployment - Workers.dev URL
+      - name: Verify deployment - Custom domain
         run: |
-          echo "Testing production worker on workers.dev..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-prod.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev/health)
+          echo "Testing custom domain hashbin.org..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin.org/health)
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n-1)
 
@@ -215,27 +215,30 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Workers.dev URL verified"
+          echo "✅ Custom domain verified"
 
-      - name: Verify deployment - Custom domain
+      - name: Verify deployment - Workers.dev URL
+        if: ${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN != '' }}
         continue-on-error: true
         run: |
-          echo "Testing custom domain hashbin.org..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin.org/health || echo "")
+          echo "Testing production worker on workers.dev..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-prod.${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN }}.workers.dev/health)
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n-1)
 
-          if [ -z "$RESPONSE" ] || [ "$HTTP_CODE" != "200" ]; then
-            echo "⚠️  Custom domain not yet configured or DNS not propagated"
-            echo "This is expected on first deployment"
-            echo "Configure custom domain in Cloudflare dashboard: Workers & Pages → hashbin-worker-prod → Settings → Domains"
+          echo "HTTP Status Code: $HTTP_CODE"
+          echo "Response Body: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "⚠️  Workers.dev URL returned HTTP $HTTP_CODE"
+            echo "This may be expected if workers.dev is not enabled"
             exit 0
           fi
 
           if echo "$BODY" | grep -q '"status":"healthy"'; then
-            echo "✅ Custom domain verified"
+            echo "✅ Workers.dev URL verified"
           else
-            echo "⚠️  Custom domain responding but health check failed"
+            echo "⚠️  Workers.dev responding but health check failed"
           fi
 
       - name: Deployment verification summary
@@ -243,13 +246,10 @@ jobs:
           echo "=========================================="
           echo "✅ Production Deployment Successful"
           echo "=========================================="
-          echo "Workers URL: https://hashbin-worker-prod.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev"
-          echo "Custom domain: https://hashbin.org"
-          echo "Health endpoint: VERIFIED"
+          echo "Custom domain: https://hashbin.org (VERIFIED)"
           echo "Environment: production"
           echo ""
-          echo "Next steps:"
-          echo "1. Configure custom domain in Cloudflare dashboard if not already done"
-          echo "2. Verify DNS is pointing to Cloudflare"
-          echo "3. Test: curl https://hashbin.org/health"
+          echo "Optional: To enable workers.dev URL verification,"
+          echo "add CLOUDFLARE_WORKERS_SUBDOMAIN secret with your"
+          echo "workers subdomain from Cloudflare dashboard."
           echo "=========================================="
