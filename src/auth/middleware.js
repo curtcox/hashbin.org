@@ -25,7 +25,12 @@ const USER_RATE_LIMIT = 1000;
 const KEY_RATE_LIMIT = 500;
 
 // In-memory rate limiting cache (simple implementation)
-// In production, this could be stored in Durable Objects or KV
+// NOTE: This is not production-ready for distributed Workers
+// In production, rate limiting should use:
+// - Durable Objects for strong consistency
+// - KV with per-key limits and TTLs
+// - Cloudflare Rate Limiting API
+// This implementation works for local development and testing only
 const rateLimitCache = new Map();
 
 /**
@@ -184,7 +189,9 @@ async function validateApiKey(apiKey, env) {
     }
 
     // Update last_used_at timestamp
-    // Note: This could be done asynchronously to avoid blocking the request
+    // Note: This is fire-and-forget to avoid blocking the request
+    // In production, consider using ExecutionContext.waitUntil() if available
+    // or implementing this as a post-request hook
     userProfileStub.fetch(
       new Request(`http://internal/apikeys/${keyId}/use`, {
         method: 'POST'

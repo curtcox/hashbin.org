@@ -149,12 +149,12 @@ export class KeyRegistry {
       );
     }
 
-    const existed = await this.state.storage.delete(`key:${key_hash}`);
+    await this.state.storage.delete(`key:${key_hash}`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: existed ? 'Key revoked successfully' : 'Key not found'
+        message: 'Key revoked successfully'
       }),
       {
         status: 200,

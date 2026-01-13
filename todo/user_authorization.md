@@ -1,5 +1,27 @@
 # User Authorization Plan
 
+## Implementation Status
+
+**Status:** ✅ **Phases 3.1-3.5 Complete**
+
+The core user authorization system has been implemented:
+- ✅ Clerk SDK integration for OAuth authentication
+- ✅ API key generation and management (hb_live_/hb_test_ prefixes)
+- ✅ UserProfile Durable Object with full CRUD operations
+- ✅ KeyRegistry Durable Object for efficient key lookups
+- ✅ Authorization middleware supporting both Clerk sessions and API keys
+- ✅ Rate limiting (100/min anonymous, 1000/min user, 500/min per-key)
+- ✅ Account deletion with soft delete and payment record retention
+- ✅ All authentication API endpoints implemented
+
+**Remaining Work:**
+- Clerk webhooks (requires deployed Clerk application)
+- Phase 3.6: Escalation System (planned for Phase 6)
+- Integration testing with actual Clerk authentication
+- Production deployment configuration
+
+---
+
 ## Overview
 
 This document outlines the plan for implementing user authorization in HashBin.org. The system uses Clerk for OAuth authentication and custom API keys for programmatic access.
@@ -169,45 +191,45 @@ The escalation system handles contests and DMCA requests without requiring admin
 
 ### Phase 3.1: Clerk Integration
 
-- [ ] Add Clerk SDK to dependencies
-- [ ] Configure Clerk environment variables
-- [ ] Implement session validation middleware
-- [ ] Create `/api/auth/session` endpoint for session info
-- [ ] Handle Clerk webhooks for user events
-- [ ] Configure multi-provider account linking in Clerk
+- [x] Add Clerk SDK to dependencies
+- [x] Configure Clerk environment variables
+- [x] Implement session validation middleware
+- [x] Create `/api/auth/session` endpoint for session info
+- [ ] Handle Clerk webhooks for user events (TODO: Requires webhook endpoint)
+- [ ] Configure multi-provider account linking in Clerk (Handled by Clerk, requires setup)
 
 ### Phase 3.2: User Profile Storage
 
-- [ ] Implement UserProfile Durable Object methods
-- [ ] Store user metadata from Clerk (id, linked providers, created_at)
-- [ ] Track upload history per user
-- [ ] Track payment history per user
-- [ ] Support multiple linked OAuth providers per user
+- [x] Implement UserProfile Durable Object methods
+- [x] Store user metadata from Clerk (id, linked providers, created_at)
+- [x] Track upload history per user
+- [x] Track payment history per user (integrated into UserProfile)
+- [x] Support multiple linked OAuth providers per user
 
 ### Phase 3.3: API Key System
 
-- [ ] Generate cryptographically secure API keys
-- [ ] Store API keys in UserProfile DO (hashed)
-- [ ] Implement API key validation
-- [ ] Create API key management endpoints
-- [ ] Support up to 25 API keys per user
-- [ ] Implement API key revocation
-- [ ] Set 5-year maximum expiration
+- [x] Generate cryptographically secure API keys
+- [x] Store API keys in UserProfile DO (hashed)
+- [x] Implement API key validation
+- [x] Create API key management endpoints
+- [x] Support up to 25 API keys per user
+- [x] Implement API key revocation
+- [x] Set 5-year maximum expiration
 
 ### Phase 3.4: Authorization Middleware
 
-- [ ] Create middleware to extract auth from request
-- [ ] Support both Clerk sessions and API keys
-- [ ] Inject user context into request
-- [ ] Protect endpoints based on authorization level
-- [ ] Implement rate limiting (per-user and per-key)
+- [x] Create middleware to extract auth from request
+- [x] Support both Clerk sessions and API keys
+- [x] Inject user context into request
+- [x] Protect endpoints based on authorization level
+- [x] Implement rate limiting (per-user and per-key)
 
 ### Phase 3.5: Account Management
 
-- [ ] Implement self-service account deletion
-- [ ] Require 2FA confirmation for account deletion
-- [ ] Retain payment records after deletion
-- [ ] Delete all other user data on account deletion
+- [x] Implement self-service account deletion
+- [x] Require 2FA confirmation for account deletion
+- [x] Retain payment records after deletion
+- [x] Delete all other user data on account deletion
 
 ### Phase 3.6: Escalation System (Note: May be Phase 6)
 

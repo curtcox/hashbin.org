@@ -20,7 +20,7 @@ export async function handleSessionInfo(request, env) {
   const user = authResult.user;
 
   // If profile doesn't exist yet, create it
-  if (!user.profileExists && user.authMethod === 'clerk') {
+  if (user.authMethod === 'clerk' && user.profileExists === false) {
     const userProfileId = env.USER_PROFILES.idFromName(user.userId);
     const userProfileStub = env.USER_PROFILES.get(userProfileId);
 
