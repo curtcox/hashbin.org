@@ -10,7 +10,10 @@ vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
 # Production environment
 [env.production]
 name = "hashbin-worker-prod"
-route = { pattern = "hashbin.org/*", zone_name = "hashbin.org" }
+routes = [
+  { pattern = "hashbin.org/*", zone_name = "hashbin.org" },
+  { pattern = "www.hashbin.org/*", zone_name = "hashbin.org" }
+]
 workers_dev = true
 vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
 
