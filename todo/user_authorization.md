@@ -512,6 +512,31 @@ hb_test_<32-character-random-string>
 | ESC-13 | Appeal triggers re-review | User appeals Tier 1 decision | Re-enters at Tier 2 |
 | ESC-14 | All escalation decisions logged | Any state transition | Full audit trail stored |
 
+#### Submission Endpoint Tests
+
+| Test ID | Test Case | Input | Expected Output |
+|---------|-----------|-------|-----------------|
+| SUB-01 | Valid contest submission via API | Complete contest data | 201 Created, escalation_id returned |
+| SUB-02 | Valid DMCA submission via API | Complete DMCA data with signature | 201 Created, escalation_id returned |
+| SUB-03 | Contest missing content_hash | No content_hash field | 400 Bad Request |
+| SUB-04 | Contest missing claimant_email | No email field | 400 Bad Request |
+| SUB-05 | Contest with invalid email format | `not-an-email` | 400 Bad Request |
+| SUB-06 | Contest with non-existent content_hash | Unknown hash | 404 Not Found |
+| SUB-07 | DMCA missing sworn_statement | No sworn statement | 400 Bad Request |
+| SUB-08 | DMCA missing signature | No signature field | 400 Bad Request |
+| SUB-09 | DMCA missing claimant_name | No name field | 400 Bad Request |
+| SUB-10 | Contest form renders correctly | GET /contest | 200 OK, HTML form returned |
+| SUB-11 | DMCA form renders correctly | GET /dmca | 200 OK, HTML form returned |
+| SUB-12 | Contest form submission creates escalation | POST form data | Redirect to confirmation, escalation created |
+| SUB-13 | DMCA form submission creates escalation | POST form data | Redirect to confirmation, escalation created |
+| SUB-14 | Submission rate limiting enforced | 100+ submissions/hour from same IP | 429 Too Many Requests |
+| SUB-15 | Duplicate contest for same hash rejected | Same hash within 24h | 409 Conflict |
+| SUB-16 | Duplicate DMCA for same hash rejected | Same hash within 24h | 409 Conflict |
+| SUB-17 | Evidence field accepts large text | 10KB evidence text | 201 Created |
+| SUB-18 | Evidence field rejects oversized text | 1MB evidence text | 400 Bad Request (too large) |
+| SUB-19 | XSS in evidence field sanitized | `<script>alert(1)</script>` | Stored escaped, no XSS |
+| SUB-20 | SQL injection in email field blocked | `'; DROP TABLE--` | 400 Bad Request or safely escaped |
+
 #### Orphaned Account Tests
 
 | Test ID | Test Case | Input | Expected Output |
@@ -730,3 +755,4 @@ No open questions remain. All decisions have been made.
 | 0.5 | 2026-01-13 | Claude | Added specific thresholds, SLAs, webhook payload, and finalized appeals |
 | 0.6 | 2026-01-13 | Claude | Marked values as configurable; set default model to claude-3-sonnet |
 | 0.7 | 2026-01-13 | Claude | Added configuration approach (constants) and contest/DMCA submission endpoints |
+| 0.8 | 2026-01-13 | Claude | Added 20 submission endpoint tests (SUB-01 through SUB-20) |
