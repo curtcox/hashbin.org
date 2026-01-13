@@ -2,7 +2,7 @@
 
 ## Implementation Status
 
-**Status:** Phases 3.1-3.5 Complete
+**Status:** Phase 3.1-3.5 Complete, Webhooks Implemented
 
 The core user authorization system has been implemented:
 - Clerk SDK integration for OAuth authentication
@@ -13,12 +13,12 @@ The core user authorization system has been implemented:
 - Rate limiting (100/min anonymous, 1000/min user, 500/min per-key)
 - Account deletion with soft delete and payment record retention
 - All authentication API endpoints implemented
+- Clerk webhook handler for user.created, user.updated, user.deleted events
 
 **Remaining Work:**
-- Clerk webhooks (requires deployed Clerk application)
 - Phase 3.6: Escalation System (see [Content Dispute Resolution](./content_dispute_resolution.md))
-- Integration testing with actual Clerk authentication
-- Production deployment configuration
+- Integration testing with actual Clerk authentication (requires deployed Clerk application)
+- Production deployment with Clerk configuration
 
 ---
 
@@ -135,8 +135,8 @@ See [Account Management](./account_management.md) for account linking and deleti
 - [x] Configure Clerk environment variables
 - [x] Implement session validation middleware
 - [x] Create `/api/auth/session` endpoint for session info
-- [ ] Handle Clerk webhooks for user events (TODO: Requires webhook endpoint)
-- [ ] Configure multi-provider account linking in Clerk (Handled by Clerk, requires setup)
+- [x] Handle Clerk webhooks for user events (webhook handler implemented)
+- [ ] Configure multi-provider account linking in Clerk (Handled by Clerk dashboard, requires production setup)
 
 ### Phase 3.2: User Profile Storage
 
@@ -186,6 +186,20 @@ See [Content Dispute Resolution](./content_dispute_resolution.md) for details.
 ---
 
 ## API Endpoints
+
+### Webhook Endpoints
+
+```
+POST /api/webhooks/clerk
+  - Receives webhooks from Clerk for user lifecycle events
+  - Requires: Valid Svix signature in headers
+  - Events handled:
+    - user.created: Creates new UserProfile DO
+    - user.updated: Updates UserProfile DO (e.g., when providers are linked)
+    - user.deleted: Soft deletes UserProfile DO
+  - No rate limiting (verified by signature)
+  - Response: { success: true, message: string }
+```
 
 ### Session Management
 

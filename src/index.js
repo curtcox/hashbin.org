@@ -20,6 +20,8 @@ import {
   handleDeleteAccount
 } from './api/auth.js';
 
+import { handleClerkWebhook } from './api/webhooks.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -34,7 +36,13 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Apply rate limiting to all requests
+    // Webhook endpoints (no rate limiting or auth required)
+    // These are verified by signature instead
+    if (url.pathname === '/api/webhooks/clerk' && request.method === 'POST') {
+      return handleClerkWebhook(request, env);
+    }
+
+    // Apply rate limiting to all other requests
     const authResult = await authenticate(request, env);
     const rateLimitError = applyRateLimit(request, authResult);
     if (rateLimitError) return rateLimitError;
