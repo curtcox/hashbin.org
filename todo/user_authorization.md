@@ -642,6 +642,44 @@ The owner notification webhook includes all relevant information:
 | AI service for Tier 2 | **OpenRouter** | OpenRouter provides access to multiple models with a unified API |
 | Default model | **anthropic/claude-3-sonnet** | Default model; configurable via `OPENROUTER_MODEL` env var |
 
+### Configuration
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Configuration storage | **Well-named constants** | Thresholds and SLAs stored as named constants in code; change requires redeployment |
+
+### Contest & DMCA Submission
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Submission methods | **Public form + API endpoint** | Both web form and programmatic API access |
+
+#### Submission Endpoints
+
+```
+GET /contest
+  - Public web form for submitting content contests
+  - No authentication required
+  - Collects: content_hash, claimant_email, evidence, reason
+
+POST /api/contest
+  - API endpoint for programmatic contest submission
+  - No authentication required
+  - Request: { content_hash, claimant_email, evidence, reason }
+  - Response: { escalation_id, status, created_at }
+
+GET /dmca
+  - Public web form for DMCA takedown requests
+  - No authentication required
+  - Collects: content_hash, claimant_email, claimant_name, sworn_statement
+
+POST /api/dmca
+  - API endpoint for programmatic DMCA submission
+  - No authentication required
+  - Request: { content_hash, claimant_email, claimant_name, sworn_statement, signature }
+  - Response: { escalation_id, status, created_at }
+```
+
 ---
 
 ## Open Questions
@@ -691,3 +729,4 @@ No open questions remain. All decisions have been made.
 | 0.4 | 2026-01-13 | Claude | Resolved all escalation open questions |
 | 0.5 | 2026-01-13 | Claude | Added specific thresholds, SLAs, webhook payload, and finalized appeals |
 | 0.6 | 2026-01-13 | Claude | Marked values as configurable; set default model to claude-3-sonnet |
+| 0.7 | 2026-01-13 | Claude | Added configuration approach (constants) and contest/DMCA submission endpoints |
