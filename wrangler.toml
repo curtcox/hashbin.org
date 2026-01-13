@@ -11,6 +11,7 @@ vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
 [env.production]
 name = "hashbin-worker-prod"
 route = { pattern = "hashbin.org/*", zone_name = "hashbin.org" }
+workers_dev = true
 vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
 
 # Production Durable Objects bindings
