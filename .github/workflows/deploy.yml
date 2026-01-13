@@ -218,11 +218,16 @@ jobs:
           echo "✅ Custom domain verified"
 
       - name: Verify deployment - Workers.dev URL
-        if: ${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN != '' }}
         continue-on-error: true
+        env:
+          WORKERS_SUBDOMAIN: ${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN }}
         run: |
+          if [ -z "$WORKERS_SUBDOMAIN" ]; then
+            echo "⏭️  Skipping workers.dev verification (CLOUDFLARE_WORKERS_SUBDOMAIN not set)"
+            exit 0
+          fi
           echo "Testing production worker on workers.dev..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-prod.${{ secrets.CLOUDFLARE_WORKERS_SUBDOMAIN }}.workers.dev/health)
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-prod.${WORKERS_SUBDOMAIN}.workers.dev/health)
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n-1)
 
