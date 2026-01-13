@@ -48,6 +48,10 @@ class_name = "ContestRecord"
 name = "MESSAGE_THREADS"
 class_name = "MessageThread"
 
+[[env.production.durable_objects.bindings]]
+name = "KEY_REGISTRY"
+class_name = "KeyRegistry"
+
 # Production R2 bucket bindings
 [[env.production.r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -83,6 +87,11 @@ name = "MESSAGE_THREADS"
 class_name = "MessageThread"
 script_name = "hashbin-worker"
 
+[[durable_objects.bindings]]
+name = "KEY_REGISTRY"
+class_name = "KeyRegistry"
+script_name = "hashbin-worker"
+
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -98,3 +107,7 @@ preview_bucket_name = "hashbin-backups-dev"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["ContentMetadata", "UserProfile", "PaymentRecord", "ContestRecord", "MessageThread"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["KeyRegistry"]

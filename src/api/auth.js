@@ -156,6 +156,22 @@ export async function handleCreateApiKey(request, env) {
 
   const keyInfo = await response.json();
 
+  // Register key in KeyRegistry
+  const registryId = env.KEY_REGISTRY.idFromName('global');
+  const registryStub = env.KEY_REGISTRY.get(registryId);
+
+  await registryStub.fetch(
+    new Request('http://internal/register', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        key_hash: keyHash,
+        user_id: authResult.user.userId,
+        key_id: keyId
+      })
+    })
+  );
+
   // Return the API key (ONLY SHOWN ONCE!)
   return new Response(
     JSON.stringify({
@@ -258,6 +274,10 @@ export async function handleRevokeApiKey(request, env, keyId) {
   }
 
   const result = await response.json();
+
+  // Note: KeyRegistry entry is not removed here because we don't have the key hash
+  // The validation in middleware will check the revoked_at field in the UserProfile
+  // This is acceptable because revoked keys are kept for 5 years for audit purposes
 
   return new Response(JSON.stringify(result), {
     status: 200,

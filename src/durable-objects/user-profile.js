@@ -64,6 +64,11 @@ export class UserProfile {
         return await this.getUploads();
       }
 
+      if (url.pathname.startsWith('/apikeys/') && url.pathname.endsWith('/use') && method === 'POST') {
+        const keyId = url.pathname.split('/')[2];
+        return await this.updateLastUsed(keyId);
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -479,5 +484,53 @@ export class UserProfile {
       status: 200,
       headers: { 'content-type': 'application/json' }
     });
+  }
+
+  /**
+   * Update last_used_at timestamp for an API key
+   */
+  async updateLastUsed(keyId) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({
+          error: 'Profile not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const apiKey = profile.api_keys.find(key => key.key_id === keyId);
+
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          error: 'API key not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    apiKey.last_used_at = new Date().toISOString();
+    profile.updated_at = new Date().toISOString();
+
+    await this.state.storage.put('profile', profile);
+
+    return new Response(
+      JSON.stringify({
+        success: true
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
   }
 }

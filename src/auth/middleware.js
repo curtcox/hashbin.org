@@ -119,19 +119,119 @@ async function validateApiKey(apiKey, env) {
   // Hash the key for lookup
   const keyHash = await hashApiKey(apiKey);
 
-  // We need to find which user owns this key
-  // For now, we'll store a mapping in a special DO
-  // In a real implementation, you might want a KeyRegistry DO
-  // For this implementation, we'll iterate through user profiles (not scalable)
-  // A better approach would be to have a KeyRegistry DO that maps key hashes to user IDs
+  // Use KeyRegistry DO to find the user
+  const registryId = env.KEY_REGISTRY.idFromName('global');
+  const registryStub = env.KEY_REGISTRY.get(registryId);
 
-  // TODO: Implement KeyRegistry DO for efficient key lookup
-  // For now, return a placeholder that requires the user to be known
-  return {
-    valid: false,
-    error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
-    message: 'Key registry not yet implemented'
-  };
+  try {
+    const lookupResponse = await registryStub.fetch(
+      new Request('http://internal/lookup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ key_hash: keyHash })
+      })
+    );
+
+    if (!lookupResponse.ok) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+        message: 'API key not found'
+      };
+    }
+
+    const keyInfo = await lookupResponse.json();
+    const userId = keyInfo.user_id;
+    const keyId = keyInfo.key_id;
+
+    // Get the full key details from UserProfile DO
+    const userProfileId = env.USER_PROFILES.idFromName(userId);
+    const userProfileStub = env.USER_PROFILES.get(userProfileId);
+
+    const keyResponse = await userProfileStub.fetch(
+      new Request(`http://internal/apikeys/${keyId}`, {
+        method: 'GET'
+      })
+    );
+
+    if (!keyResponse.ok) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+        message: 'API key not found in user profile'
+      };
+    }
+
+    const apiKeyData = await keyResponse.json();
+
+    // Check if key is revoked
+    if (apiKeyData.revoked_at) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_REVOKED,
+        message: 'API key has been revoked'
+      };
+    }
+
+    // Check if key is expired
+    const expiresAt = new Date(apiKeyData.expires_at);
+    if (expiresAt <= new Date()) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_EXPIRED,
+        message: 'API key has expired'
+      };
+    }
+
+    // Update last_used_at timestamp
+    // Note: This could be done asynchronously to avoid blocking the request
+    userProfileStub.fetch(
+      new Request(`http://internal/apikeys/${keyId}/use`, {
+        method: 'POST'
+      })
+    ).catch(() => {
+      // Ignore errors updating last_used_at
+    });
+
+    // Get user profile
+    const profileResponse = await userProfileStub.fetch(
+      new Request('http://internal/profile', {
+        method: 'GET'
+      })
+    );
+
+    if (!profileResponse.ok) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+        message: 'User profile not found'
+      };
+    }
+
+    const profile = await profileResponse.json();
+
+    // Check if user is deleted
+    if (profile.deleted_at) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_USER_DELETED,
+        message: 'User account has been deleted'
+      };
+    }
+
+    return {
+      valid: true,
+      userId,
+      keyId,
+      profile
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+      message: 'Error validating API key'
+    };
+  }
 }
 
 /**

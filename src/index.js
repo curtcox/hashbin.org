@@ -9,6 +9,7 @@ export { UserProfile } from './durable-objects/user-profile.js';
 export { PaymentRecord } from './durable-objects/payment-record.js';
 export { ContestRecord } from './durable-objects/contest-record.js';
 export { MessageThread } from './durable-objects/message-thread.js';
+export { KeyRegistry } from './durable-objects/key-registry.js';
 
 // Import API route handlers
 import {
@@ -226,7 +227,8 @@ async function checkDurableObjects(env) {
     { name: 'USER_PROFILES', binding: env.USER_PROFILES },
     { name: 'PAYMENT_RECORDS', binding: env.PAYMENT_RECORDS },
     { name: 'CONTEST_RECORDS', binding: env.CONTEST_RECORDS },
-    { name: 'MESSAGE_THREADS', binding: env.MESSAGE_THREADS }
+    { name: 'MESSAGE_THREADS', binding: env.MESSAGE_THREADS },
+    { name: 'KEY_REGISTRY', binding: env.KEY_REGISTRY }
   ];
 
   const results = {};
