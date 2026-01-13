@@ -6,6 +6,34 @@
 import { verifyWebhook } from '@clerk/backend/webhooks';
 
 /**
+ * Extract OAuth providers from Clerk external_accounts
+ */
+function extractProviders(externalAccounts) {
+  const providers = [];
+  
+  if (externalAccounts && Array.isArray(externalAccounts)) {
+    for (const account of externalAccounts) {
+      // Use provider_user_id if available, otherwise use the account id
+      // Note: Some providers may only provide 'id' field
+      const providerUserId = account.provider_user_id || account.id;
+      
+      if (!providerUserId) {
+        console.warn('Skipping external account with no user ID:', account.provider);
+        continue;
+      }
+      
+      providers.push({
+        provider: account.provider, // e.g., 'google', 'github', 'oauth_apple'
+        provider_user_id: providerUserId,
+        linked_at: new Date(account.created_at).toISOString()
+      });
+    }
+  }
+  
+  return providers;
+}
+
+/**
  * Handle Clerk user.created webhook
  * Creates a new UserProfile when a user signs up
  */
@@ -13,18 +41,7 @@ async function handleUserCreated(event, env) {
   const userId = event.data.id;
   
   // Extract linked OAuth providers from the event
-  const providers = [];
-  
-  // Clerk provides external_accounts array with linked providers
-  if (event.data.external_accounts) {
-    for (const account of event.data.external_accounts) {
-      providers.push({
-        provider: account.provider, // e.g., 'google', 'github', 'oauth_apple'
-        provider_user_id: account.provider_user_id || account.id,
-        linked_at: new Date(account.created_at).toISOString()
-      });
-    }
-  }
+  const providers = extractProviders(event.data.external_accounts);
 
   // Create user profile in UserProfile DO
   const userProfileId = env.USER_PROFILES.idFromName(userId);
@@ -68,17 +85,7 @@ async function handleUserUpdated(event, env) {
   const userId = event.data.id;
 
   // Extract current linked OAuth providers
-  const providers = [];
-  
-  if (event.data.external_accounts) {
-    for (const account of event.data.external_accounts) {
-      providers.push({
-        provider: account.provider,
-        provider_user_id: account.provider_user_id || account.id,
-        linked_at: new Date(account.created_at).toISOString()
-      });
-    }
-  }
+  const providers = extractProviders(event.data.external_accounts);
 
   // Update user profile in UserProfile DO
   const userProfileId = env.USER_PROFILES.idFromName(userId);
@@ -171,7 +178,7 @@ export async function handleClerkWebhook(request, env) {
     let event;
     try {
       event = await verifyWebhook(request, {
-        secretKey: env.CLERK_WEBHOOK_SECRET
+        signingSecret: env.CLERK_WEBHOOK_SECRET
       });
     } catch (error) {
       console.error('Webhook signature verification failed:', error.message);
