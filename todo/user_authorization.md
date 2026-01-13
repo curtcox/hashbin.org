@@ -512,6 +512,31 @@ hb_test_<32-character-random-string>
 | ESC-13 | Appeal triggers re-review | User appeals Tier 1 decision | Re-enters at Tier 2 |
 | ESC-14 | All escalation decisions logged | Any state transition | Full audit trail stored |
 
+#### Submission Endpoint Tests
+
+| Test ID | Test Case | Input | Expected Output |
+|---------|-----------|-------|-----------------|
+| SUB-01 | Valid contest submission via API | Complete contest data | 201 Created, escalation_id returned |
+| SUB-02 | Valid DMCA submission via API | Complete DMCA data with signature | 201 Created, escalation_id returned |
+| SUB-03 | Contest missing content_hash | No content_hash field | 400 Bad Request |
+| SUB-04 | Contest missing claimant_email | No email field | 400 Bad Request |
+| SUB-05 | Contest with invalid email format | `not-an-email` | 400 Bad Request |
+| SUB-06 | Contest with non-existent content_hash | Unknown hash | 404 Not Found |
+| SUB-07 | DMCA missing sworn_statement | No sworn statement | 400 Bad Request |
+| SUB-08 | DMCA missing signature | No signature field | 400 Bad Request |
+| SUB-09 | DMCA missing claimant_name | No name field | 400 Bad Request |
+| SUB-10 | Contest form renders correctly | GET /contest | 200 OK, HTML form returned |
+| SUB-11 | DMCA form renders correctly | GET /dmca | 200 OK, HTML form returned |
+| SUB-12 | Contest form submission creates escalation | POST form data | Redirect to confirmation, escalation created |
+| SUB-13 | DMCA form submission creates escalation | POST form data | Redirect to confirmation, escalation created |
+| SUB-14 | Submission rate limiting enforced | 100+ submissions/hour from same IP | 429 Too Many Requests |
+| SUB-15 | Duplicate contest for same hash rejected | Same hash within 24h | 409 Conflict |
+| SUB-16 | Duplicate DMCA for same hash rejected | Same hash within 24h | 409 Conflict |
+| SUB-17 | Evidence field accepts large text | 10KB evidence text | 201 Created |
+| SUB-18 | Evidence field rejects oversized text | 1MB evidence text | 400 Bad Request (too large) |
+| SUB-19 | XSS in evidence field sanitized | `<script>alert(1)</script>` | Stored escaped, no XSS |
+| SUB-20 | SQL injection in email field blocked | `'; DROP TABLE--` | 400 Bad Request or safely escaped |
+
 #### Orphaned Account Tests
 
 | Test ID | Test Case | Input | Expected Output |
@@ -582,55 +607,109 @@ hb_test_<32-character-random-string>
 
 ---
 
+## Escalation System Decisions
+
+The following decisions have been made for the escalation system:
+
+### Escalation Triggers
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Tier 1 → Tier 2 triggers | **All conditions apply** | Escalate when: (a) no pattern match in rule set, (b) confidence score below 80%, OR (c) specific content types flag for AI review |
+| Tier 2 → Tier 3 triggers | **All conditions apply** | Escalate when: (a) AI confidence below 70%, (b) AI explicitly flags "needs human review", (c) content value above $50, OR (d) user requests human review |
+| Tier 1 confidence threshold | **80%** (configurable) | Automated rules must have 80%+ confidence to resolve without AI |
+| Tier 2 confidence threshold | **70%** (configurable) | AI must have 70%+ confidence to resolve without owner |
+| Content value threshold | **$50** (configurable) | Content valued above $50 automatically escalates to owner review |
+
+### Notification & SLAs
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Owner notification method | **Webhook only** | External webhook integration; no backup notification method |
+| Tier 1 SLA | **Immediate** | Automated processing completes in milliseconds |
+| Tier 2 SLA | **4 hours** (configurable) | AI review completes within 4 hours; allows for retries and queue processing |
+| Tier 3 SLA | **7 days** (configurable) | Owner has 7 days for manual review |
+| Webhook retry | **None** | No retry logic; single attempt only |
+
+### Webhook Payload
+
+The owner notification webhook includes all relevant information:
+
+```json
+{
+  "event_type": "escalation_tier3",
+  "escalation_id": "esc_xxx",
+  "request_type": "contest | dmca",
+  "content_hash": "256t_xxx",
+  "content_value": 75.00,
+  "submitter_email": "user@example.com",
+  "submission_timestamp": "2026-01-13T10:00:00Z",
+  "tier1_result": { "action": "escalated", "reason": "no_pattern_match" },
+  "tier2_result": { "action": "escalated", "confidence": 0.65, "reasoning": "..." },
+  "evidence": { ... },
+  "action_url": "https://hashbin.org/admin/escalation/esc_xxx"
+}
+```
+
+### Timeout & Appeals
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Default action on SLA expiry | **No action** | If owner doesn't respond within 7 days, no action is taken; content status unchanged |
+| DMCA SLA expiry | **No action** | Same policy for DMCA; content remains unchanged if no response |
+| Appeal process | **Next tier** | One appeal allowed per decision; appeals escalate to the next tier for re-review |
+| Tier 3 appeals | **Final** | Owner decisions cannot be appealed; Tier 3 is the final decision |
+
+### AI Service
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| AI service for Tier 2 | **OpenRouter** | OpenRouter provides access to multiple models with a unified API |
+| Default model | **anthropic/claude-3-sonnet** | Default model; configurable via `OPENROUTER_MODEL` env var |
+
+### Configuration
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Configuration storage | **Well-named constants** | Thresholds and SLAs stored as named constants in code; change requires redeployment |
+
+### Contest & DMCA Submission
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Submission methods | **Public form + API endpoint** | Both web form and programmatic API access |
+
+#### Submission Endpoints
+
+```
+GET /contest
+  - Public web form for submitting content contests
+  - No authentication required
+  - Collects: content_hash, claimant_email, evidence, reason
+
+POST /api/contest
+  - API endpoint for programmatic contest submission
+  - No authentication required
+  - Request: { content_hash, claimant_email, evidence, reason }
+  - Response: { escalation_id, status, created_at }
+
+GET /dmca
+  - Public web form for DMCA takedown requests
+  - No authentication required
+  - Collects: content_hash, claimant_email, claimant_name, sworn_statement
+
+POST /api/dmca
+  - API endpoint for programmatic DMCA submission
+  - No authentication required
+  - Request: { content_hash, claimant_email, claimant_name, sworn_statement, signature }
+  - Response: { escalation_id, status, created_at }
+```
+
+---
+
 ## Open Questions
 
-### Escalation System Details
-
-1. **Q: What triggers escalation from Tier 1 to Tier 2?**
-   - Need to define specific rules for when automated processing cannot resolve
-   - Options:
-     - (a) No pattern match in rule set
-     - (b) Confidence score below threshold
-     - (c) Specific content types always escalate
-     - (d) All of the above?
-
-2. **Q: What triggers escalation from Tier 2 (AI) to Tier 3 (Owner)?**
-   - Options:
-     - (a) AI confidence below X% (what threshold?)
-     - (b) AI explicitly flags as "needs human review"
-     - (c) Content value above $X
-     - (d) User explicitly requests human review
-
-3. **Q: How is the owner notified for Tier 3 review?**
-   - Options:
-     - (a) Email only
-     - (b) SMS + Email
-     - (c) Dashboard + Email
-     - (d) Webhook to external system
-
-4. **Q: What is the SLA for each escalation tier?**
-   - Tier 1 (Automated): Immediate?
-   - Tier 2 (AI): Minutes? Hours?
-   - Tier 3 (Owner): Hours? Days?
-   - What happens if SLA exceeded?
-
-5. **Q: What is the default action if owner doesn't respond (SLA expired)?**
-   - For contests: (a) Approve contest (b) Reject contest (c) Extend deadline
-   - For DMCA: (a) Remove content (b) Keep content (c) Suspend pending review
-
-6. **Q: Can users appeal automated or AI decisions?**
-   - Options:
-     - (a) No appeals
-     - (b) One appeal allowed, goes to next tier
-     - (c) Appeals always go to owner
-     - (d) Paid appeals only
-
-7. **Q: Which AI model/service for Tier 2 review?**
-   - Options:
-     - (a) Claude API
-     - (b) OpenAI API
-     - (c) Self-hosted model
-     - (d) Multiple models with consensus
+No open questions remain. All decisions have been made.
 
 ---
 
@@ -638,13 +717,14 @@ hb_test_<32-character-random-string>
 
 - **Phase 2 (Content Operations)**: Authorization depends on having content endpoints to protect
 - **Clerk Account**: Must set up Clerk application before implementation
-- **AI Service**: Required for Tier 2 escalation (model TBD)
+- **AI Service**: OpenRouter API for Tier 2 escalation
 - **Environment Variables**:
   - `CLERK_PUBLISHABLE_KEY`
   - `CLERK_SECRET_KEY`
   - `CLERK_WEBHOOK_SECRET`
-  - `AI_API_KEY` (for Tier 2)
-  - `OWNER_NOTIFICATION_EMAIL`
+  - `OPENROUTER_API_KEY` (for Tier 2)
+  - `OPENROUTER_MODEL` (configurable model ID, e.g., "anthropic/claude-3-sonnet")
+  - `OWNER_WEBHOOK_URL` (for Tier 3 notifications)
 
 ---
 
@@ -671,3 +751,8 @@ hb_test_<32-character-random-string>
 | 0.1 | 2026-01-13 | Claude | Initial draft |
 | 0.2 | 2026-01-13 | Claude | Added decisions, removed admin role, added account linking |
 | 0.3 | 2026-01-13 | Claude | Added escalation system, orphaned account handling, new tests |
+| 0.4 | 2026-01-13 | Claude | Resolved all escalation open questions |
+| 0.5 | 2026-01-13 | Claude | Added specific thresholds, SLAs, webhook payload, and finalized appeals |
+| 0.6 | 2026-01-13 | Claude | Marked values as configurable; set default model to claude-3-sonnet |
+| 0.7 | 2026-01-13 | Claude | Added configuration approach (constants) and contest/DMCA submission endpoints |
+| 0.8 | 2026-01-13 | Claude | Added 20 submission endpoint tests (SUB-01 through SUB-20) |
