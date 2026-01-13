@@ -53,4 +53,4 @@ preview_bucket_name = "hashbin-backups-dev"
 # Durable Objects migrations
 [[migrations]]
 tag = "v1"
-new_classes = ["ContentMetadata", "UserProfile", "PaymentRecord", "ContestRecord", "MessageThread"]
+new_sqlite_classes = ["ContentMetadata", "UserProfile", "PaymentRecord", "ContestRecord", "MessageThread"]
