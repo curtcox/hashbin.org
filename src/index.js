@@ -10,6 +10,11 @@ export { PaymentRecord } from './durable-objects/payment-record.js';
 export { ContestRecord } from './durable-objects/contest-record.js';
 export { MessageThread } from './durable-objects/message-thread.js';
 
+// Configuration constants
+const VALID_ENVIRONMENTS = ['development', 'production'];
+const VALID_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
+const HEALTH_CHECK_ID = 'health-check';
+
 /**
  * Main Worker fetch handler
  */
@@ -151,11 +156,8 @@ async function checkEnvironment(env) {
     const envName = env.ENVIRONMENT || 'unknown';
     const logLevel = env.LOG_LEVEL || 'unknown';
     
-    const validEnvs = ['development', 'production'];
-    const validLogLevels = ['debug', 'info', 'warn', 'error'];
-    
-    const envValid = validEnvs.includes(envName);
-    const logLevelValid = validLogLevels.includes(logLevel);
+    const envValid = VALID_ENVIRONMENTS.includes(envName);
+    const logLevelValid = VALID_LOG_LEVELS.includes(logLevel);
     
     const allValid = envValid && logLevelValid;
     
@@ -205,7 +207,7 @@ async function checkDurableObjects(env) {
         allOperational = false;
       } else {
         // Try to get an ID and stub - this validates the binding works
-        const id = doType.binding.idFromName('health-check');
+        const id = doType.binding.idFromName(HEALTH_CHECK_ID);
         const stub = doType.binding.get(id);
         results[doType.name] = {
           available: true,

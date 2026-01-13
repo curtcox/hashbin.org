@@ -115,11 +115,20 @@ echo ""
 echo "Test 3: Service status"
 echo "--------------------"
 
-# Extract status from nested checks object
-WORKER_STATUS=$(echo "$BODY" | grep -o '"worker"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
-ENV_STATUS=$(echo "$BODY" | grep -o '"environment"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
-DO_STATUS=$(echo "$BODY" | grep -o '"durableObjects"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
-R2_STATUS=$(echo "$BODY" | grep -o '"r2"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
+# Try to use jq if available, fallback to grep
+if command -v jq >/dev/null 2>&1; then
+  # Use jq for reliable JSON parsing
+  WORKER_STATUS=$(echo "$BODY" | jq -r '.checks.worker.status // "unknown"')
+  ENV_STATUS=$(echo "$BODY" | jq -r '.checks.environment.status // "unknown"')
+  DO_STATUS=$(echo "$BODY" | jq -r '.checks.durableObjects.status // "unknown"')
+  R2_STATUS=$(echo "$BODY" | jq -r '.checks.r2.status // "unknown"')
+else
+  # Fallback to grep for systems without jq
+  WORKER_STATUS=$(echo "$BODY" | grep -o '"worker"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
+  ENV_STATUS=$(echo "$BODY" | grep -o '"environment"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
+  DO_STATUS=$(echo "$BODY" | grep -o '"durableObjects"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
+  R2_STATUS=$(echo "$BODY" | grep -o '"r2"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
+fi
 
 echo "Worker: $WORKER_STATUS"
 echo "Environment: $ENV_STATUS"

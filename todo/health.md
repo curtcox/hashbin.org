@@ -251,11 +251,11 @@ This document maps requirements from `site_creation.md` to validation methods, i
 
 ### Overall Coverage
 
-- **Total site_creation.md requirements**: ~60 items
-- **Direct validation via /health**: 18 items (30%)
-- **Indirect validation**: 12 items (20%)
-- **Manual validation required**: 20 items (33%)
-- **Deferred to Phase 2+**: 10 items (17%)
+- **Total site_creation.md requirements tracked**: 48 items
+- **Direct validation via /health**: 18 items (38%)
+- **Indirect validation**: 12 items (25%)
+- **Manual validation required**: 13 items (27%)
+- **Deferred to Phase 2+**: 5 items (10%)
 
 ### By Category
 
