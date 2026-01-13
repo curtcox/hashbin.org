@@ -7,6 +7,11 @@ compatibility_date = "2024-01-01"
 name = "hashbin-worker-dev"
 vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
 
+# Note: Add these secrets using: wrangler secret put CLERK_SECRET_KEY --env development
+# CLERK_SECRET_KEY (required for development)
+# CLERK_PUBLISHABLE_KEY (required for development)
+# CLERK_WEBHOOK_SECRET (required for webhooks)
+
 # Production environment
 [env.production]
 name = "hashbin-worker-prod"
@@ -16,6 +21,11 @@ routes = [
 ]
 workers_dev = true
 vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
+
+# Note: Add these secrets using: wrangler secret put CLERK_SECRET_KEY --env production
+# CLERK_SECRET_KEY (required for production)
+# CLERK_PUBLISHABLE_KEY (required for production)
+# CLERK_WEBHOOK_SECRET (required for webhooks)
 
 # Production Durable Objects bindings
 [[env.production.durable_objects.bindings]]
@@ -37,6 +47,10 @@ class_name = "ContestRecord"
 [[env.production.durable_objects.bindings]]
 name = "MESSAGE_THREADS"
 class_name = "MessageThread"
+
+[[env.production.durable_objects.bindings]]
+name = "KEY_REGISTRY"
+class_name = "KeyRegistry"
 
 # Production R2 bucket bindings
 [[env.production.r2_buckets]]
@@ -73,6 +87,11 @@ name = "MESSAGE_THREADS"
 class_name = "MessageThread"
 script_name = "hashbin-worker"
 
+[[durable_objects.bindings]]
+name = "KEY_REGISTRY"
+class_name = "KeyRegistry"
+script_name = "hashbin-worker"
+
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -88,3 +107,7 @@ preview_bucket_name = "hashbin-backups-dev"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["ContentMetadata", "UserProfile", "PaymentRecord", "ContestRecord", "MessageThread"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["KeyRegistry"]

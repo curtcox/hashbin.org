@@ -9,6 +9,18 @@ export { UserProfile } from './durable-objects/user-profile.js';
 export { PaymentRecord } from './durable-objects/payment-record.js';
 export { ContestRecord } from './durable-objects/contest-record.js';
 export { MessageThread } from './durable-objects/message-thread.js';
+export { KeyRegistry } from './durable-objects/key-registry.js';
+
+// Import API route handlers
+import {
+  handleSessionInfo,
+  handleCreateApiKey,
+  handleListApiKeys,
+  handleRevokeApiKey,
+  handleDeleteAccount
+} from './api/auth.js';
+
+import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
 const VALID_ENVIRONMENTS = ['development', 'production'];
@@ -22,6 +34,11 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    // Apply rate limiting to all requests
+    const authResult = await authenticate(request, env);
+    const rateLimitError = applyRateLimit(request, authResult);
+    if (rateLimitError) return rateLimitError;
+
     // Basic routing
     if (url.pathname === '/') {
       return handleRoot(env);
@@ -31,9 +48,30 @@ export default {
       return handleHealth(env);
     }
 
+    // Authentication API routes
+    if (url.pathname === '/api/auth/session' && request.method === 'GET') {
+      return handleSessionInfo(request, env);
+    }
+
+    if (url.pathname === '/api/auth/apikeys' && request.method === 'POST') {
+      return handleCreateApiKey(request, env);
+    }
+
+    if (url.pathname === '/api/auth/apikeys' && request.method === 'GET') {
+      return handleListApiKeys(request, env);
+    }
+
+    if (url.pathname.startsWith('/api/auth/apikeys/') && request.method === 'DELETE') {
+      const keyId = url.pathname.split('/')[4];
+      return handleRevokeApiKey(request, env, keyId);
+    }
+
+    if (url.pathname === '/api/auth/account' && request.method === 'DELETE') {
+      return handleDeleteAccount(request, env);
+    }
+
     // TODO: Add API routes for:
     // - Content upload/download
-    // - Authentication
     // - Payments
     // - Contests
     // - Public records
@@ -189,7 +227,8 @@ async function checkDurableObjects(env) {
     { name: 'USER_PROFILES', binding: env.USER_PROFILES },
     { name: 'PAYMENT_RECORDS', binding: env.PAYMENT_RECORDS },
     { name: 'CONTEST_RECORDS', binding: env.CONTEST_RECORDS },
-    { name: 'MESSAGE_THREADS', binding: env.MESSAGE_THREADS }
+    { name: 'MESSAGE_THREADS', binding: env.MESSAGE_THREADS },
+    { name: 'KEY_REGISTRY', binding: env.KEY_REGISTRY }
   ];
 
   const results = {};
