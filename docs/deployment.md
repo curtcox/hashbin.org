@@ -677,10 +677,10 @@ After successful deployment:
 
 ## Additional Documentation
 
-- `DEPLOYMENT_SETUP.md` - Quick setup guide for hashbin.org
+- `todo/deployment_setup.md` - Quick setup guide for hashbin.org
 - `scripts/README.md` - Deployment verification scripts
 - `todo/master_plan.md` - Project roadmap and phases
-- `todo/site_creation.md` - Detailed implementation plan
+- `done/site_creation.md` - Detailed implementation plan (Phase 1 complete)
 
 ---
 
