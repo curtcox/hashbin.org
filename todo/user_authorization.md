@@ -592,9 +592,9 @@ The following decisions have been made for the escalation system:
 |----------|--------|-----------|
 | Tier 1 → Tier 2 triggers | **All conditions apply** | Escalate when: (a) no pattern match in rule set, (b) confidence score below 80%, OR (c) specific content types flag for AI review |
 | Tier 2 → Tier 3 triggers | **All conditions apply** | Escalate when: (a) AI confidence below 70%, (b) AI explicitly flags "needs human review", (c) content value above $50, OR (d) user requests human review |
-| Tier 1 confidence threshold | **80%** | Automated rules must have 80%+ confidence to resolve without AI |
-| Tier 2 confidence threshold | **70%** | AI must have 70%+ confidence to resolve without owner |
-| Content value threshold | **$50** | Content valued above $50 automatically escalates to owner review |
+| Tier 1 confidence threshold | **80%** (configurable) | Automated rules must have 80%+ confidence to resolve without AI |
+| Tier 2 confidence threshold | **70%** (configurable) | AI must have 70%+ confidence to resolve without owner |
+| Content value threshold | **$50** (configurable) | Content valued above $50 automatically escalates to owner review |
 
 ### Notification & SLAs
 
@@ -602,9 +602,9 @@ The following decisions have been made for the escalation system:
 |----------|--------|-----------|
 | Owner notification method | **Webhook only** | External webhook integration; no backup notification method |
 | Tier 1 SLA | **Immediate** | Automated processing completes in milliseconds |
-| Tier 2 SLA | **4 hours** | AI review completes within 4 hours; allows for retries and queue processing |
-| Tier 3 SLA | **7 days** | Owner has 7 days for manual review |
-| Webhook backup | **None** | If webhook fails, no alternative notification is sent |
+| Tier 2 SLA | **4 hours** (configurable) | AI review completes within 4 hours; allows for retries and queue processing |
+| Tier 3 SLA | **7 days** (configurable) | Owner has 7 days for manual review |
+| Webhook retry | **None** | No retry logic; single attempt only |
 
 ### Webhook Payload
 
@@ -640,7 +640,7 @@ The owner notification webhook includes all relevant information:
 | Decision | Choice | Rationale |
 |----------|--------|-----------|
 | AI service for Tier 2 | **OpenRouter** | OpenRouter provides access to multiple models with a unified API |
-| Model selection | **Configurable** | Model is configurable via environment variable; may change over time |
+| Default model | **anthropic/claude-3-sonnet** | Default model; configurable via `OPENROUTER_MODEL` env var |
 
 ---
 
@@ -690,3 +690,4 @@ No open questions remain. All decisions have been made.
 | 0.3 | 2026-01-13 | Claude | Added escalation system, orphaned account handling, new tests |
 | 0.4 | 2026-01-13 | Claude | Resolved all escalation open questions |
 | 0.5 | 2026-01-13 | Claude | Added specific thresholds, SLAs, webhook payload, and finalized appeals |
+| 0.6 | 2026-01-13 | Claude | Marked values as configurable; set default model to claude-3-sonnet |
