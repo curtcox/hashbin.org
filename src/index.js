@@ -130,6 +130,11 @@ function handleApiRoutes(url, request, env) {
     return handleHealth(env);
   }
 
+  // Public config endpoint (serves non-secret configuration to frontend)
+  if (url.pathname === '/api/config' && request.method === 'GET') {
+    return handleConfig(env);
+  }
+
   // Authentication API routes
   if (url.pathname === '/api/auth/callback' && request.method === 'POST') {
     return handleAuthCallback(request, env);
@@ -237,6 +242,24 @@ function handleRoot(env) {
     headers: {
       'content-type': 'application/json',
       'access-control-allow-origin': '*'
+    }
+  });
+}
+
+/**
+ * Public configuration endpoint
+ * Returns non-secret configuration needed by the frontend
+ */
+function handleConfig(env) {
+  const config = {
+    clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY || null
+  };
+
+  return new Response(JSON.stringify(config), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=300' // Cache for 5 minutes
     }
   });
 }
