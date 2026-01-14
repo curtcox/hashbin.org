@@ -15,11 +15,25 @@ const authStateListeners = new Set();
  */
 export async function initializeClerk() {
   try {
-    // Get Clerk publishable key from window (injected at build time)
-    const publishableKey = window.CLERK_PUBLISHABLE_KEY;
-    
+    // Get Clerk publishable key from API config endpoint
+    let publishableKey = null;
+    try {
+      const configResponse = await fetch('/api/config');
+      if (configResponse.ok) {
+        const config = await configResponse.json();
+        publishableKey = config.clerkPublishableKey;
+      }
+    } catch (configError) {
+      console.warn('Failed to fetch config from API:', configError);
+    }
+
+    // Fallback to window variable if API fails
     if (!publishableKey) {
-      console.error('Clerk publishable key not found');
+      publishableKey = window.CLERK_PUBLISHABLE_KEY;
+    }
+
+    if (!publishableKey || publishableKey === 'YOUR_CLERK_PUBLISHABLE_KEY') {
+      console.error('Clerk publishable key not configured');
       return false;
     }
 
