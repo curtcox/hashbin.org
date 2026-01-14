@@ -70,99 +70,37 @@ export default {
     const rateLimitError = applyRateLimit(request, authResult);
     if (rateLimitError) return rateLimitError;
 
-    // Basic routing
-    if (url.pathname === '/') {
-      return handleRoot(env);
+    // API routes (all paths starting with /api or /health)
+    if (url.pathname.startsWith('/api/') || url.pathname === '/health') {
+      // Handle API routes (existing logic below)
+      return handleApiRoutes(url, request, env);
     }
 
-    if (url.pathname === '/health') {
-      return handleHealth(env);
-    }
-
-    // Authentication API routes
-    if (url.pathname === '/api/auth/callback' && request.method === 'POST') {
-      return handleAuthCallback(request, env);
-    }
-
-    if (url.pathname === '/api/auth/session' && request.method === 'GET') {
-      return handleSessionInfo(request, env);
-    }
-
-    if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
-      return handleLogout(request, env);
-    }
-
-    if (url.pathname === '/api/auth/link' && request.method === 'POST') {
-      return handleLinkProvider(request, env);
-    }
-
-    if (url.pathname === '/api/auth/apikeys' && request.method === 'POST') {
-      return handleCreateApiKey(request, env);
-    }
-
-    if (url.pathname === '/api/auth/apikeys' && request.method === 'GET') {
-      return handleListApiKeys(request, env);
-    }
-
-    if (url.pathname.startsWith('/api/auth/apikeys/') && request.method === 'DELETE') {
-      const keyId = url.pathname.split('/')[4];
-      return handleRevokeApiKey(request, env, keyId);
-    }
-
-    if (url.pathname === '/api/auth/account' && request.method === 'DELETE') {
-      return handleDeleteAccount(request, env);
-    }
-
-    // Balance API routes
-    if (url.pathname === '/api/balance' && request.method === 'GET') {
-      return handleGetBalance(request, env);
-    }
-
-    if (url.pathname === '/api/balance/history' && request.method === 'GET') {
-      return handleGetBalanceHistory(request, env);
-    }
-
-    if (url.pathname === '/api/balance/deposit' && request.method === 'POST') {
-      return handleCreateDeposit(request, env);
-    }
-
-    // Payment calculation endpoint (public)
-    if (url.pathname === '/api/payments/calculate' && request.method === 'POST') {
-      return handleCalculateRetention(request, env);
-    }
-
-    // Content API routes
-    if (url.pathname === '/api/content' && request.method === 'POST') {
-      return handleUploadContent(request, env);
-    }
-
-    if (url.pathname.startsWith('/api/content/') && request.method === 'GET') {
-      const parts = url.pathname.split('/');
-      const cid = parts[3];
-      const action = parts[4];
-
-      if (!action) {
-        return handleGetContent(request, env, cid);
-      } else if (action === 'exists') {
-        return handleCheckContentExists(request, env, cid);
+    // Try to serve static assets for non-API paths
+    if (env.ASSETS) {
+      try {
+        // Serve static files
+        const asset = await env.ASSETS.fetch(request);
+        
+        // If asset found, return it
+        if (asset.status !== 404) {
+          return asset;
+        }
+        
+        // If requesting a path without extension, try index.html
+        if (!url.pathname.includes('.')) {
+          const indexRequest = new Request(new URL('/index.html', url), request);
+          const indexAsset = await env.ASSETS.fetch(indexRequest);
+          if (indexAsset.status !== 404) {
+            return indexAsset;
+          }
+        }
+      } catch (error) {
+        console.error('Asset serving error:', error);
       }
     }
 
-    if (url.pathname.startsWith('/api/content/') && url.pathname.endsWith('/extend') && request.method === 'POST') {
-      const cid = url.pathname.split('/')[3];
-      return handleExtendContent(request, env, cid);
-    }
-
-    // Donation API route (public - no auth required)
-    if (url.pathname.startsWith('/api/donate/cid/') && request.method === 'POST') {
-      const cid = url.pathname.split('/')[4];
-      return handleCreateDonation(request, env, cid);
-    }
-
-    // TODO: Add API routes for:
-    // - Contests
-    // - Public records
-
+    // If no static asset found, return 404
     return new Response('Not Found', { status: 404 });
   },
 
@@ -190,7 +128,104 @@ export default {
 };
 
 /**
+ * Handle API routes
+ */
+function handleApiRoutes(url, request, env) {
+  // Basic routing
+  if (url.pathname === '/health') {
+    return handleHealth(env);
+  }
+
+  // Authentication API routes
+  if (url.pathname === '/api/auth/callback' && request.method === 'POST') {
+    return handleAuthCallback(request, env);
+  }
+
+  if (url.pathname === '/api/auth/session' && request.method === 'GET') {
+    return handleSessionInfo(request, env);
+  }
+
+  if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
+    return handleLogout(request, env);
+  }
+
+  if (url.pathname === '/api/auth/link' && request.method === 'POST') {
+    return handleLinkProvider(request, env);
+  }
+
+  if (url.pathname === '/api/auth/apikeys' && request.method === 'POST') {
+    return handleCreateApiKey(request, env);
+  }
+
+  if (url.pathname === '/api/auth/apikeys' && request.method === 'GET') {
+    return handleListApiKeys(request, env);
+  }
+
+  if (url.pathname.startsWith('/api/auth/apikeys/') && request.method === 'DELETE') {
+    const keyId = url.pathname.split('/')[4];
+    return handleRevokeApiKey(request, env, keyId);
+  }
+
+  if (url.pathname === '/api/auth/account' && request.method === 'DELETE') {
+    return handleDeleteAccount(request, env);
+  }
+
+  // Balance API routes
+  if (url.pathname === '/api/balance' && request.method === 'GET') {
+    return handleGetBalance(request, env);
+  }
+
+  if (url.pathname === '/api/balance/history' && request.method === 'GET') {
+    return handleGetBalanceHistory(request, env);
+  }
+
+  if (url.pathname === '/api/balance/deposit' && request.method === 'POST') {
+    return handleCreateDeposit(request, env);
+  }
+
+  // Payment calculation endpoint (public)
+  if (url.pathname === '/api/payments/calculate' && request.method === 'POST') {
+    return handleCalculateRetention(request, env);
+  }
+
+  // Content API routes
+  if (url.pathname === '/api/content' && request.method === 'POST') {
+    return handleUploadContent(request, env);
+  }
+
+  if (url.pathname.startsWith('/api/content/') && request.method === 'GET') {
+    const parts = url.pathname.split('/');
+    const cid = parts[3];
+    const action = parts[4];
+
+    if (!action) {
+      return handleGetContent(request, env, cid);
+    } else if (action === 'exists') {
+      return handleCheckContentExists(request, env, cid);
+    }
+  }
+
+  if (url.pathname.startsWith('/api/content/') && url.pathname.endsWith('/extend') && request.method === 'POST') {
+    const cid = url.pathname.split('/')[3];
+    return handleExtendContent(request, env, cid);
+  }
+
+  // Donation API route (public - no auth required)
+  if (url.pathname.startsWith('/api/donate/cid/') && request.method === 'POST') {
+    const cid = url.pathname.split('/')[4];
+    return handleCreateDonation(request, env, cid);
+  }
+
+  // TODO: Add API routes for:
+  // - Contests
+  // - Public records
+
+  return new Response('Not Found', { status: 404 });
+}
+
+/**
  * Root endpoint - Basic info
+ */
  */
 function handleRoot(env) {
   const info = {

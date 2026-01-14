@@ -23,6 +23,7 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 - **Storage**: Cloudflare R2 (S3-compatible object storage)
 - **Database**: Cloudflare Durable Objects (distributed, transactional)
 - **Authentication**: Clerk (OAuth provider management)
+- **Frontend**: Vanilla HTML/CSS/JavaScript (ES6 modules, no build step)
 - **Language**: JavaScript (ES modules)
 - **Deployment**: GitHub Actions + Wrangler CLI
 
@@ -42,6 +43,15 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 - Account management (creation, deletion, linking)
 - Webhook handlers for user lifecycle events
 - **15/15 tests passing** ✅
+
+### ✅ Phase 7: Frontend Login UI (Complete)
+- Landing page with navigation and auth header
+- User authentication UI (Sign In/Sign Out)
+- Balance display in header
+- Protected pages (upload, dashboard, deposit)
+- Public retrieve page
+- Session persistence and auth gate
+- **Frontend deployed with Worker** ✅
 
 ### 🚧 Phase 2: Core Content Operations (Planned)
 - 256t hash generation and validation
@@ -231,8 +241,10 @@ See [todo/manual_testing_guide.md](todo/manual_testing_guide.md) for comprehensi
 ## Documentation
 
 - **[API Reference](docs/API.md)** - Complete API endpoint documentation with examples ✨
+- **[Frontend Deployment](docs/frontend-deployment.md)** - Frontend setup and Clerk configuration ✨
 - **[Master Plan](todo/master_plan.md)** - Complete implementation roadmap
 - **[User Authorization](todo/user_authorization.md)** - Authentication system (Phase 3) ✅
+- **[Login Implementation](todo/login.md)** - Frontend login functionality ✅
 - **[Account Management](todo/account_management.md)** - Account linking and deletion
 - **[Content Dispute Resolution](todo/content_dispute_resolution.md)** - Contest system (Phase 6)
 - **[Deployment Guide](docs/deployment.md)** - Production deployment instructions

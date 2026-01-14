@@ -2,6 +2,11 @@ name = "hashbin-worker"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
 
+# Static assets (frontend files)
+[assets]
+directory = "./frontend"
+binding = "ASSETS"
+
 # Development environment
 [env.development]
 name = "hashbin-worker-dev"
