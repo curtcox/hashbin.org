@@ -26,9 +26,23 @@ export async function handleGetBalance(request, env) {
   }
 
   try {
-    const userId = authResult.userId;
+    const userId = authResult.user.userId;
     const id = env.USER_PROFILES.idFromName(userId);
     const stub = env.USER_PROFILES.get(id);
+    
+    // If profile doesn't exist yet, create it (handles first login)
+    if (authResult.user.profileExists === false) {
+      await stub.fetch(
+        new Request('http://internal/profile', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId,
+            providers: []
+          })
+        })
+      );
+    }
     
     const response = await stub.fetch(new Request('http://internal/balance'));
     return response;
@@ -72,7 +86,7 @@ export async function handleGetBalanceHistory(request, env) {
     const offset = url.searchParams.get('offset') || '0';
     const type = url.searchParams.get('type');
 
-    const userId = authResult.userId;
+    const userId = authResult.user.userId;
     const id = env.PAYMENT_RECORDS.idFromName(userId);
     const stub = env.PAYMENT_RECORDS.get(id);
     

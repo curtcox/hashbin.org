@@ -63,7 +63,7 @@ export async function handleUploadContent(request, env) {
     }
 
     const size_bytes = file.size;
-    const userId = authResult.userId;
+    const userId = authResult.user.userId;
 
     // Calculate cost
     const cost_cents = calculateRetentionCost(size_bytes, retention_months);
@@ -410,7 +410,7 @@ export async function handleExtendContent(request, env, cid) {
       );
     }
 
-    const userId = authResult.userId;
+    const userId = authResult.user.userId;
 
     // Get content metadata to find size
     const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);

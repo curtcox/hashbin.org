@@ -8,7 +8,7 @@ When a new user logs in for the first time through Clerk authentication, the sys
 
 ### 1. Profile Creation Flow
 
-The user profile creation happens automatically during the first login:
+The user profile creation happens automatically during the first login at multiple points:
 
 ```
 User logs in with Clerk
@@ -19,7 +19,9 @@ Middleware detects profile doesn't exist (404 from UserProfile DO)
     ↓
 Middleware returns profileExists: false
     ↓
-handleSessionInfo checks profileExists === false
+User accesses /api/balance or /api/auth/session
+    ↓
+Endpoint checks profileExists === false
     ↓
 Creates profile with balance_cents: 0
     ↓
@@ -69,6 +71,28 @@ if (!response.ok) {
   }
 }
 ```
+
+#### Balance API Handler (`src/api/balance.js`)
+
+The `handleGetBalance` endpoint also creates the profile on first access if it doesn't exist:
+
+```javascript
+// If profile doesn't exist yet, create it (handles first login)
+if (authResult.user.profileExists === false) {
+  await stub.fetch(
+    new Request('http://internal/profile', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        providers: []
+      })
+    })
+  );
+}
+```
+
+This ensures that users can access their balance immediately without needing to call the session endpoint first.
 
 #### Session Info Handler (`src/api/auth.js`)
 
@@ -140,7 +164,9 @@ The `scripts/test-user-balance.sh` script verifies:
 4. **API Authentication**: Balance endpoint requires authentication
 5. **Complete Initialization**: All balance fields initialized to 0
 6. **Auth Flow**: Session handler creates profiles for new users
-7. **Profile Detection**: Middleware detects missing profiles
+7. **Balance Endpoint Profile Creation**: Balance endpoint creates profiles for new users
+8. **Correct userId Access**: Balance endpoint uses `authResult.user.userId`
+9. **Profile Detection**: Middleware detects missing profiles
 
 ### Running Tests
 

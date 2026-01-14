@@ -161,7 +161,31 @@ else
 fi
 
 # ==========================================
-# Test 7: Middleware detects missing profiles
+# Test 7: Balance endpoint creates profile for new users
+# ==========================================
+log_test "Balance endpoint creates profile for new users on first access"
+
+# Check that handleGetBalance creates profile when profileExists is false
+if grep -A 15 "profileExists === false" src/api/balance.js | grep -q "method: 'POST'"; then
+  log_pass "Balance endpoint creates profile for new users"
+else
+  log_fail "Balance endpoint does not create profile for new users"
+fi
+
+# ==========================================
+# Test 8: Balance endpoint uses correct userId accessor
+# ==========================================
+log_test "Balance endpoint correctly accesses userId from authResult"
+
+# Check that balance endpoint uses authResult.user.userId
+if grep -q "authResult.user.userId" src/api/balance.js; then
+  log_pass "Balance endpoint uses authResult.user.userId"
+else
+  log_fail "Balance endpoint does not use correct userId accessor"
+fi
+
+# ==========================================
+# Test 9: Middleware detects missing profiles
 # ==========================================
 log_test "Authentication middleware detects profiles that don't exist yet"
 
