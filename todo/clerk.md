@@ -517,16 +517,9 @@ Expected:
 
 ---
 
-## 7. Rollback Plan
+## 7. Failure Notification
 
-If Clerk integration fails in production:
-
-1. **Immediate:** Health endpoint will show `clerk: degraded/down`
-2. **Alert:** Smoke tests will fail and notify via GitHub Actions
-3. **Mitigation:**
-   - Auth endpoints return 503 if Clerk is down
-   - Public endpoints continue working
-   - Existing sessions remain valid (JWT-based)
+If Clerk integration fails in production, smoke tests will fail and notify via GitHub Actions.
 
 ---
 
