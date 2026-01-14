@@ -82,9 +82,9 @@ export async function handleCreateDeposit(request, env) {
       mode: 'payment',
       success_url: `${baseUrl}/balance?deposit=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${baseUrl}/balance?deposit=cancel`,
-      client_reference_id: authResult.userId,
+      client_reference_id: authResult.user.userId,
       metadata: {
-        user_id: authResult.userId,
+        user_id: authResult.user.userId,
         type: 'deposit',
         amount_cents: amount_cents.toString()
       },
@@ -412,7 +412,7 @@ export async function handleCreateDonation(request, env, cid) {
 
     // Get optional donor user ID
     const authResult = await authenticate(request, env);
-    const donorId = authResult.authenticated ? authResult.userId : null;
+    const donorId = authResult.authenticated ? authResult.user.userId : null;
 
     // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
