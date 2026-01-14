@@ -25,6 +25,22 @@ import {
 
 import { handleClerkWebhook } from './api/webhooks.js';
 
+import { handleGetBalance, handleGetBalanceHistory } from './api/balance.js';
+
+import { 
+  handleCreateDeposit, 
+  handleStripeWebhook, 
+  handleCalculateRetention,
+  handleCreateDonation
+} from './api/payments.js';
+
+import {
+  handleUploadContent,
+  handleGetContent,
+  handleCheckContentExists,
+  handleExtendContent
+} from './api/content.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -43,6 +59,10 @@ export default {
     // These are verified by signature instead
     if (url.pathname === '/api/webhooks/clerk' && request.method === 'POST') {
       return handleClerkWebhook(request, env);
+    }
+
+    if (url.pathname === '/api/payments/webhook' && request.method === 'POST') {
+      return handleStripeWebhook(request, env);
     }
 
     // Apply rate limiting to all other requests
@@ -93,9 +113,53 @@ export default {
       return handleDeleteAccount(request, env);
     }
 
+    // Balance API routes
+    if (url.pathname === '/api/balance' && request.method === 'GET') {
+      return handleGetBalance(request, env);
+    }
+
+    if (url.pathname === '/api/balance/history' && request.method === 'GET') {
+      return handleGetBalanceHistory(request, env);
+    }
+
+    if (url.pathname === '/api/balance/deposit' && request.method === 'POST') {
+      return handleCreateDeposit(request, env);
+    }
+
+    // Payment calculation endpoint (public)
+    if (url.pathname === '/api/payments/calculate' && request.method === 'POST') {
+      return handleCalculateRetention(request, env);
+    }
+
+    // Content API routes
+    if (url.pathname === '/api/content' && request.method === 'POST') {
+      return handleUploadContent(request, env);
+    }
+
+    if (url.pathname.startsWith('/api/content/') && request.method === 'GET') {
+      const parts = url.pathname.split('/');
+      const cid = parts[3];
+      const action = parts[4];
+
+      if (!action) {
+        return handleGetContent(request, env, cid);
+      } else if (action === 'exists') {
+        return handleCheckContentExists(request, env, cid);
+      }
+    }
+
+    if (url.pathname.startsWith('/api/content/') && url.pathname.endsWith('/extend') && request.method === 'POST') {
+      const cid = url.pathname.split('/')[3];
+      return handleExtendContent(request, env, cid);
+    }
+
+    // Donation API route (public - no auth required)
+    if (url.pathname.startsWith('/api/donate/cid/') && request.method === 'POST') {
+      const cid = url.pathname.split('/')[4];
+      return handleCreateDonation(request, env, cid);
+    }
+
     // TODO: Add API routes for:
-    // - Content upload/download
-    // - Payments
     // - Contests
     // - Public records
 
@@ -107,12 +171,21 @@ export default {
    * Used for daily backups and expiration checks
    */
   async scheduled(event, env, ctx) {
-    // TODO: Implement scheduled tasks
-    // - Daily Durable Objects snapshots
-    // - Content expiration checks
-    // - Deletion processing
+    try {
+      console.log('Scheduled job executed:', new Date().toISOString());
 
-    console.log('Scheduled job executed:', new Date().toISOString());
+      // Run content expiration checks
+      // Note: In a real implementation, we would need to maintain an index
+      // of all content and their expiration dates. For now, this is a placeholder.
+      // TODO: Implement content expiration index and cleanup
+      
+      // Check for content expiring in 30 days (warning emails)
+      // TODO: Implement 30-day warning email system
+      
+      console.log('Scheduled tasks completed');
+    } catch (error) {
+      console.error('Scheduled job error:', error);
+    }
   }
 };
 

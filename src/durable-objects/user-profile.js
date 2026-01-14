@@ -69,6 +69,20 @@ export class UserProfile {
         return await this.updateLastUsed(keyId);
       }
 
+      if (url.pathname === '/balance' && method === 'GET') {
+        return await this.getBalance();
+      }
+
+      if (url.pathname === '/balance/deposit' && method === 'POST') {
+        const data = await request.json();
+        return await this.depositBalance(data);
+      }
+
+      if (url.pathname === '/balance/debit' && method === 'POST') {
+        const data = await request.json();
+        return await this.debitBalance(data);
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -133,7 +147,10 @@ export class UserProfile {
       updated_at: new Date().toISOString(),
       deleted_at: null,
       api_keys: [],
-      uploads: []
+      uploads: [],
+      balance_cents: 0,
+      total_deposited_cents: 0,
+      total_spent_cents: 0
     };
 
     await this.state.storage.put('profile', profile);
@@ -526,6 +543,165 @@ export class UserProfile {
     return new Response(
       JSON.stringify({
         success: true
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Get balance information
+   */
+  async getBalance() {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({
+          error: 'Profile not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        balance_cents: profile.balance_cents || 0,
+        total_deposited_cents: profile.total_deposited_cents || 0,
+        total_spent_cents: profile.total_spent_cents || 0
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Deposit to balance (credit)
+   * This should only be called after successful Stripe payment
+   */
+  async depositBalance(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({
+          error: 'Profile not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const amount_cents = data.amount_cents;
+    if (!amount_cents || amount_cents <= 0) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid amount',
+          message: 'Amount must be greater than 0'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const balance_before = profile.balance_cents || 0;
+    const balance_after = balance_before + amount_cents;
+
+    profile.balance_cents = balance_after;
+    profile.total_deposited_cents = (profile.total_deposited_cents || 0) + amount_cents;
+    profile.updated_at = new Date().toISOString();
+
+    await this.state.storage.put('profile', profile);
+
+    return new Response(
+      JSON.stringify({
+        balance_before_cents: balance_before,
+        balance_after_cents: balance_after,
+        amount_cents: amount_cents
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Debit from balance (payment)
+   * Returns error if insufficient balance
+   */
+  async debitBalance(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({
+          error: 'Profile not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const amount_cents = data.amount_cents;
+    if (!amount_cents || amount_cents <= 0) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid amount',
+          message: 'Amount must be greater than 0'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const balance_before = profile.balance_cents || 0;
+    
+    // Check for sufficient balance
+    if (balance_before < amount_cents) {
+      return new Response(
+        JSON.stringify({
+          error: 'insufficient_balance',
+          message: 'Insufficient balance for this transaction',
+          balance_cents: balance_before,
+          required_cents: amount_cents,
+          shortfall_cents: amount_cents - balance_before
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const balance_after = balance_before - amount_cents;
+
+    profile.balance_cents = balance_after;
+    profile.total_spent_cents = (profile.total_spent_cents || 0) + amount_cents;
+    profile.updated_at = new Date().toISOString();
+
+    await this.state.storage.put('profile', profile);
+
+    return new Response(
+      JSON.stringify({
+        balance_before_cents: balance_before,
+        balance_after_cents: balance_after,
+        amount_cents: amount_cents
       }),
       {
         status: 200,

@@ -1,5 +1,50 @@
 # User Payments Implementation Plan
 
+## Implementation Status
+
+**Current Phase:** Phase 4 (Payments) - COMPLETE ✅
+
+### Completed Phases
+
+#### Phase 4.1: Balance Infrastructure ✅
+- Added balance fields to UserProfile Durable Object
+- Created TransactionRecord Durable Object (PaymentRecord)
+- Implemented deposit/debit operations with atomicity
+- Created `/api/balance` endpoint
+- Created `/api/balance/history` endpoint
+- Added pricing calculator utility
+
+#### Phase 4.2: Deposit Flow ✅
+- Added Stripe SDK dependency to package.json
+- Implemented `/api/balance/deposit` endpoint
+- Implemented Stripe webhook handler for deposits
+- Implemented `/api/payments/calculate` endpoint
+- Updated wrangler.toml with Stripe configuration
+
+#### Phase 4.3: Upload Payment Integration ✅
+- Added retention fields to ContentMetadata Durable Object
+- Created content upload API endpoint
+- Implemented balance check and deduction on upload
+- Implemented rejection messages for insufficient balance
+- Implemented duplicate content detection and extension
+- Added `/api/content/:cid` endpoint
+- Added `/api/content/:cid/exists` endpoint
+- Added `/api/content/:cid/extend` endpoint
+
+#### Phase 4.4: CID Donations ✅
+- Implemented `/api/donate/cid/:cid` endpoint
+- Added Stripe webhook handling for donations
+- Implemented anonymous donation support
+- Recorded donations for authenticated users
+
+#### Phase 4.5: Expiration & Notifications (Partial)
+- Added scheduled job placeholder for content expiration
+- ⚠️ Note: Full expiration system requires content index implementation
+- ⚠️ Note: Email notifications require email service integration
+- ⚠️ Note: Receipt generation requires email service integration
+
+---
+
 ## Overview
 
 HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
