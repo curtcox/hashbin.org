@@ -354,6 +354,18 @@ frontend/
 | 6 | **Content-Type Handling** | No preview | Always display as generic file. No image/text/PDF previews. |
 | 7 | **Clerk Session Storage** | Cookies only (not configurable) | Clerk exclusively uses `__session` cookie with `SameSite=Lax`. 4KB limit. No CORS issues for same-domain. |
 
+### Important Questions (Resolved)
+
+| # | Question | Decision | Notes |
+|---|----------|----------|-------|
+| 8 | **Error Recovery** | Show error to user | Display error information directly. No queuing, no maintenance page. |
+| 9 | **Balance Sync Frequency** | On-demand only | Balance refreshes when user explicitly requests or on page load. No polling/WebSocket. |
+| 10 | **Public Records Pagination** | Single page (no pagination) | Load all records on one page for now. Can add pagination later if needed. |
+| 11 | **API Key Display** | No hiding/timeout | Key remains visible until user navigates away. No automatic timeout. |
+| 12 | **Upload Queue** | No queue (one at a time) | User must wait for current upload to complete before starting another. |
+| 13 | **Browser Tab Behavior** | Tabs are independent | No cross-tab sync. Each tab manages its own auth state via Clerk cookies. |
+| 14 | **Duplicate Content UX** | No prominent display | Simple message only. Don't prominently show existing file details. |
+
 ### 256t Hash Implementation Details
 
 Per the project specification, 256t hashes are computed as:
@@ -383,31 +395,16 @@ async function compute256t(content) {
 
 ## Open Questions
 
-### Important Questions (Should Resolve Before Implementation)
+### Deferred Questions (Nice-to-Have)
 
-8. **Error Recovery**: If the backend is temporarily unavailable, how should the frontend behave? Queue operations? Show maintenance page?
+| # | Question | Status |
+|---|----------|--------|
+| 15 | Keyboard Shortcuts | Deferred |
+| 16 | Accessibility Preferences Persistence | Deferred |
+| 17 | Web Share API Integration | Deferred |
+| 18 | Browser Notification Permissions | Deferred |
 
-9. **Balance Sync Frequency**: How often should the dashboard refresh the wallet balance? On-demand, polling, WebSocket?
-
-10. **Public Records Pagination**: How many records per page? Should we support infinite scroll or traditional pagination?
-
-11. **API Key Display Security**: When showing the API key once on creation, should we implement a timeout before it's hidden?
-
-12. **Upload Queue**: Should users be able to queue multiple files for upload, or one at a time?
-
-13. **Browser Tab Behavior**: If user has multiple tabs open, how do we handle auth state sync?
-
-14. **Duplicate Content UX**: When user uploads duplicate content, should we show the existing file's details prominently?
-
-### Nice-to-Have Questions (Can Defer)
-
-15. **Keyboard Shortcuts**: Should we implement keyboard navigation shortcuts (e.g., Cmd+U for upload)?
-
-16. **Accessibility Preferences**: Should we persist accessibility settings (high contrast, reduced motion)?
-
-17. **Share Integration**: Should we integrate with Web Share API for mobile sharing?
-
-18. **Notification Permissions**: Should we request permission for browser notifications (e.g., upload complete)?
+**All critical and important questions have been resolved.** The deferred items can be addressed post-launch based on user feedback.
 
 ---
 
@@ -450,7 +447,8 @@ async function compute256t(content) {
 | UP-02 | Drag file onto drop zone | File info displayed, hash computation starts |
 | UP-03 | Click to select file | File picker opens |
 | UP-04 | Select file via picker | File info displayed, hash computation starts |
-| UP-05 | Drop multiple files | Error: only single file supported |
+| UP-05 | Drop multiple files | Error: only single file supported (no queue) |
+| UP-05a | Attempt upload while another in progress | Blocked until current upload completes |
 | UP-06 | Hash computation completes | Hash displayed, existence check initiated |
 | UP-07 | Upload new content (not duplicate) | Retention selector shown |
 | UP-08 | Upload duplicate content | "Already exists" message, extend option shown |
@@ -536,8 +534,10 @@ async function compute256t(content) {
 | ID | Test | Expected Result |
 |----|------|-----------------|
 | DB-01 | Load dashboard when authenticated | All sections load correctly |
-| DB-02 | Wallet balance displayed | Current balance shown correctly |
+| DB-02 | Wallet balance displayed | Current balance shown on page load |
 | DB-03 | Click deposit button | Navigate to deposit page |
+| DB-03a | Click refresh balance button | Balance fetched from server on demand |
+| DB-03b | Balance not auto-updating | No polling or WebSocket updates |
 | DB-04 | Upload list shows user's content | Correct items displayed |
 | DB-05 | Sort uploads by date | Sorted correctly |
 | DB-06 | Sort uploads by size | Sorted correctly |
@@ -546,9 +546,9 @@ async function compute256t(content) {
 | DB-09 | Click upload hash | Hash copied or details shown |
 | DB-10 | Click extend retention | Retention extension flow starts |
 | DB-11 | API keys list displayed | All user's keys shown |
-| DB-12 | Create new API key | Key created, shown once |
+| DB-12 | Create new API key | Key created and displayed |
 | DB-13 | Copy newly created API key | Key copied to clipboard |
-| DB-14 | API key hidden after creation | Key not retrievable later |
+| DB-14 | API key visible until navigation | Key remains visible; hidden after leaving page |
 | DB-15 | Revoke API key | Confirmation shown, key revoked |
 | DB-16 | Cancel revoke API key | Key not revoked |
 | DB-17 | Create key at limit (25) | Error: maximum keys reached |
@@ -584,22 +584,23 @@ async function compute256t(content) {
 | DP-16 | Browser back button from Stripe | Return to deposit page, session may still be valid |
 | DP-17 | Multiple tabs with same session | Only one payment processed |
 
-### Functional Tests - Public Records
+### Functional Tests - Public Records (Single Page)
 
 | ID | Test | Expected Result |
 |----|------|-----------------|
-| PR-01 | Load public records page | Records table displayed |
+| PR-01 | Load public records page | All records loaded on single page |
 | PR-02 | Aggregate statistics shown | All stats displayed correctly |
-| PR-03 | Filter by status | Filtered results shown |
-| PR-04 | Sort by upload date | Sorted correctly |
-| PR-05 | Sort by size | Sorted correctly |
-| PR-06 | Pagination works | Navigate through pages |
-| PR-07 | Search by hash | Matching record found |
+| PR-03 | Filter by status | Filtered results shown (client-side) |
+| PR-04 | Sort by upload date | Sorted correctly (client-side) |
+| PR-05 | Sort by size | Sorted correctly (client-side) |
+| PR-06 | All records visible | No pagination, all records in single scrollable list |
+| PR-07 | Search by hash | Matching record highlighted/filtered |
 | PR-08 | Search non-existent hash | No results message |
 | PR-09 | View contest records | Contests displayed correctly |
 | PR-10 | Export as JSON | Valid JSON file downloaded |
 | PR-11 | Export as CSV | Valid CSV file downloaded |
-| PR-12 | Large dataset performance | Page responsive with 10,000+ records |
+| PR-12 | Large dataset performance | Page loads all records without crashing |
+| PR-13 | Browser scroll performance | Smooth scrolling with many records |
 
 ### Functional Tests - Documentation
 
@@ -808,6 +809,18 @@ async function compute256t(content) {
 ---
 
 ## Changelog
+
+### Version 0.3.0 (2026-01-14)
+- **All questions resolved** - Ready for implementation
+- Resolved 7 additional important questions (#8-14)
+- Decided: Show error info directly (no queuing/maintenance page)
+- Decided: On-demand balance refresh only
+- Decided: Single page for public records (no pagination initially)
+- Decided: API key visible until navigation (no timeout)
+- Decided: No upload queue (one file at a time)
+- Decided: Browser tabs are independent
+- Decided: Simple duplicate message (no prominent existing file display)
+- Deferred 4 nice-to-have questions (#15-18)
 
 ### Version 0.2.0 (2026-01-14)
 - Resolved 7 critical questions
