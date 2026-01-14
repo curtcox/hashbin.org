@@ -134,7 +134,20 @@ export async function handleLogout(request, env) {
     const sessionId = authResult.user.sessionId;
     
     if (sessionId) {
-      await clerkClient.sessions.revokeSession(sessionId);
+      try {
+        await clerkClient.sessions.revokeSession(sessionId);
+      } catch (clerkError) {
+        // Log specific Clerk API errors for debugging
+        if (env.LOG_LEVEL === 'debug') {
+          console.error('Clerk API error during logout:', {
+            sessionId,
+            error: clerkError.message,
+            status: clerkError.status
+          });
+        }
+        // Re-throw to be handled by outer catch
+        throw clerkError;
+      }
     }
 
     return new Response(
@@ -148,9 +161,15 @@ export async function handleLogout(request, env) {
       }
     );
   } catch (error) {
-    // Log error but return success to avoid information leakage
-    console.error('Logout error:', error.message);
+    // Log error with more context for debugging
+    console.error('Logout error:', {
+      error: error.message,
+      userId: authResult.user.userId,
+      sessionId: authResult.user.sessionId
+    });
     
+    // Return success to avoid information leakage about session validity
+    // Even if revocation fails, the frontend can clear the token locally
     return new Response(
       JSON.stringify({
         success: true,

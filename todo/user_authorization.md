@@ -254,10 +254,6 @@ DELETE /api/auth/account
   - Retains: Payment records only
   - See: Account Management
 ```
-  - Requires: Clerk session + 2FA confirmation
-  - Retains: Payment records only
-  - See: Account Management
-```
 
 ### API Key Management
 
