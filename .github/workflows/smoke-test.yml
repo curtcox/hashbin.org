@@ -131,7 +131,7 @@ jobs:
       - name: Test - Clerk Session Endpoint (Unauthenticated)
         run: |
           # Should return 401 for unauthenticated request
-          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.base_url }}/api/auth/session" || echo "401")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.base_url }}/api/auth/session" || echo "000")
 
           if [ "$HTTP_CODE" != "401" ]; then
             echo "::error::Session endpoint returned $HTTP_CODE (expected 401 for unauthenticated)"
