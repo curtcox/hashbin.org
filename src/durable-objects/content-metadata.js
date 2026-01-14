@@ -74,11 +74,10 @@ export class ContentMetadata {
     // Calculate expiration date
     const created_at = new Date();
     const expires_at = new Date(created_at);
-    // Add months properly to avoid date boundary issues
-    const targetMonth = expires_at.getMonth() + data.retention_months;
-    expires_at.setMonth(targetMonth);
-    // If the day changed due to month length differences, set to last day of previous month
-    if (expires_at.getMonth() !== targetMonth % 12) {
+    const currentDay = expires_at.getDate();
+    expires_at.setMonth(expires_at.getMonth() + data.retention_months);
+    // If the day changed due to month length differences, set to last day of that month
+    if (expires_at.getDate() !== currentDay) {
       expires_at.setDate(0); // Sets to last day of previous month
     }
 
@@ -183,11 +182,10 @@ export class ContentMetadata {
     // Calculate new expiration
     const current_expires_at = new Date(content.expires_at);
     const new_expires_at = new Date(current_expires_at);
-    // Add months properly to avoid date boundary issues
-    const targetMonth = new_expires_at.getMonth() + data.months_to_add;
-    new_expires_at.setMonth(targetMonth);
-    // If the day changed due to month length differences, set to last day of previous month
-    if (new_expires_at.getMonth() !== targetMonth % 12) {
+    const currentDay = new_expires_at.getDate();
+    new_expires_at.setMonth(new_expires_at.getMonth() + data.months_to_add);
+    // If the day changed due to month length differences, set to last day of that month
+    if (new_expires_at.getDate() !== currentDay) {
       new_expires_at.setDate(0); // Sets to last day of previous month
     }
 

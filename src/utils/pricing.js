@@ -4,7 +4,7 @@
  */
 
 // Base rate: $0.03 per GB per month
-const BASE_RATE_PER_GB_PER_MONTH = 0.03;
+export const BASE_RATE_PER_GB_PER_MONTH = 0.03;
 
 // Stripe fees: 2.9% + $0.30
 const STRIPE_FEE_PERCENTAGE = 0.029;
@@ -112,10 +112,10 @@ export function formatCents(cents) {
  */
 export function calculateNewExpiration(currentExpiration, monthsToAdd) {
   const date = new Date(currentExpiration);
-  const targetMonth = date.getMonth() + monthsToAdd;
-  date.setMonth(targetMonth);
-  // If the day changed due to month length differences, set to last day of previous month
-  if (date.getMonth() !== targetMonth % 12) {
+  const currentDay = date.getDate();
+  date.setMonth(date.getMonth() + monthsToAdd);
+  // If the day changed due to month length differences, set to last day of that month
+  if (date.getDate() !== currentDay) {
     date.setDate(0); // Sets to last day of previous month
   }
   return date.toISOString();

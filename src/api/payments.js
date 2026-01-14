@@ -5,10 +5,12 @@
 
 import Stripe from 'stripe';
 import { authenticate } from '../auth/middleware.js';
-import { calculateStripeFees, formatCents, calculateRetentionCost } from '../utils/pricing.js';
-
-// Import pricing constant for consistency
-const BASE_RATE_PER_GB_PER_MONTH = 0.03;
+import { 
+  calculateStripeFees, 
+  formatCents, 
+  calculateRetentionCost,
+  BASE_RATE_PER_GB_PER_MONTH
+} from '../utils/pricing.js';
 
 /**
  * POST /api/balance/deposit
