@@ -37,8 +37,28 @@ HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
 | 22 | Balance display | **Current balance only** (no burn rate) |
 | 23 | Negative balance | **Not allowed** - hard floor at $0.00 |
 | 24 | CID donations | **Extend that CID's TTL** (not uploader's balance) |
-| 25 | Peer-to-peer balance transfer | **TBD** |
+| 25 | Peer-to-peer balance transfer | **TBD** - see [balance_transfer.md](balance_transfer.md) |
 | 26 | Upload rejection message | "Your account balance is too low for the minimum retention of 30 days. That would cost {X} and you only have {Y} in your account. {Link}" |
+| 27 | Retention duration selection | **Both** - presets + custom input |
+| 28 | Minimum retention duration | **30 days**; no maximum for single payment |
+| 29 | Self-extension of content | **Yes** - same as self-donation, available via both endpoints |
+| 30 | CID expiration behavior | **Immediate deletion**; user can re-upload |
+| 31 | Duplicate upload handling | **No owners, only uploaders**; second uploader's account debited to extend CID retention by 30 days |
+| 32 | Self-donation allowed | **Yes** |
+| 33 | Minimum donation amount | **$1.00** |
+| 34 | CID donation notifications | **None** - no email notifications for donations |
+| 35 | Retention presets | **1 month, 1 year, 1 decade, 1 century**; custom allows any multiple of 30 days |
+| 36 | Duplicate upload notification | **Yes** - user sees message that CID already exists |
+| 37 | Duplicate upload charging | **Yes** - always charged for 30 days minimum; can choose to pay for longer |
+| 38 | Duplicate upload message | "Retention extended for 30 days. You can add more {link}." |
+| 39 | Duplicate upload UX | Shows same presets + current expiration; must buy 30-day multiples/months/years (no target date picker) |
+| 40 | Long retention pricing | **Flat rate** - no discounts for century-scale retention |
+| 41 | Duplicate detection | **Both** - client-side warns before upload, server-side enforces |
+| 42 | "Add more" link destination | **CID detail page** with extend option |
+| 43 | Duplicate upload confirmation | **Automatic** - 30-day extension charged without confirmation prompt |
+| 44 | CID existence check API | **Yes** - public endpoint `GET /api/content/:cid/exists` returns exists, expiration, and size |
+| 45 | Duplicate with insufficient balance | **Reject** - show standard insufficient balance message (Decision #26) |
+| 46 | Duplicate upload behavior | **Extend retention + display message**; skip actual upload (content already exists) |
 
 ---
 
@@ -209,6 +229,7 @@ Stores all financial transactions:
 | `/api/balance/deposit` | POST | Yes | Create deposit checkout session |
 | `/api/balance/history` | GET | Yes | Get transaction history |
 | `/api/content/:cid` | GET | No | Get content metadata including expiration |
+| `/api/content/:cid/exists` | GET | No | Check if CID exists; returns exists, expiration, size |
 | `/api/content/:cid/extend` | POST | Yes | Extend own content's retention |
 | `/api/donate/cid/:cid` | POST | No* | Donate to extend any CID's retention |
 | `/api/payments/webhook` | POST | Stripe | Handle Stripe webhooks |
@@ -249,44 +270,9 @@ Existing upload endpoint gains payment logic:
 
 ## Open Questions
 
-### Upload & Retention Mechanics
+*All payment questions resolved. See Decisions #1-46 above.*
 
-1. **Can users choose retention duration at upload time?**
-   - Fixed options (1 month, 6 months, 1 year, 5 years)?
-   - Or free-form input (any number of months)?
-   - Or both (presets + custom)?
-
-2. **What is the minimum retention duration?**
-   - 30 days (1 month) seems implied
-   - Should there be a maximum for a single payment? (e.g., 100 years)
-
-3. **Can users extend their own content's retention?**
-   - Same as self-donation?
-   - Or separate endpoint with different UX?
-
-4. **What happens when a CID expires?**
-   - Immediate deletion?
-   - Grace period before deletion?
-   - Can expired content be "revived" by paying?
-
-5. **How are duplicate uploads handled?**
-   - Same content = same CID (content-addressed)
-   - Does second uploader share retention? Or each has independent TTL?
-   - Who "owns" the CID if multiple people uploaded it?
-
-### Donation Mechanics
-
-6. **Can you donate to your own CID?**
-   - Functionally same as extending retention
-   - Should use same or different endpoint?
-
-7. **Is there a minimum donation amount?**
-   - $1.00 to match deposit minimum?
-   - Or allow any amount that results in >0 days extension?
-
-8. **Are donation notifications sent to uploaders?**
-   - Email when someone donates to their CID?
-   - Privacy consideration: does donor remain anonymous to uploader?
+*Peer-to-peer balance transfer is tracked separately in [balance_transfer.md](balance_transfer.md).*
 
 ---
 
