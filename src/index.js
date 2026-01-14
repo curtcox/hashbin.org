@@ -25,6 +25,8 @@ import {
 
 import { handleClerkWebhook } from './api/webhooks.js';
 
+import { handleGetBalance, handleGetBalanceHistory } from './api/balance.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -91,6 +93,15 @@ export default {
 
     if (url.pathname === '/api/auth/account' && request.method === 'DELETE') {
       return handleDeleteAccount(request, env);
+    }
+
+    // Balance API routes
+    if (url.pathname === '/api/balance' && request.method === 'GET') {
+      return handleGetBalance(request, env);
+    }
+
+    if (url.pathname === '/api/balance/history' && request.method === 'GET') {
+      return handleGetBalanceHistory(request, env);
     }
 
     // TODO: Add API routes for:

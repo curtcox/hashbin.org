@@ -1,0 +1,149 @@
+/**
+ * Pricing Calculator Utility
+ * Calculates costs for content retention and Stripe fees
+ */
+
+// Base rate: $0.03 per GB per month
+const BASE_RATE_PER_GB_PER_MONTH = 0.03;
+
+// Stripe fees: 2.9% + $0.30
+const STRIPE_FEE_PERCENTAGE = 0.029;
+const STRIPE_FEE_FIXED_CENTS = 30;
+
+// Minimum deposit: $1.00
+const MINIMUM_DEPOSIT_CENTS = 100;
+
+// Minimum retention: 30 days (1 month)
+const MINIMUM_RETENTION_MONTHS = 1;
+
+/**
+ * Calculate retention cost for content
+ * @param {number} sizeBytes - Content size in bytes
+ * @param {number} retentionMonths - Number of months to retain
+ * @returns {number} Cost in cents
+ */
+export function calculateRetentionCost(sizeBytes, retentionMonths) {
+  if (sizeBytes < 0 || retentionMonths < 0) {
+    throw new Error('Size and retention must be non-negative');
+  }
+
+  if (retentionMonths < MINIMUM_RETENTION_MONTHS) {
+    throw new Error(`Minimum retention is ${MINIMUM_RETENTION_MONTHS} month(s)`);
+  }
+
+  // Convert bytes to GB
+  const sizeGB = sizeBytes / (1024 * 1024 * 1024);
+
+  // Calculate cost in dollars
+  const costDollars = sizeGB * retentionMonths * BASE_RATE_PER_GB_PER_MONTH;
+
+  // Convert to cents and round
+  const costCents = Math.round(costDollars * 100);
+
+  return costCents;
+}
+
+/**
+ * Calculate minimum retention cost (30 days)
+ * @param {number} sizeBytes - Content size in bytes
+ * @returns {number} Minimum cost in cents
+ */
+export function calculateMinimumRetentionCost(sizeBytes) {
+  return calculateRetentionCost(sizeBytes, MINIMUM_RETENTION_MONTHS);
+}
+
+/**
+ * Calculate Stripe fees for a deposit
+ * @param {number} depositCents - Deposit amount in cents
+ * @returns {object} { grossCents, feeCents, netCents }
+ */
+export function calculateStripeFees(depositCents) {
+  if (depositCents < MINIMUM_DEPOSIT_CENTS) {
+    throw new Error(`Minimum deposit is ${MINIMUM_DEPOSIT_CENTS} cents ($${MINIMUM_DEPOSIT_CENTS / 100})`);
+  }
+
+  const grossCents = depositCents;
+  const feeCents = Math.round(grossCents * STRIPE_FEE_PERCENTAGE + STRIPE_FEE_FIXED_CENTS);
+  const netCents = grossCents - feeCents;
+
+  return {
+    grossCents,
+    feeCents,
+    netCents
+  };
+}
+
+/**
+ * Calculate how many months of retention a donation amount provides
+ * @param {number} donationCents - Donation amount in cents
+ * @param {number} sizeBytes - Content size in bytes
+ * @returns {number} Months of retention
+ */
+export function calculateRetentionMonths(donationCents, sizeBytes) {
+  if (donationCents <= 0 || sizeBytes <= 0) {
+    return 0;
+  }
+
+  // Convert bytes to GB
+  const sizeGB = sizeBytes / (1024 * 1024 * 1024);
+
+  // Calculate months: amount / (size * rate)
+  const donationDollars = donationCents / 100;
+  const months = donationDollars / (sizeGB * BASE_RATE_PER_GB_PER_MONTH);
+
+  return months;
+}
+
+/**
+ * Format cents as dollar string
+ * @param {number} cents - Amount in cents
+ * @returns {string} Formatted dollar amount (e.g., "$1.50")
+ */
+export function formatCents(cents) {
+  const dollars = cents / 100;
+  return `$${dollars.toFixed(2)}`;
+}
+
+/**
+ * Calculate new expiration date
+ * @param {string} currentExpiration - Current expiration ISO date string
+ * @param {number} monthsToAdd - Months to add
+ * @returns {string} New expiration ISO date string
+ */
+export function calculateNewExpiration(currentExpiration, monthsToAdd) {
+  const date = new Date(currentExpiration);
+  date.setMonth(date.getMonth() + monthsToAdd);
+  return date.toISOString();
+}
+
+/**
+ * Check if balance is sufficient for upload
+ * @param {number} balanceCents - Current balance in cents
+ * @param {number} sizeBytes - Content size in bytes
+ * @param {number} retentionMonths - Requested retention months
+ * @returns {object} { sufficient: boolean, required: number, shortfall: number }
+ */
+export function checkBalanceSufficient(balanceCents, sizeBytes, retentionMonths) {
+  const requiredCents = calculateRetentionCost(sizeBytes, retentionMonths);
+  const sufficient = balanceCents >= requiredCents;
+  const shortfall = sufficient ? 0 : requiredCents - balanceCents;
+
+  return {
+    sufficient,
+    required: requiredCents,
+    shortfall
+  };
+}
+
+/**
+ * Generate insufficient balance message
+ * @param {number} balanceCents - Current balance in cents
+ * @param {number} requiredCents - Required amount in cents
+ * @returns {string} Error message
+ */
+export function generateInsufficientBalanceMessage(balanceCents, requiredCents) {
+  const balanceDollars = formatCents(balanceCents);
+  const requiredDollars = formatCents(requiredCents);
+  
+  return `Your account balance is too low for the minimum retention of 30 days. That would cost ${requiredDollars} and you only have ${balanceDollars} in your account.`;
+}
