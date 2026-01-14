@@ -396,6 +396,95 @@ Delete user account (soft delete).
 
 ---
 
+## Balance Management
+
+These endpoints manage user account balance for content storage payments.
+
+---
+
+#### GET /api/balance
+
+Get the current user's account balance.
+
+**Authentication:** Required (Clerk session or API key)
+
+**Response:**
+```json
+{
+  "balance_cents": 0,
+  "total_deposited_cents": 0,
+  "total_spent_cents": 0
+}
+```
+
+**Fields:**
+- `balance_cents`: Current account balance in cents (1 dollar = 100 cents)
+- `total_deposited_cents`: Lifetime total of all deposits
+- `total_spent_cents`: Lifetime total of all spending
+
+**Notes:**
+- New users automatically receive a balance of $0.00 (0 cents) upon first login
+- Balance is displayed as cents in the API but formatted as dollars in the UI ($0.00)
+- All users can view their balance immediately after account creation
+
+**Error Responses:**
+- `401 AUTH_MISSING` - No authentication provided
+- `404` - User profile not found
+
+**Example:**
+```bash
+curl -X GET https://hashbin.org/api/balance \
+  -H "Authorization: Bearer <clerk-jwt-token>"
+```
+
+---
+
+#### GET /api/balance/history
+
+Get transaction history for the current user's balance.
+
+**Authentication:** Required (Clerk session or API key)
+
+**Query Parameters:**
+- `limit` (optional): Number of transactions to return (default: 20, max: 100)
+- `offset` (optional): Pagination offset (default: 0)
+- `type` (optional): Filter by transaction type (`deposit`, `debit`, `refund`)
+
+**Response:**
+```json
+{
+  "transactions": [
+    {
+      "id": "txn_abc123",
+      "type": "deposit",
+      "amount_cents": 1000,
+      "balance_after_cents": 1000,
+      "created_at": "2026-01-14T00:00:00.000Z",
+      "description": "Stripe payment"
+    },
+    {
+      "id": "txn_xyz789",
+      "type": "debit",
+      "amount_cents": 50,
+      "balance_after_cents": 950,
+      "created_at": "2026-01-14T01:00:00.000Z",
+      "description": "Content storage for hash abc..."
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "total": 2
+  }
+}
+```
+
+**Error Responses:**
+- `401 AUTH_MISSING` - No authentication provided
+- `400` - Invalid query parameters
+
+---
+
 ## Content Endpoints (Planned)
 
 The following endpoints are planned for Phase 2 (Core Content Operations):
