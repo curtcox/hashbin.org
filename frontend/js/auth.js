@@ -37,13 +37,16 @@ export async function initializeClerk() {
       return false;
     }
 
-    // Load Clerk from CDN if not already loaded
+    // Load Clerk from CDN with publishable key
+    // The clerk.browser.js bundle auto-initializes, so we pass the key via data attribute
     if (!window.Clerk) {
-      await loadClerkScript();
+      await loadClerkScript(publishableKey);
     }
 
-    // Initialize Clerk v5 - Clerk is a constructor, not an instance
-    clerkInstance = new window.Clerk(publishableKey);
+    // After loading, window.Clerk is the initialized Clerk instance
+    clerkInstance = window.Clerk;
+
+    // Wait for Clerk to be ready
     await clerkInstance.load();
 
     // Set up auth state listener
@@ -61,9 +64,10 @@ export async function initializeClerk() {
 
 /**
  * Load Clerk script from CDN
+ * @param {string} publishableKey - The Clerk publishable key
  * @returns {Promise<void>}
  */
-function loadClerkScript() {
+function loadClerkScript(publishableKey) {
   return new Promise((resolve, reject) => {
     if (window.Clerk) {
       resolve();
@@ -74,10 +78,12 @@ function loadClerkScript() {
     script.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
     script.async = true;
     script.crossOrigin = 'anonymous';
-    
+    // Pass publishable key via data attribute - required for auto-initialization
+    script.setAttribute('data-clerk-publishable-key', publishableKey);
+
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Failed to load Clerk script'));
-    
+
     document.head.appendChild(script);
   });
 }
