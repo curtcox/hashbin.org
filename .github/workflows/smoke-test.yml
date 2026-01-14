@@ -106,14 +106,27 @@ jobs:
           fi
 
           CLERK_STATUS=$(echo "$BODY" | jq -r '.checks.clerk.status')
-          if [ "$CLERK_STATUS" != "operational" ]; then
-            echo "::error::Clerk status is $CLERK_STATUS (expected operational)"
-            CLERK_DETAILS=$(echo "$BODY" | jq '.checks.clerk.details')
-            echo "Details: $CLERK_DETAILS"
-            exit 1
+          TARGET_ENV="${{ steps.env.outputs.target }}"
+          
+          # Production must have Clerk operational
+          if [ "$TARGET_ENV" == "production" ]; then
+            if [ "$CLERK_STATUS" != "operational" ]; then
+              echo "::error::Clerk status is $CLERK_STATUS (expected operational in production)"
+              CLERK_DETAILS=$(echo "$BODY" | jq '.checks.clerk.details')
+              echo "Details: $CLERK_DETAILS"
+              exit 1
+            fi
+            echo "::notice::Clerk integration operational in production"
+          else
+            # Development can be down/degraded/operational
+            if [ "$CLERK_STATUS" == "operational" ]; then
+              echo "::notice::Clerk integration operational in development"
+            elif [ "$CLERK_STATUS" == "degraded" ]; then
+              echo "::warning::Clerk partially configured in development"
+            else
+              echo "::warning::Clerk not configured in development (this is OK)"
+            fi
           fi
-
-          echo "::notice::Clerk integration operational"
 
       - name: Test - Clerk Session Endpoint (Unauthenticated)
         run: |

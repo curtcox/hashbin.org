@@ -64,10 +64,14 @@ async function checkClerk(env) {
     const allConfigured = checks.secretKeyConfigured &&
                           checks.publishableKeyConfigured &&
                           checks.webhookSecretConfigured;
+    const someConfigured = checks.secretKeyConfigured ||
+                           checks.publishableKeyConfigured ||
+                           checks.webhookSecretConfigured;
 
     return {
-      status: allConfigured ? 'operational' : 'down',
-      message: allConfigured ? 'Clerk secrets configured' : 'Clerk secrets not fully configured',
+      status: allConfigured ? 'operational' : (someConfigured ? 'degraded' : 'down'),
+      message: allConfigured ? 'Clerk secrets configured' :
+               (someConfigured ? 'Some Clerk secrets missing' : 'Clerk not configured'),
       details: checks
     };
   } catch (error) {
