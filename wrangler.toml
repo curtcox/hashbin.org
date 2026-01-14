@@ -15,7 +15,6 @@ vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
 # Note: Add these secrets using: wrangler secret put CLERK_SECRET_KEY --env development
 # CLERK_SECRET_KEY (required for development)
 # CLERK_PUBLISHABLE_KEY (required for development)
-# CLERK_WEBHOOK_SECRET (required for webhooks)
 # STRIPE_SECRET_KEY (required for payments)
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
 
@@ -32,7 +31,6 @@ vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
 # Note: Add these secrets using: wrangler secret put CLERK_SECRET_KEY --env production
 # CLERK_SECRET_KEY (required for production)
 # CLERK_PUBLISHABLE_KEY (required for production)
-# CLERK_WEBHOOK_SECRET (required for webhooks)
 # STRIPE_SECRET_KEY (required for payments)
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
 

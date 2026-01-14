@@ -41,7 +41,7 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 - API key generation and management
 - Rate limiting (anonymous, authenticated, per-key)
 - Account management (creation, deletion, linking)
-- Webhook handlers for user lifecycle events
+- On-demand user profile creation
 - **15/15 tests passing** ✅
 
 ### ✅ Phase 7: Frontend Login UI (Complete)
@@ -172,9 +172,6 @@ HashBin.org supports two authentication methods:
 - `DELETE /api/auth/apikeys/{key_id}` - Revoke API key
 - `DELETE /api/auth/account` - Delete user account (requires 2FA)
 
-#### Webhook Endpoints
-- `POST /api/webhooks/clerk` - Clerk user lifecycle webhooks
-
 See [docs/API.md](docs/API.md) for complete API reference documentation.
 
 ## Rate Limits
@@ -206,10 +203,9 @@ See [todo/user_authorization.md#production-deployment-checklist](todo/user_autho
 
 Quick summary:
 1. Configure OAuth providers in Clerk Dashboard
-2. Set up Clerk webhook for user lifecycle events
-3. Add secrets to Cloudflare: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_WEBHOOK_SECRET`
-4. Deploy: `npm run deploy:prod`
-5. Verify: `npm run verify:prod`
+2. Add secrets to Cloudflare: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`
+3. Deploy: `npm run deploy:prod`
+4. Verify: `npm run verify:prod`
 
 ## Testing
 
@@ -230,7 +226,6 @@ Test categories:
 - Authentication rejection on protected endpoints
 - API key format validation
 - Environment-specific key validation
-- Webhook signature verification
 - Session management endpoints
 - Durable Objects health checks
 
