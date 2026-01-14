@@ -258,3 +258,6 @@ jobs:
           echo "add CLOUDFLARE_WORKERS_SUBDOMAIN secret with your"
           echo "workers subdomain from Cloudflare dashboard."
           echo "=========================================="
+
+# Note: Smoke tests run automatically via workflow_run trigger
+# in .github/workflows/smoke-test.yml after this workflow completes

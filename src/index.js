@@ -255,7 +255,8 @@ async function handleHealth(env) {
     worker: await checkWorker(env),
     environment: await checkEnvironment(env),
     durableObjects: await checkDurableObjects(env),
-    r2: await checkR2Buckets(env)
+    r2: await checkR2Buckets(env),
+    clerk: await checkClerk(env)
   };
 
   // Determine overall status
@@ -449,4 +450,43 @@ async function checkR2Buckets(env) {
     message: allOperational ? 'All R2 buckets accessible' : 'Some R2 buckets unavailable',
     details: results
   };
+}
+
+/**
+ * Check Clerk integration health
+ */
+async function checkClerk(env) {
+  const checks = {
+    secretKeyConfigured: false,
+    publishableKeyConfigured: false,
+    webhookSecretConfigured: false
+  };
+
+  try {
+    // Check required secrets are configured
+    checks.secretKeyConfigured = !!env.CLERK_SECRET_KEY;
+    checks.publishableKeyConfigured = !!env.CLERK_PUBLISHABLE_KEY;
+    checks.webhookSecretConfigured = !!env.CLERK_WEBHOOK_SECRET;
+
+    const allConfigured = checks.secretKeyConfigured &&
+                          checks.publishableKeyConfigured &&
+                          checks.webhookSecretConfigured;
+    const someConfigured = checks.secretKeyConfigured ||
+                           checks.publishableKeyConfigured ||
+                           checks.webhookSecretConfigured;
+
+    return {
+      status: allConfigured ? 'operational' : (someConfigured ? 'degraded' : 'down'),
+      message: allConfigured ? 'Clerk secrets configured' :
+               (someConfigured ? 'Some Clerk secrets missing' : 'Clerk not configured'),
+      details: checks
+    };
+  } catch (error) {
+    return {
+      status: 'down',
+      message: 'Clerk check failed',
+      error: error.message,
+      details: checks
+    };
+  }
 }

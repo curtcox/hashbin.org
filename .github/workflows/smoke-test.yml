@@ -1,0 +1,223 @@
+name: Smoke Test
+
+on:
+  # Run on demand
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - development
+
+  # Run after deployment workflow completes
+  workflow_run:
+    workflows: ["Deploy to Cloudflare"]
+    types:
+      - completed
+    branches:
+      - main
+      - develop
+
+  # Run on schedule (optional - every 6 hours)
+  schedule:
+    - cron: '0 */6 * * *'
+
+env:
+  PRODUCTION_URL: https://hashbin.org
+
+jobs:
+  smoke-test:
+    name: Run Smoke Tests
+    runs-on: ubuntu-latest
+    # Skip if triggered by failed deployment
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Determine target environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "target=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "workflow_run" ]; then
+            if [ "${{ github.event.workflow_run.head_branch }}" == "main" ]; then
+              echo "target=production" >> $GITHUB_OUTPUT
+            else
+              echo "target=development" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "target=production" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set target URL
+        id: url
+        env:
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ "${{ steps.env.outputs.target }}" == "production" ]; then
+            echo "base_url=${{ env.PRODUCTION_URL }}" >> $GITHUB_OUTPUT
+          else
+            DEV_URL="https://hashbin-worker-dev.${ACCOUNT_ID}.workers.dev"
+            echo "base_url=$DEV_URL" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for deployment propagation
+        if: github.event_name == 'workflow_run'
+        run: sleep 30
+
+      # ============================================
+      # Basic Health Check
+      # ============================================
+      - name: Test - Basic Health Endpoint
+        id: health
+        run: |
+          echo "Testing ${{ steps.url.outputs.base_url }}/health"
+          RESPONSE=$(curl -sf -w "\n%{http_code}" "${{ steps.url.outputs.base_url }}/health" || printf '\n000')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n-1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Health endpoint returned HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "::notice::Health endpoint OK"
+
+      # ============================================
+      # Clerk Integration Tests
+      # ============================================
+      - name: Test - Clerk Integration Health
+        run: |
+          BODY='${{ steps.health.outputs.body }}'
+
+          # Check Clerk is in health response
+          if ! echo "$BODY" | jq -e '.checks.clerk' > /dev/null 2>&1; then
+            echo "::error::Clerk health check not found in response"
+            exit 1
+          fi
+
+          CLERK_STATUS=$(echo "$BODY" | jq -r '.checks.clerk.status')
+          TARGET_ENV="${{ steps.env.outputs.target }}"
+          
+          # Production must have Clerk operational
+          if [ "$TARGET_ENV" == "production" ]; then
+            if [ "$CLERK_STATUS" != "operational" ]; then
+              echo "::error::Clerk status is $CLERK_STATUS (expected operational in production)"
+              CLERK_DETAILS=$(echo "$BODY" | jq '.checks.clerk.details')
+              echo "Details: $CLERK_DETAILS"
+              exit 1
+            fi
+            echo "::notice::Clerk integration operational in production"
+          else
+            # Development can be down/degraded/operational
+            if [ "$CLERK_STATUS" == "operational" ]; then
+              echo "::notice::Clerk integration operational in development"
+            elif [ "$CLERK_STATUS" == "degraded" ]; then
+              echo "::warning::Clerk partially configured in development"
+            else
+              echo "::warning::Clerk not configured in development (this is OK)"
+            fi
+          fi
+
+      - name: Test - Clerk Session Endpoint (Unauthenticated)
+        run: |
+          # Should return 401 for unauthenticated request
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.base_url }}/api/auth/session" || printf '000')
+
+          if [ "$HTTP_CODE" != "401" ]; then
+            echo "::error::Session endpoint returned $HTTP_CODE (expected 401 for unauthenticated)"
+            exit 1
+          fi
+
+          echo "::notice::Auth endpoint correctly returns 401 for unauthenticated requests"
+
+      # ============================================
+      # R2 Storage Tests
+      # ============================================
+      - name: Test - R2 Storage Health
+        run: |
+          BODY='${{ steps.health.outputs.body }}'
+
+          R2_STATUS=$(echo "$BODY" | jq -r '.checks.r2.status')
+          if [ "$R2_STATUS" != "operational" ]; then
+            echo "::error::R2 status is $R2_STATUS (expected operational)"
+            R2_DETAILS=$(echo "$BODY" | jq '.checks.r2.details')
+            echo "Details: $R2_DETAILS"
+            exit 1
+          fi
+
+          echo "::notice::R2 storage operational"
+
+      # ============================================
+      # Durable Objects Tests
+      # ============================================
+      - name: Test - Durable Objects Health
+        run: |
+          BODY='${{ steps.health.outputs.body }}'
+
+          DO_STATUS=$(echo "$BODY" | jq -r '.checks.durableObjects.status')
+          if [ "$DO_STATUS" != "operational" ]; then
+            echo "::error::Durable Objects status is $DO_STATUS (expected operational)"
+            DO_DETAILS=$(echo "$BODY" | jq '.checks.durableObjects.details')
+            echo "Details: $DO_DETAILS"
+            exit 1
+          fi
+
+          echo "::notice::Durable Objects operational"
+
+      # ============================================
+      # API Endpoint Tests
+      # ============================================
+      - name: Test - Root Endpoint
+        run: |
+          RESPONSE=$(curl -sf "${{ steps.url.outputs.base_url }}/" || printf 'ERROR')
+
+          if [ "$RESPONSE" == "ERROR" ]; then
+            echo "::error::Root endpoint failed to respond"
+            exit 1
+          fi
+
+          if ! echo "$RESPONSE" | grep -q "HashBin.org API"; then
+            echo "::error::Root endpoint missing expected content"
+            exit 1
+          fi
+
+          echo "::notice::Root endpoint OK"
+
+      - name: Test - Public Endpoints Accessible
+        run: |
+          # Test calculate retention endpoint (public)
+          HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"size_bytes": 1048576, "retention_months": 1}' \
+            "${{ steps.url.outputs.base_url }}/api/payments/calculate" || printf '000')
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::Calculate endpoint returned $HTTP_CODE"
+          else
+            echo "::notice::Public calculate endpoint OK"
+          fi
+
+      # ============================================
+      # Summary
+      # ============================================
+      - name: Smoke Test Summary
+        if: always()
+        run: |
+          echo "=========================================="
+          echo "Smoke Test Results"
+          echo "=========================================="
+          echo "Environment: ${{ steps.env.outputs.target }}"
+          echo "URL: ${{ steps.url.outputs.base_url }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo "=========================================="
