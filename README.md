@@ -165,7 +165,7 @@ HashBin.org supports two authentication methods:
 #### Webhook Endpoints
 - `POST /api/webhooks/clerk` - Clerk user lifecycle webhooks
 
-See [todo/user_authorization.md](todo/user_authorization.md) for complete API documentation.
+See [docs/API.md](docs/API.md) for complete API reference documentation.
 
 ## Rate Limits
 
@@ -230,6 +230,7 @@ See [todo/manual_testing_guide.md](todo/manual_testing_guide.md) for comprehensi
 
 ## Documentation
 
+- **[API Reference](docs/API.md)** - Complete API endpoint documentation with examples ✨
 - **[Master Plan](todo/master_plan.md)** - Complete implementation roadmap
 - **[User Authorization](todo/user_authorization.md)** - Authentication system (Phase 3) ✅
 - **[Account Management](todo/account_management.md)** - Account linking and deletion
