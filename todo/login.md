@@ -11,7 +11,7 @@
 This document outlines the implementation plan for user login functionality and balance checking. The backend APIs are already implemented (Clerk OAuth, session management, balance endpoints). This plan focuses on the frontend integration.
 
 **Scope:**
-- User login via Clerk OAuth (Google, Apple, Microsoft, GitHub)
+- User login via Clerk OAuth (Google, Apple, Microsoft)
 - Session management on the frontend
 - Balance display after authentication
 - Logout functionality
@@ -116,6 +116,9 @@ Per resolved question from `frontend_ui.md`:
 
 **Configuration Required:**
 - `CLERK_PUBLISHABLE_KEY` - Clerk frontend key (different from secret key)
+  - Injected at build time via Cloudflare Pages environment variables
+  - Set in `wrangler.toml` or Cloudflare Pages dashboard
+  - Format: `pk_live_xxx` (production) or `pk_test_xxx` (development)
 
 ### 2. Navigation Header Component
 
@@ -124,7 +127,14 @@ Per resolved question from `frontend_ui.md`:
 **States:**
 - **Unauthenticated:** Show "Sign In" button
 - **Loading:** Show loading indicator
-- **Authenticated:** Show user info + "Sign Out" button + balance
+- **Authenticated:** Show user name + avatar + provider icon + balance + "Sign Out" button
+
+**Authenticated State Display:**
+- User's profile picture (from OAuth provider)
+- User's display name
+- Small OAuth provider icon (Google/Apple/Microsoft logo)
+- Current balance (with deposit link if $0.00)
+- "Sign Out" button
 
 **Markup:**
 ```html
@@ -136,7 +146,22 @@ Per resolved question from `frontend_ui.md`:
     <a href="/docs/">Docs</a>
   </nav>
   <div id="auth-section">
-    <!-- Dynamically populated based on auth state -->
+    <!-- Unauthenticated: -->
+    <button class="btn-sign-in">Sign In</button>
+
+    <!-- Authenticated: -->
+    <div class="user-info">
+      <img class="avatar" src="..." alt="User avatar">
+      <span class="user-name">John Doe</span>
+      <img class="provider-icon" src="..." alt="Google" title="Signed in with Google">
+    </div>
+    <div class="balance">
+      <span class="balance-amount">$12.50</span>
+      <!-- or if $0.00: -->
+      <span class="balance-amount zero">$0.00</span>
+      <a href="/deposit.html" class="deposit-link">Add funds</a>
+    </div>
+    <button class="btn-sign-out">Sign Out</button>
   </div>
 </header>
 ```
@@ -147,13 +172,14 @@ Per resolved question from `frontend_ui.md`:
 
 **Location:** Navigation header (when authenticated) and Dashboard
 
-**Format:** Display in dollars with 2 decimal places (e.g., "$12.50")
+**Format:** Always display in dollars with 2 decimal places (e.g., "$12.50", "$0.03")
 
 **Behavior:**
 - Fetch balance on page load when authenticated
-- On-demand refresh (no polling per resolved question #9)
+- On-demand refresh (no polling per resolved question #9 in `frontend_ui.md`)
 - Show loading state while fetching
 - Handle error state gracefully
+- **Special case for $0.00:** Display "$0.00" with "Add funds" link to deposit page
 
 ### 4. Auth Gate Component
 
@@ -171,28 +197,28 @@ Per resolved question from `frontend_ui.md`:
 
 ---
 
-## Open Questions
+## Resolved Questions
 
 ### Critical Questions
 
-| # | Question | Options | Impact |
-|---|----------|---------|--------|
-| 1 | **Where should the Clerk Publishable Key be stored?** | A) Hardcoded in JS, B) Environment variable injected at build, C) Fetched from backend endpoint | Security and deployment complexity |
-| 2 | **Should we show the balance in the navigation header on every page?** | A) Yes (always visible when logged in), B) Only on dashboard, C) Optional via user preference | UX and API call frequency |
-| 3 | **What OAuth providers should be enabled initially?** | A) All 4 (Google, Apple, Microsoft, GitHub), B) Start with Google only, C) Google + GitHub | Clerk configuration and testing scope |
-| 4 | **What happens when a user has $0.00 balance?** | A) Show $0.00 normally, B) Show "$0.00" with a prompt to deposit, C) Show "No funds" message | UX for new users |
-| 5 | **How should we handle Clerk service unavailability?** | A) Show error page, B) Allow limited functionality, C) Retry with backoff | Reliability |
-| 6 | **Should login persist across browser sessions?** | A) Yes (remember me by default), B) No (session only), C) User choice | Security vs convenience |
+| # | Question | Decision | Notes |
+|---|----------|----------|-------|
+| 1 | **Where should the Clerk Publishable Key be stored?** | Environment variable injected at build | Cloudflare Pages build-time injection via `wrangler.toml` or dashboard |
+| 2 | **Should we show the balance in the navigation header on every page?** | Yes (always visible when logged in) | Balance displayed in header on all pages when authenticated |
+| 3 | **What OAuth providers should be enabled initially?** | Google, Apple, Microsoft | GitHub excluded from initial launch |
+| 4 | **What happens when a user has $0.00 balance?** | Show "$0.00" with link to deposit | Link navigates to deposit page (see `add_to_balance.md`) |
+| 5 | **How should we handle Clerk service unavailability?** | Show error page | Full-page error with "Unable to authenticate" message |
+| 6 | **Should login persist across browser sessions?** | Yes (remember me by default) | Clerk default session persistence enabled |
 
 ### Important Questions
 
-| # | Question | Options | Impact |
-|---|----------|---------|--------|
-| 7 | **What should the login button text say?** | A) "Sign In", B) "Log In", C) "Get Started", D) Provider-specific buttons | UX consistency |
-| 8 | **Should we show which OAuth provider a user logged in with?** | A) Yes (show provider icon), B) No (just show user info), C) Only in settings | User awareness |
-| 9 | **What user info should we display when logged in?** | A) Email only, B) Name + avatar, C) Just a generic "Account" icon, D) Provider avatar | Privacy and UX |
-| 10 | **How should we handle users who clear cookies mid-session?** | A) Silent re-auth if possible, B) Redirect to login immediately, C) Show "session expired" message | UX when session lost |
-| 11 | **Should balance be displayed in cents for small amounts?** | A) Always dollars ($0.03), B) Switch to cents below $1 (3¢), C) Always dollars with more precision ($0.0300) | Readability |
+| # | Question | Decision | Notes |
+|---|----------|----------|-------|
+| 7 | **What should the login button text say?** | "Sign In" | Consistent with industry standard |
+| 8 | **Should we show which OAuth provider a user logged in with?** | Yes (show provider icon) | Small icon next to user name/avatar |
+| 9 | **What user info should we display when logged in?** | Name + avatar | Display name and profile picture from OAuth provider |
+| 10 | **How should we handle users who clear cookies mid-session?** | Show "session expired" message | Clear message with link to sign in again |
+| 11 | **Should balance be displayed in cents for small amounts?** | Always dollars ($0.03) | Consistent formatting regardless of amount |
 
 ### Deferred Questions (for add_to_balance.md)
 
@@ -226,29 +252,31 @@ Per resolved question from `frontend_ui.md`:
 | BL-02 | Fetch balance without auth | Returns 401 error |
 | BL-03 | Fetch balance with expired token | Returns 401, triggers re-auth |
 | BL-04 | Fetch balance when backend unavailable | Graceful error with retry option |
-| BL-05 | Format balance of 0 cents | Displays "$0.00" |
-| BL-06 | Format balance of 1 cent | Displays "$0.01" |
+| BL-05 | Format balance of 0 cents | Displays "$0.00" with "Add funds" link |
+| BL-06 | Format balance of 1 cent | Displays "$0.01" (no deposit link) |
 | BL-07 | Format balance of 100 cents | Displays "$1.00" |
 | BL-08 | Format balance of 12345 cents | Displays "$123.45" |
-| BL-09 | Format balance of 1 cent (if cents display chosen) | Displays "1¢" or "$0.01" based on decision |
+| BL-09 | Format balance of 3 cents | Displays "$0.03" (always dollars format) |
 | BL-10 | Refresh balance on demand | Fetches fresh balance from server |
+| BL-11 | Click "Add funds" link at $0.00 | Navigates to deposit page |
 
 ### Integration Tests - Login Flow
 
 | ID | Test | Expected Result |
 |----|------|-----------------|
-| LG-01 | Click "Sign In" button | Clerk OAuth modal/redirect opens |
+| LG-01 | Click "Sign In" button | Clerk OAuth modal/redirect opens with Google, Apple, Microsoft options |
 | LG-02 | Complete Google OAuth flow | User authenticated, redirected to intended page |
 | LG-03 | Complete Apple OAuth flow | User authenticated, redirected to intended page |
 | LG-04 | Complete Microsoft OAuth flow | User authenticated, redirected to intended page |
-| LG-05 | Complete GitHub OAuth flow | User authenticated, redirected to intended page |
-| LG-06 | Cancel OAuth flow | Return to previous page, no error shown |
-| LG-07 | OAuth provider returns error | User-friendly error message displayed |
-| LG-08 | First-time user login | Profile created via webhook, balance starts at $0.00 |
-| LG-09 | Returning user login | Profile retrieved, balance displayed correctly |
-| LG-10 | Login from landing page | Redirect to dashboard after login |
-| LG-11 | Login from protected page | Return to original page after login |
-| LG-12 | Login attempt with Clerk down | Error message, suggestion to try later |
+| LG-05 | Cancel OAuth flow | Return to previous page, no error shown |
+| LG-06 | OAuth provider returns error | User-friendly error message displayed |
+| LG-07 | First-time user login | Profile created via webhook, balance starts at $0.00 with deposit link |
+| LG-08 | Returning user login | Profile retrieved, balance displayed correctly |
+| LG-09 | Login from landing page | Redirect to dashboard after login |
+| LG-10 | Login from protected page | Return to original page after login |
+| LG-11 | Login attempt with Clerk down | Full error page displayed with "Unable to authenticate" message |
+| LG-12 | User name and avatar displayed | Name + profile picture from OAuth provider shown in header |
+| LG-13 | Provider icon displayed | Small Google/Apple/Microsoft icon shown next to user info |
 
 ### Integration Tests - Logout Flow
 
@@ -265,14 +293,16 @@ Per resolved question from `frontend_ui.md`:
 
 | ID | Test | Expected Result |
 |----|------|-----------------|
-| SM-01 | Page refresh while authenticated | Session persists, user still logged in |
-| SM-02 | Close browser and reopen | Session persists (if "remember me") or expires |
-| SM-03 | Session expires naturally | Re-authentication prompt shown |
+| SM-01 | Page refresh while authenticated | Session persists, user still logged in (remember me enabled) |
+| SM-02 | Close browser and reopen | Session persists across browser sessions |
+| SM-03 | Session expires naturally | "Your session has expired" message with sign in link |
 | SM-04 | Session revoked by backend | User logged out, redirect to login |
 | SM-05 | Multiple tabs open | All tabs share auth state via cookies |
 | SM-06 | Navigate between pages | Auth state consistent across navigation |
 | SM-07 | Clerk JWT token refresh | Happens automatically, transparent to user |
 | SM-08 | Backend rejects stale token | Frontend refreshes token and retries |
+| SM-09 | User clears cookies mid-session | "Your session has expired" message displayed |
+| SM-10 | Navigate to page after clearing cookies | Session expired message with "Sign In" link |
 
 ### Integration Tests - Balance Display
 
@@ -497,9 +527,10 @@ Authorization: Bearer <clerk_jwt_token>
 
 | Error | User Message | Recovery Action |
 |-------|--------------|-----------------|
-| Clerk SDK failed to load | "Unable to load authentication. Please refresh the page." | Refresh button |
+| Clerk SDK failed to load | Full error page: "Unable to authenticate. Please refresh the page." | Refresh button |
+| Clerk service unavailable | Full error page: "Authentication service is temporarily unavailable." | Refresh button |
 | OAuth provider error | "Sign in failed. Please try again." | Try again button |
-| Session expired | "Your session has expired. Please sign in again." | Redirect to login |
+| Session expired / cookies cleared | "Your session has expired. Please sign in again." | "Sign In" link |
 | Balance fetch failed | "Unable to load balance. Click to retry." | Retry button |
 | Network error | "Network error. Please check your connection." | Retry button |
 | Backend unavailable | "Service temporarily unavailable. Please try again later." | Retry button |
@@ -529,7 +560,33 @@ Authorization: Bearer <clerk_jwt_token>
 
 ---
 
+## Open Questions
+
+**All questions have been resolved.** This plan is ready for implementation.
+
+---
+
 ## Changelog
+
+### Version 0.2.0 (2026-01-14)
+- **All questions resolved** - Ready for implementation
+- Resolved 6 critical questions:
+  - Clerk key: Build-time environment variable injection
+  - Balance in header: Yes, always visible when logged in
+  - OAuth providers: Google, Apple, Microsoft (GitHub excluded)
+  - Zero balance: Show "$0.00" with "Add funds" deposit link
+  - Clerk unavailable: Show full error page
+  - Session persistence: Yes (remember me by default)
+- Resolved 5 important questions:
+  - Login button: "Sign In"
+  - Provider display: Show provider icon
+  - User info: Name + avatar from OAuth provider
+  - Cookies cleared: Show "session expired" message
+  - Balance format: Always dollars (e.g., "$0.03")
+- Updated test cases to reflect decisions
+- Added tests for provider icon display (LG-12, LG-13)
+- Added tests for session expired message (SM-09, SM-10)
+- Added test for $0.00 deposit link (BL-11)
 
 ### Version 0.1.0 (2026-01-14)
 - Initial plan created
