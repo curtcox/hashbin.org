@@ -408,39 +408,51 @@ Add at the end of `.github/workflows/deploy.yml`:
 
 ---
 
-## 4. Cloudflare Secrets Configuration
+## 4. GitHub Secrets Configuration
 
-### 4.1 Set Production Secrets
+Per Architectural Decision #21, all secrets are managed via GitHub and deployed through CI/CD.
 
-Run these commands to set required secrets:
+### 4.1 Required GitHub Secrets
+
+Add these secrets in GitHub repository settings (Settings > Secrets and variables > Actions):
+
+| Secret Name | Value Source | Description |
+|-------------|--------------|-------------|
+| `CLERK_SECRET_KEY` | Clerk Dashboard > API Keys | `sk_live_XXXXX` |
+| `CLERK_PUBLISHABLE_KEY` | Clerk Dashboard > API Keys | `pk_live_XXXXX` |
+| `CLERK_WEBHOOK_SECRET` | Clerk Dashboard > Webhooks | `whsec_XXXXX` |
+
+### 4.2 CI/CD Deployment
+
+The deployment workflow (`.github/workflows/deploy.yml`) must deploy secrets to Cloudflare:
+
+```yaml
+- name: Deploy Clerk secrets
+  run: |
+    echo "${{ secrets.CLERK_SECRET_KEY }}" | npx wrangler secret put CLERK_SECRET_KEY --env production
+    echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | npx wrangler secret put CLERK_PUBLISHABLE_KEY --env production
+    echo "${{ secrets.CLERK_WEBHOOK_SECRET }}" | npx wrangler secret put CLERK_WEBHOOK_SECRET --env production
+  env:
+    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+```
+
+### 4.3 Verify Secrets in Health Endpoint
+
+After deployment, verify via health endpoint:
 
 ```bash
-# Set Clerk secrets for production
-npx wrangler secret put CLERK_SECRET_KEY --env production
-# Enter: sk_live_XXXXX (from Clerk Dashboard > API Keys)
-
-npx wrangler secret put CLERK_PUBLISHABLE_KEY --env production
-# Enter: pk_live_XXXXX (from Clerk Dashboard > API Keys)
-
-npx wrangler secret put CLERK_WEBHOOK_SECRET --env production
-# Enter: whsec_XXXXX (from Clerk Dashboard > Webhooks)
+curl -s https://hashbin.org/health | jq '.checks.clerk.details'
 ```
 
-### 4.2 Verify Secrets
-
-After setting, verify with:
-
-```bash
-npx wrangler secret list --env production
-```
-
-Expected output:
-```
-CLERK_SECRET_KEY
-CLERK_PUBLISHABLE_KEY
-CLERK_WEBHOOK_SECRET
-STRIPE_SECRET_KEY
-STRIPE_WEBHOOK_SECRET
+Expected:
+```json
+{
+  "secretKeyConfigured": true,
+  "publishableKeyConfigured": true,
+  "webhookSecretConfigured": true,
+  "apiConnectivity": true
+}
 ```
 
 ---

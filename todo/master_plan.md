@@ -827,6 +827,45 @@ The following key decisions have been made to guide implementation:
 
 ---
 
+### 21. Secrets Management: GitHub as Source of Truth
+**Decision:** All API keys, secrets, and application configuration must be stored in GitHub Secrets and Variables, deployed to Cloudflare via CI/CD.
+
+**Rationale:**
+- Single source of truth for all environments
+- Enables automated deployments without manual intervention
+- Audit trail through GitHub's access logs
+- Environment-specific configuration (dev vs production)
+- Secrets never stored in code or wrangler.toml
+- CI/CD workflows can deploy complete, working environments
+
+**Implementation:**
+- **GitHub Secrets** (encrypted, for sensitive values):
+  - `CLERK_SECRET_KEY` - Clerk backend API authentication
+  - `CLERK_PUBLISHABLE_KEY` - Clerk frontend initialization
+  - `CLERK_WEBHOOK_SECRET` - Webhook signature verification
+  - `STRIPE_SECRET_KEY` - Stripe payment processing
+  - `STRIPE_WEBHOOK_SECRET` - Stripe webhook verification
+  - `CLOUDFLARE_API_TOKEN` - Cloudflare deployment access
+  - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account identifier
+
+- **GitHub Variables** (non-sensitive configuration):
+  - `ENVIRONMENT` - Environment name (development/production)
+  - `LOG_LEVEL` - Logging verbosity
+
+- **Deployment workflow:**
+  1. CI/CD reads secrets from GitHub
+  2. Deploys to Cloudflare with `wrangler secret put` commands
+  3. Verifies deployment via health endpoint
+  4. Smoke tests validate all integrations
+
+**Benefits:**
+- No manual `wrangler secret put` commands needed
+- New team members can deploy immediately
+- Disaster recovery: redeploy from GitHub
+- Environment parity guaranteed
+
+---
+
 ## Critical Open Questions
 
 **All architectural decisions have been made.** Implementation can proceed with the following understanding:
