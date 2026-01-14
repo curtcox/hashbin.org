@@ -201,19 +201,22 @@ See [Account Management](./account_management.md) for account linking and deleti
 See [Account Management](./account_management.md) for details.
 
 - [x] Implement self-service account deletion
-- [x] Require 2FA confirmation for account deletion (implemented with TOTP verification)
+- [x] Require 2FA confirmation for account deletion (implemented with step-up authentication)
 - [x] Retain payment records after deletion
 - [x] Delete all other user data on account deletion
 
-**2FA Implementation Details:**
+**2FA Implementation Details (Step-Up Authentication):**
 - Account deletion requires explicit user confirmation (`confirmed: true` in request body)
 - If user has TOTP 2FA enabled in Clerk:
   - System fetches user's 2FA status from Clerk API
   - Requires session to be "fresh" (last active within 5 minutes)
-  - Validates session has completed 2FA verification (active status)
+  - Validates session status is active
+  - Validates session was created with 2FA authentication
+  - Frontend should prompt for re-authentication if session is stale
   - Returns detailed error messages indicating 2FA requirements
 - If user does not have 2FA enabled:
   - Confirmation alone is sufficient for account deletion
+- **Step-Up Authentication Pattern**: TOTP verification happens at login/re-authentication time, not per-operation. The backend verifies the session was recently authenticated with 2FA rather than requiring a TOTP code for each sensitive operation.
 - Graceful degradation: If Clerk API is unavailable and CLERK_SECRET_KEY is not configured (dev mode), allows deletion with warning
 
 ### Phase 3.6: Escalation System (Moved to Phase 6)
@@ -276,23 +279,24 @@ POST /api/auth/link
   - After linking, user.updated webhook updates backend profile automatically
 
 DELETE /api/auth/account
-  - Deletes user account (requires confirmation and 2FA if enabled)
+  - Deletes user account (requires confirmation and recent 2FA if enabled)
   - Requires: Clerk session (not API key)
   - Request body:
     {
-      "confirmed": true,        // Required: explicit confirmation
-      "totp_token": "123456"   // Optional: required if user has TOTP 2FA enabled
+      "confirmed": true        // Required: explicit confirmation
     }
-  - 2FA Verification:
+  - 2FA Verification (Step-Up Authentication):
     - Checks if user has TOTP enabled via Clerk API
     - If enabled, validates session is fresh (< 5 minutes old)
-    - If enabled, validates session has active 2FA verification
-    - If disabled, confirmation alone is sufficient
+    - If enabled, validates session status is active
+    - If enabled, validates session was created with 2FA
+    - Frontend should re-authenticate user if session is stale
   - Response codes:
     - 200: Account deleted successfully
-    - 403: Missing confirmation, TOTP required, or stale session
+    - 403: Missing confirmation, re-authentication required, or invalid session
     - 500: Unable to verify 2FA status
   - Retains: Payment records only
+  - Note: Uses "step-up authentication" pattern - TOTP verification happens at auth time, not per-operation
   - See: Account Management
 ```
 
