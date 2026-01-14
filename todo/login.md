@@ -129,12 +129,12 @@ Per resolved question from `frontend_ui.md`:
 - **Loading:** Show loading indicator
 - **Authenticated:** Show user name + avatar + provider icon + balance + "Sign Out" button
 
-**Authenticated State Display:**
-- User's profile picture (from OAuth provider)
-- User's display name
-- Small OAuth provider icon (Google/Apple/Microsoft logo)
-- Current balance (with deposit link if $0.00)
-- "Sign Out" button
+**Authenticated State Display (left to right):**
+1. User's profile picture (avatar from OAuth provider)
+2. User's display name
+3. Small OAuth provider icon to the right of avatar (Google/Apple/Microsoft logo)
+4. Current balance (with "Add funds" link if $0.00)
+5. "Sign Out" button
 
 **Markup:**
 ```html
@@ -154,6 +154,7 @@ Per resolved question from `frontend_ui.md`:
       <img class="avatar" src="..." alt="User avatar">
       <span class="user-name">John Doe</span>
       <img class="provider-icon" src="..." alt="Google" title="Signed in with Google">
+      <!-- Provider icon appears to the right of avatar/name -->
     </div>
     <div class="balance">
       <span class="balance-amount">$12.50</span>
@@ -207,8 +208,8 @@ Per resolved question from `frontend_ui.md`:
 | 2 | **Should we show the balance in the navigation header on every page?** | Yes (always visible when logged in) | Balance displayed in header on all pages when authenticated |
 | 3 | **What OAuth providers should be enabled initially?** | Google, Apple, Microsoft | GitHub excluded from initial launch |
 | 4 | **What happens when a user has $0.00 balance?** | Show "$0.00" with link to deposit | Link navigates to deposit page (see `add_to_balance.md`) |
-| 5 | **How should we handle Clerk service unavailability?** | Show error page | Full-page error with "Unable to authenticate" message |
-| 6 | **Should login persist across browser sessions?** | Yes (remember me by default) | Clerk default session persistence enabled |
+| 5 | **How should we handle Clerk service unavailability?** | Show error for auth features only | Unauthenticated pages (retrieve, docs) still accessible; auth-dependent features show error |
+| 6 | **Should login persist across browser sessions?** | Yes (remember me by default) | Use Clerk's default session duration (configurable in Clerk dashboard) |
 
 ### Important Questions
 
@@ -219,6 +220,9 @@ Per resolved question from `frontend_ui.md`:
 | 9 | **What user info should we display when logged in?** | Name + avatar | Display name and profile picture from OAuth provider |
 | 10 | **How should we handle users who clear cookies mid-session?** | Show "session expired" message | Clear message with link to sign in again |
 | 11 | **Should balance be displayed in cents for small amounts?** | Always dollars ($0.03) | Consistent formatting regardless of amount |
+| 12 | **Where should the provider icon appear?** | To the right of the avatar | Order: avatar → name → provider icon |
+| 13 | **What session duration should be used?** | Clerk's default | Configurable in Clerk dashboard, not hardcoded |
+| 14 | **Where should first-time users be redirected after login?** | Dashboard | Shows $0.00 balance with "Add funds" deposit link |
 
 ### Deferred Questions (for add_to_balance.md)
 
@@ -270,11 +274,13 @@ Per resolved question from `frontend_ui.md`:
 | LG-04 | Complete Microsoft OAuth flow | User authenticated, redirected to intended page |
 | LG-05 | Cancel OAuth flow | Return to previous page, no error shown |
 | LG-06 | OAuth provider returns error | User-friendly error message displayed |
-| LG-07 | First-time user login | Profile created via webhook, balance starts at $0.00 with deposit link |
+| LG-07 | First-time user login | Profile created, redirect to dashboard with $0.00 balance and deposit link |
 | LG-08 | Returning user login | Profile retrieved, balance displayed correctly |
 | LG-09 | Login from landing page | Redirect to dashboard after login |
 | LG-10 | Login from protected page | Return to original page after login |
-| LG-11 | Login attempt with Clerk down | Full error page displayed with "Unable to authenticate" message |
+| LG-11 | Login attempt with Clerk down | Auth section shows "Authentication unavailable" message |
+| LG-14 | Access retrieve page with Clerk down | Page works normally, only auth section shows error |
+| LG-15 | Access docs with Clerk down | Page works normally, only auth section shows error |
 | LG-12 | User name and avatar displayed | Name + profile picture from OAuth provider shown in header |
 | LG-13 | Provider icon displayed | Small Google/Apple/Microsoft icon shown next to user info |
 
@@ -523,17 +529,24 @@ Authorization: Bearer <clerk_jwt_token>
 
 ## Error Handling
 
+### Clerk Unavailability Behavior
+
+When Clerk service is unavailable:
+- **Unauthenticated pages remain accessible:** Retrieve page, docs, landing page all work normally
+- **Auth-dependent features show error:** Sign In button shows error, protected pages show auth error
+- **Header shows degraded state:** "Sign In" button replaced with "Authentication unavailable" message
+
 ### Error States
 
-| Error | User Message | Recovery Action |
-|-------|--------------|-----------------|
-| Clerk SDK failed to load | Full error page: "Unable to authenticate. Please refresh the page." | Refresh button |
-| Clerk service unavailable | Full error page: "Authentication service is temporarily unavailable." | Refresh button |
-| OAuth provider error | "Sign in failed. Please try again." | Try again button |
-| Session expired / cookies cleared | "Your session has expired. Please sign in again." | "Sign In" link |
-| Balance fetch failed | "Unable to load balance. Click to retry." | Retry button |
-| Network error | "Network error. Please check your connection." | Retry button |
-| Backend unavailable | "Service temporarily unavailable. Please try again later." | Retry button |
+| Error | User Message | Recovery Action | Scope |
+|-------|--------------|-----------------|-------|
+| Clerk SDK failed to load | "Unable to load authentication. Please refresh." | Refresh button | Auth section only |
+| Clerk service unavailable | "Authentication temporarily unavailable." | Refresh button | Auth section only |
+| OAuth provider error | "Sign in failed. Please try again." | Try again button | Auth modal |
+| Session expired / cookies cleared | "Your session has expired. Please sign in again." | "Sign In" link | Auth section |
+| Balance fetch failed | "Unable to load balance. Click to retry." | Retry button | Balance display |
+| Network error | "Network error. Please check your connection." | Retry button | Affected component |
+| Backend unavailable | "Service temporarily unavailable. Please try again later." | Retry button | Affected component |
 
 ---
 
@@ -567,6 +580,16 @@ Authorization: Bearer <clerk_jwt_token>
 ---
 
 ## Changelog
+
+### Version 0.3.0 (2026-01-14)
+- Resolved 4 followup questions:
+  - Clerk unavailable: Unauthenticated pages (retrieve, docs) remain accessible
+  - Provider icon position: To the right of avatar
+  - Session duration: Use Clerk's default (configurable in dashboard)
+  - First-time user redirect: Dashboard with $0.00 balance
+- Updated error handling to clarify graceful degradation
+- Added tests for Clerk unavailability (LG-14, LG-15)
+- Total test cases: 88
 
 ### Version 0.2.0 (2026-01-14)
 - **All questions resolved** - Ready for implementation
