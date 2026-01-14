@@ -60,7 +60,7 @@ log_test "New user profile is created with balance of 0 cents"
 # the structure and behavior through code inspection
 
 # Verify the createProfile method sets balance_cents to 0
-if grep -q "balance_cents: 0," src/durable-objects/user-profile.js; then
+if grep -q "balance_cents[[:space:]]*:[[:space:]]*0" src/durable-objects/user-profile.js; then
   log_pass "UserProfile.createProfile sets balance_cents to 0"
 else
   log_fail "UserProfile.createProfile does not set balance_cents to 0"
@@ -84,9 +84,12 @@ fi
 log_test "Balance response includes all required fields"
 
 # Check that getBalance returns the expected structure
-if grep -A 30 "async getBalance()" src/durable-objects/user-profile.js | grep -q "balance_cents"; then
-  if grep -A 30 "async getBalance()" src/durable-objects/user-profile.js | grep -q "total_deposited_cents"; then
-    if grep -A 30 "async getBalance()" src/durable-objects/user-profile.js | grep -q "total_spent_cents"; then
+# Store grep results to avoid multiple identical commands
+BALANCE_METHOD=$(grep -A 30 "async getBalance()" src/durable-objects/user-profile.js)
+
+if echo "$BALANCE_METHOD" | grep -q "balance_cents"; then
+  if echo "$BALANCE_METHOD" | grep -q "total_deposited_cents"; then
+    if echo "$BALANCE_METHOD" | grep -q "total_spent_cents"; then
       log_pass "getBalance returns balance_cents, total_deposited_cents, and total_spent_cents"
     else
       log_fail "getBalance missing total_spent_cents"
@@ -104,7 +107,7 @@ fi
 log_test "Balance API endpoint is accessible to authenticated users"
 
 # Check that balance endpoint returns 401 without auth
-if timeout 2 curl -s http://localhost:8787/health > /dev/null 2>&1; then
+if timeout 2 curl -s "$BASE_URL/api/balance" > /dev/null 2>&1; then
   RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/balance")
   HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 
@@ -129,10 +132,11 @@ fi
 log_test "New profile initializes all balance-related fields"
 
 # Check that createProfile initializes all balance fields to 0
-PROFILE_CREATE=$(sed -n '/async createProfile/,/async updateProfile/p' src/durable-objects/user-profile.js)
-if echo "$PROFILE_CREATE" | grep -q "balance_cents: 0"; then
-  if echo "$PROFILE_CREATE" | grep -q "total_deposited_cents: 0"; then
-    if echo "$PROFILE_CREATE" | grep -q "total_spent_cents: 0"; then
+# Get lines around the createProfile function
+PROFILE_CREATE=$(grep -A 40 "async createProfile" src/durable-objects/user-profile.js)
+if echo "$PROFILE_CREATE" | grep -q "balance_cents[[:space:]]*:[[:space:]]*0"; then
+  if echo "$PROFILE_CREATE" | grep -q "total_deposited_cents[[:space:]]*:[[:space:]]*0"; then
+    if echo "$PROFILE_CREATE" | grep -q "total_spent_cents[[:space:]]*:[[:space:]]*0"; then
       log_pass "createProfile initializes all balance fields to 0"
     else
       log_fail "createProfile missing total_spent_cents initialization"
@@ -162,16 +166,11 @@ fi
 log_test "Authentication middleware detects profiles that don't exist yet"
 
 # Check that middleware returns profileExists: false when profile doesn't exist
-MIDDLEWARE_CODE=$(sed -n '/async function validateClerkToken/,/export async function authenticate/p' src/auth/middleware.js)
-if echo "$MIDDLEWARE_CODE" | grep -q "profileExists: false"; then
+# Search directly in the file rather than extracting large blocks
+if grep -q "profileExists[[:space:]]*:[[:space:]]*false" src/auth/middleware.js; then
   log_pass "Middleware detects missing profiles and returns profileExists: false"
 else
-  log_info "Checking alternative implementation..."
-  if grep -B 5 -A 5 "profileExists" src/auth/middleware.js | grep -q "false"; then
-    log_pass "Middleware detects missing profiles"
-  else
-    log_fail "Middleware does not properly detect missing profiles"
-  fi
+  log_fail "Middleware does not properly detect missing profiles"
 fi
 
 # ==========================================
