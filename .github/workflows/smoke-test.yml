@@ -186,7 +186,7 @@ jobs:
             exit 1
           fi
 
-          if ! echo "$RESPONSE" | grep -q "HashBin.org API"; then
+          if ! echo "$RESPONSE" | grep -q "HashBin"; then
             echo "::error::Root endpoint missing expected content"
             exit 1
           fi

@@ -42,11 +42,9 @@ export async function initializeClerk() {
       await loadClerkScript();
     }
 
-    // Initialize Clerk
-    clerkInstance = window.Clerk;
-    await clerkInstance.load({
-      publishableKey: publishableKey
-    });
+    // Initialize Clerk v5 - Clerk is a constructor, not an instance
+    clerkInstance = new window.Clerk(publishableKey);
+    await clerkInstance.load();
 
     // Set up auth state listener
     clerkInstance.addListener((session) => {
