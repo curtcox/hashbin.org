@@ -179,7 +179,12 @@ jobs:
       # ============================================
       - name: Test - Root Endpoint
         run: |
-          RESPONSE=$(curl -sf "${{ steps.url.outputs.base_url }}/")
+          RESPONSE=$(curl -sf "${{ steps.url.outputs.base_url }}/" || printf 'ERROR')
+
+          if [ "$RESPONSE" == "ERROR" ]; then
+            echo "::error::Root endpoint failed to respond"
+            exit 1
+          fi
 
           if ! echo "$RESPONSE" | grep -q "HashBin.org API"; then
             echo "::error::Root endpoint missing expected content"
