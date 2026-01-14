@@ -1,0 +1,169 @@
+/**
+ * Authentication Component Styles
+ */
+
+/* Auth section in header */
+#auth-section {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+/* Sign in button */
+.btn-sign-in {
+  background-color: var(--color-primary);
+  color: white;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn-sign-in:hover {
+  background-color: var(--color-primary-hover);
+}
+
+/* Sign out button */
+.btn-sign-out {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.btn-sign-out:hover {
+  background-color: var(--color-border);
+}
+
+/* User info display */
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.user-info .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+}
+
+.user-info .user-name {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.user-info .provider-icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+/* Balance display */
+.balance {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.balance-amount {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.balance-amount.zero {
+  color: var(--color-text-light);
+}
+
+.balance .deposit-link {
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+  margin-left: var(--spacing-sm);
+}
+
+.balance .deposit-link:hover {
+  text-decoration: underline;
+}
+
+.balance-loading,
+.balance-error {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-light);
+}
+
+.balance-error {
+  color: var(--color-error);
+  cursor: pointer;
+}
+
+/* Auth loading state */
+.auth-loading {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-light);
+}
+
+/* Auth error state */
+.auth-error {
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-error);
+  color: white;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+/* Auth gate loading */
+.auth-gate-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  gap: var(--spacing-lg);
+}
+
+.auth-gate-loading .spinner {
+  width: 48px;
+  height: 48px;
+  border-width: 4px;
+}
+
+/* Session expired message */
+.session-expired {
+  text-align: center;
+  padding: var(--spacing-2xl);
+}
+
+.session-expired h2 {
+  color: var(--color-warning);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  #auth-section {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--spacing-md);
+  }
+  
+  .user-info {
+    flex-wrap: wrap;
+  }
+  
+  .balance {
+    width: 100%;
+    justify-content: center;
+  }
+}

@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HashBin.org Dashboard">
+  <title>Dashboard - HashBin.org</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <!-- Clerk Publishable Key (injected at build time) -->
+  <script>
+    window.CLERK_PUBLISHABLE_KEY = 'YOUR_CLERK_PUBLISHABLE_KEY'; // TODO: Replace with actual key
+  </script>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header">
+    <a href="/" class="logo">HashBin</a>
+    <nav>
+      <a href="/upload.html">Upload</a>
+      <a href="/retrieve.html">Retrieve</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+    <div id="auth-section">
+      <!-- Auth UI will be rendered here by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <h1>Dashboard</h1>
+      
+      <!-- Balance Card -->
+      <div class="card">
+        <h2 class="card-title">Account Balance</h2>
+        <div id="dashboard-balance">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div class="spinner"></div>
+            <span>Loading balance...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card" style="margin-top: 2rem;">
+        <h2 class="card-title">Quick Actions</h2>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+          <a href="/upload.html" class="btn btn-primary">Upload Content</a>
+          <a href="/retrieve.html" class="btn btn-secondary">Retrieve Content</a>
+          <a href="/deposit.html" class="btn btn-secondary">Add Funds</a>
+        </div>
+      </div>
+
+      <!-- Placeholder for future features -->
+      <div class="card" style="margin-top: 2rem;">
+        <h2 class="card-title">Recent Uploads</h2>
+        <p style="color: var(--color-text-light);">
+          Your uploaded content will appear here. Upload functionality coming soon.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source | 
+      <a href="/docs/">Documentation</a> | 
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { requireAuth } from './js/auth-gate.js';
+    import { authenticatedFetch, formatBalance, handleApiError } from './js/utils.js';
+    
+    // Protect this page - require authentication
+    await requireAuth();
+    
+    // Load and display balance on dashboard
+    async function loadDashboardBalance() {
+      const balanceEl = document.getElementById('dashboard-balance');
+      
+      try {
+        const response = await authenticatedFetch('/api/balance');
+        await handleApiError(response);
+        
+        const data = await response.json();
+        const balanceCents = data.balance_cents;
+        const balanceFormatted = formatBalance(balanceCents);
+        
+        if (balanceCents === 0) {
+          balanceEl.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+              <p style="font-size: 2rem; font-weight: 600; color: var(--color-text-light);">
+                ${balanceFormatted}
+              </p>
+              <p style="color: var(--color-text-light); margin: 1rem 0;">
+                You don't have any funds yet. Add funds to start uploading content.
+              </p>
+              <a href="/deposit.html" class="btn btn-primary">Add Funds</a>
+            </div>
+          `;
+        } else {
+          balanceEl.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+              <p style="font-size: 3rem; font-weight: 700; color: var(--color-primary);">
+                ${balanceFormatted}
+              </p>
+              <p style="color: var(--color-text-light);">
+                Current account balance
+              </p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('Failed to load balance:', error);
+        balanceEl.innerHTML = `
+          <div class="alert alert-error">
+            <p>Failed to load balance. Please try refreshing the page.</p>
+          </div>
+        `;
+      }
+    }
+    
+    // Load balance when page loads
+    loadDashboardBalance();
+  </script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

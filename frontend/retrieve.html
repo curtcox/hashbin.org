@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Retrieve content from HashBin.org">
+  <title>Retrieve Content - HashBin.org</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <!-- Clerk Publishable Key (injected at build time) -->
+  <script>
+    window.CLERK_PUBLISHABLE_KEY = 'YOUR_CLERK_PUBLISHABLE_KEY'; // TODO: Replace with actual key
+  </script>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header">
+    <a href="/" class="logo">HashBin</a>
+    <nav>
+      <a href="/upload.html">Upload</a>
+      <a href="/retrieve.html">Retrieve</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+    <div id="auth-section">
+      <!-- Auth UI will be rendered here by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <h1>Retrieve Content</h1>
+      
+      <div class="card">
+        <h2 class="card-title">Enter Content Hash</h2>
+        <p style="color: var(--color-text-light); margin-bottom: 1.5rem;">
+          Enter a 256t content hash to retrieve the associated content. No authentication required.
+        </p>
+        
+        <form id="retrieve-form">
+          <div class="form-group">
+            <label for="content-hash" class="form-label">Content Hash (256t)</label>
+            <input 
+              type="text" 
+              id="content-hash" 
+              class="form-input" 
+              placeholder="Enter 256t hash..."
+              required
+            >
+          </div>
+          
+          <button type="submit" class="btn btn-primary">Retrieve Content</button>
+        </form>
+
+        <div id="retrieve-result" class="hidden" style="margin-top: 2rem;">
+          <!-- Results will be displayed here -->
+        </div>
+      </div>
+
+      <div class="alert alert-info" style="margin-top: 2rem;">
+        <strong>Note:</strong> Content retrieval is free and doesn't require an account. 
+        The 256t hash serves as a permanent, verifiable address for the content.
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source | 
+      <a href="/docs/">Documentation</a> | 
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module">
+    // Retrieve form handling (placeholder - actual implementation in Phase 2)
+    document.getElementById('retrieve-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      
+      const hash = document.getElementById('content-hash').value;
+      const resultDiv = document.getElementById('retrieve-result');
+      
+      resultDiv.classList.remove('hidden');
+      resultDiv.innerHTML = `
+        <div class="alert alert-warning">
+          <strong>Coming Soon:</strong> Content retrieval will be available in Phase 2. 
+          You entered hash: <code>${hash}</code>
+        </div>
+      `;
+    });
+  </script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
