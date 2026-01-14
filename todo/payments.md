@@ -53,6 +53,9 @@ HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
 | 38 | Duplicate upload message | "Retention extended for 30 days. You can add more {link}." |
 | 39 | Duplicate upload UX | Shows same presets + current expiration; must buy 30-day multiples/months/years (no target date picker) |
 | 40 | Long retention pricing | **Flat rate** - no discounts for century-scale retention |
+| 41 | Duplicate detection | **Both** - client-side warns before upload, server-side enforces |
+| 42 | "Add more" link destination | **CID detail page** with extend option |
+| 43 | Duplicate upload confirmation | **Automatic** - 30-day extension charged without confirmation prompt |
 
 ---
 
@@ -263,7 +266,7 @@ Existing upload endpoint gains payment logic:
 
 ## Open Questions
 
-*All payment questions resolved. See Decisions #1-40 above.*
+*All payment questions resolved. See Decisions #1-43 above.*
 
 *Peer-to-peer balance transfer is tracked separately in [balance_transfer.md](balance_transfer.md).*
 
