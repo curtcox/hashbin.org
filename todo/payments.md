@@ -37,7 +37,7 @@ HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
 | 22 | Balance display | **Current balance only** (no burn rate) |
 | 23 | Negative balance | **Not allowed** - hard floor at $0.00 |
 | 24 | CID donations | **Extend that CID's TTL** (not uploader's balance) |
-| 25 | Peer-to-peer balance transfer | **TBD** |
+| 25 | Peer-to-peer balance transfer | **TBD** - see [balance_transfer.md](balance_transfer.md) |
 | 26 | Upload rejection message | "Your account balance is too low for the minimum retention of 30 days. That would cost {X} and you only have {Y} in your account. {Link}" |
 | 27 | Retention duration selection | **Both** - presets + custom input |
 | 28 | Minimum retention duration | **30 days**; no maximum for single payment |
@@ -47,6 +47,9 @@ HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
 | 32 | Self-donation allowed | **Yes** |
 | 33 | Minimum donation amount | **$1.00** |
 | 34 | CID donation notifications | **None** - no email notifications for donations |
+| 35 | Retention presets | **1 month, 1 year, 1 decade, 1 century**; custom allows any multiple of 30 days |
+| 36 | Duplicate upload notification | **Yes** - user sees message that CID already exists |
+| 37 | Duplicate upload charging | **Yes** - always charged for 30 days minimum; can choose to pay for longer |
 
 ---
 
@@ -257,21 +260,9 @@ Existing upload endpoint gains payment logic:
 
 ## Open Questions
 
-*All upload, retention, and donation mechanics questions have been resolved. See Decisions #27-34 above.*
+*All payment questions resolved. See Decisions #1-37 above.*
 
-### Remaining Questions
-
-1. **Peer-to-peer balance transfer** (Decision #25 - TBD)
-   - Should users be able to transfer balance to other users?
-   - What are the fraud implications?
-
-2. **Duplicate upload UX**
-   - When a second user uploads the same content, what message do they see?
-   - Should they be informed that the CID already exists?
-   - What if the existing CID has >30 days remaining - are they still charged?
-
-3. **Retention preset values**
-   - What fixed options should be offered? (e.g., 1 month, 6 months, 1 year, 5 years, 10 years?)
+*Peer-to-peer balance transfer is tracked separately in [balance_transfer.md](balance_transfer.md).*
 
 ---
 
