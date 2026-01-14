@@ -226,7 +226,6 @@ function handleApiRoutes(url, request, env) {
 /**
  * Root endpoint - Basic info
  */
- */
 function handleRoot(env) {
   const info = {
     service: 'HashBin.org API',
