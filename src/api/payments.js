@@ -273,15 +273,200 @@ async function handleCheckoutSessionCompleted(session, env) {
   } else if (type === 'donation') {
     // Handle CID donation
     const cid = session.metadata.cid;
-    // TODO: Implement donation handling in Phase 4.4
-    console.log(`Donation completed: ${amount_cents} cents for CID ${cid}`);
+    const donorId = session.metadata.donor_id === 'anonymous' ? null : session.metadata.donor_id;
+
+    // Get content metadata to find size
+    const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);
+    const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);
+    
+    const contentResponse = await contentMetadataStub.fetch(
+      new Request('http://internal/content')
+    );
+
+    if (contentResponse.ok) {
+      const content = await contentResponse.json();
+      const size_bytes = content.size_bytes;
+
+      // Calculate months to add
+      const donationDollars = amount_cents / 100;
+      const sizeGB = size_bytes / (1024 * 1024 * 1024);
+      const monthsToAdd = donationDollars / (sizeGB * 0.03);
+
+      // Extend retention
+      const transactionId = crypto.randomUUID();
+      await contentMetadataStub.fetch(
+        new Request('http://internal/extend', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            months_to_add: monthsToAdd,
+            amount_cents: amount_cents,
+            payer_id: donorId,
+            payment_id: transactionId
+          })
+        })
+      );
+
+      // If donor is authenticated, record transaction
+      if (donorId) {
+        const paymentRecordId = env.PAYMENT_RECORDS.idFromName(donorId);
+        const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
+
+        await paymentRecordStub.fetch(
+          new Request('http://internal/transaction', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              transaction_id: transactionId,
+              type: 'donation_received',
+              user_id: donorId,
+              amount_cents: amount_cents,
+              balance_before_cents: 0,
+              balance_after_cents: 0,
+              stripe_session_id: session.id,
+              stripe_payment_intent: session.payment_intent,
+              cid: cid,
+              retention_months: monthsToAdd
+            })
+          })
+        );
+      }
+
+      console.log(`Donation completed: ${amount_cents} cents for CID ${cid} by ${donorId || 'anonymous'}`);
+      // Note: No email notification for donations per requirements
+    } else {
+      console.error(`Failed to process donation for CID ${cid}: content not found`);
+    }
   }
 }
 
 /**
- * POST /api/payments/calculate
- * Calculate retention cost for given size and duration
+ * POST /api/donate/cid/:cid
+ * Create a Stripe checkout session for donating to a CID (anonymous allowed)
  */
+export async function handleCreateDonation(request, env, cid) {
+  try {
+    const data = await request.json();
+    const amount_cents = data.amount_cents;
+
+    // Validate amount
+    if (!amount_cents || amount_cents < 100) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid amount',
+          message: 'Minimum donation is $1.00 (100 cents)'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Check if content exists
+    const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);
+    const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);
+    
+    const existsResponse = await contentMetadataStub.fetch(
+      new Request('http://internal/exists')
+    );
+    const existsData = await existsResponse.json();
+
+    if (!existsData.exists) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found',
+          message: 'The specified CID does not exist'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Calculate how many months this donation provides
+    const donationDollars = amount_cents / 100;
+    const sizeGB = existsData.size_bytes / (1024 * 1024 * 1024);
+    const monthsAdded = donationDollars / (sizeGB * 0.03);
+
+    // Calculate new expiration
+    const currentExpiration = new Date(existsData.expires_at);
+    const newExpiration = new Date(currentExpiration);
+    newExpiration.setMonth(newExpiration.getMonth() + Math.floor(monthsAdded));
+
+    // Initialize Stripe
+    const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
+      apiVersion: '2023-10-16'
+    });
+
+    // Determine URLs based on environment
+    const baseUrl = env.ENVIRONMENT === 'production' 
+      ? 'https://hashbin.org' 
+      : 'https://hashbin-worker-dev.curtcox.workers.dev';
+
+    // Get optional donor user ID
+    const authResult = await authenticate(request, env);
+    const donorId = authResult.authenticated ? authResult.userId : null;
+
+    // Create Stripe Checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `Extend HashBin Content (${cid.substring(0, 12)}...)`,
+              description: `Donate ${formatCents(amount_cents)} to extend retention by ~${Math.floor(monthsAdded)} months`
+            },
+            unit_amount: amount_cents
+          },
+          quantity: 1
+        }
+      ],
+      mode: 'payment',
+      success_url: `${baseUrl}/content/${cid}?donation=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/content/${cid}?donation=cancel`,
+      client_reference_id: donorId,
+      metadata: {
+        type: 'donation',
+        cid: cid,
+        amount_cents: amount_cents.toString(),
+        donor_id: donorId || 'anonymous'
+      },
+      automatic_tax: {
+        enabled: true
+      }
+    });
+
+    return new Response(
+      JSON.stringify({
+        checkout_url: session.url,
+        session_id: session.id,
+        estimated_months_added: Math.floor(monthsAdded),
+        estimated_new_expiration: newExpiration.toISOString(),
+        current_expiration: existsData.expires_at,
+        amount_cents: amount_cents
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: 'Donation creation failed',
+        message: error.message
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+}
 export async function handleCalculateRetention(request, env) {
   try {
     const data = await request.json();

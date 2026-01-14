@@ -152,6 +152,12 @@ export default {
       return handleExtendContent(request, env, cid);
     }
 
+    // Donation API route (public - no auth required)
+    if (url.pathname.startsWith('/api/donate/cid/') && request.method === 'POST') {
+      const cid = url.pathname.split('/')[4];
+      return handleCreateDonation(request, env, cid);
+    }
+
     // TODO: Add API routes for:
     // - Contests
     // - Public records
