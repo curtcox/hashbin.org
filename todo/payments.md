@@ -56,6 +56,9 @@ HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
 | 41 | Duplicate detection | **Both** - client-side warns before upload, server-side enforces |
 | 42 | "Add more" link destination | **CID detail page** with extend option |
 | 43 | Duplicate upload confirmation | **Automatic** - 30-day extension charged without confirmation prompt |
+| 44 | CID existence check API | **Yes** - public endpoint `GET /api/content/:cid/exists` returns exists + expiration |
+| 45 | Duplicate with insufficient balance | **Reject** - show insufficient balance message; don't extend |
+| 46 | Duplicate upload behavior | **Extend retention + display message**; skip actual upload (content already exists) |
 
 ---
 
@@ -266,7 +269,7 @@ Existing upload endpoint gains payment logic:
 
 ## Open Questions
 
-*All payment questions resolved. See Decisions #1-43 above.*
+*All payment questions resolved. See Decisions #1-46 above.*
 
 *Peer-to-peer balance transfer is tracked separately in [balance_transfer.md](balance_transfer.md).*
 
