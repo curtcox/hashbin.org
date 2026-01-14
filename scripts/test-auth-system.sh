@@ -46,15 +46,16 @@ log_info() {
 }
 
 # Cleanup function
-cleanup() {
-  if [ ! -z "$DEV_PID" ]; then
-    log_info "Stopping wrangler dev (PID: $DEV_PID)..."
-    kill $DEV_PID 2>/dev/null || true
-    wait $DEV_PID 2>/dev/null || true
-  fi
-}
-
-# Don't trap cleanup automatically - let the script finish naturally
+# Note: This script expects the dev server to be started externally
+# If you want to start the dev server within this script, uncomment
+# the trap and add server startup logic
+# cleanup() {
+#   if [ ! -z "$DEV_PID" ]; then
+#     log_info "Stopping wrangler dev (PID: $DEV_PID)..."
+#     kill $DEV_PID 2>/dev/null || true
+#     wait $DEV_PID 2>/dev/null || true
+#   fi
+# }
 # trap cleanup EXIT
 
 # Start tests
