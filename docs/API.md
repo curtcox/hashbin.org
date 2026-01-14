@@ -396,44 +396,6 @@ Delete user account (soft delete).
 
 ---
 
-### Webhook Endpoints
-
-These endpoints handle external service notifications.
-
----
-
-#### POST /api/webhooks/clerk
-
-Receive webhooks from Clerk for user lifecycle events.
-
-**Authentication:** Svix signature verification (not user authentication)
-
-**Supported Events:**
-- `user.created` - New user signed up
-- `user.updated` - User profile updated (e.g., linked new provider)
-- `user.deleted` - User deleted account in Clerk
-
-**Request Headers:**
-```http
-svix-id: msg_abc123
-svix-timestamp: 1234567890
-svix-signature: v1,signature_here
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "Webhook processed successfully"
-}
-```
-
-**Error Responses:**
-- `401` - Invalid webhook signature
-- `400` - Invalid webhook payload
-
----
-
 ## Content Endpoints (Planned)
 
 The following endpoints are planned for Phase 2 (Core Content Operations):

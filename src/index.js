@@ -23,8 +23,6 @@ import {
   handleDeleteAccount
 } from './api/auth.js';
 
-import { handleClerkWebhook } from './api/webhooks.js';
-
 import { handleGetBalance, handleGetBalanceHistory } from './api/balance.js';
 
 import { 
@@ -55,12 +53,8 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
-    // Webhook endpoints (no rate limiting or auth required)
-    // These are verified by signature instead
-    if (url.pathname === '/api/webhooks/clerk' && request.method === 'POST') {
-      return handleClerkWebhook(request, env);
-    }
-
+    // Stripe webhook endpoint (no rate limiting or auth required)
+    // Verified by Stripe signature instead
     if (url.pathname === '/api/payments/webhook' && request.method === 'POST') {
       return handleStripeWebhook(request, env);
     }
@@ -458,22 +452,18 @@ async function checkR2Buckets(env) {
 async function checkClerk(env) {
   const checks = {
     secretKeyConfigured: false,
-    publishableKeyConfigured: false,
-    webhookSecretConfigured: false
+    publishableKeyConfigured: false
   };
 
   try {
     // Check required secrets are configured
     checks.secretKeyConfigured = !!env.CLERK_SECRET_KEY;
     checks.publishableKeyConfigured = !!env.CLERK_PUBLISHABLE_KEY;
-    checks.webhookSecretConfigured = !!env.CLERK_WEBHOOK_SECRET;
 
     const allConfigured = checks.secretKeyConfigured &&
-                          checks.publishableKeyConfigured &&
-                          checks.webhookSecretConfigured;
+                          checks.publishableKeyConfigured;
     const someConfigured = checks.secretKeyConfigured ||
-                           checks.publishableKeyConfigured ||
-                           checks.webhookSecretConfigured;
+                           checks.publishableKeyConfigured;
 
     return {
       status: allConfigured ? 'operational' : (someConfigured ? 'degraded' : 'down'),
