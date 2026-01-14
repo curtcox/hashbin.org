@@ -28,7 +28,6 @@ on:
 
 env:
   PRODUCTION_URL: https://hashbin.org
-  DEVELOPMENT_URL: https://hashbin-worker-dev.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev
 
 jobs:
   smoke-test:
@@ -55,11 +54,14 @@ jobs:
 
       - name: Set target URL
         id: url
+        env:
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           if [ "${{ steps.env.outputs.target }}" == "production" ]; then
             echo "base_url=${{ env.PRODUCTION_URL }}" >> $GITHUB_OUTPUT
           else
-            echo "base_url=${{ env.DEVELOPMENT_URL }}" >> $GITHUB_OUTPUT
+            DEV_URL="https://hashbin-worker-dev.${ACCOUNT_ID}.workers.dev"
+            echo "base_url=$DEV_URL" >> $GITHUB_OUTPUT
           fi
 
       - name: Wait for deployment propagation

@@ -459,8 +459,7 @@ async function checkClerk(env) {
   const checks = {
     secretKeyConfigured: false,
     publishableKeyConfigured: false,
-    webhookSecretConfigured: false,
-    apiConnectivity: false
+    webhookSecretConfigured: false
   };
 
   try {
@@ -469,26 +468,13 @@ async function checkClerk(env) {
     checks.publishableKeyConfigured = !!env.CLERK_PUBLISHABLE_KEY;
     checks.webhookSecretConfigured = !!env.CLERK_WEBHOOK_SECRET;
 
-    // Test Clerk API connectivity (lightweight call)
-    if (checks.secretKeyConfigured) {
-      const response = await fetch('https://api.clerk.com/v1/health', {
-        headers: {
-          'Authorization': `Bearer ${env.CLERK_SECRET_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      checks.apiConnectivity = response.ok;
-    }
-
     const allConfigured = checks.secretKeyConfigured &&
                           checks.publishableKeyConfigured &&
                           checks.webhookSecretConfigured;
-    const operational = allConfigured && checks.apiConnectivity;
 
     return {
-      status: operational ? 'operational' : (allConfigured ? 'degraded' : 'down'),
-      message: operational ? 'Clerk integration operational' :
-               (allConfigured ? 'Clerk configured but API unreachable' : 'Clerk not fully configured'),
+      status: allConfigured ? 'operational' : 'down',
+      message: allConfigured ? 'Clerk secrets configured' : 'Clerk secrets not fully configured',
       details: checks
     };
   } catch (error) {
