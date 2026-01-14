@@ -56,8 +56,8 @@ HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
 | 41 | Duplicate detection | **Both** - client-side warns before upload, server-side enforces |
 | 42 | "Add more" link destination | **CID detail page** with extend option |
 | 43 | Duplicate upload confirmation | **Automatic** - 30-day extension charged without confirmation prompt |
-| 44 | CID existence check API | **Yes** - public endpoint `GET /api/content/:cid/exists` returns exists + expiration |
-| 45 | Duplicate with insufficient balance | **Reject** - show insufficient balance message; don't extend |
+| 44 | CID existence check API | **Yes** - public endpoint `GET /api/content/:cid/exists` returns exists, expiration, and size |
+| 45 | Duplicate with insufficient balance | **Reject** - show standard insufficient balance message (Decision #26) |
 | 46 | Duplicate upload behavior | **Extend retention + display message**; skip actual upload (content already exists) |
 
 ---
@@ -229,6 +229,7 @@ Stores all financial transactions:
 | `/api/balance/deposit` | POST | Yes | Create deposit checkout session |
 | `/api/balance/history` | GET | Yes | Get transaction history |
 | `/api/content/:cid` | GET | No | Get content metadata including expiration |
+| `/api/content/:cid/exists` | GET | No | Check if CID exists; returns exists, expiration, size |
 | `/api/content/:cid/extend` | POST | Yes | Extend own content's retention |
 | `/api/donate/cid/:cid` | POST | No* | Donate to extend any CID's retention |
 | `/api/payments/webhook` | POST | Stripe | Handle Stripe webhooks |
