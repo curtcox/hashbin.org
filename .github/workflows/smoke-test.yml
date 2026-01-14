@@ -75,7 +75,7 @@ jobs:
         id: health
         run: |
           echo "Testing ${{ steps.url.outputs.base_url }}/health"
-          RESPONSE=$(curl -sf -w "\n%{http_code}" "${{ steps.url.outputs.base_url }}/health" || echo -e "\n000")
+          RESPONSE=$(curl -sf -w "\n%{http_code}" "${{ steps.url.outputs.base_url }}/health" || printf '\n000')
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n-1)
 
@@ -131,7 +131,7 @@ jobs:
       - name: Test - Clerk Session Endpoint (Unauthenticated)
         run: |
           # Should return 401 for unauthenticated request
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.base_url }}/api/auth/session" || echo "000")
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${{ steps.url.outputs.base_url }}/api/auth/session" || printf '000')
 
           if [ "$HTTP_CODE" != "401" ]; then
             echo "::error::Session endpoint returned $HTTP_CODE (expected 401 for unauthenticated)"
@@ -195,7 +195,7 @@ jobs:
             -X POST \
             -H "Content-Type: application/json" \
             -d '{"sizeBytes": 1024, "retentionDays": 30}' \
-            "${{ steps.url.outputs.base_url }}/api/payments/calculate")
+            "${{ steps.url.outputs.base_url }}/api/payments/calculate" || printf '000')
 
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::warning::Calculate endpoint returned $HTTP_CODE"
