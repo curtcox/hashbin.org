@@ -199,7 +199,7 @@ jobs:
           HTTP_CODE=$(curl -sf -o /dev/null -w "%{http_code}" \
             -X POST \
             -H "Content-Type: application/json" \
-            -d '{"sizeBytes": 1024, "retentionDays": 30}' \
+            -d '{"size_bytes": 1048576, "retention_months": 1}' \
             "${{ steps.url.outputs.base_url }}/api/payments/calculate" || printf '000')
 
           if [ "$HTTP_CODE" != "200" ]; then
