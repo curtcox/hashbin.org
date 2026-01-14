@@ -78,15 +78,20 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Configure Clerk secrets (development)
-        if: ${{ secrets.CLERK_SECRET_KEY != '' && secrets.CLERK_PUBLISHABLE_KEY != '' }}
         run: |
+          if [ -z "$CLERK_SECRET_KEY" ] || [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
+            echo "⚠️  Skipping Clerk secrets configuration (secrets not set)"
+            exit 0
+          fi
           echo "Configuring Clerk secrets for development..."
-          echo "${{ secrets.CLERK_SECRET_KEY }}" | npx wrangler secret put CLERK_SECRET_KEY --env development
-          echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | npx wrangler secret put CLERK_PUBLISHABLE_KEY --env development
+          echo "$CLERK_SECRET_KEY" | npx wrangler secret put CLERK_SECRET_KEY --env development
+          echo "$CLERK_PUBLISHABLE_KEY" | npx wrangler secret put CLERK_PUBLISHABLE_KEY --env development
           echo "✅ Clerk secrets configured"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
       - name: Wait for deployment propagation
         run: sleep 10
@@ -199,15 +204,20 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Configure Clerk secrets (production)
-        if: ${{ secrets.CLERK_SECRET_KEY != '' && secrets.CLERK_PUBLISHABLE_KEY != '' }}
         run: |
+          if [ -z "$CLERK_SECRET_KEY" ] || [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
+            echo "⚠️  Skipping Clerk secrets configuration (secrets not set)"
+            exit 0
+          fi
           echo "Configuring Clerk secrets for production..."
-          echo "${{ secrets.CLERK_SECRET_KEY }}" | npx wrangler secret put CLERK_SECRET_KEY --env production
-          echo "${{ secrets.CLERK_PUBLISHABLE_KEY }}" | npx wrangler secret put CLERK_PUBLISHABLE_KEY --env production
+          echo "$CLERK_SECRET_KEY" | npx wrangler secret put CLERK_SECRET_KEY --env production
+          echo "$CLERK_PUBLISHABLE_KEY" | npx wrangler secret put CLERK_PUBLISHABLE_KEY --env production
           echo "✅ Clerk secrets configured"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
       - name: Wait for deployment propagation
         run: sleep 10
