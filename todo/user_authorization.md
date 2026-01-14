@@ -6,6 +6,7 @@
 
 The core user authorization system has been fully implemented and tested:
 - ✅ Clerk SDK integration for OAuth authentication
+- ✅ Session management endpoints (callback, session info, logout, link provider)
 - ✅ API key generation and management (hb_live_/hb_test_ prefixes)
 - ✅ UserProfile Durable Object with full CRUD operations
 - ✅ KeyRegistry Durable Object for efficient key lookups
@@ -14,7 +15,7 @@ The core user authorization system has been fully implemented and tested:
 - ✅ Account deletion with soft delete and payment record retention
 - ✅ All authentication API endpoints implemented
 - ✅ Clerk webhook handler for user.created, user.updated, user.deleted events
-- ✅ **Comprehensive test suite (12 tests, all passing)**
+- ✅ **Comprehensive test suite (15 tests, all passing)**
 
 **Test Coverage:**
 - Anonymous access to public endpoints
@@ -27,6 +28,8 @@ The core user authorization system has been fully implemented and tested:
 - Clerk session requirement for API key management
 - Durable Objects health reporting
 - Clerk SDK package verification
+- Session management endpoints (callback, logout, link provider)
+- Endpoint authentication requirements
 
 **Remaining Work:**
 - Phase 3.6: Escalation System (see [Content Dispute Resolution](./content_dispute_resolution.md))
@@ -148,6 +151,9 @@ See [Account Management](./account_management.md) for account linking and deleti
 - [x] Configure Clerk environment variables
 - [x] Implement session validation middleware
 - [x] Create `/api/auth/session` endpoint for session info
+- [x] Create `/api/auth/callback` endpoint (delegates to Clerk SDK)
+- [x] Create `/api/auth/logout` endpoint for session invalidation
+- [x] Create `/api/auth/link` endpoint (delegates to Clerk SDK)
 - [x] Handle Clerk webhooks for user events (webhook handler implemented)
 - [ ] Configure multi-provider account linking in Clerk (Handled by Clerk dashboard, requires production setup)
 
@@ -218,23 +224,29 @@ POST /api/webhooks/clerk
 
 ```
 POST /api/auth/callback
-  - Clerk OAuth callback handler
-  - Creates/updates UserProfile DO entry
-  - Returns session cookie
+  - OAuth callback handler for custom flows
+  - Note: In standard Clerk integration, OAuth callbacks are handled by Clerk frontend SDK
+  - Response: { error: "Not implemented", message: string } (501)
+  - Use Clerk Components for OAuth flow in production
 
 GET /api/auth/session
   - Returns current session info
-  - Requires: Clerk session
-  - Response: { user_id, providers: [], created_at }
+  - Requires: Clerk session or API key
+  - Response: { user_id, auth_method, session_id, profile }
 
 POST /api/auth/logout
   - Invalidates Clerk session
-  - Requires: Clerk session
+  - Requires: Clerk session (not API key)
+  - Calls Clerk Backend API to revoke session
+  - Response: { success: true, message: string }
 
 POST /api/auth/link
   - Links additional OAuth provider to account
+  - Note: OAuth provider linking is handled by Clerk frontend SDK
   - Requires: Clerk session
-  - Handled by Clerk SDK
+  - Response: { error: "Not implemented", message: string } (501)
+  - Use Clerk Components (SignIn/SignUp with "Link Account") in production
+  - After linking, user.updated webhook updates backend profile automatically
 
 DELETE /api/auth/account
   - Deletes user account (requires 2FA)

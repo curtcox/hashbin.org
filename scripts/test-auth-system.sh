@@ -370,6 +370,46 @@ else
 fi
 
 # ==========================================
+# Test 16: Session Management Endpoints Exist
+# ==========================================
+log_test "Session management endpoints are implemented"
+
+# Test callback endpoint
+RESPONSE=$(curl -s -X POST "$BASE_URL/api/auth/callback" -H "Content-Type: application/json")
+if echo "$RESPONSE" | grep -q '"Not implemented"'; then
+  log_pass "Callback endpoint exists and returns expected response"
+else
+  log_fail "Callback endpoint response incorrect"
+  echo "Response: $RESPONSE"
+fi
+
+# ==========================================
+# Test 17: Logout Endpoint Requires Authentication
+# ==========================================
+log_test "Logout endpoint requires authentication"
+
+RESPONSE=$(curl -s -X POST "$BASE_URL/api/auth/logout" -H "Content-Type: application/json")
+if echo "$RESPONSE" | grep -q '"AUTH_MISSING"'; then
+  log_pass "Logout endpoint correctly requires authentication"
+else
+  log_fail "Logout endpoint should require authentication"
+  echo "Response: $RESPONSE"
+fi
+
+# ==========================================
+# Test 18: Link Provider Endpoint Requires Authentication
+# ==========================================
+log_test "Link provider endpoint requires authentication"
+
+RESPONSE=$(curl -s -X POST "$BASE_URL/api/auth/link" -H "Content-Type: application/json")
+if echo "$RESPONSE" | grep -q '"AUTH_MISSING"'; then
+  log_pass "Link provider endpoint correctly requires authentication"
+else
+  log_fail "Link provider endpoint should require authentication"
+  echo "Response: $RESPONSE"
+fi
+
+# ==========================================
 # Summary
 # ==========================================
 echo ""

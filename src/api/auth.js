@@ -5,6 +5,47 @@
 
 import { authenticate, requireAuth, AUTH_ERROR_CODES } from '../auth/middleware.js';
 import { generateApiKey, hashApiKey, generateKeyId, validateKeyName, validateExpiration } from '../auth/utils.js';
+import { createClerkClient } from '@clerk/backend';
+
+/**
+ * Handle OAuth callback endpoint
+ * POST /api/auth/callback
+ * 
+ * Note: In most Clerk integrations, the OAuth callback is handled entirely by
+ * Clerk's frontend SDK and redirects. This endpoint provides a server-side
+ * callback handler for custom OAuth flows or backend-only integrations.
+ */
+export async function handleAuthCallback(request, env) {
+  try {
+    // In a typical Clerk setup, the OAuth flow is handled by the Clerk frontend SDK
+    // This endpoint is provided for completeness but may not be used in standard flows
+    
+    // The callback would typically contain authorization codes or tokens
+    // that need to be exchanged with Clerk's backend
+    
+    return new Response(
+      JSON.stringify({
+        error: 'Not implemented',
+        message: 'OAuth callbacks are typically handled by Clerk frontend SDK. For backend-only flows, use Clerk Backend API directly.'
+      }),
+      {
+        status: 501,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: 'Callback processing failed',
+        message: error.message
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+}
 
 /**
  * Handle session info endpoint
@@ -45,6 +86,152 @@ export async function handleSessionInfo(request, env) {
     }),
     {
       status: 200,
+      headers: { 'content-type': 'application/json' }
+    }
+  );
+}
+
+/**
+ * Handle logout endpoint
+ * POST /api/auth/logout
+ * 
+ * Invalidates the current Clerk session
+ */
+export async function handleLogout(request, env) {
+  const authResult = await authenticate(request, env);
+
+  // Require authentication
+  const authError = requireAuth(authResult);
+  if (authError) return authError;
+
+  // Only Clerk sessions can be logged out
+  if (authResult.user.authMethod !== 'clerk') {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid authentication method',
+        message: 'Only Clerk sessions can be logged out. API keys must be revoked instead.'
+      }),
+      {
+        status: 400,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  try {
+    // Verify Clerk secret is configured
+    if (!env.CLERK_SECRET_KEY) {
+      throw new Error('CLERK_SECRET_KEY not configured');
+    }
+
+    // Create Clerk client
+    const clerkClient = createClerkClient({
+      secretKey: env.CLERK_SECRET_KEY
+    });
+
+    // Revoke the session using Clerk Backend API
+    // Note: The sessionId was extracted during authentication
+    const sessionId = authResult.user.sessionId;
+    
+    if (sessionId && typeof sessionId === 'string' && sessionId.length > 0) {
+      try {
+        await clerkClient.sessions.revokeSession(sessionId);
+      } catch (clerkError) {
+        // Log specific Clerk API errors for debugging (without sensitive data)
+        if (env.LOG_LEVEL === 'debug' && env.ENVIRONMENT !== 'production') {
+          console.error('Clerk API error during logout:', {
+            sessionId: sessionId.substring(0, 8) + '...', // Truncated for security
+            error: clerkError.message || 'Unknown error',
+            status: clerkError.status || 'unknown'
+          });
+        }
+        // Re-throw to be handled by outer catch
+        throw clerkError;
+      }
+    } else {
+      // No valid sessionId to revoke, but that's okay
+      // User might have already logged out or session might have expired
+      if (env.LOG_LEVEL === 'debug' && env.ENVIRONMENT !== 'production') {
+        console.warn('Logout called without valid sessionId');
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Session logged out successfully'
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  } catch (error) {
+    // Log error with minimal context for debugging (avoid sensitive data in production)
+    if (env.ENVIRONMENT !== 'production') {
+      const userId = authResult.user?.userId;
+      console.error('Logout error:', {
+        error: error.message || 'Unknown error',
+        userId: userId && typeof userId === 'string' ? userId.substring(0, 8) + '...' : 'unknown'
+      });
+    } else {
+      // Production: log only non-sensitive error info
+      console.error('Logout error:', error.message || 'Unknown error');
+    }
+    
+    // Return success to avoid information leakage about session validity
+    // Even if revocation fails, the frontend can clear the token locally
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Logout processed'
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+}
+
+/**
+ * Handle OAuth provider linking endpoint
+ * POST /api/auth/link
+ * 
+ * Links additional OAuth provider to existing account
+ */
+export async function handleLinkProvider(request, env) {
+  const authResult = await authenticate(request, env);
+
+  // Require Clerk session
+  const authError = requireAuth(authResult);
+  if (authError) return authError;
+
+  if (authResult.user.authMethod !== 'clerk') {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid authentication method',
+        message: 'Use Clerk session to link OAuth providers'
+      }),
+      {
+        status: 403,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  // In Clerk's architecture, OAuth provider linking is handled by the frontend SDK
+  // The user initiates the OAuth flow in the browser, and Clerk handles the linking
+  // automatically. The webhook (user.updated) will then notify this backend.
+  
+  // This endpoint serves as a placeholder/documentation endpoint
+  return new Response(
+    JSON.stringify({
+      error: 'Not implemented',
+      message: 'OAuth provider linking is handled by Clerk frontend SDK. Use Clerk Components or SignIn/SignUp components with the "Link Account" option. After successful linking, the user.updated webhook will update the backend profile automatically.'
+    }),
+    {
+      status: 501,
       headers: { 'content-type': 'application/json' }
     }
   );
