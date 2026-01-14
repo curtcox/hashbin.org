@@ -16,11 +16,11 @@ This document tracks all remaining steps required to get Clerk authentication wo
 - Clerk webhook handlers - Complete
 - Frontend Clerk SDK integration - Complete
 - API key system - Complete
+- Clerk health check in `/health` endpoint - ✅ Complete
+- Independent smoke-test workflow - ✅ Complete
 
 **What's Remaining:**
 - Production secrets configuration
-- Clerk health check in `/health` endpoint
-- Independent smoke-test workflow
 - Clerk dashboard production configuration
 - End-to-end production testing
 
@@ -539,9 +539,9 @@ If Clerk integration fails in production, smoke tests will fail and notify via G
 
 All items below must be completed before marking this task done:
 
-- [ ] `checkClerk()` function added to `src/index.js`
-- [ ] `/health` endpoint includes Clerk status
-- [ ] `.github/workflows/smoke-test.yml` created and tested
+- [x] `checkClerk()` function added to `src/index.js`
+- [x] `/health` endpoint includes Clerk status
+- [x] `.github/workflows/smoke-test.yml` created and tested
 - [ ] Smoke tests pass for both development and production
 - [ ] Production secrets configured via `wrangler secret put`
 - [ ] Clerk webhook configured and verified
