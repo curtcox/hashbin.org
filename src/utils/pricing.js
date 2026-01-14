@@ -112,7 +112,12 @@ export function formatCents(cents) {
  */
 export function calculateNewExpiration(currentExpiration, monthsToAdd) {
   const date = new Date(currentExpiration);
-  date.setMonth(date.getMonth() + monthsToAdd);
+  const targetMonth = date.getMonth() + monthsToAdd;
+  date.setMonth(targetMonth);
+  // If the day changed due to month length differences, set to last day of previous month
+  if (date.getMonth() !== targetMonth % 12) {
+    date.setDate(0); // Sets to last day of previous month
+  }
   return date.toISOString();
 }
 

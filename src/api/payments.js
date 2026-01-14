@@ -7,6 +7,9 @@ import Stripe from 'stripe';
 import { authenticate } from '../auth/middleware.js';
 import { calculateStripeFees, formatCents, calculateRetentionCost } from '../utils/pricing.js';
 
+// Import pricing constant for consistency
+const BASE_RATE_PER_GB_PER_MONTH = 0.03;
+
 /**
  * POST /api/balance/deposit
  * Create a Stripe checkout session for depositing funds
@@ -50,7 +53,7 @@ export async function handleCreateDeposit(request, env) {
 
     // Initialize Stripe
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16'
+      apiVersion: '2024-11-20.acacia'
     });
 
     // Determine URLs based on environment
@@ -124,7 +127,7 @@ export async function handleCreateDeposit(request, env) {
 export async function handleStripeWebhook(request, env) {
   try {
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16'
+      apiVersion: '2024-11-20.acacia'
     });
 
     // Get the signature from headers
@@ -290,7 +293,7 @@ async function handleCheckoutSessionCompleted(session, env) {
       // Calculate months to add
       const donationDollars = amount_cents / 100;
       const sizeGB = size_bytes / (1024 * 1024 * 1024);
-      const monthsToAdd = donationDollars / (sizeGB * 0.03);
+      const monthsToAdd = donationDollars / (sizeGB * BASE_RATE_PER_GB_PER_MONTH);
 
       // Extend retention
       const transactionId = crypto.randomUUID();
@@ -388,7 +391,7 @@ export async function handleCreateDonation(request, env, cid) {
     // Calculate how many months this donation provides
     const donationDollars = amount_cents / 100;
     const sizeGB = existsData.size_bytes / (1024 * 1024 * 1024);
-    const monthsAdded = donationDollars / (sizeGB * 0.03);
+    const monthsAdded = donationDollars / (sizeGB * BASE_RATE_PER_GB_PER_MONTH);
 
     // Calculate new expiration
     const currentExpiration = new Date(existsData.expires_at);
@@ -397,7 +400,7 @@ export async function handleCreateDonation(request, env, cid) {
 
     // Initialize Stripe
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
-      apiVersion: '2023-10-16'
+      apiVersion: '2024-11-20.acacia'
     });
 
     // Determine URLs based on environment

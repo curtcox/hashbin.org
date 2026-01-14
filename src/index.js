@@ -30,7 +30,8 @@ import { handleGetBalance, handleGetBalanceHistory } from './api/balance.js';
 import { 
   handleCreateDeposit, 
   handleStripeWebhook, 
-  handleCalculateRetention 
+  handleCalculateRetention,
+  handleCreateDonation
 } from './api/payments.js';
 
 import {
