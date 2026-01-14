@@ -13,7 +13,10 @@ export { KeyRegistry } from './durable-objects/key-registry.js';
 
 // Import API route handlers
 import {
+  handleAuthCallback,
   handleSessionInfo,
+  handleLogout,
+  handleLinkProvider,
   handleCreateApiKey,
   handleListApiKeys,
   handleRevokeApiKey,
@@ -57,8 +60,20 @@ export default {
     }
 
     // Authentication API routes
+    if (url.pathname === '/api/auth/callback' && request.method === 'POST') {
+      return handleAuthCallback(request, env);
+    }
+
     if (url.pathname === '/api/auth/session' && request.method === 'GET') {
       return handleSessionInfo(request, env);
+    }
+
+    if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
+      return handleLogout(request, env);
+    }
+
+    if (url.pathname === '/api/auth/link' && request.method === 'POST') {
+      return handleLinkProvider(request, env);
     }
 
     if (url.pathname === '/api/auth/apikeys' && request.method === 'POST') {
