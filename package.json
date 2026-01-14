@@ -10,8 +10,10 @@
     "verify:dev": "scripts/verify-deployment.sh development",
     "verify:prod": "scripts/verify-deployment.sh production",
     "verify:custom": "scripts/verify-deployment.sh https://hashbin.org",
-    "test": "bash scripts/test-grep-patterns.sh",
-    "test:grep": "bash scripts/test-grep-patterns.sh"
+    "test": "bash scripts/test-grep-patterns.sh && bash scripts/test-user-balance.sh",
+    "test:grep": "bash scripts/test-grep-patterns.sh",
+    "test:balance": "bash scripts/test-user-balance.sh",
+    "test:auth": "bash scripts/test-auth-system.sh"
   },
   "keywords": [
     "256t",

@@ -2,6 +2,108 @@
 
 This directory contains scripts for verifying deployments and testing the HashBin.org infrastructure.
 
+## test-user-balance.sh
+
+Tests that verify user profile creation with zero balance.
+
+### Usage
+
+```bash
+# Run balance tests
+./scripts/test-user-balance.sh
+
+# Or use npm script
+npm run test:balance
+```
+
+### What It Tests
+
+The script verifies the following user balance features:
+
+1. **Profile Creation with Zero Balance**
+   - Verifies `UserProfile.createProfile` sets `balance_cents: 0`
+   - Ensures new users start with exactly $0.00 balance
+
+2. **Balance Field Defaults**
+   - Tests that `getBalance` defaults to 0 if balance_cents is missing
+   - Ensures backward compatibility
+
+3. **Balance Response Structure**
+   - Validates that balance response includes:
+     - `balance_cents`: Current account balance
+     - `total_deposited_cents`: Lifetime deposits
+     - `total_spent_cents`: Lifetime spending
+
+4. **Balance API Authentication**
+   - Verifies balance endpoint requires authentication
+   - Checks that unauthenticated requests receive 401
+
+5. **Complete Profile Initialization**
+   - Ensures all balance fields initialized to 0:
+     - `balance_cents`
+     - `total_deposited_cents`
+     - `total_spent_cents`
+
+6. **Authentication Flow**
+   - Verifies `handleSessionInfo` creates profile for new users
+   - Tests first-login profile creation
+
+7. **Middleware Profile Detection**
+   - Confirms middleware detects when profiles don't exist
+   - Ensures `profileExists: false` flag is set correctly
+
+### Exit Codes
+
+- `0` - All tests passed
+- `1` - One or more tests failed
+
+### Example Output
+
+```
+==========================================
+User Balance Creation Tests
+==========================================
+
+Testing against: http://localhost:8787
+
+==========================================
+TEST: New user profile is created with balance of 0 cents
+==========================================
+✅ PASS: UserProfile.createProfile sets balance_cents to 0
+
+==========================================
+TEST: getBalance method returns 0 for new users with no balance
+==========================================
+✅ PASS: getBalance defaults to 0 if balance_cents is missing
+
+...
+
+==========================================
+Test Summary
+==========================================
+Total Tests:  7
+Passed:       7
+Failed:       0
+
+✅ All tests passed!
+```
+
+## test-auth-system.sh
+
+Comprehensive test script for User Authorization System that tests authentication flows, API key management, and authorization middleware.
+
+### Usage
+
+```bash
+# Run auth tests (requires dev server running)
+./scripts/test-auth-system.sh
+
+# Or use npm script
+npm run test:auth
+```
+
+See the script file for detailed documentation of what it tests.
+
 ## verify-deployment.sh
 
 Comprehensive deployment verification script that tests all critical endpoints and services.
