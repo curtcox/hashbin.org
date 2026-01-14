@@ -19,23 +19,23 @@ Allow logged-in users to add money to their account balance via Stripe checkout.
 - Frontend deposit form UI (`/deposit.html` is placeholder)
 - Deposit success/cancel page handlers
 - Error handling UI
-- Email receipts/confirmations
 
 ---
 
 ## User Flow
 
 1. User navigates to deposit page (authenticated)
-2. User enters desired deposit amount
-3. System displays amount breakdown (deposit + Stripe fees)
+2. User enters desired credit amount (e.g., $10.00)
+3. System displays: "Credit: $10.00 + Fee: $0.59 = Total: $10.59"
 4. User clicks "Add Funds" button
 5. System creates Stripe checkout session via `POST /api/balance/deposit`
-6. User is redirected to Stripe checkout
+6. User is redirected to Stripe checkout (charged $10.59)
 7. User completes payment on Stripe
-8. Stripe redirects user back to success URL with session ID
-9. Stripe sends webhook to backend
-10. Backend credits user balance and records transaction
-11. User sees updated balance and success confirmation
+8. Stripe redirects user to success URL with session ID
+9. Success page shows confirmation, redirects to dashboard
+10. Stripe sends webhook to backend (may happen before or after redirect)
+11. Backend credits user $10.00 and records transaction
+12. Dashboard displays updated balance
 
 ---
 
@@ -55,14 +55,8 @@ File: `src/api/payments.js`
 File: `src/api/payments.js`
 
 - Verify `checkout.session.completed` handler works correctly
-- Ensure idempotency (same session not processed twice)
-- Ensure balance is credited with correct amount (net of Stripe fees? or gross?)
-
-#### 3. Add Deposit Status Endpoint
-File: `src/api/payments.js` (new endpoint)
-
-- `GET /api/balance/deposit/:sessionId/status` - Check if deposit was processed
-- Returns: `{ status: 'pending' | 'completed' | 'failed', amount_cents?, error? }`
+- Ensure idempotency using transaction IDs (same session not processed twice)
+- Credit the requested amount (user pays fees on top, receives full credit)
 
 ### Frontend Changes
 
@@ -83,57 +77,37 @@ File: `frontend/js/deposit.js`
 - Calculate and display fees
 - Submit to API and handle response
 - Redirect to Stripe checkout
-- Handle success/cancel return URLs
-- Poll for webhook completion (optional)
+- Handle success/cancel return URLs (success redirects to dashboard)
 
 #### 3. Success/Cancel Handling
 - Parse URL query parameters on page load
 - Display appropriate message based on status
-- Fetch and display updated balance on success
-- Provide retry option on cancel
+- On success: show brief confirmation, redirect to dashboard
+- On cancel: show message with retry button
 
 ---
 
-## Open Questions
+## Requirements (Resolved)
 
-### Business Logic
-
-1. **Minimum deposit amount**: Currently set to $1.00 (100 cents). Is this correct?
-
-2. **Maximum deposit amount**: Is there a maximum? Should there be one for fraud prevention?
-
-3. **Fee handling**: Who pays Stripe fees (2.9% + $0.30)?
-   - Option A: User pays gross, receives net (e.g., pay $10, receive ~$9.41 credit)
-   - Option B: User pays net, we absorb fees (e.g., pay $10, receive $10 credit)
-   - Option C: Fees added on top (e.g., want $10 credit, pay ~$10.62)
-
-4. **Currency**: USD only? Or support international currencies?
-
-5. **Receipt emails**: Should Stripe send receipt emails? Should we send our own?
-
-6. **Refund policy**: Can users request refunds of unused balance? Under what conditions?
+### Business Rules
+- **Minimum deposit**: $1.00 (100 cents)
+- **Maximum deposit**: No maximum
+- **Fee handling**: User pays Stripe fees (2.9% + $0.30), always displayed during payment
+- **Currency**: USD only
+- **Receipts**: Stripe sends receipt emails (no custom emails needed)
+- **Refunds**: No refunds of balance
 
 ### Technical
-
-7. **Webhook reliability**: What happens if webhook fails or is delayed?
-   - Should frontend poll for completion?
-   - What's the timeout before showing "pending" state?
-
-8. **Idempotency**: How do we prevent double-crediting if webhook is received twice?
-
-9. **Session expiration**: How long should Stripe checkout sessions be valid?
-
-10. **Error recovery**: If user completes payment but webhook fails, how do we recover?
+- **Webhook handling**: Trust Stripe webhooks, but show errors to user if issues occur
+- **Idempotency**: Record and check transaction IDs to prevent double-crediting
+- **Session expiration**: Use Stripe default (24 hours)
+- **Error recovery**: Rely on Stripe's webhook retry mechanism
 
 ### UX
-
-11. **Preset amounts**: Should we offer preset amounts ($5, $10, $25, $50) or free-form input only?
-
-12. **Balance display**: Where should current balance be shown during deposit flow?
-
-13. **Post-deposit redirect**: After successful deposit, redirect to dashboard or stay on deposit page?
-
-14. **Mobile experience**: Any special considerations for mobile Stripe checkout?
+- **Amount input**: Free-form input only (no preset buttons)
+- **Balance display**: Show in header (standard location)
+- **Post-deposit redirect**: Redirect to dashboard after successful deposit
+- **Mobile**: No special considerations (Stripe handles mobile checkout)
 
 ---
 
@@ -166,29 +140,25 @@ TEST: Accept valid minimum amount
 TEST: Accept valid large amount
   INPUT: amount_cents = 100000 ($1000)
   EXPECTED: Success, checkout session created
-
-TEST: Reject amount above maximum (if maximum exists)
-  INPUT: amount_cents = 10000000 ($100,000)
-  EXPECTED: Error "Maximum deposit is $X"
 ```
 
 #### Fee Calculation Tests
 ```
 TEST: Calculate Stripe fee correctly for small amount
-  INPUT: amount_cents = 100 ($1.00)
-  EXPECTED: fee = 33 cents (2.9% + $0.30)
+  INPUT: credit_amount_cents = 100 ($1.00 credit requested)
+  EXPECTED: fee = 33 cents (2.9% + $0.30), total charged = $1.33
 
 TEST: Calculate Stripe fee correctly for medium amount
-  INPUT: amount_cents = 1000 ($10.00)
-  EXPECTED: fee = 59 cents (2.9% + $0.30)
+  INPUT: credit_amount_cents = 1000 ($10.00 credit requested)
+  EXPECTED: fee = 59 cents (2.9% + $0.30), total charged = $10.59
 
 TEST: Calculate Stripe fee correctly for large amount
-  INPUT: amount_cents = 10000 ($100.00)
-  EXPECTED: fee = 320 cents (2.9% + $0.30)
+  INPUT: credit_amount_cents = 10000 ($100.00 credit requested)
+  EXPECTED: fee = 320 cents (2.9% + $0.30), total charged = $103.20
 
-TEST: Calculate net credit correctly (if user pays fees)
-  INPUT: amount_cents = 1000
-  EXPECTED: net_credit = 941 cents
+TEST: User receives full credit amount (fees added on top)
+  INPUT: credit_amount_cents = 1000
+  EXPECTED: User pays $10.59, receives $10.00 credit
 ```
 
 ### API Tests
@@ -252,9 +222,9 @@ TEST: Correct user credited (from session metadata)
   INPUT: Event with user_id in metadata
   EXPECTED: Correct user's balance updated
 
-TEST: Correct amount credited
-  INPUT: Event with amount_total = 1000
-  EXPECTED: User balance increased by correct amount (net or gross per policy)
+TEST: Correct amount credited (full requested credit, not charge amount)
+  INPUT: Event for $10.00 credit request (amount_total includes fees)
+  EXPECTED: User balance increased by 1000 cents ($10.00 credit)
 
 TEST: Transaction recorded in PaymentRecord
   INPUT: Valid checkout.session.completed
@@ -346,11 +316,11 @@ TEST: Abandoned checkout session
   4. User can create new session
 
 TEST: Webhook delay handling
-  1. User completes payment
-  2. Webhook delayed by 30 seconds
-  3. User sees "pending" status
-  4. Webhook arrives, balance updated
-  5. User sees success on refresh
+  1. User completes payment on Stripe
+  2. Redirect to success page happens immediately
+  3. Brief success message shown, redirect to dashboard
+  4. If balance not yet updated, user sees old balance (webhook pending)
+  5. On page refresh after webhook processed, balance is correct
 
 TEST: Duplicate webhook handling
   1. Webhook received for session X
@@ -382,27 +352,27 @@ TEST: Valid amount enables submit button
 
 TEST: Fee breakdown updates as amount changes
   ACTION: Type "10" in amount field
-  EXPECTED: Shows "$10.00 + $0.59 fee = $10.59 total" (or similar)
+  EXPECTED: Shows "Credit: $10.00 + Fee: $0.59 = Total: $10.59"
 ```
 
 #### Success/Cancel Handling
 
 ```
-TEST: Success URL displays confirmation
+TEST: Success URL displays confirmation then redirects
   URL: /deposit?status=success&session_id=cs_xxx
-  EXPECTED: "Deposit successful!" message displayed
+  EXPECTED: "Deposit successful!" message displayed, then redirect to dashboard
 
-TEST: Success URL shows updated balance
-  URL: /deposit?status=success&session_id=cs_xxx
-  EXPECTED: New balance displayed
+TEST: Dashboard shows updated balance after redirect
+  SETUP: Complete deposit flow
+  EXPECTED: Dashboard displays new balance in header
 
 TEST: Cancel URL displays appropriate message
   URL: /deposit?status=cancel
   EXPECTED: "Deposit cancelled" message, retry button shown
 
-TEST: Invalid session_id handled gracefully
-  URL: /deposit?status=success&session_id=invalid
-  EXPECTED: Error message, prompt to check balance manually
+TEST: Success with any session_id redirects to dashboard
+  URL: /deposit?status=success&session_id=cs_xxx
+  EXPECTED: Show success message, redirect to dashboard (webhook handles actual credit)
 ```
 
 #### Loading States
@@ -449,18 +419,18 @@ TEST: CSRF protection on deposit endpoint
 ### Edge Cases
 
 ```
-TEST: Very small deposit (minimum)
+TEST: Very small deposit (minimum $1.00)
   INPUT: amount_cents = 100
-  EXPECTED: Success (fees may exceed deposit value - is this allowed?)
+  EXPECTED: Success (user pays $1.00 + $0.33 fee = $1.33 total, receives $1.00 credit)
 
-TEST: Very large deposit
+TEST: Very large deposit (no maximum)
   INPUT: amount_cents = 1000000 ($10,000)
-  EXPECTED: Success or clear error if maximum exceeded
+  EXPECTED: Success, checkout session created
 
 TEST: Deposit when user has existing balance
   SETUP: User has $5.00 balance
-  INPUT: Deposit $10.00
-  EXPECTED: Balance = $15.00 (or $14.41 after fees)
+  INPUT: Deposit $10.00 credit
+  EXPECTED: Balance = $15.00
 
 TEST: Deposit immediately after account creation
   SETUP: New user, just signed up
@@ -505,9 +475,7 @@ TEST: Stripe checkout page timeout
 ### Phase 3: Polish & Edge Cases
 1. Add loading states
 2. Add error handling UI
-3. Add preset amount buttons (if desired)
-4. Mobile optimization
-5. Accessibility review
+3. Accessibility review
 
 ### Phase 4: Testing & Launch
 1. Run full test suite
