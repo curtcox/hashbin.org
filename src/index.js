@@ -33,6 +33,13 @@ import {
   handleCalculateRetention 
 } from './api/payments.js';
 
+import {
+  handleUploadContent,
+  handleGetContent,
+  handleCheckContentExists,
+  handleExtendContent
+} from './api/content.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -123,8 +130,29 @@ export default {
       return handleCalculateRetention(request, env);
     }
 
+    // Content API routes
+    if (url.pathname === '/api/content' && request.method === 'POST') {
+      return handleUploadContent(request, env);
+    }
+
+    if (url.pathname.startsWith('/api/content/') && request.method === 'GET') {
+      const parts = url.pathname.split('/');
+      const cid = parts[3];
+      const action = parts[4];
+
+      if (!action) {
+        return handleGetContent(request, env, cid);
+      } else if (action === 'exists') {
+        return handleCheckContentExists(request, env, cid);
+      }
+    }
+
+    if (url.pathname.startsWith('/api/content/') && url.pathname.endsWith('/extend') && request.method === 'POST') {
+      const cid = url.pathname.split('/')[3];
+      return handleExtendContent(request, env, cid);
+    }
+
     // TODO: Add API routes for:
-    // - Content upload/download
     // - Contests
     // - Public records
 
