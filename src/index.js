@@ -27,6 +27,12 @@ import { handleClerkWebhook } from './api/webhooks.js';
 
 import { handleGetBalance, handleGetBalanceHistory } from './api/balance.js';
 
+import { 
+  handleCreateDeposit, 
+  handleStripeWebhook, 
+  handleCalculateRetention 
+} from './api/payments.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -45,6 +51,10 @@ export default {
     // These are verified by signature instead
     if (url.pathname === '/api/webhooks/clerk' && request.method === 'POST') {
       return handleClerkWebhook(request, env);
+    }
+
+    if (url.pathname === '/api/payments/webhook' && request.method === 'POST') {
+      return handleStripeWebhook(request, env);
     }
 
     // Apply rate limiting to all other requests
@@ -104,9 +114,17 @@ export default {
       return handleGetBalanceHistory(request, env);
     }
 
+    if (url.pathname === '/api/balance/deposit' && request.method === 'POST') {
+      return handleCreateDeposit(request, env);
+    }
+
+    // Payment calculation endpoint (public)
+    if (url.pathname === '/api/payments/calculate' && request.method === 'POST') {
+      return handleCalculateRetention(request, env);
+    }
+
     // TODO: Add API routes for:
     // - Content upload/download
-    // - Payments
     // - Contests
     // - Public records
 
