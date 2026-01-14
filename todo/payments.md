@@ -50,6 +50,9 @@ HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
 | 35 | Retention presets | **1 month, 1 year, 1 decade, 1 century**; custom allows any multiple of 30 days |
 | 36 | Duplicate upload notification | **Yes** - user sees message that CID already exists |
 | 37 | Duplicate upload charging | **Yes** - always charged for 30 days minimum; can choose to pay for longer |
+| 38 | Duplicate upload message | "Retention extended for 30 days. You can add more {link}." |
+| 39 | Duplicate upload UX | Shows same presets + current expiration; must buy 30-day multiples/months/years (no target date picker) |
+| 40 | Long retention pricing | **Flat rate** - no discounts for century-scale retention |
 
 ---
 
@@ -260,7 +263,7 @@ Existing upload endpoint gains payment logic:
 
 ## Open Questions
 
-*All payment questions resolved. See Decisions #1-37 above.*
+*All payment questions resolved. See Decisions #1-40 above.*
 
 *Peer-to-peer balance transfer is tracked separately in [balance_transfer.md](balance_transfer.md).*
 
