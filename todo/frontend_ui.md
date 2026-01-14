@@ -320,13 +320,13 @@ frontend/
 
 | # | Question | Options | Decision |
 |---|----------|---------|----------|
-| 11 | Hash computation library | js-256t (custom), existing library, Web Crypto API | **TBD** |
+| 11 | Hash computation library | js-256t (custom), existing library, Web Crypto API | **Web Crypto API** (native SHA-512 + custom Base64URL) |
 | 12 | State management | Global object, URL params, sessionStorage | **TBD** |
-| 13 | API error handling | Retry with backoff, immediate fail, user choice | **TBD** |
+| 13 | API error handling | Retry with backoff, immediate fail, user choice | **Immediate fail** (manual retry only) |
 | 14 | Offline support | None, basic caching, full PWA | **TBD** |
 | 15 | Browser support baseline | ES6+ only, with polyfills, IE11 support | **TBD** |
 | 16 | Form validation timing | On blur, on submit, real-time | **TBD** |
-| 17 | File chunking for large uploads | None, 5MB chunks, adaptive | **TBD** |
+| 17 | File chunking for large uploads | None, 5MB chunks, adaptive | **None** |
 | 18 | Client-side hash verification | On upload only, on download too, optional | **TBD** |
 
 ### Content/Copy Decisions
@@ -340,23 +340,48 @@ frontend/
 
 ---
 
+## Resolved Questions
+
+### Critical Questions (Resolved)
+
+| # | Question | Decision | Notes |
+|---|----------|----------|-------|
+| 1 | **256t Hash Library** | Custom implementation required | No existing library. 256t spec uses SHA-512 + Base64URL. Must be created as part of Phase 2 or as frontend dependency. See `todo/256t_integration.md` (to be created). |
+| 2 | **Clerk SDK Version** | `@clerk/clerk-js` v5.x (Core 2) | Latest major version with improved UX. ~6 month release cycle. LTS support for 1 year after new major. |
+| 3 | **Stripe Integration Mode** | Stripe Checkout (redirect) | Easiest integration - hosted page, minimal code, handles compliance automatically. |
+| 4 | **File Size Limits** | No maximum, no chunking | Frontend accepts any file size. R2 handles up to 5TB. No client-side chunking. |
+| 5 | **Upload Interruption Handling** | Detailed error + manual retry | Display specific error message. User must manually click retry. No automatic retry. |
+| 6 | **Content-Type Handling** | No preview | Always display as generic file. No image/text/PDF previews. |
+| 7 | **Clerk Session Storage** | Cookies only (not configurable) | Clerk exclusively uses `__session` cookie with `SameSite=Lax`. 4KB limit. No CORS issues for same-domain. |
+
+### 256t Hash Implementation Details
+
+Per the project specification, 256t hashes are computed as:
+- **Hash algorithm:** SHA-512
+- **Encoding:** Base64URL (RFC 4648)
+- **Content ≤ 64 bytes:** Direct Base64URL encoding (no hash)
+- **Content > 64 bytes:** SHA-512 hash encoded in Base64URL
+- **Format:** 8-char length prefix + 86-char hash/content
+- **Max length:** 94 characters (URL-safe)
+
+**Implementation approach:**
+```javascript
+// Using Web Crypto API (native, no library needed)
+async function compute256t(content) {
+  const bytes = new Uint8Array(content);
+  if (bytes.length <= 64) {
+    // Direct encoding for small content
+    return lengthPrefix(bytes.length) + base64url(bytes);
+  }
+  // SHA-512 hash for larger content
+  const hash = await crypto.subtle.digest('SHA-512', bytes);
+  return lengthPrefix(bytes.length) + base64url(new Uint8Array(hash));
+}
+```
+
+---
+
 ## Open Questions
-
-### Critical Questions (Must Resolve Before Implementation)
-
-1. **256t Hash Library**: What JavaScript library should be used to compute 256t hashes client-side? Does one exist or do we need to create it?
-
-2. **Clerk SDK Version**: Which Clerk JavaScript SDK version should we target? Are there specific Cloudflare Pages integration requirements?
-
-3. **Stripe Integration Mode**: Should we use Stripe Checkout (redirect), Stripe Elements (embedded), or Payment Intents API directly?
-
-4. **File Size Limits**: What is the maximum file size the frontend should accept? Should we implement chunked uploads for large files?
-
-5. **Upload Interruption Handling**: If an upload fails midway, how should we handle it? Retry automatically? Show error and let user retry?
-
-6. **Content-Type Handling**: Should the frontend display content previews for known types (images, text, PDF) or always show as generic file?
-
-7. **Clerk Session Storage**: Where does Clerk store session tokens? localStorage, sessionStorage, cookies? Any CORS considerations?
 
 ### Important Questions (Should Resolve Before Implementation)
 
@@ -445,10 +470,48 @@ frontend/
 | UP-22 | Cancel upload in progress | Upload cancelled, no charge |
 | UP-23 | Close browser during upload | No charge (failed upload not billed) |
 | UP-24 | Upload 0-byte file | Error: empty files not allowed |
-| UP-25 | Upload file larger than limit | Error: file too large (with limit shown) |
+| UP-25 | Upload file > 5TB (R2 limit) | Error: file exceeds storage limit |
 | UP-26 | Copy hash after successful upload | Hash copied to clipboard |
 | UP-27 | Drag file outside drop zone | No action taken |
 | UP-28 | Hash computation for large file | Progress indicator shown |
+
+### Functional Tests - 256t Hash Computation
+
+| ID | Test | Expected Result |
+|----|------|-----------------|
+| HC-01 | Hash file < 64 bytes | Direct Base64URL encoding (no SHA-512) |
+| HC-02 | Hash file = 64 bytes | Direct Base64URL encoding |
+| HC-03 | Hash file = 65 bytes | SHA-512 hash computed |
+| HC-04 | Hash file > 64 bytes | SHA-512 hash in Base64URL format |
+| HC-05 | Hash output length ≤ 94 chars | All hashes within spec limit |
+| HC-06 | Hash is URL-safe | No special characters requiring encoding |
+| HC-07 | Hash 1MB file | Completes in < 100ms |
+| HC-08 | Hash 100MB file | Completes in < 1 second |
+| HC-09 | Hash 1GB file | Completes in < 10 seconds with progress |
+| HC-10 | Hash 5GB file | Completes successfully (no memory issues) |
+| HC-11 | Same content produces same hash | Deterministic output |
+| HC-12 | Different content produces different hash | No collisions in test set |
+| HC-13 | Empty file (0 bytes) | Rejected before hashing |
+| HC-14 | Binary file hashing | Works correctly |
+| HC-15 | Text file hashing | Works correctly |
+| HC-16 | Unicode filename with binary content | Hash computed on content only |
+| HC-17 | Length prefix format correct | 8-char prefix as per spec |
+| HC-18 | Web Crypto API availability check | Graceful error if unsupported |
+
+### Functional Tests - Large File Upload (No Chunking)
+
+| ID | Test | Expected Result |
+|----|------|-----------------|
+| LF-01 | Upload 100MB file | Single request, progress shown |
+| LF-02 | Upload 1GB file | Single request, progress shown |
+| LF-03 | Upload 5GB file | Single request succeeds (R2 limit) |
+| LF-04 | Upload progress accuracy | Percentage reflects actual upload |
+| LF-05 | Network interruption mid-upload | Detailed error message displayed |
+| LF-06 | Network timeout on large upload | Error with timeout details |
+| LF-07 | Manual retry after failure | New upload starts from beginning |
+| LF-08 | Browser memory during large upload | No excessive memory usage |
+| LF-09 | Cancel large upload in progress | Upload cancelled, connection closed |
+| LF-10 | Upload while on slow connection | Eventually completes or times out with clear error |
 
 ### Functional Tests - Retrieve Page
 
@@ -499,25 +562,27 @@ frontend/
 | DB-25 | Empty upload list | Appropriate empty state shown |
 | DB-26 | Empty API keys list | Appropriate empty state shown |
 
-### Functional Tests - Deposit Page
+### Functional Tests - Deposit Page (Stripe Checkout Redirect)
 
 | ID | Test | Expected Result |
 |----|------|-----------------|
-| DP-01 | Load deposit page | Current balance and form displayed |
+| DP-01 | Load deposit page | Current balance and amount input displayed |
 | DP-02 | Enter $1.00 amount | Accepted, fees calculated |
 | DP-03 | Enter $0.50 amount | Error: minimum is $1.00 |
 | DP-04 | Enter $100.00 amount | Accepted, fees calculated |
 | DP-05 | Stripe fees displayed | 2.9% + $0.30 shown correctly |
 | DP-06 | Total charge calculated | Sum of amount + fees correct |
-| DP-07 | Submit valid card | Payment processed, balance updated |
-| DP-08 | Submit invalid card number | Stripe error shown |
-| DP-09 | Submit expired card | Stripe error shown |
-| DP-10 | Card declined | Appropriate error message |
-| DP-11 | Payment succeeds | Redirect to dashboard with success message |
-| DP-12 | Payment fails | Error shown, remain on deposit page |
-| DP-13 | Cancel payment | Return to dashboard, no charge |
-| DP-14 | Network error during payment | Error message, retry option |
-| DP-15 | Stripe 3D Secure challenge | Challenge handled correctly |
+| DP-07 | Click "Pay" button | Redirect to Stripe Checkout hosted page |
+| DP-08 | Complete payment on Stripe | Redirect back to dashboard with success |
+| DP-09 | Cancel on Stripe Checkout page | Redirect back to deposit page, no charge |
+| DP-10 | Card declined on Stripe | Stripe shows error, user can retry on Stripe |
+| DP-11 | Payment succeeds | Balance updated on dashboard |
+| DP-12 | Stripe session expires (24hr) | User must start new checkout session |
+| DP-13 | Network error before redirect | Error message shown on deposit page |
+| DP-14 | Return URL tampering | Server validates payment via webhook |
+| DP-15 | Stripe 3D Secure challenge | Handled by Stripe Checkout automatically |
+| DP-16 | Browser back button from Stripe | Return to deposit page, session may still be valid |
+| DP-17 | Multiple tabs with same session | Only one payment processed |
 
 ### Functional Tests - Public Records
 
@@ -743,6 +808,17 @@ frontend/
 ---
 
 ## Changelog
+
+### Version 0.2.0 (2026-01-14)
+- Resolved 7 critical questions
+- Decided: Web Crypto API for 256t hash computation (SHA-512 + Base64URL)
+- Decided: @clerk/clerk-js v5.x (Core 2)
+- Decided: Stripe Checkout (redirect) for payments
+- Decided: No file size limits, no chunking
+- Decided: Manual retry only on upload failure
+- Decided: No content previews (generic file display)
+- Confirmed: Clerk uses cookies only (`__session` with SameSite=Lax)
+- Added 256t implementation details with code example
 
 ### Version 0.1.0 (2026-01-14)
 - Initial plan created
