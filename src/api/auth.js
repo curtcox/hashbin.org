@@ -133,20 +133,26 @@ export async function handleLogout(request, env) {
     // Note: The sessionId was extracted during authentication
     const sessionId = authResult.user.sessionId;
     
-    if (sessionId) {
+    if (sessionId && typeof sessionId === 'string' && sessionId.length > 0) {
       try {
         await clerkClient.sessions.revokeSession(sessionId);
       } catch (clerkError) {
-        // Log specific Clerk API errors for debugging
-        if (env.LOG_LEVEL === 'debug') {
+        // Log specific Clerk API errors for debugging (without sensitive data)
+        if (env.LOG_LEVEL === 'debug' && env.ENVIRONMENT !== 'production') {
           console.error('Clerk API error during logout:', {
-            sessionId,
+            sessionId: sessionId.substring(0, 8) + '...', // Truncated for security
             error: clerkError.message,
             status: clerkError.status
           });
         }
         // Re-throw to be handled by outer catch
         throw clerkError;
+      }
+    } else {
+      // No valid sessionId to revoke, but that's okay
+      // User might have already logged out or session might have expired
+      if (env.LOG_LEVEL === 'debug' && env.ENVIRONMENT !== 'production') {
+        console.warn('Logout called without valid sessionId');
       }
     }
 
@@ -161,12 +167,16 @@ export async function handleLogout(request, env) {
       }
     );
   } catch (error) {
-    // Log error with more context for debugging
-    console.error('Logout error:', {
-      error: error.message,
-      userId: authResult.user.userId,
-      sessionId: authResult.user.sessionId
-    });
+    // Log error with minimal context for debugging (avoid sensitive data in production)
+    if (env.ENVIRONMENT !== 'production') {
+      console.error('Logout error:', {
+        error: error.message,
+        userId: authResult.user.userId.substring(0, 8) + '...' // Truncated
+      });
+    } else {
+      // Production: log only non-sensitive error info
+      console.error('Logout error:', error.message);
+    }
     
     // Return success to avoid information leakage about session validity
     // Even if revocation fails, the frontend can clear the token locally
