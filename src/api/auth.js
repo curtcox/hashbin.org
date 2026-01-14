@@ -141,8 +141,8 @@ export async function handleLogout(request, env) {
         if (env.LOG_LEVEL === 'debug' && env.ENVIRONMENT !== 'production') {
           console.error('Clerk API error during logout:', {
             sessionId: sessionId.substring(0, 8) + '...', // Truncated for security
-            error: clerkError.message,
-            status: clerkError.status
+            error: clerkError.message || 'Unknown error',
+            status: clerkError.status || 'unknown'
           });
         }
         // Re-throw to be handled by outer catch
@@ -169,13 +169,14 @@ export async function handleLogout(request, env) {
   } catch (error) {
     // Log error with minimal context for debugging (avoid sensitive data in production)
     if (env.ENVIRONMENT !== 'production') {
+      const userId = authResult.user?.userId;
       console.error('Logout error:', {
-        error: error.message,
-        userId: authResult.user.userId.substring(0, 8) + '...' // Truncated
+        error: error.message || 'Unknown error',
+        userId: userId && typeof userId === 'string' ? userId.substring(0, 8) + '...' : 'unknown'
       });
     } else {
       // Production: log only non-sensitive error info
-      console.error('Logout error:', error.message);
+      console.error('Logout error:', error.message || 'Unknown error');
     }
     
     // Return success to avoid information leakage about session validity
