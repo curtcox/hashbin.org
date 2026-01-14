@@ -2,7 +2,12 @@
 
 ## Overview
 
-HashBin.org operates on a **prepaid wallet, pay-to-publish, free-to-download** model. Users deposit funds into their account balance, then use that balance to pay for content storage. Uploads require sufficient balance to cover at least 30 days of storage.
+HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
+- Users deposit funds into their account balance
+- When uploading, users pay upfront for a specific retention duration
+- Each CID has its own expiration time (time-to-deletion), independent of account balance
+- Reading/downloading is always free
+- Anyone can donate to extend a CID's retention
 
 ## Decisions Made
 
@@ -10,22 +15,30 @@ HashBin.org operates on a **prepaid wallet, pay-to-publish, free-to-download** m
 |---|----------|----------|
 | 1 | Maximum retention duration | **Unlimited** |
 | 2 | Volume discounts | **No** - flat rate for all users |
-| 3 | Prepaid wallet support | **Yes** - required for uploads; must have 30+ days balance |
+| 3 | Prepaid wallet support | **Yes** - required for uploads; must cover 30+ days retention |
 | 4 | Currencies supported | **USD only** |
 | 5 | Refunds | **No refunds**; failed uploads are never charged |
 | 6 | Contested content removal | **No payment impact** - no refund or credit |
-| 7 | Payment-to-upload flow | **Pay first, then upload**; rejected if balance < 30 days |
+| 7 | Payment-to-upload flow | **Pay from balance at upload time**; rejected if balance < 30 days cost |
 | 8 | Size estimates | **None** - real-time feedback on upload attempt |
 | 9 | Checkout session timeout | **Stripe default** (24 hours) |
 | 10 | Stripe fee handling | **Pass through to user**, clearly labeled |
-| 11 | Account deletion | **No impact on content**; users can pay for others' content |
+| 11 | Account deletion | **No impact on content**; content retained until its TTL expires |
 | 12 | Multi-region Stripe | **Single account** |
-| 13 | Guest checkout | **Anonymous donations allowed**; anonymous uploads NOT allowed |
+| 13 | Guest checkout | **Anonymous donations to CIDs allowed**; anonymous uploads NOT allowed |
 | 14 | Email notifications | Payment confirmation, receipt, 30-day expiration warning |
-| 15 | Expiration warning | **30 days** before expiration |
+| 15 | Expiration warning | **30 days** before CID expiration |
 | 16 | Payment data logged | Beginning balance, ending balance, external transaction number |
 | 17 | Fraud prevention | **Deferred** to later phase |
 | 18 | Tax handling | **Stripe Tax** |
+| 19 | Balance deduction model | **No recurring deductions** - balance only changes on deposits/uploads |
+| 20 | Balance vs content retention | **Independent** - balance is wallet money; CIDs have their own TTL |
+| 21 | Minimum/maximum deposit | **$1.00 minimum**, no maximum |
+| 22 | Balance display | **Current balance only** (no burn rate) |
+| 23 | Negative balance | **Not allowed** - hard floor at $0.00 |
+| 24 | CID donations | **Extend that CID's TTL** (not uploader's balance) |
+| 25 | Peer-to-peer balance transfer | **TBD** |
+| 26 | Upload rejection message | "Your account balance is too low for the minimum retention of 30 days. That would cost {X} and you only have {Y} in your account. {Link}" |
 
 ---
 
@@ -33,26 +46,67 @@ HashBin.org operates on a **prepaid wallet, pay-to-publish, free-to-download** m
 
 ### Pricing Formula
 ```
-Storage Cost = Size (GB) × Duration (months) × $0.03
-Total Cost = Storage Cost + Stripe Fees
+Retention Cost = Size (GB) × Duration (months) × $0.03
 ```
 
 ### Pricing Parameters
 - **Base Rate**: $0.03 per GB per month (100% markup over R2 costs)
 - **Minimum Deposit**: $1.00
-- **Stripe Fees**: 2.9% + $0.30 per transaction (passed through to user)
+- **Minimum Retention**: 30 days
 - **Maximum Retention**: Unlimited
-- **Minimum Balance for Upload**: 30 days of storage for the content size
+- **Stripe Fees**: 2.9% + $0.30 per deposit (passed through to user)
 
-### Fee Display Example
+### Key Concepts
+
+#### Account Balance (Wallet)
+- Money available to spend on uploads or retention extensions
+- Increases when user deposits via Stripe
+- Decreases when user uploads content (pays for retention)
+- No recurring deductions - balance only changes on explicit transactions
+
+#### CID Retention (Time-to-Deletion)
+- Each CID has its own expiration timestamp
+- Set at upload time based on paid duration
+- Can be extended by anyone via donation
+- Independent of uploader's account balance
+
+### Example Scenarios
+
+**Scenario 1: New Upload**
 ```
-Content size: 10 GB
-Retention: 6 months
+User balance: $5.00
+Upload size: 10 GB
+Requested retention: 3 months
 ─────────────────────────
-Storage cost:     $1.80
-Stripe fee:       $0.35  (2.9% + $0.30)
+Retention cost: 10 GB × 3 months × $0.03 = $0.90
 ─────────────────────────
-Total deposit:    $2.15
+New balance: $4.10
+CID expires: 3 months from now
+```
+
+**Scenario 2: Insufficient Balance**
+```
+User balance: $0.50
+Upload size: 100 GB
+Minimum retention: 30 days (1 month)
+─────────────────────────
+Minimum cost: 100 GB × 1 month × $0.03 = $3.00
+─────────────────────────
+Result: REJECTED
+Message: "Your account balance is too low for the minimum
+retention of 30 days. That would cost $3.00 and you only
+have $0.50 in your account. [Deposit more]"
+```
+
+**Scenario 3: Donation to CID**
+```
+CID size: 5 GB
+Current expiration: 2025-03-01
+Donation amount: $1.50
+─────────────────────────
+Extension: $1.50 ÷ (5 GB × $0.03/month) = 10 months
+─────────────────────────
+New expiration: 2026-01-01
 ```
 
 ---
@@ -68,25 +122,6 @@ Total deposit:    $2.15
 - Google Pay
 - ACH bank transfers (US only)
 
-### Core Concepts
-
-#### Account Balance (Wallet)
-Each user has a USD balance that:
-- Increases when they deposit funds via Stripe
-- Decreases as storage costs accrue over time
-- Must maintain 30+ days of projected storage to upload
-
-#### Balance Depletion
-Storage costs are continuously deducted from the user's balance based on:
-- Total size of all stored content
-- Time elapsed since last calculation
-
-#### Anonymous Donations
-Users can:
-- Donate to another user's account (by user ID)
-- Pay for storage of any existing CID (extends retention)
-- Cannot upload anonymously
-
 ### Data Flow
 
 #### Deposit Flow
@@ -97,15 +132,17 @@ Stripe → Webhook → Credit UserProfile Balance → Send Receipt
 
 #### Upload Flow
 ```
-User → Upload Request → Check Balance ≥ 30 days storage
-If sufficient → Accept Upload → Associate CID → Start Deducting
-If insufficient → Reject with detailed message (current balance, required, shortfall)
+User → Upload Request (size, retention_months)
+     → Calculate cost: size × months × $0.03
+     → Check balance ≥ cost (minimum 30 days)
+     → If sufficient: Deduct from balance → Store content → Set CID TTL
+     → If insufficient: Return rejection message with details
 ```
 
-#### Donation Flow
+#### CID Donation Flow
 ```
-Anonymous User → Donate to CID/User → Create Stripe Session
-Stripe → Webhook → Credit Target Account/Extend CID Retention
+Anyone → Donate to CID → Create Stripe Session
+Stripe → Webhook → Calculate extension → Update CID expiration
 ```
 
 ---
@@ -114,71 +151,97 @@ Stripe → Webhook → Credit Target Account/Extend CID Retention
 
 ### 1. UserProfile Durable Object (Updated)
 
-Add wallet/balance tracking:
+Add wallet tracking:
 ```javascript
 {
   // ... existing fields
   balance_cents: number,           // Current USD balance in cents
-  balance_updated_at: string,      // Last balance calculation timestamp
   total_deposited_cents: number,   // Lifetime deposits
-  total_storage_used_bytes: number, // Current total stored content size
-  deposit_ids: string[],           // List of deposit transaction IDs
+  total_spent_cents: number,       // Lifetime spend on uploads/extensions
 }
 ```
 
-### 2. DepositRecord Durable Object
+### 2. ContentMetadata Durable Object (Updated)
 
-Stores deposit transactions (replacing PaymentRecord concept):
+Add retention tracking:
 ```javascript
 {
-  deposit_id: string,              // UUID, primary key
-  depositor_id: string | null,     // Clerk user ID (null for anonymous)
-  recipient_id: string | null,     // Target user ID (for donations)
-  target_cid: string | null,       // Target CID (for CID-specific payments)
-  amount_cents: number,            // Deposit amount in cents
-  stripe_fee_cents: number,        // Stripe fee passed through
-  net_amount_cents: number,        // Amount credited to balance
-  status: string,                  // pending | completed | failed
-  stripe_session_id: string,       // Stripe Checkout session ID
-  stripe_payment_intent: string,   // Stripe PaymentIntent ID
-  beginning_balance_cents: number, // Balance before deposit
-  ending_balance_cents: number,    // Balance after deposit
-  created_at: string,              // ISO 8601 timestamp
-  completed_at: string | null,     // When deposit completed
+  // ... existing fields
+  hash_256t: string,              // Content hash
+  size_bytes: number,             // Content size
+  uploader_id: string,            // Clerk user ID who uploaded
+  created_at: string,             // Upload timestamp
+  expires_at: string,             // When content will be deleted
+  retention_payments: [{          // History of payments for this CID
+    payment_id: string,
+    amount_cents: number,
+    months_added: number,
+    payer_id: string | null,      // null for anonymous
+    created_at: string,
+  }],
 }
 ```
 
-### 3. API Endpoints
+### 3. TransactionRecord Durable Object
+
+Stores all financial transactions:
+```javascript
+{
+  transaction_id: string,         // UUID, primary key
+  type: string,                   // deposit | upload_payment | cid_extension | donation_received
+  user_id: string,                // User whose balance changed
+  amount_cents: number,           // Amount (positive for credits, negative for debits)
+  balance_before_cents: number,   // Balance before transaction
+  balance_after_cents: number,    // Balance after transaction
+  stripe_session_id: string | null,  // For deposits
+  stripe_payment_intent: string | null,
+  cid: string | null,             // For upload/extension payments
+  retention_months: number | null, // For upload/extension payments
+  created_at: string,
+}
+```
+
+### 4. API Endpoints
 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/api/balance` | GET | Yes | Get current balance and storage costs |
+| `/api/balance` | GET | Yes | Get current balance |
 | `/api/balance/deposit` | POST | Yes | Create deposit checkout session |
-| `/api/balance/history` | GET | Yes | Get deposit/deduction history |
-| `/api/donate/user/:userId` | POST | No* | Donate to another user's balance |
-| `/api/donate/cid/:cid` | POST | No* | Pay for specific CID storage |
+| `/api/balance/history` | GET | Yes | Get transaction history |
+| `/api/content/:cid` | GET | No | Get content metadata including expiration |
+| `/api/content/:cid/extend` | POST | Yes | Extend own content's retention |
+| `/api/donate/cid/:cid` | POST | No* | Donate to extend any CID's retention |
 | `/api/payments/webhook` | POST | Stripe | Handle Stripe webhooks |
-| `/api/payments/calculate` | POST | No | Calculate storage cost for size/duration |
+| `/api/payments/calculate` | POST | No | Calculate retention cost for size/duration |
 
 *Anonymous donations require Stripe payment but not HashBin account
 
-### 4. Stripe Webhook Events
+### 5. Upload Endpoint (Updated)
 
-Events to handle:
-- `checkout.session.completed` - Deposit successful, credit balance
-- `checkout.session.expired` - Session expired, no action needed
-- `payment_intent.payment_failed` - Payment failed, log for debugging
-- `charge.dispute.created` - Chargeback, flag account
-
-### 5. Balance Calculation Engine
-
-Runs on every balance-affecting operation:
+Existing upload endpoint gains payment logic:
 ```javascript
-function calculateCurrentBalance(user) {
-  const timeSinceLastUpdate = now() - user.balance_updated_at;
-  const dailyCost = (user.total_storage_used_bytes / GB) * 0.03 / 30;
-  const costSinceLastUpdate = dailyCost * timeSinceLastUpdate.days;
-  return user.balance_cents - costSinceLastUpdate;
+// POST /api/content
+{
+  content: File,
+  retention_months: number,  // Minimum 1 (30 days)
+}
+
+// Response on success
+{
+  cid: string,
+  size_bytes: number,
+  expires_at: string,
+  cost_cents: number,
+  new_balance_cents: number,
+}
+
+// Response on insufficient balance
+{
+  error: "insufficient_balance",
+  message: "Your account balance is too low for the minimum retention of 30 days. That would cost $3.00 and you only have $0.50 in your account.",
+  required_cents: 300,
+  balance_cents: 50,
+  deposit_url: "/balance/deposit",
 }
 ```
 
@@ -186,42 +249,44 @@ function calculateCurrentBalance(user) {
 
 ## Open Questions
 
-### Balance & Wallet Mechanics
+### Upload & Retention Mechanics
 
-1. **What is the balance deduction frequency?**
-   - Options: Real-time (on every check), hourly, daily, monthly
-   - Affects: Computational overhead, balance accuracy, user experience
-   - Recommendation: Real-time calculation on read, daily snapshot for records
+1. **Can users choose retention duration at upload time?**
+   - Fixed options (1 month, 6 months, 1 year, 5 years)?
+   - Or free-form input (any number of months)?
+   - Or both (presets + custom)?
 
-2. **What happens when balance reaches zero?**
-   - Content immediately deleted?
-   - Grace period before deletion? How long?
-   - Content frozen (no new uploads) but existing content preserved temporarily?
+2. **What is the minimum retention duration?**
+   - 30 days (1 month) seems implied
+   - Should there be a maximum for a single payment? (e.g., 100 years)
 
-3. **Is there a minimum deposit amount?**
-   - $1.00 minimum makes sense given Stripe's $0.30 fixed fee
-   - Should there be a maximum single deposit?
+3. **Can users extend their own content's retention?**
+   - Same as self-donation?
+   - Or separate endpoint with different UX?
 
-4. **How is balance displayed to the user?**
-   - Current balance only?
-   - Projected days remaining at current storage level?
-   - Burn rate ($/day)?
+4. **What happens when a CID expires?**
+   - Immediate deletion?
+   - Grace period before deletion?
+   - Can expired content be "revived" by paying?
 
-5. **Can balance go negative?**
-   - If timing allows deductions to exceed balance slightly
-   - Or enforce hard floor at $0.00?
+5. **How are duplicate uploads handled?**
+   - Same content = same CID (content-addressed)
+   - Does second uploader share retention? Or each has independent TTL?
+   - Who "owns" the CID if multiple people uploaded it?
 
-6. **How are donations to a CID handled?**
-   - Credit the CID owner's account?
-   - Create separate retention fund for that specific CID?
-   - What if CID has no owner (anonymous upload - but wait, anonymous uploads aren't allowed)?
+### Donation Mechanics
 
-7. **Can users transfer balance to each other?**
-   - Peer-to-peer balance transfer vs. only via Stripe donation?
+6. **Can you donate to your own CID?**
+   - Functionally same as extending retention
+   - Should use same or different endpoint?
 
-8. **What is the upload rejection message format?**
-   - Example: "Insufficient balance. You have $0.50 (15 days). This upload requires $1.00 (30 days). Please deposit at least $0.50."
-   - Should we suggest the exact deposit amount needed?
+7. **Is there a minimum donation amount?**
+   - $1.00 to match deposit minimum?
+   - Or allow any amount that results in >0 days extension?
+
+8. **Are donation notifications sent to uploaders?**
+   - Email when someone donates to their CID?
+   - Privacy consideration: does donor remain anonymous to uploader?
 
 ---
 
@@ -231,32 +296,30 @@ function calculateCurrentBalance(user) {
 
 ```
 describe('PricingCalculator', () => {
-  // Basic calculations
-  - should calculate storage cost for 1 GB for 1 month ($0.03)
-  - should calculate storage cost for 10 GB for 1 month ($0.30)
-  - should calculate storage cost for 1 GB for 12 months ($0.36)
-  - should calculate storage cost for 100 GB for 6 months ($18.00)
+  // Basic retention cost calculations
+  - should calculate cost for 1 GB for 1 month ($0.03)
+  - should calculate cost for 10 GB for 1 month ($0.30)
+  - should calculate cost for 1 GB for 12 months ($0.36)
+  - should calculate cost for 100 GB for 6 months ($18.00)
+  - should calculate cost for 500 MB for 1 month ($0.015 → $0.02 rounded)
 
-  // Stripe fee calculations
+  // Stripe fee calculations (deposits only)
   - should calculate Stripe fee as 2.9% + $0.30
-  - should calculate total (storage + fee) correctly
-  - should display fee separately from storage cost
+  - should calculate net deposit after fees
   - should handle fee on $1.00 deposit ($0.33 fee, $0.67 net)
   - should handle fee on $100 deposit ($3.20 fee, $96.80 net)
 
-  // Minimum deposit enforcement
-  - should enforce $1.00 minimum deposit
-  - should reject deposit below $1.00
-
   // Edge cases - size
-  - should handle 0 bytes (no storage cost)
+  - should handle 0 bytes (error - cannot upload empty content)
   - should handle negative size (error)
   - should handle extremely large size (1 PB)
-  - should handle fractional bytes (round up to nearest byte)
+  - should handle fractional bytes (use exact bytes)
 
   // Edge cases - duration
-  - should calculate for fractional months correctly
-  - should handle very long durations (10 years)
+  - should handle 0 months (error)
+  - should handle negative months (error)
+  - should handle fractional months (round up to nearest day?)
+  - should handle very long durations (100 years)
 
   // Precision handling
   - should round final price to nearest cent
@@ -264,71 +327,97 @@ describe('PricingCalculator', () => {
   - should use integer cents internally
 
   // 30-day minimum calculations
-  - should calculate 30-day cost for given file size
-  - should determine if balance covers 30 days
-  - should calculate shortfall amount
+  - should calculate minimum cost for given file size
+  - should determine if balance covers minimum retention
+  - should calculate shortfall amount for rejection message
 });
 ```
 
-### Unit Tests - Balance Engine
+### Unit Tests - Balance Operations
 
 ```
-describe('BalanceEngine', () => {
-  // Balance calculation
-  - should return full balance when no storage used
-  - should deduct proportional amount for storage over time
-  - should calculate correctly for 1 GB stored for 1 day
-  - should calculate correctly for 100 GB stored for 30 days
-  - should handle multiple content items summed together
-  - should update balance_updated_at after calculation
+describe('BalanceOperations', () => {
+  // Deposits
+  - should credit balance on successful deposit
+  - should record transaction with before/after balance
+  - should update total_deposited_cents
+  - should handle multiple deposits correctly
 
-  // Time-based deductions
-  - should deduct nothing for 0 seconds elapsed
-  - should deduct proportionally for partial days
-  - should handle timezone correctly (use UTC)
-  - should handle leap seconds/days gracefully
+  // Debits (upload payments)
+  - should debit balance on successful upload
+  - should record transaction with before/after balance
+  - should update total_spent_cents
+  - should reject if balance insufficient
 
-  // Edge cases
+  // Balance queries
+  - should return current balance
+  - should return 0 for new users
   - should never return negative balance
-  - should handle balance exactly reaching zero
-  - should handle very small balances (fractions of a cent)
-  - should handle very large storage (petabytes)
 
   // Concurrency
-  - should handle concurrent balance reads
-  - should serialize balance writes
-  - should prevent race conditions in deposit + deduction
+  - should handle concurrent deposits correctly
+  - should handle concurrent upload attempts
+  - should prevent race conditions (double-spend)
+  - should serialize balance modifications
 });
 ```
 
-### Unit Tests - Upload Validation
+### Unit Tests - Upload Payment Validation
 
 ```
-describe('UploadValidation', () => {
-  // Balance checks
-  - should allow upload when balance covers 30+ days
-  - should reject upload when balance covers < 30 days
-  - should reject upload when balance is zero
-  - should calculate required balance based on file size
+describe('UploadPaymentValidation', () => {
+  // Sufficient balance
+  - should allow upload when balance ≥ cost for requested retention
+  - should allow upload when balance exactly equals cost
+  - should allow upload with balance > 30-day minimum
 
-  // Rejection messages
-  - should include current balance in rejection
-  - should include required balance in rejection
-  - should include shortfall amount in rejection
-  - should include days of coverage in rejection
-  - should suggest deposit amount
+  // Insufficient balance
+  - should reject when balance < 30-day minimum cost
+  - should reject when balance < requested retention cost
+  - should return detailed rejection message
+  - should include required_cents in response
+  - should include balance_cents in response
+  - should include deposit_url in response
+
+  // Rejection message format
+  - should format message: "Your account balance is too low..."
+  - should include cost formatted as dollars ($X.XX)
+  - should include balance formatted as dollars
+  - should include link to deposit
 
   // Edge cases
-  - should handle exact 30-day balance (allow)
-  - should handle 29.9-day balance (reject)
-  - should handle zero-byte file (allow? or error?)
-  - should handle user with no prior deposits
+  - should reject zero-byte uploads (or allow?)
+  - should reject zero-month retention
+  - should handle very large files correctly
+  - should handle very long retention correctly
+});
+```
 
-  // After successful upload
-  - should associate CID with user
-  - should add file size to total_storage_used_bytes
-  - should recalculate balance immediately
-  - should start deduction clock
+### Unit Tests - CID Retention
+
+```
+describe('CIDRetention', () => {
+  // Setting expiration
+  - should set expires_at based on retention_months
+  - should calculate expiration from upload timestamp
+  - should handle month boundary correctly (e.g., Jan 31 + 1 month)
+
+  // Extending retention
+  - should add months to existing expires_at
+  - should record extension payment in retention_payments
+  - should handle extension of near-expired content
+  - should handle extension of already-expired content (if allowed)
+
+  // Donation extensions
+  - should calculate months from donation amount
+  - should handle fractional months (round to days)
+  - should record anonymous donor as null payer_id
+  - should record authenticated donor's user ID
+
+  // Expiration
+  - should mark content as expired when expires_at passes
+  - should delete content after expiration (or grace period)
+  - should not allow access to expired content
 });
 ```
 
@@ -343,97 +432,58 @@ describe('POST /api/balance/deposit', () => {
   - should accept valid API key
 
   // Request validation
-  - should require amount field
-  - should reject amount below $1.00
+  - should require amount_cents field
+  - should reject amount below $1.00 (100 cents)
   - should reject non-numeric amount
   - should reject negative amount
 
   // Success response
   - should return Stripe checkout URL
-  - should return deposit_id
-  - should return amount breakdown (deposit, fee, net credit)
-  - should create pending DepositRecord
+  - should return transaction_id
+  - should return amount breakdown (gross, fee, net)
 
   // Stripe integration
   - should create Stripe Checkout session
-  - should set correct amount (including fees)
-  - should set success_url with deposit_id
+  - should set correct amount
+  - should set success_url
   - should set cancel_url
   - should enable Stripe Tax
 
   // Error handling
   - should handle Stripe API errors
   - should return 503 if Stripe unavailable
-  - should not create deposit record if Stripe fails
 });
 ```
 
-### Unit Tests - Anonymous Donation API
+### Unit Tests - CID Donation API
 
 ```
-describe('POST /api/donate/user/:userId', () => {
+describe('POST /api/donate/cid/:cid', () => {
   // No auth required
   - should work without authentication
-  - should work with authentication (for receipt)
+  - should work with authentication
 
   // Request validation
-  - should require amount field
-  - should reject amount below $1.00
-  - should validate userId exists
-  - should reject donation to non-existent user
-
-  // Success response
-  - should return Stripe checkout URL
-  - should return donation_id
-  - should indicate recipient
-
-  // After completion
-  - should credit recipient's balance
-  - should record donor info if authenticated
-  - should record as anonymous if not authenticated
-});
-
-describe('POST /api/donate/cid/:cid', () => {
-  // Validation
+  - should require amount_cents field
+  - should reject amount below minimum (if any)
   - should validate CID exists
   - should validate CID format
   - should reject donation to non-existent CID
 
-  // Success flow
-  - should calculate current storage cost for CID
-  - should extend retention based on donation amount
-  - should credit owner's balance (if CID has owner)
+  // Success response
+  - should return Stripe checkout URL
+  - should return estimated extension (months/days)
+  - should return new expiration date (estimated)
+
+  // After completion (webhook)
+  - should extend CID expiration
+  - should record donation in retention_payments
+  - should notify uploader (if configured)
 
   // Edge cases
-  - should handle CID with no owner
-  - should handle contested CID
-  - should handle expired CID
-});
-```
-
-### Unit Tests - Balance History API
-
-```
-describe('GET /api/balance/history', () => {
-  // Authentication
-  - should require authentication
-  - should reject anonymous requests
-  - should only return own history
-
-  // Response format
-  - should include deposits with beginning/ending balance
-  - should include storage deductions
-  - should order by timestamp descending
-  - should include transaction type (deposit, deduction, donation_received)
-
-  // Pagination
-  - should support limit parameter
-  - should support offset parameter
-  - should default to 20 items
-
-  // Filtering
-  - should filter by transaction type
-  - should filter by date range
+  - should handle donation to expired CID
+  - should handle donation to contested CID
+  - should handle very small donations (< 1 day extension)
 });
 ```
 
@@ -449,21 +499,21 @@ describe('Stripe Webhook Handler', () => {
   - should reject replayed webhook (duplicate event ID)
 
   // checkout.session.completed - Deposit
-  - should update deposit status to completed
   - should credit user balance
-  - should record beginning_balance and ending_balance
+  - should record transaction with before/after balance
   - should update total_deposited_cents
   - should send receipt email
-  - should be idempotent
+  - should be idempotent (handle duplicate webhooks)
 
-  // checkout.session.completed - Donation
-  - should credit recipient's balance
-  - should record donor info
-  - should notify recipient (if they have email notifications)
+  // checkout.session.completed - CID Donation
+  - should extend CID expiration
+  - should record donation in CID's retention_payments
+  - should notify uploader (if enabled)
+  - should handle anonymous donations
 
   // checkout.session.expired
-  - should update deposit status to expired
-  - should not affect any balance
+  - should not affect any balances
+  - should log for debugging
 
   // charge.dispute.created
   - should flag account for review
@@ -472,12 +522,12 @@ describe('Stripe Webhook Handler', () => {
 
   // Error handling
   - should return 400 for malformed JSON
-  - should return 200 for unknown event types (Stripe best practice)
+  - should return 200 for unknown event types
   - should log errors securely
 });
 ```
 
-### Unit Tests - Current Balance API
+### Unit Tests - Balance & History APIs
 
 ```
 describe('GET /api/balance', () => {
@@ -486,17 +536,29 @@ describe('GET /api/balance', () => {
   - should return own balance only
 
   // Response format
-  - should return current_balance_cents
-  - should return total_storage_bytes
-  - should return daily_burn_rate_cents
-  - should return days_remaining (at current rate)
-  - should return last_updated timestamp
+  - should return balance_cents
+  - should return total_deposited_cents
+  - should return total_spent_cents
+});
 
-  // Calculations
-  - should calculate real-time balance (deduct since last update)
-  - should return 0 for users with no deposits
-  - should handle users with balance but no storage
-  - should return Infinity days_remaining if no storage
+describe('GET /api/balance/history', () => {
+  // Authentication
+  - should require authentication
+  - should only return own transactions
+
+  // Response format
+  - should return array of transactions
+  - should include type, amount, before/after balance
+  - should order by timestamp descending
+
+  // Pagination
+  - should support limit parameter
+  - should support offset parameter
+  - should default to 20 items
+
+  // Filtering
+  - should filter by transaction type
+  - should filter by date range
 });
 ```
 
@@ -506,85 +568,91 @@ describe('GET /api/balance', () => {
 describe('Deposit Flow', () => {
   // Happy path
   - should complete: request → Stripe → webhook → balance updated
-  - should reflect new balance in /api/balance
-  - should appear in /api/balance/history
-  - should enable previously-blocked upload
+  - should reflect new balance in GET /api/balance
+  - should appear in GET /api/balance/history
+  - should enable previously-rejected upload
+
+  // Multiple deposits
+  - should accumulate balance correctly
+  - should record each transaction separately
 
   // Failed deposit
   - should handle card declined
   - should not affect balance on failure
-  - should allow retry
 
   // Abandoned checkout
-  - should timeout after 24 hours
-  - should not affect balance
-  - should allow new deposit attempt
+  - should not affect balance if checkout abandoned
 });
 ```
 
-### Integration Tests - Upload with Balance
+### Integration Tests - Upload with Payment
 
 ```
-describe('Upload with Balance Check', () => {
+describe('Upload with Payment', () => {
   // Happy path
   - should accept upload when balance sufficient
-  - should associate CID with user
-  - should start deducting from balance
-  - should reflect in total_storage_used_bytes
+  - should deduct cost from balance
+  - should set CID expiration correctly
+  - should record transaction
+  - should return new balance in response
 
   // Insufficient balance
-  - should reject upload with detailed message
-  - should not create any content record
-  - should not affect balance
+  - should reject with detailed message
+  - should not create content
+  - should not deduct from balance
   - should allow retry after deposit
 
-  // Balance edge cases
-  - should handle exact 30-day threshold
-  - should handle rapid successive uploads
-  - should handle upload during deposit processing
+  // Exactly sufficient balance
+  - should accept upload when balance exactly equals cost
+  - should result in zero balance after
+
+  // Multiple uploads
+  - should handle sequential uploads correctly
+  - should prevent concurrent double-spend
 });
 ```
 
-### Integration Tests - Donation Flow
+### Integration Tests - CID Donation
 
 ```
-describe('Donation Flow', () => {
-  // Donate to user
-  - should credit recipient balance
-  - should not affect donor's HashBin balance (just Stripe charge)
-  - should appear in recipient's history
-  - should send notification to recipient
+describe('CID Donation', () => {
+  // Happy path
+  - should create Stripe checkout
+  - should extend CID expiration after payment
+  - should record donation in CID metadata
 
-  // Donate to CID
-  - should extend CID retention
-  - should credit owner's balance
-  - should calculate extension correctly
+  // Anonymous donor
+  - should work without authentication
+  - should record payer_id as null
 
-  // Anonymous donation
-  - should work without HashBin account
-  - should still process through Stripe
-  - should record as anonymous in history
+  // Authenticated donor
+  - should record payer_id
+  - should not affect donor's HashBin balance (only Stripe charge)
+
+  // Self-donation (extend own content)
+  - should work the same as any donation
+  - should extend expiration correctly
 });
 ```
 
-### Integration Tests - Balance Depletion
+### Integration Tests - Content Lifecycle
 
 ```
-describe('Balance Depletion', () => {
-  // Normal depletion
-  - should reduce balance over time proportionally
-  - should match expected daily burn rate
-  - should handle multiple content items
+describe('Content Lifecycle', () => {
+  // Upload to expiration
+  - should create content with correct expiration
+  - should be accessible before expiration
+  - should become inaccessible after expiration
+  - should be deleted after expiration (or grace period)
 
-  // Low balance warnings
-  - should send warning at 30 days remaining
-  - should include balance details in warning
-  - should include deposit link
+  // Extension before expiration
+  - should extend expiration correctly
+  - should remain accessible after original expiration
 
-  // Zero balance
-  - should stop at zero (not go negative)
-  - should trigger content expiration flow
-  - should prevent new uploads
+  // Warning emails
+  - should send warning 30 days before expiration
+  - should include CID and expiration date
+  - should include link to extend
 });
 ```
 
@@ -594,23 +662,23 @@ describe('Balance Depletion', () => {
 describe('E2E Payment Scenarios', () => {
   // New user journey
   - should sign up → deposit → upload → verify content accessible
-  - should show balance decrease over time
-  - should receive 30-day warning email
+  - should show correct balance after upload
+  - should show content in user's content list with expiration
 
-  // Returning user
-  - should show existing balance
-  - should allow additional deposits
-  - should aggregate total correctly
+  // Donation journey
+  - should allow anonymous donation to any CID
+  - should extend that CID's expiration
+  - should notify uploader
 
-  // Donation scenario
-  - should allow anonymous donation to popular CID
-  - should extend retention for that content
-  - should notify content owner
+  // Low balance journey
+  - should reject upload with clear message
+  - should allow deposit
+  - should allow upload after deposit
 
-  // Edge cases
-  - should handle network failure during checkout
-  - should handle webhook delivery delay
-  - should maintain consistency during failures
+  // Content expiration journey
+  - should send warning email at 30 days
+  - should allow extension via self-donation
+  - should remain accessible after extension
 });
 ```
 
@@ -620,23 +688,23 @@ describe('E2E Payment Scenarios', () => {
 describe('Payment Security', () => {
   // Access control
   - should not expose other users' balances
-  - should not allow modifying balance via API
+  - should not allow direct balance manipulation
   - should validate all inputs
 
   // Webhook security
   - should reject invalid signatures
   - should prevent replay attacks
-  - should rate limit webhook endpoint
+  - should be idempotent
+
+  // Double-spend prevention
+  - should prevent concurrent uploads exceeding balance
+  - should serialize balance modifications
+  - should use transactions for atomicity
 
   // Data protection
-  - should only log allowed fields (beginning/ending balance, txn number)
+  - should only log allowed fields
   - should not log card details
   - should use HTTPS everywhere
-
-  // Balance integrity
-  - should prevent double-crediting from same webhook
-  - should prevent balance manipulation
-  - should audit all balance changes
 });
 ```
 
@@ -647,16 +715,17 @@ describe('Payment Performance', () => {
   // Response times
   - should return balance in <100ms
   - should create deposit checkout in <2s
+  - should process upload payment in <500ms
   - should process webhook in <500ms
 
   // Concurrency
   - should handle concurrent balance reads
   - should handle concurrent deposits
-  - should maintain balance consistency under load
+  - should maintain consistency under load
 
   // Scale
-  - should handle user with 10,000 content items
-  - should calculate balance efficiently
+  - should handle user with many transactions
+  - should paginate history efficiently
 });
 ```
 
@@ -666,33 +735,36 @@ describe('Payment Performance', () => {
 
 ### Phase 4.1: Balance Infrastructure
 1. Add balance fields to UserProfile DO
-2. Implement balance calculation engine
-3. Create `/api/balance` endpoint
-4. Add unit tests for balance logic
+2. Create TransactionRecord DO
+3. Implement deposit/debit operations with atomicity
+4. Create `/api/balance` endpoint
+5. Add unit tests for balance operations
 
 ### Phase 4.2: Deposit Flow
-1. Create DepositRecord DO
-2. Add Stripe SDK dependency
-3. Implement `/api/balance/deposit` endpoint
-4. Implement Stripe webhook handler
-5. Add deposit integration tests
+1. Add Stripe SDK dependency
+2. Implement `/api/balance/deposit` endpoint
+3. Implement Stripe webhook handler for deposits
+4. Create `/api/balance/history` endpoint
+5. Add integration tests
 
-### Phase 4.3: Upload Integration
-1. Add balance check to upload endpoint
-2. Implement rejection messages with details
-3. Update storage tracking on upload
-4. Add upload validation tests
+### Phase 4.3: Upload Payment Integration
+1. Add retention_months parameter to upload endpoint
+2. Implement balance check and deduction
+3. Update ContentMetadata DO with expiration
+4. Implement rejection messages
+5. Add upload payment tests
 
-### Phase 4.4: Donations
-1. Implement `/api/donate/user/:userId` endpoint
-2. Implement `/api/donate/cid/:cid` endpoint
-3. Add donation notification emails
-4. Add donation integration tests
+### Phase 4.4: CID Donations
+1. Implement `/api/donate/cid/:cid` endpoint
+2. Add Stripe webhook handling for donations
+3. Implement expiration extension logic
+4. Add donation notification emails
+5. Add donation tests
 
-### Phase 4.5: Notifications & Polish
+### Phase 4.5: Expiration & Notifications
 1. Implement 30-day warning emails
-2. Add receipt generation
-3. Implement balance history endpoint
+2. Implement content expiration/deletion job
+3. Add receipt generation
 4. Add E2E tests
 5. Security review
 
@@ -741,19 +813,20 @@ STRIPE_PUBLISHABLE_KEY = "pk_test_..." # or pk_live_...
 |------|--------|------------|
 | PCI compliance violation | High | Use Stripe Checkout (hosted), never touch card data |
 | Webhook delivery failure | Medium | Idempotent handlers, Stripe auto-retry |
-| Double-crediting balance | High | Check deposit status before crediting, idempotent webhooks |
+| Double-spend on uploads | High | Serialize balance operations, use transactions |
 | Balance calculation errors | High | Comprehensive unit tests, audit logging |
 | Stripe outage | Medium | Graceful degradation, clear error messages |
-| Content deleted while payment pending | Medium | Clearly document 30-day minimum requirement |
+| Content deleted unexpectedly | Medium | 30-day warning emails, clear expiration display |
 
 ---
 
 ## Success Metrics
 
 - Deposit success rate > 95%
-- Balance calculation accuracy: 100%
+- Upload payment processing time p99 < 500ms
 - Webhook processing time p99 < 1s
 - Zero PCI compliance violations
+- Zero double-spend incidents
 - Chargeback rate < 0.5%
 
 ---
