@@ -47,17 +47,16 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 | 18 | Content type handling | **None** - content stored as raw bytes with no associated type |
 | 19 | Filename handling | **Hash only** - no filename stored, content-addressed only |
 | 20 | Success redirect | **Go to CID detail page** |
+| 21 | Inline content pricing | **Free** - no R2 storage used, no charge for ≤64 byte content |
+| 22 | CID detail page scope | **Minimal** - CID, expiry, size only |
+| 23 | Download content-type header | **application/octet-stream always** - no content type stored or inferred |
+| 24 | Expiration display | **Both** - show "expires in X days/months" and exact date |
 
 ---
 
 ## Open Questions
 
-| # | Question | Options | Impact |
-|---|----------|---------|--------|
-| 21 | Inline content pricing | A) Free (no R2 storage used), B) Charge same rate, C) Minimum fee | Content ≤64 bytes is encoded directly in CID - no R2 storage. Should this be free? |
-| 22 | CID detail page scope | A) Minimal (CID, expiry, size), B) Full (+ download, extend, share), C) Requires separate plan | What should the CID detail page display? Does it exist yet? |
-| 23 | Download content-type header | A) application/octet-stream always, B) Browser sniffs, C) User specifies on upload | How should downloads be served since we don't store content type? |
-| 24 | Maximum CID age display | A) Show "expires in X days/months", B) Show exact date only, C) Both | How should expiration be communicated to users? |
+None - all questions resolved.
 
 ---
 
@@ -337,7 +336,7 @@ describe('Retention Picker', () => {
 describe('Cost Display', () => {
   // Display format
   - should format cost as $X.XX
-  - should show $0.00 for inline content (if free, per decision #21)
+  - should show $0.00 for inline content (free per decision #21)
   - should update after file selection
   - should update during retention change
 
@@ -769,7 +768,7 @@ src/
 
 ---
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Created:** 2026-01-15
 **Updated:** 2026-01-15
-**Status:** Draft - 4 open questions remaining (#21-24)
+**Status:** Ready for implementation - all questions resolved
