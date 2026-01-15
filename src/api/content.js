@@ -611,9 +611,13 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     // Check If-None-Match header for conditional requests
     const ifNoneMatch = request.headers.get('If-None-Match');
     if (ifNoneMatch) {
-      // Handle multiple ETags
-      const etags = ifNoneMatch.split(',').map(tag => tag.trim().replace(/^W\//, ''));
-      if (etags.includes(`"${cid}"`) || etags.includes(cid)) {
+      // Normalize ETags by removing quotes and weak prefix for comparison
+      const etags = ifNoneMatch.split(',').map(tag => 
+        tag.trim().replace(/^W\//, '').replace(/^"|"$/g, '')
+      );
+      
+      // Check if any ETag matches our CID
+      if (etags.includes(cid)) {
         return new Response(null, {
           status: 304,
           headers: headers
@@ -748,7 +752,10 @@ export async function handleDownloadContent(request, env, cid, extension = null)
       });
     }
 
-    // Increment download count (fire and forget)
+    // Increment download count (fire and forget - intentionally async for performance)
+    // Note: This is not awaited to avoid blocking the response. The download count
+    // is aggregate analytics only and small inconsistencies are acceptable.
+    // Race conditions are handled by the Durable Object's transactional storage.
     incrementDownloadCount(env, cid).catch(err => {
       console.error('Failed to increment download count:', err);
     });

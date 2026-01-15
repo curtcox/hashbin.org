@@ -47,6 +47,19 @@ const VALID_ENVIRONMENTS = ['development', 'production'];
 const VALID_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
 const HEALTH_CHECK_ID = 'health-check';
 
+// Static paths that should not be matched as CIDs
+const STATIC_PATHS = [
+  'index.html',
+  'upload.html',
+  'retrieve.html',
+  'dashboard.html',
+  'deposit.html',
+  'info.html',
+  'css/',
+  'js/',
+  'docs/'
+];
+
 /**
  * Main Worker fetch handler
  */
@@ -76,9 +89,7 @@ export default {
     const pathWithoutLeadingSlash = url.pathname.substring(1);
     
     // Skip if it's a known static path
-    const staticPaths = ['index.html', 'upload.html', 'retrieve.html', 'dashboard.html', 
-                         'deposit.html', 'info.html', 'css/', 'js/', 'docs/'];
-    const isStaticPath = staticPaths.some(path => pathWithoutLeadingSlash.startsWith(path));
+    const isStaticPath = STATIC_PATHS.some(path => pathWithoutLeadingSlash.startsWith(path));
     
     if (!isStaticPath && pathWithoutLeadingSlash) {
       // Check if this looks like a CID (256t format)

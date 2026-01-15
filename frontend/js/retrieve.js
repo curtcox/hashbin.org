@@ -85,12 +85,20 @@ function showInlineContentInfo(cid, size) {
           Download Content
         </a>
         
-        <button onclick="showExtensionPicker('${cid}')" class="btn btn-secondary">
+        <button class="btn btn-secondary show-ext-picker" data-cid="${cid}">
           Download with Extension
         </button>
       </div>
     </div>
   `;
+  
+  // Add event listener for extension picker button
+  const extPickerBtn = resultDiv.querySelector('.show-ext-picker');
+  if (extPickerBtn) {
+    extPickerBtn.addEventListener('click', () => {
+      showExtensionPicker(extPickerBtn.dataset.cid);
+    });
+  }
 }
 
 /**
@@ -159,12 +167,20 @@ async function fetchAndShowContentInfo(cid) {
             Download Content
           </a>
           
-          <button onclick="showExtensionPicker('${cid}')" class="btn btn-secondary">
+          <button class="btn btn-secondary show-ext-picker" data-cid="${cid}">
             Download with Extension
           </button>
         </div>
       </div>
     `;
+    
+    // Add event listener for extension picker button
+    const extPickerBtn = resultDiv.querySelector('.show-ext-picker');
+    if (extPickerBtn) {
+      extPickerBtn.addEventListener('click', () => {
+        showExtensionPicker(extPickerBtn.dataset.cid);
+      });
+    }
   } catch (error) {
     showError(`Error fetching content info: ${error.message}`);
   }
@@ -173,7 +189,7 @@ async function fetchAndShowContentInfo(cid) {
 /**
  * Show extension picker modal
  */
-window.showExtensionPicker = function(cid) {
+function showExtensionPicker(cid) {
   const resultDiv = document.getElementById('retrieve-result');
   
   const commonExtensions = [
@@ -196,7 +212,7 @@ window.showExtensionPicker = function(cid) {
 
   const existingCard = resultDiv.querySelector('.card');
   existingCard.insertAdjacentHTML('afterend', `
-    <div class="card" style="margin-top: 1rem;">
+    <div class="card extension-picker" style="margin-top: 1rem;">
       <h3 class="card-title">Download with Extension</h3>
       <p style="color: var(--color-text-light); margin-bottom: 1rem;">
         Choose a file extension to set the appropriate MIME type:
@@ -215,21 +231,29 @@ window.showExtensionPicker = function(cid) {
             class="form-input" 
             placeholder="e.g., xml, csv"
             style="flex: 1;"
+            data-cid="${cid}"
           >
-          <button onclick="downloadWithCustomExtension('${cid}')" class="btn btn-primary">
+          <button class="btn btn-primary custom-ext-btn">
             Download
           </button>
         </div>
       </div>
     </div>
   `);
-};
+  
+  // Add event listener for custom extension button
+  const customExtBtn = document.querySelector('.custom-ext-btn');
+  if (customExtBtn) {
+    customExtBtn.addEventListener('click', downloadWithCustomExtension);
+  }
+}
 
 /**
  * Download with custom extension
  */
-window.downloadWithCustomExtension = function(cid) {
+function downloadWithCustomExtension() {
   const input = document.getElementById('custom-extension');
+  const cid = input.dataset.cid;
   const ext = input.value.trim().replace(/^\./, '');
   
   if (!ext) {
@@ -243,7 +267,7 @@ window.downloadWithCustomExtension = function(cid) {
   }
   
   window.location.href = `/${cid}.${ext}`;
-};
+}
 
 /**
  * Show error message
