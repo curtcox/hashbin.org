@@ -1,0 +1,300 @@
+# Stripe Production Setup - Remaining Steps
+
+## Implementation Status
+
+**Status:** IN PROGRESS - Backend Complete, Production Setup Pending
+
+---
+
+## Overview
+
+This document tracks all remaining steps required to get Stripe payment processing working in production at https://hashbin.org. The backend implementation is complete, but production configuration and monitoring need to be finalized.
+
+**What's Done:**
+- Stripe SDK dependency added (`stripe@^14.0.0`)
+- Deposit endpoint (`POST /api/balance/deposit`) - Complete
+- Webhook handler (`POST /api/payments/webhook`) - Complete
+- Donation endpoint (`POST /api/donate/cid/:cid`) - Complete
+- Pricing calculator (`/api/payments/calculate`) - Complete
+- Idempotency checking for deposits - Complete
+- Fee calculation (2.9% + $0.30) - Complete
+
+**What's Remaining:**
+- Stripe health check in `/health` endpoint
+- GitHub Actions secrets configuration
+- Production Stripe dashboard setup
+- Webhook endpoint configuration
+- End-to-end production testing
+
+---
+
+## 1. GitHub Actions Secrets Configuration
+
+### 1.1 Required GitHub Secrets
+
+Add these secrets in GitHub repository settings (Settings > Secrets and variables > Actions):
+
+| Secret Name | Value Source | Description |
+|-------------|--------------|-------------|
+| `STRIPE_SECRET_KEY` | Stripe Dashboard > Developers > API Keys | `sk_test_...` (dev) or `sk_live_...` (prod) |
+| `STRIPE_WEBHOOK_SECRET` | Stripe Dashboard > Developers > Webhooks | `whsec_...` |
+
+### 1.2 Environment-Specific Keys
+
+| Environment | Secret Key Type | Webhook Secret |
+|-------------|----------------|----------------|
+| Development | `sk_test_XXXXX` | `whsec_XXXXX` (test webhook) |
+| Production | `sk_live_XXXXX` | `whsec_XXXXX` (live webhook) |
+
+### 1.3 CI/CD Deployment
+
+The deployment workflow (`.github/workflows/deploy.yml`) deploys secrets to Cloudflare:
+
+```yaml
+- name: Configure Stripe secrets
+  run: |
+    if [ -z "$STRIPE_SECRET_KEY" ] || [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
+      echo "Skipping Stripe secrets configuration (secrets not set)"
+      exit 0
+    fi
+    echo "$STRIPE_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY --env production
+    echo "$STRIPE_WEBHOOK_SECRET" | npx wrangler secret put STRIPE_WEBHOOK_SECRET --env production
+  env:
+    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+    STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+```
+
+---
+
+## 2. Health Endpoint Verification
+
+### 2.1 Expected Health Response
+
+After configuration, `https://hashbin.org/health` should return:
+
+```json
+{
+  "status": "healthy",
+  "checks": {
+    "stripe": {
+      "status": "operational",
+      "message": "Stripe secrets configured",
+      "details": {
+        "secretKeyConfigured": true,
+        "webhookSecretConfigured": true
+      }
+    }
+  }
+}
+```
+
+### 2.2 Verify Configuration
+
+```bash
+# Check Stripe health status
+curl -s https://hashbin.org/health | jq '.checks.stripe'
+```
+
+---
+
+## 3. Stripe Dashboard Configuration
+
+### 3.1 Production Account Setup
+
+- [ ] Log into [Stripe Dashboard](https://dashboard.stripe.com)
+- [ ] Ensure account is activated for live payments
+- [ ] Complete business verification if required
+- [ ] Enable required payment methods:
+  - [ ] Credit/debit cards (Visa, Mastercard, Amex)
+  - [ ] Apple Pay
+  - [ ] Google Pay
+  - [ ] ACH bank transfers (optional)
+
+### 3.2 API Keys
+
+- [ ] Navigate to Developers > API Keys
+- [ ] Copy the live publishable key (`pk_live_...`)
+- [ ] Copy the live secret key (`sk_live_...`)
+- [ ] Add `STRIPE_SECRET_KEY` to GitHub secrets
+
+### 3.3 Webhook Configuration
+
+- [ ] Navigate to Developers > Webhooks
+- [ ] Add endpoint: `https://hashbin.org/api/payments/webhook`
+- [ ] Select events to listen for:
+  - `checkout.session.completed`
+  - `checkout.session.expired`
+  - `charge.dispute.created`
+- [ ] Copy the webhook signing secret (`whsec_...`)
+- [ ] Add `STRIPE_WEBHOOK_SECRET` to GitHub secrets
+
+### 3.4 Stripe Tax (Optional)
+
+- [ ] Enable Stripe Tax in Dashboard
+- [ ] Configure tax settings for US sales
+- [ ] Update checkout sessions to include tax calculation
+
+---
+
+## 4. Checkout Session Configuration
+
+### 4.1 Success/Cancel URLs
+
+| Environment | Success URL | Cancel URL |
+|-------------|-------------|------------|
+| Development | `https://hashbin-worker-dev.*.workers.dev/balance?deposit=success` | `https://hashbin-worker-dev.*.workers.dev/balance?deposit=cancel` |
+| Production | `https://hashbin.org/balance?deposit=success` | `https://hashbin.org/balance?deposit=cancel` |
+
+### 4.2 Checkout Options
+
+Current implementation supports:
+- Deposit to account balance
+- Donation to specific CID
+- Fee transparency (fees shown separately)
+
+---
+
+## 5. Production Testing Checklist
+
+### 5.1 Deposit Flow
+
+| Test | Expected | Status |
+|------|----------|--------|
+| Create deposit session | Returns Stripe checkout URL | [ ] |
+| Complete checkout (test card) | Webhook received | [ ] |
+| Verify balance updated | Balance reflects deposit | [ ] |
+| Check transaction history | Deposit appears in history | [ ] |
+
+### 5.2 Donation Flow
+
+| Test | Expected | Status |
+|------|----------|--------|
+| Create donation for CID | Returns Stripe checkout URL | [ ] |
+| Complete donation checkout | Webhook received | [ ] |
+| Verify CID extension | Content expiration extended | [ ] |
+| Anonymous donation | Works without authentication | [ ] |
+
+### 5.3 Webhook Handling
+
+| Test | Expected | Status |
+|------|----------|--------|
+| Valid signature | Webhook processed | [ ] |
+| Invalid signature | 401 returned | [ ] |
+| Duplicate event | Idempotent (no double-credit) | [ ] |
+| `checkout.session.completed` | Balance credited | [ ] |
+| `checkout.session.expired` | No balance change | [ ] |
+| `charge.dispute.created` | Dispute logged | [ ] |
+
+### 5.4 Error Handling
+
+| Test | Expected | Status |
+|------|----------|--------|
+| Stripe API unavailable | Graceful error message | [ ] |
+| Invalid amount | Validation error returned | [ ] |
+| Below minimum ($1.00) | Rejected with message | [ ] |
+
+---
+
+## 6. Test Cards for Development
+
+Use these test card numbers in Stripe test mode:
+
+| Card Number | Scenario |
+|-------------|----------|
+| `4242424242424242` | Successful payment |
+| `4000000000000002` | Card declined |
+| `4000000000009995` | Insufficient funds |
+| `4000000000000069` | Expired card |
+| `4000000000000127` | Incorrect CVC |
+
+---
+
+## 7. Smoke Test Updates
+
+### 7.1 Add Stripe Tests to `.github/workflows/smoke-test.yml`
+
+```yaml
+- name: Test - Stripe Integration Health
+  run: |
+    BODY='${{ steps.health.outputs.body }}'
+
+    if ! echo "$BODY" | jq -e '.checks.stripe' > /dev/null 2>&1; then
+      echo "::warning::Stripe health check not found in response"
+      exit 0
+    fi
+
+    STRIPE_STATUS=$(echo "$BODY" | jq -r '.checks.stripe.status')
+    if [ "$STRIPE_STATUS" == "operational" ]; then
+      echo "::notice::Stripe integration operational"
+    elif [ "$STRIPE_STATUS" == "degraded" ]; then
+      echo "::warning::Stripe integration degraded"
+    else
+      echo "::error::Stripe integration down"
+    fi
+```
+
+---
+
+## 8. Monitoring and Alerts
+
+### 8.1 Stripe Dashboard Monitoring
+
+- Enable email notifications for:
+  - Successful payments
+  - Failed payments
+  - Disputes
+  - Refunds
+
+### 8.2 Application Monitoring
+
+- Health endpoint checks Stripe configuration
+- Smoke tests verify Stripe health status
+- Failed webhooks logged for investigation
+
+---
+
+## 9. Pricing Reference
+
+### 9.1 Current Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| Base storage rate | $0.03/GB/month |
+| Stripe processing fee | 2.9% + $0.30 |
+| Minimum deposit | $1.00 |
+| Minimum retention | 30 days |
+
+### 9.2 Fee Breakdown Example
+
+For a $10.00 deposit:
+- Stripe fee: $10.00 * 2.9% + $0.30 = $0.59
+- Total charged: $10.59
+- Account credit: $10.00
+
+---
+
+## Completion Criteria
+
+All items below must be completed before marking Stripe integration as production-ready:
+
+- [ ] `checkStripe()` function added to `/health` endpoint
+- [ ] GitHub Actions deploys Stripe secrets
+- [ ] Production Stripe API keys configured
+- [ ] Webhook endpoint configured and tested
+- [ ] Deposit flow tested end-to-end
+- [ ] Donation flow tested end-to-end
+- [ ] Smoke tests include Stripe health check
+- [ ] Monitoring/alerts configured
+
+---
+
+## References
+
+- [Stripe Checkout Documentation](https://stripe.com/docs/payments/checkout)
+- [Stripe Webhooks](https://stripe.com/docs/webhooks)
+- [Stripe API Reference](https://stripe.com/docs/api)
+- [Stripe Test Cards](https://stripe.com/docs/testing)
+- Backend implementation: `src/api/payments.js`
+- Pricing utility: `src/utils/pricing.js`
