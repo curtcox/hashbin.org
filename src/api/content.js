@@ -712,6 +712,20 @@ export async function handleDownloadContent(request, env, cid, extension = null)
         const start = parseInt(rangeMatch[1]);
         const end = rangeMatch[2] ? parseInt(rangeMatch[2]) : undefined;
         
+        // Validate range
+        if (end !== undefined && start > end) {
+          return new Response(
+            JSON.stringify({
+              error: 'invalid_range',
+              message: 'Invalid range: start must be less than or equal to end'
+            }),
+            {
+              status: 416, // Range Not Satisfiable
+              headers: { 'content-type': 'application/json' }
+            }
+          );
+        }
+        
         // R2 expects a range object with offset and optional length
         const rangeOptions = { offset: start };
         if (end !== undefined) {
@@ -747,8 +761,12 @@ export async function handleDownloadContent(request, env, cid, extension = null)
 
     // Handle range response
     if (r2Object.range) {
-      headers['Content-Range'] = `bytes ${r2Object.range.offset}-${r2Object.range.offset + r2Object.range.length - 1}/${metadata.size_bytes}`;
-      headers['Content-Length'] = r2Object.range.length.toString();
+      const rangeStart = r2Object.range.offset;
+      const rangeLength = r2Object.range.length || (metadata.size_bytes - rangeStart);
+      const rangeEnd = rangeStart + rangeLength - 1;
+      
+      headers['Content-Range'] = `bytes ${rangeStart}-${rangeEnd}/${metadata.size_bytes}`;
+      headers['Content-Length'] = rangeLength.toString();
     }
 
     // Add Content-Disposition if ?download=true
@@ -770,6 +788,7 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     // Note: This is not awaited to avoid blocking the response. The download count
     // is aggregate analytics only and small inconsistencies are acceptable.
     // Race conditions are handled by the Durable Object's transactional storage.
+    // Errors are logged but don't cause memory leaks - failed increments are ignored.
     incrementDownloadCount(env, cid).catch(err => {
       console.error('Failed to increment download count:', err);
     });
