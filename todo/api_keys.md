@@ -72,6 +72,7 @@ API keys can be provided via:
 | `expires_at` | ISO8601 | When the key expires |
 | `revoked_at` | ISO8601 | When the key was revoked (null if active) |
 | `last_used_at` | ISO8601 | Last time the key was used (null if never) |
+| `reveal_timestamps` | ISO8601[] | Last 3 reveal times for rate limiting (sliding window) |
 
 **Storage Security**: Keys are stored both hashed (for fast O(1) validation via KeyRegistry) and encrypted (for reveal functionality). The encryption key is stored as a Cloudflare secret (`API_KEY_ENCRYPTION_KEY`).
 
@@ -84,6 +85,8 @@ API keys can be provided via:
 | Min name length | 1 char | Must have a name |
 | Max name length | 255 chars | Reasonable limit |
 | Rate limit | 500 req/min | Per-key limit to prevent abuse |
+| Fresh session threshold | 5 minutes | Fixed; reveal requires recent authentication |
+| Reveal rate limit | 3 per hour per key | Prevents rapid key extraction if session compromised |
 
 ---
 
@@ -414,6 +417,27 @@ TEST: POST /api/auth/apikeys/:keyId/reveal - reject for other user's key
   AND: key belongs to User B
   WHEN: POST /api/auth/apikeys/:keyId/reveal
   THEN: status = 404
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - rate limit (3 per hour)
+  GIVEN: fresh Clerk session
+  AND: key has been revealed 3 times in the last hour
+  WHEN: POST /api/auth/apikeys/:keyId/reveal
+  THEN: status = 429
+  AND: error = 'REVEAL_RATE_LIMITED'
+  AND: Retry-After header indicates time until next reveal allowed
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - rate limit resets after hour
+  GIVEN: fresh Clerk session
+  AND: key was revealed 3 times, but > 1 hour ago
+  WHEN: POST /api/auth/apikeys/:keyId/reveal
+  THEN: status = 200
+  AND: response contains full api_key value
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - rate limit per key (not per user)
+  GIVEN: fresh Clerk session
+  AND: user has keyA (revealed 3 times) and keyB (never revealed)
+  WHEN: POST /api/auth/apikeys/keyB/reveal
+  THEN: status = 200 (keyB has its own limit)
 ```
 
 ### Integration Tests: API Key Authentication
@@ -773,6 +797,9 @@ The following design decisions have been finalized:
 | 11 | RateLimiter DO architecture | **Dedicated DO per identifier** | Separate RateLimiter class; instances keyed by `key:<id>`, `user:<id>`, `anon:<ip>` |
 | 12 | RateLimiter DO failure behavior | **Fail closed (503)** | Security over availability; deny requests if rate limiting unavailable |
 | 13 | API key reveal after creation | **Re-authenticate to reveal** | User can reveal key again after fresh Clerk session or 2FA |
+| 14 | Fresh session threshold | **Fixed 5-minute threshold** | Simple, consistent; no configuration needed |
+| 15 | Key reveal rate limiting | **Max 3 reveals per hour per key** | Prevents rapid extraction if session compromised |
+| 16 | Encryption key rotation | **Defer to future** | Handle if/when needed; not MVP requirement |
 
 ---
 
@@ -797,8 +824,9 @@ The following design decisions have been finalized:
 3. Implement encryptApiKey() and decryptApiKey() in auth/utils.js
 4. Update key creation to store key_encrypted alongside key_hash
 5. Implement POST /api/auth/apikeys/:keyId/reveal endpoint
-6. Add isSessionFresh() helper for fresh session validation
-7. Write tests for reveal endpoint (fresh session, stale session, etc.)
+6. Add isSessionFresh() helper for fresh session validation (fixed 5-minute threshold)
+7. Implement reveal rate limiting (3 per hour per key) with reveal_timestamps tracking
+8. Write tests for reveal endpoint (fresh session, stale session, rate limiting, etc.)
 
 ### Phase 4: Fix Any Issues Found
 1. Address any bugs discovered during testing
@@ -849,7 +877,7 @@ The following design decisions have been finalized:
 
 ## Success Criteria
 
-- [x] All design decisions finalized (13/13 resolved)
+- [x] All design decisions finalized (16/16 resolved)
 - [ ] All unit tests pass
 - [ ] All integration tests pass
 - [ ] All E2E tests pass
