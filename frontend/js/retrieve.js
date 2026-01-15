@@ -3,7 +3,7 @@
  * Handles content retrieval and download
  */
 
-import { validate256tCID, isInlineContent, getContentSize } from './hash256t.js';
+import { validate256tCID, isInlineContent, getContentSize, formatFileSize } from './hash256t.js';
 
 /**
  * Initialize retrieve page
@@ -71,7 +71,7 @@ function showInlineContentInfo(cid, size) {
         
         <div class="info-row">
           <span class="info-label">Size:</span>
-          <span class="info-value">${formatBytes(size)}</span>
+          <span class="info-value">${formatFileSize(size)}</span>
         </div>
         
         <div class="info-row">
@@ -144,7 +144,7 @@ async function fetchAndShowContentInfo(cid) {
           
           <div class="info-row">
             <span class="info-label">Size:</span>
-            <span class="info-value">${formatBytes(data.size_bytes)}</span>
+            <span class="info-value">${formatFileSize(data.size_bytes)}</span>
           </div>
           
           <div class="info-row">
@@ -256,17 +256,42 @@ function downloadWithCustomExtension() {
   const cid = input.dataset.cid;
   const ext = input.value.trim().replace(/^\./, '');
   
+  // Clear any previous error
+  const existingError = document.querySelector('.extension-error');
+  if (existingError) {
+    existingError.remove();
+  }
+  
   if (!ext) {
-    alert('Please enter a file extension');
+    showExtensionError(input, 'Please enter a file extension');
     return;
   }
   
   if (!/^[a-zA-Z0-9]+$/.test(ext)) {
-    alert('Invalid extension. Use only letters and numbers.');
+    showExtensionError(input, 'Invalid extension. Use only letters and numbers.');
     return;
   }
   
   window.location.href = `/${cid}.${ext}`;
+}
+
+/**
+ * Show extension input error
+ */
+function showExtensionError(inputElement, message) {
+  const errorDiv = document.createElement('div');
+  errorDiv.className = 'alert alert-error extension-error';
+  errorDiv.style.marginTop = '0.5rem';
+  errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+  
+  inputElement.parentElement.parentElement.appendChild(errorDiv);
+  
+  // Clear error after 5 seconds
+  setTimeout(() => {
+    if (errorDiv.parentElement) {
+      errorDiv.remove();
+    }
+  }, 5000);
 }
 
 /**
@@ -280,19 +305,6 @@ function showError(message) {
       <strong>Error:</strong> ${message}
     </div>
   `;
-}
-
-/**
- * Format bytes to human-readable size
- */
-function formatBytes(bytes) {
-  if (bytes === 0) return '0 Bytes';
-  
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
 }
 
 // Auto-initialize if on retrieve page

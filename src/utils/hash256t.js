@@ -116,7 +116,16 @@ export function extractInlineContent(cid) {
   }
   
   const contentPart = cid.substring(8);
-  return base64UrlDecode(contentPart);
+  const decoded = base64UrlDecode(contentPart);
+  
+  // Validate that decoded content matches expected size from prefix
+  if (decoded.length !== size) {
+    throw new Error(
+      `Content size mismatch: expected ${size} bytes, got ${decoded.length} bytes`
+    );
+  }
+  
+  return decoded;
 }
 
 /**
