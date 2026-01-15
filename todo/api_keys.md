@@ -667,6 +667,7 @@ The following design decisions have been finalized:
 | 8 | Key rotation workflow | **Manual rotation** | Users create new key, update clients, revoke old key |
 | 9 | Frontend UI location | **Dedicated /settings/api-keys page** | Clear, focused location for key management |
 | 10 | Key creation audit log | **api_keys array is sufficient** | Timestamps in UserProfile provide adequate audit trail |
+| 11 | RateLimiter DO architecture | **Dedicated DO per identifier** | Separate RateLimiter class; instances keyed by `key:<id>`, `user:<id>`, `anon:<ip>` |
 
 ---
 
@@ -690,11 +691,16 @@ The following design decisions have been finalized:
 2. Implement any missing functionality identified by tests
 
 ### Phase 4: Production Rate Limiting (Durable Objects)
-1. Create RateLimiter Durable Object class
-2. Implement sliding window counter with 60-second TTL
-3. Add rate limit check to authenticate middleware
-4. Handle concurrent request counting with DO transactions
-5. Add rate limit tests for distributed scenarios
+1. Create dedicated RateLimiter Durable Object class
+2. Configure wrangler.toml with RATE_LIMITER binding
+3. Implement DO identification scheme:
+   - API keys: `env.RATE_LIMITER.idFromName('key:' + keyId)`
+   - Users: `env.RATE_LIMITER.idFromName('user:' + userId)`
+   - Anonymous: `env.RATE_LIMITER.idFromName('anon:' + ipAddress)`
+4. Implement sliding window counter with 60-second TTL
+5. Add rate limit check to authenticate middleware
+6. Handle concurrent request counting with DO transactions
+7. Add rate limit tests for distributed scenarios
 
 ### Phase 5: Frontend UI
 1. Design API key management interface
@@ -724,7 +730,7 @@ The following design decisions have been finalized:
 
 ## Success Criteria
 
-- [x] All design decisions finalized (10/10 resolved)
+- [x] All design decisions finalized (11/11 resolved)
 - [ ] All unit tests pass
 - [ ] All integration tests pass
 - [ ] All E2E tests pass
