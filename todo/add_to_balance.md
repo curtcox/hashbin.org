@@ -459,30 +459,82 @@ TEST: Stripe checkout page timeout
 
 ## Implementation Phases
 
-### Phase 1: Backend Verification
-1. Verify Stripe webhook is configured and working
-2. Add idempotency check to webhook handler
-3. Add deposit status endpoint (optional)
-4. Add integration tests for existing endpoints
+### Phase 1: Backend Verification ✅ COMPLETED
+1. ✅ Verify Stripe webhook is configured and working
+2. ✅ Add idempotency check to webhook handler
+3. ✅ Fix fee calculation (user pays credit + fees, receives full credit)
+4. ⏭️ Add deposit status endpoint (optional - skipped)
+5. ⏭️ Add integration tests for existing endpoints (to be done in testing phase)
 
-### Phase 2: Frontend Implementation
-1. Create deposit form UI
-2. Implement amount validation
-3. Implement fee calculation display
-4. Implement checkout redirect
-5. Implement success/cancel handling
+### Phase 2: Frontend Implementation ✅ COMPLETED
+1. ✅ Create deposit form UI
+2. ✅ Implement amount validation
+3. ✅ Implement fee calculation display
+4. ✅ Implement checkout redirect
+5. ✅ Implement success/cancel handling
 
-### Phase 3: Polish & Edge Cases
-1. Add loading states
-2. Add error handling UI
-3. Accessibility review
+### Phase 3: Polish & Edge Cases ✅ COMPLETED
+1. ✅ Add loading states
+2. ✅ Add error handling UI
+3. ⏭️ Accessibility review (deferred - basic accessibility in place)
 
-### Phase 4: Testing & Launch
-1. Run full test suite
-2. Test with Stripe test mode
-3. Test webhook reliability
-4. Deploy to production
-5. Monitor for issues
+### Phase 4: Testing & Launch 🚧 IN PROGRESS
+1. 🚧 Run full test suite
+2. 🚧 Test with Stripe test mode
+3. 🚧 Test webhook reliability
+4. ⏭️ Deploy to production (awaiting testing)
+5. ⏭️ Monitor for issues (post-deployment)
+
+---
+
+## Recent Implementation Notes
+
+### Completed Changes (2026-01-15)
+
+#### Backend
+1. **Idempotency Check**: Added session tracking to prevent duplicate webhook processing
+   - PaymentRecord now stores `session:{session_id}` -> `transaction_id` mapping
+   - Webhook handler checks for existing session before processing
+   
+2. **Fee Calculation Fix**: Updated to charge `credit + fees`
+   - Added `calculateTotalWithFees()` function in pricing.js
+   - User specifies credit amount (e.g., $10), pays $10 + fees, receives $10 credit
+   - Previous implementation charged only credit amount (incorrect)
+
+3. **Enhanced Validation**: Added stricter validation in deposit endpoint
+   - Check for integer cents
+   - Check for positive amounts
+   - Check for minimum amount ($1.00)
+
+4. **Redirect URLs**: Updated success/cancel URLs to point to `/deposit` page
+   - Success: Shows confirmation, redirects to dashboard after 2 seconds
+   - Cancel: Shows cancel message, allows retry
+
+#### Frontend
+1. **Deposit Form**: Created complete deposit form with:
+   - Dollar amount input with $ prefix
+   - Real-time fee calculation and display
+   - Submit button that creates Stripe checkout session
+   
+2. **Fee Breakdown Display**: Shows:
+   - Credit Amount: What user will receive
+   - Processing Fee: Stripe fees (2.9% + $0.30)
+   - Total Charge: What user pays
+   
+3. **Success/Cancel Handling**:
+   - Detects URL parameters after Stripe redirect
+   - Shows appropriate messages
+   - Auto-redirects to dashboard on success
+   
+4. **Loading States**: Button shows loading spinner during checkout creation
+
+5. **Error Handling**: Displays validation and API errors inline
+
+#### CSS
+- Added deposit form specific styles
+- Input group with $ prefix
+- Fee breakdown table styling
+- Loading button animation
 
 ---
 
@@ -497,15 +549,19 @@ TEST: Stripe checkout page timeout
 
 ## Files to Create/Modify
 
-### Create
-- `frontend/js/deposit.js` - Deposit page logic
-- `tests/deposit.test.js` - Deposit tests (if test framework exists)
+### Created ✅
+- ✅ `frontend/js/deposit.js` - Deposit page logic (COMPLETED)
 
-### Modify
-- `frontend/deposit.html` - Replace placeholder with actual form
-- `src/api/payments.js` - Add idempotency, possibly status endpoint
-- `src/index.js` - Add any new routes
-- `frontend/css/components.css` - Form styling (if needed)
+### Modified ✅
+- ✅ `frontend/deposit.html` - Replaced placeholder with actual form (COMPLETED)
+- ✅ `src/api/payments.js` - Added idempotency, fixed fee calculation (COMPLETED)
+- ✅ `src/durable-objects/payment-record.js` - Added session existence check (COMPLETED)
+- ✅ `src/utils/pricing.js` - Added calculateTotalWithFees function (COMPLETED)
+- ✅ `frontend/css/components.css` - Added form styling (COMPLETED)
+- ⏭️ `src/index.js` - No new routes needed (SKIPPED)
+
+### Not Needed
+- `tests/deposit.test.js` - No test framework exists yet; bash-based tests available
 
 ---
 

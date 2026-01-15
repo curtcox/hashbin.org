@@ -7,6 +7,7 @@ import Stripe from 'stripe';
 import { authenticate } from '../auth/middleware.js';
 import { 
   calculateStripeFees, 
+  calculateTotalWithFees,
   formatCents, 
   calculateRetentionCost,
   BASE_RATE_PER_GB_PER_MONTH
@@ -50,8 +51,37 @@ export async function handleCreateDeposit(request, env) {
       );
     }
 
-    // Calculate fees
-    const fees = calculateStripeFees(amount_cents);
+    // Validate amount is an integer
+    if (!Number.isInteger(amount_cents)) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid amount',
+          message: 'Amount must be a whole number of cents'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Validate amount is positive
+    if (amount_cents <= 0) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid amount',
+          message: 'Amount must be greater than zero'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Calculate total charge (credit amount + fees)
+    // User wants amount_cents credit, so we calculate how much to charge them
+    const feeBreakdown = calculateTotalWithFees(amount_cents);
 
     // Initialize Stripe
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
@@ -74,20 +104,21 @@ export async function handleCreateDeposit(request, env) {
               name: 'HashBin.org Account Deposit',
               description: `Deposit ${formatCents(amount_cents)} to your HashBin account`
             },
-            unit_amount: amount_cents
+            unit_amount: feeBreakdown.totalChargeCents
           },
           quantity: 1
         }
       ],
       mode: 'payment',
-      success_url: `${baseUrl}/balance?deposit=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/balance?deposit=cancel`,
+      success_url: `${baseUrl}/deposit?status=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/deposit?status=cancel`,
       client_reference_id: authResult.user.userId,
       metadata: {
         user_id: authResult.user.userId,
         type: 'deposit',
         amount_cents: amount_cents.toString()
       },
+      customer_email: authResult.user.email,
       automatic_tax: {
         enabled: true
       }
@@ -98,9 +129,9 @@ export async function handleCreateDeposit(request, env) {
         checkout_url: session.url,
         session_id: session.id,
         amount_breakdown: {
-          gross_cents: fees.grossCents,
-          stripe_fee_cents: fees.feeCents,
-          net_cents: fees.netCents
+          credit_cents: feeBreakdown.creditCents,
+          fee_cents: feeBreakdown.feeCents,
+          total_charge_cents: feeBreakdown.totalChargeCents
         }
       }),
       {
@@ -223,6 +254,20 @@ async function handleCheckoutSessionCompleted(session, env) {
 
   if (!userId) {
     console.error('No user_id in checkout session:', session.id);
+    return;
+  }
+
+  // Check if this session has already been processed (idempotency check)
+  const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
+  const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
+  
+  const existsResponse = await paymentRecordStub.fetch(
+    new Request(`http://internal/session/exists?session_id=${session.id}`)
+  );
+  const existsData = await existsResponse.json();
+  
+  if (existsData.exists) {
+    console.log(`Session ${session.id} already processed. Skipping duplicate webhook.`);
     return;
   }
 
