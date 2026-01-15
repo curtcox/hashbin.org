@@ -126,13 +126,17 @@ curl -s https://hashbin.org/health | jq '.checks.stripe'
 ### 3.3 Webhook Configuration
 
 - [ ] Navigate to Developers > Webhooks
-- [ ] Add endpoint: `https://hashbin.org/api/payments/webhook`
+- [ ] Add endpoint:
+  - **Production:** `https://hashbin.org/api/payments/webhook`
+  - **Development:** `https://hashbin-worker-dev.{ACCOUNT_ID}.workers.dev/api/payments/webhook`
 - [ ] Select events to listen for:
   - `checkout.session.completed`
   - `checkout.session.expired`
   - `charge.dispute.created`
 - [ ] Copy the webhook signing secret (`whsec_...`)
 - [ ] Add `STRIPE_WEBHOOK_SECRET` to GitHub secrets
+
+**Note:** You can configure separate webhooks for test mode (development) and live mode (production), or use the same webhook secret for both environments.
 
 ### 3.4 Stripe Tax (Optional)
 
@@ -148,8 +152,10 @@ curl -s https://hashbin.org/health | jq '.checks.stripe'
 
 | Environment | Success URL | Cancel URL |
 |-------------|-------------|------------|
-| Development | `https://hashbin-worker-dev.*.workers.dev/balance?deposit=success` | `https://hashbin-worker-dev.*.workers.dev/balance?deposit=cancel` |
+| Development | `https://hashbin-worker-dev.{ACCOUNT_ID}.workers.dev/balance?deposit=success` | `https://hashbin-worker-dev.{ACCOUNT_ID}.workers.dev/balance?deposit=cancel` |
 | Production | `https://hashbin.org/balance?deposit=success` | `https://hashbin.org/balance?deposit=cancel` |
+
+**Note:** Replace `{ACCOUNT_ID}` with your actual Cloudflare Account ID.
 
 ### 4.2 Checkout Options
 
