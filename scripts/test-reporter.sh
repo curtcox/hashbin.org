@@ -5,8 +5,31 @@
 
 # Note: Not using 'set -e' because we need to continue running
 # even when individual test suites fail to collect all results
-# Using pipefail to ensure pipeline failures are detected
+# Using pipefail for robustness (useful if future changes add pipelines)
 set -o pipefail
+
+# Track temporary files for cleanup
+declare -a TEMP_FILES
+
+# Cleanup function
+cleanup() {
+  for temp_file in "${TEMP_FILES[@]}"; do
+    if [ -f "$temp_file" ]; then
+      rm -f "$temp_file"
+    fi
+  done
+}
+
+# Set trap to cleanup on exit
+trap cleanup EXIT INT TERM
+
+# Helper function to escape output for markdown code blocks
+# Replaces triple backticks with a safe alternative to prevent breaking the code block
+escape_for_markdown() {
+  local text="$1"
+  # Replace triple backticks with a safe alternative
+  echo "$text" | sed 's/```/`‍`‍`/g'
+}
 
 # Initialize counters
 TOTAL_TEST_SUITES=0
@@ -55,12 +78,14 @@ run_test_suite() {
   fi
   
   # Capture output and exit code
-  # Using a more robust method with process substitution
+  # Using a more robust method with temporary files
   local output
   local exit_code
   local temp_file
   
   temp_file=$(mktemp)
+  TEMP_FILES+=("$temp_file")  # Track for cleanup
+  
   bash "$suite_script" > "$temp_file" 2>&1
   exit_code=$?
   output=$(cat "$temp_file")
@@ -174,7 +199,7 @@ if [ -n "$GITHUB_STEP_SUMMARY" ]; then
       fi
       echo ""
       echo "\`\`\`text"
-      echo "$output"
+      escape_for_markdown "$output"
       echo "\`\`\`"
       echo ""
     done
