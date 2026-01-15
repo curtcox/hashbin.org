@@ -1,6 +1,7 @@
 {
   "name": "hashbin-org",
   "version": "0.1.0",
+  "type": "module",
   "description": "Content distribution platform using 256t hash-based addressing",
   "private": true,
   "scripts": {
