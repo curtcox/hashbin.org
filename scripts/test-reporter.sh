@@ -5,6 +5,8 @@
 
 # Note: Not using 'set -e' because we need to continue running
 # even when individual test suites fail to collect all results
+# Using pipefail to ensure pipeline failures are detected
+set -o pipefail
 
 # Initialize counters
 TOTAL_TEST_SUITES=0
@@ -53,11 +55,16 @@ run_test_suite() {
   fi
   
   # Capture output and exit code
+  # Using a more robust method with process substitution
   local output
   local exit_code
+  local temp_file
   
-  output=$(bash "$suite_script" 2>&1)
+  temp_file=$(mktemp)
+  bash "$suite_script" > "$temp_file" 2>&1
   exit_code=$?
+  output=$(cat "$temp_file")
+  rm -f "$temp_file"
   
   # Store results
   SUITE_OUTPUTS+=("$output")
@@ -166,7 +173,7 @@ if [ -n "$GITHUB_STEP_SUMMARY" ]; then
         echo "Status: ❌ **FAILED**"
       fi
       echo ""
-      echo "\`\`\`"
+      echo "\`\`\`text"
       echo "$output"
       echo "\`\`\`"
       echo ""
