@@ -128,7 +128,7 @@ curl -s https://hashbin.org/health | jq '.checks.stripe'
 - [ ] Navigate to Developers > Webhooks
 - [ ] Add endpoint:
   - **Production:** `https://hashbin.org/api/payments/webhook`
-  - **Development:** `https://hashbin-worker-dev.{ACCOUNT_ID}.workers.dev/api/payments/webhook`
+  - **Development:** `https://hashbin-worker-dev.<YOUR_ACCOUNT_ID>.workers.dev/api/payments/webhook`
 - [ ] Select events to listen for:
   - `checkout.session.completed`
   - `checkout.session.expired`
@@ -136,7 +136,7 @@ curl -s https://hashbin.org/health | jq '.checks.stripe'
 - [ ] Copy the webhook signing secret (`whsec_...`)
 - [ ] Add `STRIPE_WEBHOOK_SECRET` to GitHub secrets
 
-**Note:** You can configure separate webhooks for test mode (development) and live mode (production), or use the same webhook secret for both environments.
+**Note:** You can configure separate webhooks for test mode (development) and live mode (production), or use the same webhook secret for both environments. Replace `<YOUR_ACCOUNT_ID>` with your Cloudflare Account ID.
 
 ### 3.4 Stripe Tax (Optional)
 
@@ -152,10 +152,10 @@ curl -s https://hashbin.org/health | jq '.checks.stripe'
 
 | Environment | Success URL | Cancel URL |
 |-------------|-------------|------------|
-| Development | `https://hashbin-worker-dev.{ACCOUNT_ID}.workers.dev/balance?deposit=success` | `https://hashbin-worker-dev.{ACCOUNT_ID}.workers.dev/balance?deposit=cancel` |
+| Development | `https://hashbin-worker-dev.<YOUR_ACCOUNT_ID>.workers.dev/balance?deposit=success` | `https://hashbin-worker-dev.<YOUR_ACCOUNT_ID>.workers.dev/balance?deposit=cancel` |
 | Production | `https://hashbin.org/balance?deposit=success` | `https://hashbin.org/balance?deposit=cancel` |
 
-**Note:** Replace `{ACCOUNT_ID}` with your actual Cloudflare Account ID.
+**Note:** Replace `<YOUR_ACCOUNT_ID>` with your actual Cloudflare Account ID (found in Cloudflare Dashboard).
 
 ### 4.2 Checkout Options
 
@@ -278,10 +278,12 @@ Use these test card numbers in Stripe test mode:
 
 ### 9.2 Fee Breakdown Example
 
-For a $10.00 deposit:
-- Stripe fee: $10.00 * 2.9% + $0.30 = $0.59
-- Total charged: $10.59
-- Account credit: $10.00
+**For a $10.00 deposit (what the user wants credited to their account):**
+- Account credit: $10.00 (what the user receives)
+- Stripe processing fee: ($10.00 × 2.9%) + $0.30 = $0.59
+- **Total charged to user's card: $10.59**
+
+The user pays the Stripe fees on top of their desired credit amount, ensuring they receive the full requested credit in their account balance.
 
 ---
 
