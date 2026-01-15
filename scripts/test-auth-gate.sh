@@ -129,7 +129,7 @@ else
 fi
 
 # Check for proper loading check
-if echo "$RESPONSE" | grep -E 'Clerk\.(loaded|load)' > /dev/null; then
+if echo "$RESPONSE" | grep -E 'window\.Clerk\.(loaded|load)' > /dev/null; then
   log_pass "Auth gate checks for Clerk loaded state"
 else
   log_fail "Auth gate missing Clerk loaded state check"
@@ -156,7 +156,7 @@ log_test "Protected pages don't contain server-side redirects"
 
 # Check deposit page for redirect meta tags
 RESPONSE=$(curl -s "$BASE_URL/deposit")
-if echo "$RESPONSE" | grep -qi '<meta.*http-equiv.*refresh'; then
+if echo "$RESPONSE" | grep -qiE '<meta[^>]*http-equiv[^>]*refresh'; then
   log_fail "deposit page contains meta refresh redirect"
 else
   log_pass "deposit page has no meta refresh redirect"
@@ -164,7 +164,7 @@ fi
 
 # Check upload page for redirect meta tags
 RESPONSE=$(curl -s "$BASE_URL/upload")
-if echo "$RESPONSE" | grep -qi '<meta.*http-equiv.*refresh'; then
+if echo "$RESPONSE" | grep -qiE '<meta[^>]*http-equiv[^>]*refresh'; then
   log_fail "upload page contains meta refresh redirect"
 else
   log_pass "upload page has no meta refresh redirect"
