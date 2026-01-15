@@ -52,10 +52,20 @@ run_test_suite() {
     SUITE_RESULTS+=("PASS")
     PASSED_TEST_SUITES=$((PASSED_TEST_SUITES + 1))
     echo -e "${GREEN}✅ PASSED${NC}: $suite_name"
+    
+    # Add GitHub Actions annotation if running in CI
+    if [ -n "$GITHUB_ACTIONS" ]; then
+      echo "::notice title=Test Suite Passed::$suite_name completed successfully"
+    fi
   else
     SUITE_RESULTS+=("FAIL")
     FAILED_TEST_SUITES=$((FAILED_TEST_SUITES + 1))
     echo -e "${RED}❌ FAILED${NC}: $suite_name"
+    
+    # Add GitHub Actions annotation if running in CI
+    if [ -n "$GITHUB_ACTIONS" ]; then
+      echo "::error title=Test Suite Failed::$suite_name failed with exit code $exit_code"
+    fi
   fi
   
   # Print output
