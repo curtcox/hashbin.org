@@ -23,30 +23,41 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 
 ---
 
+## Decisions
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Maximum single file size | **5GB** (R2 single-part upload limit) |
+| 2 | Maximum upload per request | **Single file only** |
+| 3 | File type restrictions | **No restrictions** - any content accepted |
+| 4 | Upload progress feedback | **Simple spinner** |
+| 5 | Drag-and-drop support | **Yes** |
+| 6 | Content preview before upload | **No preview** |
+| 7 | Hash calculation location | **Both** - client warns, server enforces |
+| 8 | Zero-byte file handling | **Allow** - Note: CIDs ≤64 bytes contain content directly in the CID; no actual storage needed |
+| 9 | Resumable uploads | **No** |
+| 10 | Upload cancellation | **Yes** - user can cancel in-progress uploads |
+| 11 | Concurrent upload limit | **Unlimited** - all must be prepaid |
+| 12 | Retention selection UI | **Dropdown + custom input** |
+| 13 | Cost display timing | **Both** - after file selection and during upload |
+| 14 | Upload confirmation step | **No** - immediate upload on submit |
+| 15 | Failed upload retry | **Manual only** - user decides to retry |
+| 16 | API key upload support | **Yes** - for CLI/automation |
+| 17 | Upload rate limiting | **None beyond auth** - prepaid model prevents abuse |
+| 18 | Content type handling | **None** - content stored as raw bytes with no associated type |
+| 19 | Filename handling | **Hash only** - no filename stored, content-addressed only |
+| 20 | Success redirect | **Go to CID detail page** |
+
+---
+
 ## Open Questions
 
-| # | Question | Options | Decision |
-|---|----------|---------|----------|
-| 1 | Maximum single file size | A) 100MB (simple), B) 1GB, C) 5GB (R2 single-part max), D) 5TB (R2 multipart) | **TBD** |
-| 2 | Maximum upload per request | A) Single file only, B) Multiple files (batch) | **TBD** |
-| 3 | File type restrictions | A) No restrictions, B) Block executables, C) Block specific MIME types | **TBD** |
-| 4 | Upload progress feedback | A) Simple spinner, B) Progress bar with percentage, C) Progress + speed/ETA | **TBD** |
-| 5 | Drag-and-drop support | A) Yes, B) No (file picker only) | **TBD** |
-| 6 | Content preview before upload | A) Yes (for images/text), B) No preview | **TBD** |
-| 7 | Hash calculation location | A) Client-side only, B) Server-side only, C) Both (client warns, server enforces) | **TBD** |
-| 8 | Zero-byte file handling | A) Allow, B) Reject | **TBD** |
-| 9 | Resumable uploads | A) Yes (for large files), B) No | **TBD** |
-| 10 | Upload cancellation | A) Yes (cancel in-progress), B) No (wait for completion) | **TBD** |
-| 11 | Concurrent upload limit | A) 1 at a time, B) 3 concurrent, C) Unlimited | **TBD** |
-| 12 | Retention selection UI | A) Dropdown only, B) Slider, C) Dropdown + custom input | **TBD** |
-| 13 | Cost display timing | A) After file selection, B) During upload, C) Both | **TBD** |
-| 14 | Upload confirmation step | A) Yes (review before upload), B) No (immediate) | **TBD** |
-| 15 | Failed upload retry | A) Automatic (with limit), B) Manual only, C) No retry | **TBD** |
-| 16 | API key upload support | A) Yes (for CLI/automation), B) Web only | **TBD** |
-| 17 | Upload rate limiting | A) None beyond auth, B) X uploads per minute, C) X bytes per hour | **TBD** |
-| 18 | Content type detection | A) Trust client MIME, B) Server-side magic bytes, C) Both | **TBD** |
-| 19 | Filename handling | A) Store original, B) Hash only (no filename), C) Optional metadata | **TBD** |
-| 20 | Success redirect | A) Stay on upload page, B) Go to CID detail page, C) User preference | **TBD** |
+| # | Question | Options | Impact |
+|---|----------|---------|--------|
+| 21 | Inline content pricing | A) Free (no R2 storage used), B) Charge same rate, C) Minimum fee | Content ≤64 bytes is encoded directly in CID - no R2 storage. Should this be free? |
+| 22 | CID detail page scope | A) Minimal (CID, expiry, size), B) Full (+ download, extend, share), C) Requires separate plan | What should the CID detail page display? Does it exist yet? |
+| 23 | Download content-type header | A) application/octet-stream always, B) Browser sniffs, C) User specifies on upload | How should downloads be served since we don't store content type? |
+| 24 | Maximum CID age display | A) Show "expires in X days/months", B) Show exact date only, C) Both | How should expiration be communicated to users? |
 
 ---
 
@@ -59,13 +70,13 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 │                              UPLOAD FLOW                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  User selects file(s)                                                   │
+│  User selects file (click or drag-and-drop)                             │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────────┐                                                   │
 │  │ Client-side      │                                                   │
 │  │ - Calculate hash │ ◄─── 256t specification                          │
-│  │ - Check size     │                                                   │
+│  │ - Check size     │      (≤5GB limit)                                 │
 │  │ - Estimate cost  │                                                   │
 │  └────────┬─────────┘                                                   │
 │           │                                                              │
@@ -81,34 +92,53 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 │           ┌──────────────────┐  ┌──────────────────┐                   │
 │           │ Show "Duplicate" │  │ Show cost,       │                   │
 │           │ message + extend │  │ retention picker │                   │
-│           │ option           │  │                  │                   │
+│           │ option           │  │ (dropdown+custom)│                   │
 │           └────────┬─────────┘  └────────┬─────────┘                   │
 │                    │                     │                              │
 │                    └──────────┬──────────┘                              │
+│                               │                                         │
 │                               ▼                                         │
 │                    ┌──────────────────┐                                 │
-│                    │ User confirms    │                                 │
-│                    │ (if confirmation │                                 │
-│                    │  step enabled)   │                                 │
-│                    └────────┬─────────┘                                 │
-│                             │                                           │
-│                             ▼                                           │
-│                    ┌──────────────────┐                                 │
-│                    │ POST /api/content│                                 │
+│                    │ POST /api/content│ ◄─── Immediate, no confirmation │
 │                    │ - FormData       │                                 │
 │                    │ - retention_mnths│                                 │
 │                    └────────┬─────────┘                                 │
 │                             │                                           │
-│              ┌──────────────┴──────────────┐                            │
-│              │                             │                            │
-│        Success                        Failure                           │
-│              │                             │                            │
-│              ▼                             ▼                            │
-│   ┌──────────────────┐         ┌──────────────────┐                    │
-│   │ Show CID, expiry │         │ Show error msg   │                    │
-│   │ + share options  │         │ (balance, size,  │                    │
-│   │                  │         │  validation)     │                    │
-│   └──────────────────┘         └──────────────────┘                    │
+│           ┌─────────────────┼─────────────────┐                         │
+│           │                 │                 │                         │
+│      Success           In Progress        Failure                       │
+│           │                 │                 │                         │
+│           ▼                 ▼                 ▼                         │
+│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                 │
+│   │ Redirect to  │  │ Show spinner │  │ Show error   │                 │
+│   │ CID detail   │  │ + cancel btn │  │ + manual     │                 │
+│   │ page         │  │              │  │ retry option │                 │
+│   └──────────────┘  └──────────────┘  └──────────────┘                 │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Inline Content Flow (≤64 bytes)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        INLINE CONTENT (≤64 bytes)                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Content ≤ 64 bytes                                                     │
+│         │                                                                │
+│         ▼                                                                │
+│  ┌──────────────────┐                                                   │
+│  │ Calculate 256t   │                                                   │
+│  │ CID = prefix +   │ ◄─── Content is Base64URL encoded directly       │
+│  │ Base64URL(content)│      NO hash, NO R2 storage needed               │
+│  └────────┬─────────┘                                                   │
+│           │                                                              │
+│           ▼                                                              │
+│  ┌──────────────────┐                                                   │
+│  │ CID IS the       │                                                   │
+│  │ content itself   │ ◄─── Download = decode CID, no R2 fetch          │
+│  └──────────────────┘                                                   │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -117,17 +147,17 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 
 #### Frontend Components
 1. **UploadForm** - Main upload interface
-2. **FileSelector** - File input with drag-and-drop
-3. **HashCalculator** - Client-side 256t hash computation
-4. **RetentionPicker** - Duration selection UI
-5. **CostDisplay** - Real-time cost calculation
-6. **ProgressIndicator** - Upload progress feedback
-7. **UploadResult** - Success/failure display
+2. **FileSelector** - File input with drag-and-drop support
+3. **HashCalculator** - Client-side 256t hash computation (Web Worker)
+4. **RetentionPicker** - Dropdown presets + custom month input
+5. **CostDisplay** - Real-time cost calculation with balance check
+6. **SpinnerIndicator** - Simple upload progress spinner with cancel
+7. **UploadResult** - Redirect to CID detail page on success
 
 #### API Endpoints
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
-| `/api/content` | POST | Required | Upload content |
+| `/api/content` | POST | Required (Session or API Key) | Upload content |
 | `/api/content/:cid/exists` | GET | Public | Check if CID exists |
 | `/api/content/:cid` | GET | Public | Get content metadata |
 | `/api/content/:cid/download` | GET | Public | Download content (TODO) |
@@ -139,46 +169,43 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 
 ### Phase 1: 256t Hash Implementation
 - Implement SHA-512 hash generation per 256t specification
-- 8-char length prefix + 86-char Base64URL hash
-- Content <= 64 bytes: Direct Base64URL encoding
+- 8-char length prefix + up to 86-char Base64URL hash
+- Content ≤ 64 bytes: Direct Base64URL encoding (inline content)
 - Content > 64 bytes: SHA-512 hash
+- Both client-side (JavaScript) and server-side (Worker) implementations
 
-### Phase 2: Client-Side Hashing
-- JavaScript library for browser-based 256t calculation
-- WebCrypto API for SHA-512
-- Progress callback for large files
-- Worker thread for non-blocking computation
+### Phase 2: Frontend Upload UI
+- File selection with drag-and-drop
+- Retention picker (dropdown: 1 month, 1 year, 1 decade, 1 century + custom input)
+- Cost display (updates on file selection and retention change)
+- Balance display with deposit link if insufficient
+- Upload button (immediate submission, no confirmation)
 
-### Phase 3: Frontend Upload UI
-- File selection component
-- Retention picker with presets (1 month, 1 year, 1 decade, 1 century)
-- Cost calculator display
-- Balance display and deposit link
-- Upload button with confirmation
+### Phase 3: Client-Side Hashing & Duplicate Detection
+- Web Worker for non-blocking hash calculation
+- Progress indication during hash (for large files)
+- Check `/api/content/:cid/exists` before upload
+- Show duplicate message with extension option
 
-### Phase 4: Upload Progress
-- XMLHttpRequest or fetch with progress events
-- Progress bar UI component
-- Cancel button (if cancellation supported)
-- Speed and ETA display (optional)
+### Phase 4: Upload Progress & Cancellation
+- Simple spinner during upload
+- Cancel button to abort in-progress upload
+- XHR abort or AbortController for fetch
 
-### Phase 5: Duplicate Detection
-- Client-side hash calculation before upload
-- API check for existing CID
-- UI for showing duplicate message
-- Option to extend existing content
+### Phase 5: Error Handling & Retry
+- Insufficient balance: show amount needed, link to deposit
+- File too large: show 5GB limit message
+- Network error: preserve form state, show manual retry button
+- Server error: user-friendly message
 
-### Phase 6: Error Handling
-- Insufficient balance messaging
-- File validation errors
-- Network error handling
-- Retry mechanism (if enabled)
+### Phase 6: Success Flow
+- Redirect to CID detail page
+- CID detail page shows: CID, expiration, size, copy button, share URL
 
-### Phase 7: Success Flow
-- Display CID with copy button
-- Expiration date display
-- Share options (URL, QR code)
-- Upload another button
+### Phase 7: API Key Support
+- Accept `Authorization: Bearer hb_live_...` or `hb_test_...` header
+- Same functionality as session-based upload
+- JSON error responses for programmatic consumption
 
 ---
 
@@ -193,30 +220,32 @@ describe('256t Hash Generation', () => {
   - should encode size in 6-byte big-endian format
   - should use Base64URL encoding for prefix
 
-  // Small content (≤ 64 bytes) - direct encoding
+  // Inline content (≤ 64 bytes) - direct encoding, no hash
   - should directly encode empty content (0 bytes)
   - should directly encode 1-byte content
   - should directly encode 64-byte content exactly
   - should use Base64URL without padding
+  - should allow content recovery from CID (decode Base64URL)
 
   // Large content (> 64 bytes) - SHA-512 hash
   - should hash 65-byte content
   - should hash 1KB content
   - should hash 1MB content
   - should hash 1GB content
+  - should hash 5GB content (max size)
   - should produce consistent hash for same content
   - should produce different hash for different content
 
   // Format validation
   - should produce max 94 character identifier
-  - should contain only URL-safe characters
-  - should match format: 8-char prefix + up to 86-char hash
+  - should contain only URL-safe characters (A-Za-z0-9_-)
+  - should match format: 8-char prefix + up to 86-char hash/content
 
   // Edge cases
-  - should handle binary content
-  - should handle Unicode text
-  - should handle null bytes in content
-  - should handle maximum size content (256TB theoretical)
+  - should handle binary content (null bytes, high bytes)
+  - should handle Unicode text (UTF-8 encoded)
+  - should handle content with only null bytes
+  - should reject content > 5GB with clear error
 });
 ```
 
@@ -228,21 +257,25 @@ describe('Client Hash Calculator', () => {
   - should calculate hash for File object
   - should calculate hash for Blob
   - should calculate hash for ArrayBuffer
+  - should use Web Worker for computation
 
-  // Progress reporting
-  - should report progress for large files
+  // Progress reporting (for large files)
+  - should report progress for files > 1MB
   - should report 0% at start
   - should report 100% at completion
-  - should report intermediate progress
+  - should report intermediate progress proportional to bytes read
 
   // Performance
   - should not block main thread
-  - should use Web Worker if available
-  - should handle files larger than memory
-  - should use streaming for large files
+  - should use streaming for large files (not load entire file in memory)
+  - should complete 5GB file hash in reasonable time
+
+  // Cancellation
+  - should support cancellation mid-computation
+  - should clean up resources on cancel
 
   // Error handling
-  - should reject on read error
+  - should reject on file read error
   - should handle file access denied
   - should handle file deleted during read
 });
@@ -253,22 +286,22 @@ describe('Client Hash Calculator', () => {
 ```
 describe('File Validation', () => {
   // Size validation
-  - should accept file within size limit
-  - should reject file exceeding size limit
-  - should handle zero-byte file (per decision)
-  - should calculate size correctly for large files
+  - should accept file of 0 bytes (empty file)
+  - should accept file of 1 byte
+  - should accept file of exactly 5GB
+  - should reject file of 5GB + 1 byte
+  - should show clear error message for oversized file
 
-  // Type validation (if enabled)
-  - should accept allowed MIME types
-  - should reject blocked MIME types
-  - should detect MIME type from content (if enabled)
-  - should handle missing/unknown MIME type
+  // No type restrictions (per decision)
+  - should accept any MIME type
+  - should accept files with no MIME type
+  - should accept executable files
+  - should accept files with unusual extensions
 
-  // Name validation
-  - should accept valid filenames
-  - should handle filenames with special characters
-  - should handle very long filenames
-  - should handle missing filename
+  // Filename handling (not stored, per decision)
+  - should not require filename
+  - should ignore filename for processing
+  - should not store filename in metadata
 });
 ```
 
@@ -276,23 +309,25 @@ describe('File Validation', () => {
 
 ```
 describe('Retention Picker', () => {
-  // Preset selection
-  - should have 1 month preset
-  - should have 1 year preset
-  - should have 1 decade preset
-  - should have 1 century preset
+  // Preset selection (dropdown)
+  - should have 1 month preset (default)
+  - should have 1 year (12 months) preset
+  - should have 1 decade (120 months) preset
+  - should have 1 century (1200 months) preset
+  - should have "Custom" option to enable input
 
   // Custom input
-  - should accept custom month value
+  - should show input field when "Custom" selected
+  - should accept integer month values
   - should enforce minimum 1 month
-  - should accept very large values (100+ years)
-  - should reject non-integer values
-  - should reject zero or negative values
+  - should accept very large values (1200+ months)
+  - should reject non-integer values (show validation error)
+  - should reject zero
+  - should reject negative values
 
-  // Cost calculation
-  - should update cost on selection change
-  - should display cost in dollars
-  - should show breakdown if relevant
+  // Cost calculation integration
+  - should trigger cost recalculation on selection change
+  - should trigger cost recalculation on custom input change
 });
 ```
 
@@ -302,44 +337,61 @@ describe('Retention Picker', () => {
 describe('Cost Display', () => {
   // Display format
   - should format cost as $X.XX
-  - should show minimum $1.00 for small costs
-  - should update in real-time on file change
-  - should update in real-time on retention change
+  - should show $0.00 for inline content (if free, per decision #21)
+  - should update after file selection
+  - should update during retention change
 
   // Balance comparison
   - should show current balance
-  - should indicate if balance sufficient
-  - should show shortfall amount if insufficient
-  - should provide link to deposit if insufficient
+  - should show green/positive indicator if balance >= cost
+  - should show red/warning indicator if balance < cost
+  - should show shortfall amount: "Need $X.XX more"
+  - should show deposit link when insufficient
 
   // Edge cases
-  - should handle very large costs
-  - should handle fractional cents (rounding)
-  - should handle zero cost (empty file if allowed)
+  - should handle very large costs (century retention of 5GB)
+  - should round fractional cents appropriately
+  - should handle $0.00 cost display (inline content)
 });
 ```
 
-### Unit Tests - Upload Form Submission
+### Unit Tests - Drag and Drop
 
 ```
-describe('Upload Form Submission', () => {
-  // Form validation
-  - should require file selection
-  - should require retention selection
-  - should validate before submission
-  - should disable submit during upload
+describe('Drag and Drop', () => {
+  // Basic functionality
+  - should highlight drop zone on drag enter
+  - should remove highlight on drag leave
+  - should accept dropped file
+  - should trigger hash calculation on drop
 
-  // Request format
-  - should send FormData
-  - should include file as 'content'
-  - should include retention_months
-  - should include auth token in header
+  // Validation
+  - should reject multiple files (show "single file only" message)
+  - should reject directories
+  - should reject files > 5GB
 
-  // Progress tracking
-  - should update progress during upload
-  - should handle progress events
-  - should show upload speed (if enabled)
-  - should show ETA (if enabled)
+  // Visual feedback
+  - should show drag-over state
+  - should show accepted state on valid file
+  - should show rejected state on invalid file
+});
+```
+
+### Unit Tests - Upload Spinner & Cancellation
+
+```
+describe('Upload Spinner', () => {
+  // Display
+  - should show spinner when upload starts
+  - should hide spinner when upload completes
+  - should hide spinner when upload fails
+  - should hide spinner when upload cancelled
+
+  // Cancel button
+  - should show cancel button during upload
+  - should abort upload on cancel click
+  - should restore form state on cancel
+  - should not charge balance on cancelled upload
 });
 ```
 
@@ -349,18 +401,20 @@ describe('Upload Form Submission', () => {
 describe('Duplicate Detection', () => {
   // Client-side check
   - should calculate hash before upload
-  - should call /api/content/:cid/exists
-  - should show duplicate message if exists
-  - should show current expiration for duplicate
+  - should call GET /api/content/:cid/exists
+  - should proceed normally if CID does not exist
 
-  // User flow
-  - should allow proceeding (extends retention)
-  - should show extension cost
-  - should allow canceling upload
+  // Duplicate found
+  - should show "Content already exists" message
+  - should show current expiration date
+  - should show current size
+  - should offer "Extend retention" option
+  - should allow user to cancel (not pay)
 
   // Edge cases
-  - should handle network error on check
-  - should handle race condition (uploaded between check and submit)
+  - should handle network error on exists check (proceed with upload)
+  - should handle race condition (CID uploaded between check and submit)
+  - should handle inline content (always "exists" conceptually)
 });
 ```
 
@@ -369,25 +423,29 @@ describe('Duplicate Detection', () => {
 ```
 describe('Upload Error Handling', () => {
   // Insufficient balance
-  - should show specific message for insufficient balance
+  - should show "Insufficient balance" message
   - should show required amount
   - should show current balance
+  - should show shortfall
   - should provide deposit link
+  - should preserve file selection for retry after deposit
 
-  // Validation errors
-  - should show file too large message
-  - should show invalid file type message
-  - should show invalid retention message
+  // File too large
+  - should show "File too large" message
+  - should show 5GB limit
+  - should show actual file size
 
   // Network errors
   - should detect network failure
-  - should offer retry (if enabled)
+  - should show "Upload failed - network error" message
+  - should show "Retry" button
   - should preserve form state on error
+  - should preserve file selection
 
-  // Server errors
-  - should handle 500 errors gracefully
-  - should show user-friendly error message
+  // Server errors (5xx)
+  - should show "Upload failed - please try again"
   - should not expose internal error details
+  - should show "Retry" button
 });
 ```
 
@@ -396,23 +454,39 @@ describe('Upload Error Handling', () => {
 ```
 describe('Upload Success', () => {
   // Response handling
-  - should display returned CID
+  - should receive CID from server
+  - should receive expiration date
+  - should receive new balance
+  - should receive cost charged
+
+  // Redirect
+  - should redirect to /content/:cid page
+  - should pass success state to detail page
+
+  // No additional UI (redirect handles display)
+});
+```
+
+### Unit Tests - CID Detail Page
+
+```
+describe('CID Detail Page', () => {
+  // Display elements
+  - should display full CID
   - should display expiration date
-  - should display new balance
-  - should display cost charged
+  - should display file size
+  - should have copy CID button
+  - should have download link
 
   // Copy functionality
-  - should have copy CID button
-  - should copy full CID to clipboard
-  - should show copy confirmation
+  - should copy CID to clipboard on button click
+  - should show "Copied!" confirmation
+  - should reset confirmation after 2 seconds
 
-  // Share options
-  - should generate shareable URL
-  - should generate QR code (if enabled)
-
-  // Next actions
-  - should offer "upload another" button
-  - should offer "view content" link
+  // Actions
+  - should have "Extend retention" link
+  - should have "Upload another" link
+  - should have shareable URL display
 });
 ```
 
@@ -420,29 +494,40 @@ describe('Upload Success', () => {
 
 ```
 describe('Full Upload Flow', () => {
-  // Happy path - new content
-  - should complete: select file → set retention → upload → success
-  - should deduct from balance
+  // Happy path - new content (large file)
+  - should complete: select file → hash → check exists → set retention → upload → redirect
+  - should deduct correct amount from balance
   - should store content in R2
   - should create metadata record
-  - should return valid CID
+  - should return valid CID matching client hash
+
+  // Happy path - inline content (≤64 bytes)
+  - should complete upload without R2 storage
+  - should return CID containing content
+  - should charge appropriately (per decision #21)
 
   // Happy path - duplicate content
-  - should detect duplicate
-  - should extend retention
-  - should not re-upload bytes
+  - should detect duplicate via exists check
+  - should show extension UI
+  - should extend retention without re-uploading bytes
   - should charge for extension only
 
   // Insufficient balance path
   - should reject with clear message
   - should not create content
   - should not deduct balance
-  - should succeed after deposit
+  - should allow retry after deposit (without re-selecting file)
+
+  // Cancelled upload path
+  - should abort XHR/fetch
+  - should not charge balance
+  - should not create content
+  - should return to ready state
 
   // Edge cases
-  - should handle exactly-sufficient balance
-  - should handle maximum file size
-  - should handle minimum retention
+  - should handle exactly-sufficient balance (balance == cost)
+  - should handle maximum file size (5GB)
+  - should handle minimum retention (1 month)
 });
 ```
 
@@ -451,18 +536,43 @@ describe('Full Upload Flow', () => {
 ```
 describe('API Key Upload', () => {
   // Authentication
-  - should accept valid API key in header
-  - should reject invalid API key
-  - should reject expired API key
+  - should accept valid API key: Authorization: Bearer hb_live_xxx
+  - should accept valid test key: Authorization: Bearer hb_test_xxx
+  - should reject invalid API key (401)
+  - should reject expired API key (401)
+  - should reject revoked API key (401)
 
   // Functionality
-  - should work same as session-based upload
-  - should respect rate limits
-  - should record in user's upload history
+  - should upload content same as session-based
+  - should deduct from key owner's balance
+  - should record in key owner's upload history
+  - should return JSON response
 
-  // Error responses
-  - should return JSON errors
-  - should include appropriate status codes
+  // Error responses (JSON format)
+  - should return JSON for insufficient balance
+  - should return JSON for file too large
+  - should return JSON for server errors
+  - should include appropriate HTTP status codes
+});
+```
+
+### Integration Tests - Inline Content
+
+```
+describe('Inline Content Upload', () => {
+  // Small content handling
+  - should handle 0-byte content
+  - should handle 1-byte content
+  - should handle 64-byte content (boundary)
+  - should hash 65-byte content (just over boundary)
+
+  // Storage behavior
+  - should NOT store ≤64 byte content in R2
+  - should STORE >64 byte content in R2
+
+  // CID verification
+  - should produce CID that decodes back to original content (≤64 bytes)
+  - should produce CID that cannot decode to content (>64 bytes, is hash)
 });
 ```
 
@@ -470,21 +580,37 @@ describe('API Key Upload', () => {
 
 ```
 describe('E2E Upload Journey', () => {
-  // New user upload
-  - should sign in → deposit → upload → view content
+  // New user first upload
+  - should: sign in → see upload page → deposit (if needed) → select file → upload → view CID page
 
-  // Returning user upload
-  - should sign in → upload (has balance) → view content
+  // Returning user with balance
+  - should: sign in → select file → see cost → upload → view CID page
 
-  // Multiple uploads
-  - should upload multiple files sequentially
+  // Drag and drop journey
+  - should: drag file → drop → see cost → upload → view CID page
+
+  // Multiple sequential uploads
+  - should upload file 1 → view CID → click "upload another" → upload file 2
+  - should correctly deduct balance for each
   - should track all in upload history
-  - should update balance correctly
 
-  // Error recovery
-  - should recover from network error
-  - should retry failed upload
-  - should complete after balance deposit
+  // Error recovery journey
+  - should: upload → network error → retry → success
+  - should: upload → insufficient balance → deposit → retry → success
+});
+```
+
+### E2E Tests - CLI/API Upload
+
+```
+describe('E2E CLI Upload', () => {
+  // curl-style upload
+  - should upload via: curl -X POST -H "Authorization: Bearer hb_live_xxx" -F "content=@file" -F "retention_months=1" /api/content
+  - should return JSON with CID
+
+  // Scripted upload
+  - should support programmatic upload via fetch/axios
+  - should support streaming upload for large files
 });
 ```
 
@@ -493,24 +619,26 @@ describe('E2E Upload Journey', () => {
 ```
 describe('Upload Security', () => {
   // Authentication
-  - should reject unauthenticated upload
+  - should reject unauthenticated upload (401)
   - should validate session token
-  - should validate API key format and validity
+  - should validate API key format
+  - should validate API key not expired/revoked
 
   // Authorization
   - should only charge uploader's balance
   - should associate content with correct user
+  - should not allow access to other users' balance
 
-  // Input validation
-  - should sanitize filename
-  - should validate content type
-  - should enforce size limits server-side
+  // Input validation (server-side enforcement)
+  - should enforce 5GB size limit server-side
+  - should reject retention_months < 1
+  - should reject non-integer retention_months
+  - should validate CID format matches content
 
-  // Attack prevention
-  - should prevent path traversal in filename
-  - should limit request size
-  - should rate limit uploads
-  - should prevent content-type spoofing
+  // No filename/type vulnerabilities (not stored)
+  - should ignore filename in request
+  - should ignore content-type in request
+  - should not allow path traversal (no paths stored)
 });
 ```
 
@@ -518,19 +646,20 @@ describe('Upload Security', () => {
 
 ```
 describe('Upload Performance', () => {
-  // Response times
-  - should complete small file upload in <2s
-  - should maintain progress updates during large upload
-  - should not timeout for large files
+  // Client-side hashing
+  - should hash 100MB file in <5s
+  - should hash 1GB file in <30s
+  - should not freeze UI during hashing
 
-  // Client performance
-  - should not freeze UI during hash calculation
-  - should use streaming for large file hashing
-  - should handle concurrent operations
+  // Upload times (network dependent)
+  - should complete small file upload (<1MB) in <2s
+  - should maintain responsive UI during large upload
+  - should support 5GB upload without timeout
 
-  // Server performance
-  - should handle concurrent uploads from same user
-  - should handle concurrent uploads from different users
+  // Concurrent uploads (per decision: unlimited)
+  - should handle 3 concurrent uploads from same user
+  - should correctly track balance across concurrent uploads
+  - should prevent race conditions on balance
 });
 ```
 
@@ -539,19 +668,27 @@ describe('Upload Performance', () => {
 ```
 describe('Upload Accessibility', () => {
   // Keyboard navigation
-  - should allow file selection via keyboard
-  - should support tab navigation through form
+  - should allow file selection via keyboard (Enter/Space on input)
+  - should support Tab navigation through form
   - should allow form submission via Enter
+  - should allow cancel via Escape
 
   // Screen reader support
-  - should have descriptive labels
-  - should announce progress updates
-  - should announce success/error states
+  - should have aria-label on file input
+  - should announce "File selected: [name], [size]"
+  - should announce "Uploading..." when upload starts
+  - should announce "Upload complete" or "Upload failed"
+  - should announce cost and balance information
+
+  // Focus management
+  - should focus file input on page load
+  - should move focus to error message on error
+  - should move focus appropriately after redirect
 
   // Visual accessibility
-  - should have sufficient color contrast
-  - should not rely solely on color for status
-  - should support reduced motion preference
+  - should have sufficient color contrast on all elements
+  - should not rely solely on color for insufficient balance warning
+  - should respect prefers-reduced-motion for spinner
 });
 ```
 
@@ -564,19 +701,17 @@ frontend/
 ├── js/
 │   ├── upload.js           # Main upload page logic
 │   ├── hash256t.js         # 256t hash calculation
-│   ├── file-validator.js   # File validation
-│   ├── retention-picker.js # Retention UI component
-│   ├── cost-calculator.js  # Cost display component
-│   └── upload-progress.js  # Progress indicator
+│   ├── hash-worker.js      # Web Worker for async hashing
+│   └── upload-components.js # UI components (retention picker, cost display)
 ├── css/
-│   └── upload.css          # Upload page styles
+│   └── upload.css          # Upload page styles (drag-drop, spinner)
 └── upload.html             # Upload page
 
 src/
 ├── api/
-│   └── content.js          # Upload API handler (exists)
+│   └── content.js          # Upload API handler (exists, needs 256t update)
 └── utils/
-    └── hash256t.js         # Server-side hash (TODO)
+    └── hash256t.js         # Server-side 256t hash validation
 ```
 
 ---
@@ -585,8 +720,8 @@ src/
 
 ### Frontend
 - None (vanilla JavaScript)
-- WebCrypto API (built-in)
-- Web Workers (built-in)
+- WebCrypto API (built-in) - for SHA-512
+- Web Workers (built-in) - for async hashing
 
 ### Backend
 - Existing: Cloudflare Workers, R2, Durable Objects
@@ -596,14 +731,17 @@ src/
 
 ## Success Criteria
 
-- [ ] User can upload files up to configured size limit
-- [ ] 256t hash is correctly calculated
-- [ ] Duplicate content is detected and handled
-- [ ] Cost is displayed before upload
-- [ ] Balance is checked and deducted
-- [ ] Upload progress is shown
-- [ ] Success displays CID with copy button
-- [ ] Errors are handled gracefully
+- [ ] User can upload files up to 5GB
+- [ ] User can drag-and-drop files
+- [ ] 256t hash is correctly calculated (client and server match)
+- [ ] Inline content (≤64 bytes) handled correctly
+- [ ] Duplicate content is detected and user can extend
+- [ ] Cost is displayed after file selection and during upload
+- [ ] Balance is checked and deducted correctly
+- [ ] Simple spinner shown during upload with cancel option
+- [ ] Success redirects to CID detail page
+- [ ] Errors show clear messages with manual retry option
+- [ ] API key uploads work for CLI/automation
 - [ ] All tests pass
 - [ ] Accessibility requirements met
 
@@ -613,11 +751,11 @@ src/
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Large file handling | Browser memory/crash | Use streaming, chunked reading |
-| Hash calculation time | Poor UX | Web Worker, progress indication |
-| Network interruption | Lost upload | Retry mechanism, resumable upload |
-| Balance race condition | Double-spend | Server-side atomicity (exists) |
-| Content type spoofing | Security | Server-side validation |
+| 5GB file browser memory | Browser crash | Use streaming/chunked reading in Web Worker |
+| Hash calculation time | Poor UX | Web Worker + progress indication |
+| Network interruption | Lost upload, wasted time | Manual retry preserves form state |
+| Balance race condition | Double-spend | Server-side atomic balance check (exists) |
+| CID mismatch client/server | Data integrity | Server validates hash matches content |
 
 ---
 
@@ -631,6 +769,7 @@ src/
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Created:** 2026-01-15
-**Status:** Draft - Awaiting decisions on open questions
+**Updated:** 2026-01-15
+**Status:** Draft - 4 open questions remaining (#21-24)
