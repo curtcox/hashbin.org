@@ -319,11 +319,12 @@ TEST: DELETE /api/auth/apikeys/:keyId - revoke non-existent key
   WHEN: DELETE /api/auth/apikeys/non-existent-id
   THEN: status = 404
 
-TEST: DELETE /api/auth/apikeys/:keyId - revoke already revoked key
+TEST: DELETE /api/auth/apikeys/:keyId - revoke already revoked key (idempotent)
   GIVEN: valid Clerk session
   AND: key was already revoked
   WHEN: DELETE /api/auth/apikeys/:keyId
-  THEN: status = 200 OR 400 (TBD - see open questions)
+  THEN: status = 200
+  AND: revoked_at timestamp unchanged
 
 TEST: DELETE /api/auth/apikeys/:keyId - reject API key authentication
   GIVEN: valid API key (even the one being revoked)
@@ -389,6 +390,18 @@ TEST: authenticate - case-insensitive 'apikey' scheme
   GIVEN: header = 'Authorization: apikey hb_test_...'
   WHEN: authenticate(request, env) is called
   THEN: authenticates successfully
+
+TEST: authenticate - updates last_used_at even for revoked key (security signal)
+  GIVEN: revoked API key with last_used_at = '2024-01-01T00:00:00Z'
+  WHEN: authenticate(request, env) is called
+  THEN: returns { authenticated: false, error: 'AUTH_REVOKED' }
+  AND: last_used_at is updated to current timestamp
+
+TEST: authenticate - updates last_used_at even for expired key (security signal)
+  GIVEN: expired API key with last_used_at = '2024-01-01T00:00:00Z'
+  WHEN: authenticate(request, env) is called
+  THEN: returns { authenticated: false, error: 'AUTH_EXPIRED' }
+  AND: last_used_at is updated to current timestamp
 ```
 
 ### Integration Tests: Content Upload with API Key
@@ -471,6 +484,63 @@ TEST: rate limit - window reset
   GIVEN: API key at rate limit
   WHEN: wait 60 seconds
   THEN: requests succeed again
+
+TEST: rate limit - persists across Worker instances (Durable Objects)
+  GIVEN: API key with 400 requests counted in DO
+  WHEN: request hits different Worker instance
+  AND: makes 100 more requests
+  THEN: first 100 succeed (total 500)
+  AND: next request returns 429
+
+TEST: rate limit - concurrent requests handled correctly
+  GIVEN: API key with 498 requests in window
+  WHEN: 5 concurrent requests arrive
+  THEN: exactly 2 succeed
+  AND: exactly 3 return 429
+```
+
+### Integration Tests: RateLimiter Durable Object
+
+#### `durable-objects/rate-limiter.test.js`
+
+```
+TEST: increment - first request in window
+  GIVEN: empty rate limit state for identifier
+  WHEN: POST /increment with identifier = 'key:abc123'
+  THEN: returns { count: 1, allowed: true, remaining: 499 }
+
+TEST: increment - request within limit
+  GIVEN: identifier has 100 requests in current window
+  WHEN: POST /increment
+  THEN: returns { count: 101, allowed: true, remaining: 399 }
+
+TEST: increment - request at limit
+  GIVEN: identifier has 499 requests in current window
+  WHEN: POST /increment
+  THEN: returns { count: 500, allowed: true, remaining: 0 }
+
+TEST: increment - request over limit
+  GIVEN: identifier has 500 requests in current window
+  WHEN: POST /increment
+  THEN: returns { count: 500, allowed: false, remaining: 0, resetAt: <timestamp> }
+
+TEST: window expiration - old requests don't count
+  GIVEN: identifier had 500 requests 61 seconds ago
+  WHEN: POST /increment
+  THEN: returns { count: 1, allowed: true, remaining: 499 }
+
+TEST: concurrent increments - transactional safety
+  GIVEN: identifier has 498 requests
+  WHEN: 5 concurrent POST /increment requests
+  THEN: exactly 2 return allowed: true
+  AND: exactly 3 return allowed: false
+  AND: final count is 500
+
+TEST: different identifiers - isolated counters
+  GIVEN: 'key:abc' has 500 requests (rate limited)
+  AND: 'key:xyz' has 0 requests
+  WHEN: POST /increment for 'key:xyz'
+  THEN: returns { count: 1, allowed: true }
 ```
 
 ### Integration Tests: KeyRegistry Durable Object
@@ -535,11 +605,17 @@ TEST: update last_used_at - records usage
   WHEN: POST /apikeys/:keyId/use
   THEN: last_used_at is updated
 
-TEST: does NOT include revoked keys in max count
-  GIVEN: user has 20 active keys and 10 revoked keys (30 total)
+TEST: only active keys count toward 25-key limit
+  GIVEN: user has 20 active keys and 10 revoked keys (30 total stored)
   WHEN: POST /apikeys (create new)
-  THEN: succeeds (only 20 count toward limit)
-  OR: fails (all 30 count toward limit) - see open questions
+  THEN: succeeds (only 20 active keys count toward limit)
+  AND: user now has 21 active keys
+
+TEST: can create key after revoking when at limit
+  GIVEN: user has exactly 25 active keys (at limit)
+  WHEN: user revokes 1 key
+  AND: user creates a new key
+  THEN: succeeds (now has 24 active + 1 revoked + 1 new = 25 active)
 ```
 
 ### End-to-End Tests
@@ -575,144 +651,22 @@ TEST: key expiration - expires at correct time
 
 ---
 
-## Open Questions
+## Resolved Decisions
 
-### Question 1: Revoked Keys - Count Toward Limit?
+The following design decisions have been finalized:
 
-**Context**: Users can have max 25 API keys.
-
-**Options**:
-- A) Only active (non-revoked) keys count toward limit
-- B) All keys (including revoked) count toward limit
-- C) Revoked keys are deleted after a retention period
-
-**Current Implementation**: Unclear - needs verification
-
-**Recommendation**: Option A - Only active keys count. This allows users to rotate keys without hitting the limit. Revoked keys should be retained for audit purposes.
-
----
-
-### Question 2: Re-revoking Already Revoked Keys
-
-**Context**: What happens if DELETE /api/auth/apikeys/:keyId is called on an already-revoked key?
-
-**Options**:
-- A) Return 200 (idempotent - no change)
-- B) Return 400 (client error - already revoked)
-- C) Return 404 (treat revoked as non-existent)
-
-**Current Implementation**: Needs verification
-
-**Recommendation**: Option A - Idempotent behavior is safest for distributed systems.
-
----
-
-### Question 3: Deleted User's Keys in KeyRegistry
-
-**Context**: When a user account is deleted, their API keys remain in KeyRegistry.
-
-**Options**:
-- A) Leave orphaned entries (current behavior - validation checks user status)
-- B) Clean up KeyRegistry entries on user deletion
-- C) Periodic garbage collection of orphaned entries
-
-**Current Implementation**: Option A - Keys remain, validation fails at user lookup step.
-
-**Recommendation**: Option A is acceptable for now. GC can be added later if storage becomes an issue.
-
----
-
-### Question 4: API Key Name Uniqueness
-
-**Context**: Can a user have multiple keys with the same name?
-
-**Options**:
-- A) Allow duplicate names (current behavior)
-- B) Require unique names per user
-- C) Warn but allow duplicates
-
-**Recommendation**: Option A - Names are for human reference only. key_id provides uniqueness.
-
----
-
-### Question 5: Rate Limit Storage
-
-**Context**: Current rate limiting uses in-memory Map, which doesn't work across distributed Workers.
-
-**Options**:
-- A) Keep in-memory (development only)
-- B) Use Durable Objects for rate limiting
-- C) Use Cloudflare Rate Limiting API
-- D) Use KV with TTLs
-
-**Current Implementation**: In-memory only (documented as development-only)
-
-**Recommendation**: Option B or C for production. Need to decide before launch.
-
----
-
-### Question 6: Should Revoked Keys Update last_used_at?
-
-**Context**: If someone tries to use a revoked key, should last_used_at be updated?
-
-**Options**:
-- A) Yes - helps detect attempted use of compromised keys
-- B) No - key is inactive, no point updating
-
-**Recommendation**: Option A - Useful security signal.
-
----
-
-### Question 7: API Key Scope/Permissions
-
-**Context**: Should API keys have granular permissions?
-
-**Options**:
-- A) Full access (same as user) - current implementation
-- B) Scoped permissions (e.g., upload only, read only, specific CIDs)
-- C) Defer to future phase
-
-**Recommendation**: Option C - Full access for MVP, add scopes later if needed.
-
----
-
-### Question 8: Key Rotation Workflow
-
-**Context**: How should users rotate keys?
-
-**Options**:
-- A) Manual: create new key, update clients, revoke old key
-- B) Atomic: endpoint to create new + revoke old in one operation
-- C) Overlap period: new key created, old key auto-revokes after N days
-
-**Recommendation**: Option A for MVP. Users can handle rotation manually.
-
----
-
-### Question 9: Frontend UI Location
-
-**Context**: Where should API key management UI live?
-
-**Options**:
-- A) Dedicated settings page (/settings/api-keys)
-- B) Within user dashboard (/dashboard)
-- C) Account dropdown menu
-- D) All of the above with navigation
-
-**Recommendation**: Need frontend design input.
-
----
-
-### Question 10: Key Creation Audit Log
-
-**Context**: Should we log API key creation/revocation events?
-
-**Options**:
-- A) Yes - store in PaymentRecord or new AuditLog DO
-- B) No - api_keys array in UserProfile is sufficient
-- C) Only log revocations
-
-**Recommendation**: Option B for MVP. The api_keys array with timestamps provides audit trail.
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | Revoked keys count toward limit? | **Only active keys count** | Allows key rotation without hitting limit; revoked keys retained for audit |
+| 2 | Re-revoking already revoked keys | **Idempotent 200 response** | Safest for distributed systems; no error, no change |
+| 3 | Deleted user's keys in KeyRegistry | **Leave orphaned entries** | Validation fails at user lookup; GC can be added later if needed |
+| 4 | API key name uniqueness | **Allow duplicate names** | Names are human reference only; key_id provides uniqueness |
+| 5 | Rate limit storage | **Use Durable Objects** | Required for production distributed Workers |
+| 6 | Update last_used_at for revoked keys? | **Yes** | Helps detect attempted use of compromised keys |
+| 7 | API key scope/permissions | **Defer to future phase** | Full access for MVP; add scopes later if needed |
+| 8 | Key rotation workflow | **Manual rotation** | Users create new key, update clients, revoke old key |
+| 9 | Frontend UI location | **Dedicated /settings/api-keys page** | Clear, focused location for key management |
+| 10 | Key creation audit log | **api_keys array is sufficient** | Timestamps in UserProfile provide adequate audit trail |
 
 ---
 
@@ -733,11 +687,14 @@ TEST: key expiration - expires at correct time
 
 ### Phase 3: Fix Any Issues Found
 1. Address any bugs discovered during testing
-2. Resolve open questions based on test results
+2. Implement any missing functionality identified by tests
 
-### Phase 4: Production Rate Limiting
-1. Implement Durable Object-based rate limiting OR
-2. Configure Cloudflare Rate Limiting API
+### Phase 4: Production Rate Limiting (Durable Objects)
+1. Create RateLimiter Durable Object class
+2. Implement sliding window counter with 60-second TTL
+3. Add rate limit check to authenticate middleware
+4. Handle concurrent request counting with DO transactions
+5. Add rate limit tests for distributed scenarios
 
 ### Phase 5: Frontend UI
 1. Design API key management interface
@@ -767,10 +724,10 @@ TEST: key expiration - expires at correct time
 
 ## Success Criteria
 
+- [x] All design decisions finalized (10/10 resolved)
 - [ ] All unit tests pass
 - [ ] All integration tests pass
 - [ ] All E2E tests pass
-- [ ] Rate limiting works in production environment
-- [ ] Frontend UI is functional and secure
+- [ ] Rate limiting works in production environment (Durable Objects)
+- [ ] Frontend UI at /settings/api-keys is functional and secure
 - [ ] Documentation is complete
-- [ ] No open questions remain
