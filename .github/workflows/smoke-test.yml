@@ -141,6 +141,46 @@ jobs:
           echo "::notice::Auth endpoint correctly returns 401 for unauthenticated requests"
 
       # ============================================
+      # Stripe Integration Tests
+      # ============================================
+      - name: Test - Stripe Integration Health
+        run: |
+          BODY='${{ steps.health.outputs.body }}'
+
+          # Check Stripe is in health response
+          if ! echo "$BODY" | jq -e '.checks.stripe' > /dev/null 2>&1; then
+            echo "::warning::Stripe health check not found in response"
+            exit 0
+          fi
+
+          STRIPE_STATUS=$(echo "$BODY" | jq -r '.checks.stripe.status')
+          TARGET_ENV="${{ steps.env.outputs.target }}"
+
+          # Production should have Stripe operational for payments
+          if [ "$TARGET_ENV" == "production" ]; then
+            if [ "$STRIPE_STATUS" == "operational" ]; then
+              echo "::notice::Stripe integration operational in production"
+            elif [ "$STRIPE_STATUS" == "degraded" ]; then
+              echo "::warning::Stripe partially configured in production"
+              STRIPE_DETAILS=$(echo "$BODY" | jq '.checks.stripe.details')
+              echo "Details: $STRIPE_DETAILS"
+            else
+              echo "::warning::Stripe not configured in production (payments disabled)"
+              STRIPE_DETAILS=$(echo "$BODY" | jq '.checks.stripe.details')
+              echo "Details: $STRIPE_DETAILS"
+            fi
+          else
+            # Development can be down/degraded/operational
+            if [ "$STRIPE_STATUS" == "operational" ]; then
+              echo "::notice::Stripe integration operational in development"
+            elif [ "$STRIPE_STATUS" == "degraded" ]; then
+              echo "::warning::Stripe partially configured in development"
+            else
+              echo "::notice::Stripe not configured in development (this is OK)"
+            fi
+          fi
+
+      # ============================================
       # R2 Storage Tests
       # ============================================
       - name: Test - R2 Storage Health

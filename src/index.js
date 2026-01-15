@@ -273,7 +273,8 @@ async function handleHealth(env) {
     environment: await checkEnvironment(env),
     durableObjects: await checkDurableObjects(env),
     r2: await checkR2Buckets(env),
-    clerk: await checkClerk(env)
+    clerk: await checkClerk(env),
+    stripe: await checkStripe(env)
   };
 
   // Determine overall status
@@ -498,6 +499,41 @@ async function checkClerk(env) {
     return {
       status: 'down',
       message: 'Clerk check failed',
+      error: error.message,
+      details: checks
+    };
+  }
+}
+
+/**
+ * Check Stripe integration health
+ */
+async function checkStripe(env) {
+  const checks = {
+    secretKeyConfigured: false,
+    webhookSecretConfigured: false
+  };
+
+  try {
+    // Check required secrets are configured
+    checks.secretKeyConfigured = !!env.STRIPE_SECRET_KEY;
+    checks.webhookSecretConfigured = !!env.STRIPE_WEBHOOK_SECRET;
+
+    const allConfigured = checks.secretKeyConfigured &&
+                          checks.webhookSecretConfigured;
+    const someConfigured = checks.secretKeyConfigured ||
+                           checks.webhookSecretConfigured;
+
+    return {
+      status: allConfigured ? 'operational' : (someConfigured ? 'degraded' : 'down'),
+      message: allConfigured ? 'Stripe secrets configured' :
+               (someConfigured ? 'Some Stripe secrets missing' : 'Stripe not configured'),
+      details: checks
+    };
+  } catch (error) {
+    return {
+      status: 'down',
+      message: 'Stripe check failed',
       error: error.message,
       details: checks
     };
