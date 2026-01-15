@@ -74,6 +74,30 @@ export function calculateStripeFees(depositCents) {
 }
 
 /**
+ * Calculate total charge amount for a desired credit
+ * User pays fees on top of the credit amount they want to receive
+ * @param {number} creditCents - Desired credit amount in cents
+ * @returns {object} { creditCents, feeCents, totalChargeCents }
+ */
+export function calculateTotalWithFees(creditCents) {
+  if (creditCents < MINIMUM_DEPOSIT_CENTS) {
+    throw new Error(`Minimum deposit is ${MINIMUM_DEPOSIT_CENTS} cents ($${MINIMUM_DEPOSIT_CENTS / 100})`);
+  }
+
+  // To calculate: if user wants X credit, they pay X + fees
+  // Stripe charges: (amount * 0.029) + 30
+  // So total = creditCents + (creditCents * 0.029) + 30
+  const feeCents = Math.round(creditCents * STRIPE_FEE_PERCENTAGE + STRIPE_FEE_FIXED_CENTS);
+  const totalChargeCents = creditCents + feeCents;
+
+  return {
+    creditCents,
+    feeCents,
+    totalChargeCents
+  };
+}
+
+/**
  * Calculate how many months of retention a donation amount provides
  * @param {number} donationCents - Donation amount in cents
  * @param {number} sizeBytes - Content size in bytes

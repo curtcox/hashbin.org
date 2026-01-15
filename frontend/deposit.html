@@ -33,18 +33,73 @@
     <div class="container">
       <h1>Add Funds</h1>
       
+      <!-- Success Message (shown after redirect from Stripe) -->
+      <div id="success-message" class="alert alert-success hidden">
+        <strong>✓ Deposit Successful!</strong>
+        <p>Your payment has been processed. Redirecting to dashboard...</p>
+      </div>
+
+      <!-- Cancel Message (shown after user cancels) -->
+      <div id="cancel-message" class="alert alert-warning hidden">
+        <strong>Deposit Cancelled</strong>
+        <p>You cancelled the payment. You can try again below.</p>
+      </div>
+
+      <!-- Error Message -->
+      <div id="error-message" class="alert alert-error hidden"></div>
+      
       <div class="card">
         <h2 class="card-title">Deposit to Your Account</h2>
-        <p style="color: var(--color-text-light);">
-          Payment integration coming soon. Funds will be used to pay for content storage retention.
+        <p style="color: var(--color-text-light); margin-bottom: 2rem;">
+          Add funds to your account to pay for content storage retention.
         </p>
-        
+
+        <form id="deposit-form">
+          <div class="form-group">
+            <label for="amount">Credit Amount (USD)</label>
+            <div class="input-group">
+              <span class="input-prefix">$</span>
+              <input 
+                type="number" 
+                id="amount" 
+                name="amount" 
+                step="0.01" 
+                min="1.00" 
+                placeholder="10.00" 
+                required
+                autocomplete="off"
+              >
+            </div>
+            <small class="form-text">Minimum: $1.00</small>
+          </div>
+
+          <!-- Fee Breakdown Display -->
+          <div id="fee-breakdown" class="fee-breakdown hidden">
+            <div class="fee-line">
+              <span>Credit Amount:</span>
+              <span id="credit-amount">$0.00</span>
+            </div>
+            <div class="fee-line">
+              <span>Processing Fee:</span>
+              <span id="fee-amount">$0.00</span>
+            </div>
+            <div class="fee-line fee-total">
+              <strong>Total Charge:</strong>
+              <strong id="total-amount">$0.00</strong>
+            </div>
+          </div>
+
+          <button type="submit" id="submit-btn" class="btn btn-primary" disabled>
+            Add Funds via Stripe
+          </button>
+        </form>
+
         <div class="alert alert-info" style="margin-top: 2rem;">
           <strong>Pricing:</strong> Storage costs $0.03 per GB per month. 
           All content downloads are free.
         </div>
 
-        <div style="margin-top: 2rem;">
+        <div style="margin-top: 1rem;">
           <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
         </div>
       </div>
@@ -67,5 +122,6 @@
     requireAuth();
   </script>
   <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/deposit.js"></script>
 </body>
 </html>

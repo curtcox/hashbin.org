@@ -32,6 +32,11 @@ export class PaymentRecord {
         return await this.getTransaction(transactionId);
       }
 
+      if (url.pathname === '/session/exists' && method === 'GET') {
+        const sessionId = url.searchParams.get('session_id');
+        return await this.checkSessionExists(sessionId);
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -67,6 +72,11 @@ export class PaymentRecord {
 
     // Store transaction with transaction_id as key
     await this.state.storage.put(`tx:${transaction.transaction_id}`, transaction);
+
+    // If this transaction has a Stripe session ID, index it for idempotency checking
+    if (transaction.stripe_session_id) {
+      await this.state.storage.put(`session:${transaction.stripe_session_id}`, transaction.transaction_id);
+    }
 
     // Also add to chronological list for easy retrieval
     const allTransactions = await this.state.storage.get('transactions') || [];
@@ -136,5 +146,35 @@ export class PaymentRecord {
       status: 200,
       headers: { 'content-type': 'application/json' }
     });
+  }
+
+  /**
+   * Check if a Stripe session has already been processed
+   */
+  async checkSessionExists(sessionId) {
+    if (!sessionId) {
+      return new Response(
+        JSON.stringify({
+          error: 'Missing session_id parameter'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const transactionId = await this.state.storage.get(`session:${sessionId}`);
+    
+    return new Response(
+      JSON.stringify({
+        exists: !!transactionId,
+        transaction_id: transactionId || null
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
   }
 }
