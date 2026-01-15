@@ -705,10 +705,24 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     let r2Object;
     
     if (rangeHeader) {
-      // Handle range request
-      r2Object = await env.CONTENT_BUCKET.get(cid, {
-        range: request.headers
-      });
+      // Parse Range header (format: "bytes=start-end" or "bytes=start-")
+      const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+      
+      if (rangeMatch) {
+        const start = parseInt(rangeMatch[1]);
+        const end = rangeMatch[2] ? parseInt(rangeMatch[2]) : undefined;
+        
+        // R2 expects a range object with offset and optional length
+        const rangeOptions = { offset: start };
+        if (end !== undefined) {
+          rangeOptions.length = end - start + 1;
+        }
+        
+        r2Object = await env.CONTENT_BUCKET.get(cid, { range: rangeOptions });
+      } else {
+        // Invalid range format, fetch full object
+        r2Object = await env.CONTENT_BUCKET.get(cid);
+      }
     } else {
       r2Object = await env.CONTENT_BUCKET.get(cid);
     }
