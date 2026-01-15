@@ -46,18 +46,17 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 | 17 | Upload rate limiting | **None beyond auth** - prepaid model prevents abuse |
 | 18 | Content type handling | **None** - content stored as raw bytes with no associated type |
 | 19 | Filename handling | **Hash only** - no filename stored, content-addressed only |
-| 20 | Success redirect | **Go to CID detail page** |
+| 20 | Success redirect | **Go to `/info/{CID}`** - the CID info page |
+| 21 | Inline content pricing | **Free** - no R2 storage used, no charge for ≤64 byte content |
+| 22 | CID info page scope | **Minimal** - CID, expiry, size, plus link to `/{CID}` for download |
+| 23 | Download behavior | **See [download.md](download.md)** - MIME types, caching, URL patterns |
+| 24 | Expiration display | **Both** - show "expires in X days/months" and exact date |
 
 ---
 
 ## Open Questions
 
-| # | Question | Options | Impact |
-|---|----------|---------|--------|
-| 21 | Inline content pricing | A) Free (no R2 storage used), B) Charge same rate, C) Minimum fee | Content ≤64 bytes is encoded directly in CID - no R2 storage. Should this be free? |
-| 22 | CID detail page scope | A) Minimal (CID, expiry, size), B) Full (+ download, extend, share), C) Requires separate plan | What should the CID detail page display? Does it exist yet? |
-| 23 | Download content-type header | A) application/octet-stream always, B) Browser sniffs, C) User specifies on upload | How should downloads be served since we don't store content type? |
-| 24 | Maximum CID age display | A) Show "expires in X days/months", B) Show exact date only, C) Both | How should expiration be communicated to users? |
+None - all questions resolved.
 
 ---
 
@@ -111,8 +110,8 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 │           ▼                 ▼                 ▼                         │
 │   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                 │
 │   │ Redirect to  │  │ Show spinner │  │ Show error   │                 │
-│   │ CID detail   │  │ + cancel btn │  │ + manual     │                 │
-│   │ page         │  │              │  │ retry option │                 │
+│   │ /info/{CID}  │  │ + cancel btn │  │ + manual     │                 │
+│   │              │  │              │  │ retry option │                 │
 │   └──────────────┘  └──────────────┘  └──────────────┘                 │
 │                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -152,16 +151,21 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 4. **RetentionPicker** - Dropdown presets + custom month input
 5. **CostDisplay** - Real-time cost calculation with balance check
 6. **SpinnerIndicator** - Simple upload progress spinner with cancel
-7. **UploadResult** - Redirect to CID detail page on success
+7. **UploadResult** - Redirect to `/info/{CID}` on success
 
 #### API Endpoints
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/api/content` | POST | Required (Session or API Key) | Upload content |
 | `/api/content/:cid/exists` | GET | Public | Check if CID exists |
-| `/api/content/:cid` | GET | Public | Get content metadata |
-| `/api/content/:cid/download` | GET | Public | Download content (TODO) |
 | `/api/payments/calculate` | POST | Public | Calculate retention cost |
+
+#### Page Routes
+| Route | Description |
+|-------|-------------|
+| `/info/{CID}` | CID info page (expiry, size, link to download) |
+| `/{CID}` | Direct content download (see [download.md](download.md)) |
+| `/{CID}.{ext}` | Content download with MIME type from extension |
 
 ---
 
@@ -199,8 +203,8 @@ This plan covers allowing logged-in users to upload content to HashBin.org. The 
 - Server error: user-friendly message
 
 ### Phase 6: Success Flow
-- Redirect to CID detail page
-- CID detail page shows: CID, expiration, size, copy button, share URL
+- Redirect to `/info/{CID}` page
+- Info page shows: CID, expiration, size, link to `/{CID}` for download
 
 ### Phase 7: API Key Support
 - Accept `Authorization: Bearer hb_live_...` or `hb_test_...` header
@@ -337,7 +341,7 @@ describe('Retention Picker', () => {
 describe('Cost Display', () => {
   // Display format
   - should format cost as $X.XX
-  - should show $0.00 for inline content (if free, per decision #21)
+  - should show $0.00 for inline content (free per decision #21)
   - should update after file selection
   - should update during retention change
 
@@ -460,33 +464,28 @@ describe('Upload Success', () => {
   - should receive cost charged
 
   // Redirect
-  - should redirect to /content/:cid page
-  - should pass success state to detail page
+  - should redirect to /info/{CID} page
+  - should pass success state to info page
 
   // No additional UI (redirect handles display)
 });
 ```
 
-### Unit Tests - CID Detail Page
+### Unit Tests - CID Info Page
 
 ```
-describe('CID Detail Page', () => {
-  // Display elements
+describe('CID Info Page (/info/{CID})', () => {
+  // Display elements (minimal per decision #22)
   - should display full CID
-  - should display expiration date
+  - should display expiration (relative: "expires in X days" per decision #24)
+  - should display expiration (exact date per decision #24)
   - should display file size
-  - should have copy CID button
-  - should have download link
+  - should have link to /{CID} for download
 
   // Copy functionality
   - should copy CID to clipboard on button click
   - should show "Copied!" confirmation
   - should reset confirmation after 2 seconds
-
-  // Actions
-  - should have "Extend retention" link
-  - should have "Upload another" link
-  - should have shareable URL display
 });
 ```
 
@@ -581,16 +580,16 @@ describe('Inline Content Upload', () => {
 ```
 describe('E2E Upload Journey', () => {
   // New user first upload
-  - should: sign in → see upload page → deposit (if needed) → select file → upload → view CID page
+  - should: sign in → see upload page → deposit (if needed) → select file → upload → view /info/{CID}
 
   // Returning user with balance
-  - should: sign in → select file → see cost → upload → view CID page
+  - should: sign in → select file → see cost → upload → view /info/{CID}
 
   // Drag and drop journey
-  - should: drag file → drop → see cost → upload → view CID page
+  - should: drag file → drop → see cost → upload → view /info/{CID}
 
   // Multiple sequential uploads
-  - should upload file 1 → view CID → click "upload another" → upload file 2
+  - should upload file 1 → view /info/{CID} → navigate to upload → upload file 2
   - should correctly deduct balance for each
   - should track all in upload history
 
@@ -766,10 +765,11 @@ src/
 - [Cloudflare R2 Documentation](https://developers.cloudflare.com/r2/)
 - [Master Plan](master_plan.md)
 - [Payments Plan](payments.md)
+- [Download Plan](download.md) - content retrieval, MIME types, caching
 
 ---
 
-**Document Version:** 1.1
+**Document Version:** 1.2
 **Created:** 2026-01-15
 **Updated:** 2026-01-15
-**Status:** Draft - 4 open questions remaining (#21-24)
+**Status:** Ready for implementation - all questions resolved
