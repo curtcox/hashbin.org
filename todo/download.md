@@ -31,6 +31,30 @@ This plan covers allowing users to download content from HashBin.org. Downloads 
 
 ---
 
+## Definitions
+
+### Inline Content
+
+**Inline content** is content that is small enough (≤64 bytes) to be encoded directly within the CID itself, rather than being stored in R2.
+
+**How it works:**
+- The 256t CID format includes an 8-character length prefix followed by content/hash
+- For content ≤64 bytes: The content is Base64URL-encoded directly into the CID
+- For content >64 bytes: A SHA-512 hash of the content is stored, and the actual content goes to R2
+
+**Example:**
+- Content: `Hello` (5 bytes)
+- CID: `AAAAAAAFSGVSBG8` (length prefix `AAAAAAAF` = 5 bytes + Base64URL of "Hello")
+- This CID is **self-contained** - the content can be extracted without any backend lookup
+
+**Implications for download:**
+- Inline content CIDs **always work** - no storage lookup needed
+- Inline content **never expires** - it's encoded in the CID itself
+- Inline content requires **no metadata check** - validate CID format, extract, and serve
+- The `/info/{cid}` page for inline content shows the decoded content details
+
+---
+
 ## Decisions
 
 | # | Question | Decision |
@@ -55,23 +79,21 @@ This plan covers allowing users to download content from HashBin.org. Downloads 
 | 18 | Compression | **None** - serve raw bytes, CDN can compress |
 | 19 | CORS | **Allow all origins** - public content |
 | 20 | Info page before download | **Yes** - `/info/{cid}` shows metadata, links to `/{cid}` |
+| 21 | HEAD request support | **Yes** - return headers without body for pre-flight checks |
+| 22 | Long CID handling | **Full CID always** - no shortening or URL shortener |
+| 23 | CDN vs direct serving | **Direct from Worker** - stream content directly, leverage Cloudflare CDN automatically |
+| 24 | Download count logging | **Yes, aggregate only** - count downloads per CID, no user tracking |
+| 25 | If-None-Match handling | **Standard 304 Not Modified** - return 304 when ETag matches |
+| 26 | Info page for missing content | **404 Not Found** - except inline content CIDs which always work |
+| 27 | MIME type mapping scope | **Common types only** - ~50-100 well-known extensions |
+| 28 | Force download query param | **Yes** - `?download=true` adds `Content-Disposition: attachment` |
+| 29 | CID validation error status | **400 Bad Request** - invalid format is a client error |
 
 ---
 
 ## Open Questions
 
-| # | Question | Options | Impact |
-|---|----------|---------|--------|
-| 1 | Should we support HEAD requests for download URLs? | a) Yes - return headers without body b) No - only GET | Enables pre-flight checks, download managers |
-| 2 | How to handle very long CIDs in URLs? | a) Full CID always b) Allow URL shortener c) Support first N chars with disambiguation | UX for sharing links |
-| 3 | Should download URLs redirect to CDN or serve directly? | a) Direct from Worker b) Redirect to R2 signed URL c) Use Cloudflare CDN caching | Performance, cost, and simplicity tradeoffs |
-| 4 | What HTTP status for inline content? | a) 200 OK (same as R2) b) 203 Non-Authoritative (indicates derived) | Semantic correctness vs simplicity |
-| 5 | Should we log download counts? | a) Yes - aggregate only b) No - privacy first c) Optional per-content | Analytics vs privacy tradeoff (see Decision #14 in master_plan) |
-| 6 | How to handle If-None-Match with CID as ETag? | a) Standard 304 Not Modified b) Always return content (immutable anyway) | Bandwidth optimization vs simplicity |
-| 7 | Should `/info/{cid}` page require the content to exist? | a) Yes - 404 if expired b) No - show "content expired" message | UX for expired content links |
-| 8 | What MIME types should we recognize from extensions? | a) Common types only (50-100) b) Comprehensive list (500+) c) Use a library | Scope of extension-to-MIME mapping |
-| 9 | Should we support `?download=true` query param to force download? | a) Yes - adds Content-Disposition: attachment b) No - extension determines behavior | UX flexibility |
-| 10 | How to handle CID validation errors? | a) 400 Bad Request b) 404 Not Found c) 422 Unprocessable Entity | HTTP semantics |
+*All questions have been resolved. Ready for implementation.*
 
 ---
 
@@ -84,13 +106,15 @@ This plan covers allowing users to download content from HashBin.org. Downloads 
 │                            DOWNLOAD FLOW                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  User enters URL: /{cid} or /{cid}.{ext}                                │
+│  User enters URL: /{cid} or /{cid}.{ext} or /{cid}?download=true        │
 │         │                                                                │
 │         ▼                                                                │
 │  ┌──────────────────┐                                                   │
 │  │ Parse URL        │                                                   │
 │  │ - Extract CID    │                                                   │
 │  │ - Extract ext    │ (optional, for MIME type)                         │
+│  │ - Check ?download│ (force download dialog)                           │
+│  │ - Check method   │ (GET or HEAD)                                     │
 │  └────────┬─────────┘                                                   │
 │           │                                                              │
 │           ▼                                                              │
@@ -103,61 +127,82 @@ This plan covers allowing users to download content from HashBin.org. Downloads 
 │    Invalid│                  Valid                                       │
 │           ▼                    │                                         │
 │  ┌──────────────────┐          │                                        │
-│  │ Return 400/404   │          │                                        │
+│  │ Return 400       │          │                                        │
 │  │ Bad Request      │          │                                        │
 │  └──────────────────┘          │                                        │
 │                                ▼                                         │
 │                     ┌──────────────────┐                                │
-│                     │ Check if inline  │                                │
-│                     │ content (≤64 B)  │                                │
+│                     │ Check If-None-   │                                │
+│                     │ Match header     │                                │
 │                     └────────┬─────────┘                                │
 │                              │                                          │
-│              ┌───────────────┼───────────────┐                          │
-│              │               │               │                          │
-│         Inline              │          Not Inline                       │
-│              │               │               │                          │
-│              ▼               │               ▼                          │
-│   ┌──────────────────┐       │    ┌──────────────────┐                 │
-│   │ Extract content  │       │    │ Check metadata   │                 │
-│   │ from CID itself  │       │    │ (Durable Object) │                 │
-│   │ (Base64URL decode)│      │    │ - Exists?        │                 │
-│   └────────┬─────────┘       │    │ - Expired?       │                 │
-│            │                 │    │ - Contested?     │                 │
-│            │                 │    └────────┬─────────┘                 │
-│            │                 │             │                            │
-│            │                 │    ┌────────┼────────┐                  │
-│            │                 │ Not Found   │   Contested               │
-│            │                 │    │        │        │                  │
-│            │                 │    ▼        │        ▼                  │
-│            │                 │ ┌────────┐  │   ┌─────────┐            │
-│            │                 │ │  404   │  │   │   451   │            │
-│            │                 │ └────────┘  │   │ Legal   │            │
-│            │                 │             │   └─────────┘            │
-│            │                 │        Found│                           │
-│            │                 │             ▼                           │
-│            │                 │  ┌──────────────────┐                  │
-│            │                 │  │ Fetch from R2    │                  │
-│            │                 │  │ (streaming)      │                  │
-│            │                 │  └────────┬─────────┘                  │
-│            │                 │           │                            │
-│            └─────────────────┼───────────┘                            │
-│                              │                                         │
-│                              ▼                                         │
-│                   ┌──────────────────┐                                 │
-│                   │ Determine MIME   │                                 │
-│                   │ type from ext    │                                 │
-│                   │ (or default)     │                                 │
-│                   └────────┬─────────┘                                 │
-│                            │                                           │
-│                            ▼                                           │
-│                   ┌──────────────────┐                                 │
-│                   │ Return response  │                                 │
-│                   │ - Content-Type   │                                 │
-│                   │ - Cache headers  │                                 │
-│                   │ - ETag: {cid}    │                                 │
-│                   │ - Body: content  │                                 │
-│                   └──────────────────┘                                 │
-│                                                                         │
+│                    ETag Match│           No Match / No Header           │
+│                              ▼                    │                     │
+│                   ┌──────────────────┐            │                     │
+│                   │ Return 304       │            │                     │
+│                   │ Not Modified     │            │                     │
+│                   └──────────────────┘            │                     │
+│                                                   ▼                     │
+│                                        ┌──────────────────┐             │
+│                                        │ Check if inline  │             │
+│                                        │ content (≤64 B)  │             │
+│                                        └────────┬─────────┘             │
+│                                                 │                       │
+│                              ┌──────────────────┼──────────────────┐    │
+│                              │                  │                  │    │
+│                         Inline                  │            Not Inline │
+│                              │                  │                  │    │
+│                              ▼                  │                  ▼    │
+│                   ┌──────────────────┐          │   ┌──────────────────┐│
+│                   │ Extract content  │          │   │ Check metadata   ││
+│                   │ from CID itself  │          │   │ (Durable Object) ││
+│                   │ (Base64URL decode)│         │   │ - Exists?        ││
+│                   │                  │          │   │ - Expired?       ││
+│                   │ (Always works,   │          │   │ - Contested?     ││
+│                   │  never expires)  │          │   └────────┬─────────┘│
+│                   └────────┬─────────┘          │            │          │
+│                            │                    │   ┌────────┼────────┐ │
+│                            │                    │Not Found   │  Contested│
+│                            │                    │   │        │        │ │
+│                            │                    │   ▼        │        ▼ │
+│                            │                    │┌────────┐  │  ┌──────┐│
+│                            │                    ││  404   │  │  │ 451  ││
+│                            │                    │└────────┘  │  └──────┘│
+│                            │                    │       Found│          │
+│                            │                    │            ▼          │
+│                            │                    │ ┌──────────────────┐  │
+│                            │                    │ │ Fetch from R2    │  │
+│                            │                    │ │ (streaming)      │  │
+│                            │                    │ │ Increment count  │  │
+│                            │                    │ └────────┬─────────┘  │
+│                            │                    │          │            │
+│                            └────────────────────┼──────────┘            │
+│                                                 │                       │
+│                                                 ▼                       │
+│                                      ┌──────────────────┐               │
+│                                      │ Determine MIME   │               │
+│                                      │ type from ext    │               │
+│                                      │ (or default)     │               │
+│                                      └────────┬─────────┘               │
+│                                               │                         │
+│                                               ▼                         │
+│                                      ┌──────────────────┐               │
+│                                      │ Build headers    │               │
+│                                      │ - Content-Type   │               │
+│                                      │ - Cache-Control  │               │
+│                                      │ - ETag: {cid}    │               │
+│                                      │ - Content-Disp?  │ (if ?download)│
+│                                      └────────┬─────────┘               │
+│                                               │                         │
+│                              ┌────────────────┼────────────────┐        │
+│                           HEAD                │              GET        │
+│                              ▼                │                ▼        │
+│                   ┌──────────────────┐        │     ┌──────────────────┐│
+│                   │ Return 200       │        │     │ Return 200       ││
+│                   │ Headers only     │        │     │ Headers + Body   ││
+│                   │ (empty body)     │        │     │ (stream content) ││
+│                   └──────────────────┘        │     └──────────────────┘│
+│                                               │                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -215,7 +260,10 @@ This plan covers allowing users to download content from HashBin.org. Downloads 
 | Endpoint | Method | Auth | Description |
 |----------|--------|------|-------------|
 | `/{cid}` | GET | Public | Download raw content |
+| `/{cid}` | HEAD | Public | Get headers without body |
 | `/{cid}.{ext}` | GET | Public | Download with MIME type |
+| `/{cid}.{ext}` | HEAD | Public | Get headers with MIME type |
+| `/{cid}?download=true` | GET | Public | Force download dialog |
 | `/info/{cid}` | GET | Public | HTML info page |
 | `/api/content/{cid}` | GET | Public | JSON metadata |
 | `/api/content/{cid}/exists` | GET | Public | Check existence |
@@ -578,19 +626,53 @@ describe('Conditional Request Handling', () => {
 
 ```
 describe('Info Page', () => {
-  // Content exists
+  // Content exists (R2 stored)
   - should display CID
   - should display file size (human readable)
   - should display expiration date (relative and absolute)
   - should provide download link
+  - should display download count
 
-  // Content expired/missing
-  - should show appropriate message
+  // Inline content (always works)
+  - should return 200 for valid inline CID
+  - should display CID
+  - should display decoded content size
+  - should show "No expiration" (inline content never expires)
+  - should provide download link
+  - should indicate content is inline/self-contained
+
+  // Content expired/missing (non-inline)
+  - should return 404 Not Found
   - should not expose whether content ever existed
 
   // Contested content
-  - should indicate content unavailable
+  - should return 451
+  - should indicate content unavailable for legal reasons
   - should not provide download link
+});
+```
+
+### Integration Tests - 304 Not Modified
+
+```
+describe('304 Not Modified Handling', () => {
+  // If-None-Match
+  - should return 304 when ETag matches CID
+  - should return 304 with empty body
+  - should return 304 with cache headers intact
+  - should return 200 when ETag doesn't match
+  - should return 200 when no If-None-Match header
+
+  // Multiple ETags in If-None-Match
+  - should return 304 if any ETag matches
+  - should handle quoted ETags: If-None-Match: "cid1", "cid2"
+
+  // Weak ETags
+  - should handle weak ETag comparison (W/"...")
+
+  // With other headers
+  - should respect If-None-Match even with Range header
+  - should check If-None-Match before processing Range
 });
 ```
 
@@ -620,14 +702,97 @@ describe('E2E Download Journey', () => {
 });
 ```
 
+### Unit Tests - HEAD Requests
+
+```
+describe('HEAD Request Handling', () => {
+  // Basic HEAD
+  - should return 200 for existing content
+  - should return all headers that GET would return
+  - should return empty body
+  - should include Content-Length header
+  - should include Content-Type header
+  - should include ETag header
+  - should include Cache-Control header
+
+  // HEAD for inline content
+  - should return 200 for valid inline CID
+  - should return correct Content-Length (decoded size)
+
+  // HEAD for missing content
+  - should return 404 for non-existent content
+  - should return 404 for expired content
+  - should return 451 for contested content
+
+  // HEAD with extension
+  - should return Content-Type based on extension
+  - should: HEAD /{cid}.txt → Content-Type: text/plain
+
+  // HEAD with ?download=true
+  - should include Content-Disposition: attachment
+});
+```
+
+### Unit Tests - Force Download Query Param
+
+```
+describe('Force Download Query Param', () => {
+  // ?download=true
+  - should add Content-Disposition: attachment when ?download=true
+  - should include filename in Content-Disposition
+  - should work with extension: /{cid}.txt?download=true
+  - should work without extension: /{cid}?download=true
+
+  // Without query param
+  - should not include Content-Disposition: attachment by default
+  - should allow browser to display content inline
+
+  // Edge cases
+  - should ignore ?download=false
+  - should ignore ?download=0
+  - should handle ?download (no value) as true
+  - should be case-insensitive: ?Download=TRUE
+});
+```
+
+### Unit Tests - Download Count Logging
+
+```
+describe('Download Count Logging', () => {
+  // Counting
+  - should increment download count on successful GET
+  - should not increment on HEAD request
+  - should not increment on 304 Not Modified
+  - should not increment on 404 Not Found
+  - should increment for inline content downloads
+
+  // Aggregate only (privacy)
+  - should not log user IP address
+  - should not log user agent
+  - should not log referrer
+  - should only store total count per CID
+
+  // Storage
+  - should store count in ContentMetadata Durable Object
+  - should handle concurrent increments correctly
+});
+```
+
 ### E2E Tests - CLI/Programmatic Access
 
 ```
 describe('E2E CLI Download', () => {
-  // curl
+  // curl GET
   - should: curl /{cid} → receive content
-  - should: curl -I /{cid} → receive headers only (HEAD)
   - should: curl -r 0-999 /{cid} → receive first 1000 bytes
+
+  // curl HEAD
+  - should: curl -I /{cid} → receive headers only (HEAD)
+  - should: curl -I /{cid}.txt → receive headers with text/plain Content-Type
+  - should: curl -I /{cid} → include Content-Length header
+
+  // curl conditional
+  - should: curl -H "If-None-Match: {cid}" /{cid} → receive 304
 
   // wget
   - should: wget /{cid} → save to file
@@ -635,6 +800,7 @@ describe('E2E CLI Download', () => {
 
   // fetch API
   - should: fetch('/{cid}') → receive Response with body
+  - should: fetch('/{cid}', {method: 'HEAD'}) → receive Response without body
   - should respect CORS headers for cross-origin requests
 });
 ```
@@ -716,7 +882,7 @@ describe('Download Accessibility', () => {
 ```
 src/
 ├── api/
-│   └── content.js           # Add handleDownloadContent
+│   └── content.js           # Add handleDownloadContent, handleHeadContent
 ├── utils/
 │   ├── hash256t.js          # Add inline content extraction
 │   └── mime-types.js        # NEW: Extension to MIME mapping
@@ -731,6 +897,97 @@ frontend/
 └── css/
     └── components.css       # Update for download UI
 ```
+
+---
+
+## MIME Type Mapping
+
+Common types to support (~60 types):
+
+### Text
+| Extension | MIME Type |
+|-----------|-----------|
+| .txt | text/plain |
+| .html, .htm | text/html |
+| .css | text/css |
+| .csv | text/csv |
+| .xml | text/xml |
+| .md | text/markdown |
+
+### Application
+| Extension | MIME Type |
+|-----------|-----------|
+| .js, .mjs | application/javascript |
+| .json | application/json |
+| .pdf | application/pdf |
+| .zip | application/zip |
+| .gz, .gzip | application/gzip |
+| .tar | application/x-tar |
+| .7z | application/x-7z-compressed |
+| .rar | application/vnd.rar |
+| .wasm | application/wasm |
+| .woff | font/woff |
+| .woff2 | font/woff2 |
+| .ttf | font/ttf |
+| .otf | font/otf |
+
+### Image
+| Extension | MIME Type |
+|-----------|-----------|
+| .png | image/png |
+| .jpg, .jpeg | image/jpeg |
+| .gif | image/gif |
+| .webp | image/webp |
+| .svg | image/svg+xml |
+| .ico | image/x-icon |
+| .bmp | image/bmp |
+| .tiff, .tif | image/tiff |
+| .avif | image/avif |
+
+### Audio
+| Extension | MIME Type |
+|-----------|-----------|
+| .mp3 | audio/mpeg |
+| .wav | audio/wav |
+| .ogg | audio/ogg |
+| .m4a | audio/mp4 |
+| .flac | audio/flac |
+| .aac | audio/aac |
+| .webm (audio) | audio/webm |
+
+### Video
+| Extension | MIME Type |
+|-----------|-----------|
+| .mp4 | video/mp4 |
+| .webm | video/webm |
+| .ogv | video/ogg |
+| .avi | video/x-msvideo |
+| .mov | video/quicktime |
+| .mkv | video/x-matroska |
+
+### Documents
+| Extension | MIME Type |
+|-----------|-----------|
+| .doc | application/msword |
+| .docx | application/vnd.openxmlformats-officedocument.wordprocessingml.document |
+| .xls | application/vnd.ms-excel |
+| .xlsx | application/vnd.openxmlformats-officedocument.spreadsheetml.sheet |
+| .ppt | application/vnd.ms-powerpoint |
+| .pptx | application/vnd.openxmlformats-officedocument.presentationml.presentation |
+| .odt | application/vnd.oasis.opendocument.text |
+| .ods | application/vnd.oasis.opendocument.spreadsheet |
+| .epub | application/epub+zip |
+
+### Other
+| Extension | MIME Type |
+|-----------|-----------|
+| .bin | application/octet-stream |
+| .exe | application/octet-stream |
+| .dll | application/octet-stream |
+| .iso | application/octet-stream |
+| .dmg | application/octet-stream |
+
+**Default:** Any unrecognized extension → `application/octet-stream`
 
 ---
 
@@ -856,6 +1113,7 @@ Content-Type: application/json
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 2.0
 **Created:** 2026-01-15
-**Status:** Planning - Open questions need resolution before implementation
+**Last Updated:** 2026-01-15
+**Status:** Ready for Implementation - All questions resolved
