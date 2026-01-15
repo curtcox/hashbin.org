@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/css/layout.css">
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/upload.css">
   
   <!-- Clerk configuration is loaded from /api/config -->
 </head>
@@ -33,22 +34,122 @@
     <div class="container">
       <h1>Upload Content</h1>
       
-      <div class="card">
-        <p style="color: var(--color-text-light);">
-          Upload functionality coming soon. This page requires authentication to access.
-        </p>
-        
-        <div class="alert alert-info" style="margin-top: 2rem;">
-          <strong>Note:</strong> Content upload requires:
-          <ul style="margin-top: 0.5rem; margin-left: 1.5rem; list-style: disc;">
-            <li>Active authentication session</li>
-            <li>Sufficient balance for minimum 30-day retention</li>
-            <li>Client-side 256t hash computation</li>
-          </ul>
+      <!-- Error Message -->
+      <div id="error-message" class="alert alert-error" style="display: none;"></div>
+      
+      <!-- Balance Display -->
+      <div class="card" style="margin-bottom: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <strong>Current Balance:</strong> <span id="current-balance">Loading...</span>
+          </div>
+          <a href="/deposit.html" class="btn btn-secondary">Add Funds</a>
         </div>
-
-        <div style="margin-top: 2rem;">
-          <a href="/dashboard.html" class="btn btn-primary">Go to Dashboard</a>
+      </div>
+      
+      <!-- File Selection -->
+      <div class="card">
+        <h2>Select File</h2>
+        
+        <div id="drop-zone" class="drop-zone">
+          <div class="drop-zone-content">
+            <p class="drop-zone-text">Drop file here or click to browse</p>
+            <p class="drop-zone-hint">Maximum file size: 5GB</p>
+          </div>
+          <input type="file" id="file-input" style="display: none;">
+        </div>
+        
+        <!-- File Info -->
+        <div id="file-info" style="display: none; margin-top: 1rem;">
+          <div class="file-info">
+            <div><strong>File:</strong> <span id="file-name"></span></div>
+            <div><strong>Size:</strong> <span id="file-size"></span></div>
+          </div>
+        </div>
+        
+        <!-- Hashing Progress -->
+        <div id="hashing-progress" style="display: none; margin-top: 1rem;">
+          <div class="progress-section">
+            <p><strong>Calculating hash...</strong></p>
+            <div class="progress-bar">
+              <div id="hash-progress-bar" class="progress-bar-fill"></div>
+            </div>
+            <div class="progress-text" id="hash-progress-text">0%</div>
+          </div>
+        </div>
+        
+        <!-- CID Display -->
+        <div id="cid-display" style="display: none; margin-top: 1rem;">
+          <div class="cid-box">
+            <strong>Content ID (CID):</strong>
+            <div class="cid-value" id="calculated-cid"></div>
+          </div>
+        </div>
+        
+        <!-- Duplicate Message -->
+        <div id="duplicate-message" class="alert alert-info" style="display: none; margin-top: 1rem;">
+          <strong>Content Already Exists</strong>
+          <p>This content is already stored with CID: <code id="duplicate-cid"></code></p>
+          <p>Current expiration: <span id="duplicate-expires"></span></p>
+          <p>You can extend the retention period by uploading again.</p>
+        </div>
+        
+        <!-- Inline Content Notice -->
+        <div id="inline-notice" class="alert alert-info" style="display: none; margin-top: 1rem;">
+          <strong>Free Storage!</strong>
+          <p>This content is small enough (≤64 bytes) to be stored inline within the CID itself. No storage fees apply.</p>
+        </div>
+      </div>
+      
+      <!-- Upload Form -->
+      <div id="upload-section" style="display: none;">
+        <form id="upload-form" class="card">
+          <h2>Retention & Cost</h2>
+          
+          <!-- Retention Picker -->
+          <div class="form-group">
+            <label for="retention-preset">Retention Period</label>
+            <select id="retention-preset" class="form-control">
+              <option value="1">1 month</option>
+              <option value="12">1 year (12 months)</option>
+              <option value="120">1 decade (120 months)</option>
+              <option value="1200">1 century (1200 months)</option>
+              <option value="custom">Custom...</option>
+            </select>
+          </div>
+          
+          <div id="custom-retention-group" class="form-group" style="display: none;">
+            <label for="custom-retention">Custom Months</label>
+            <input type="number" id="custom-retention" class="form-control" min="1" value="1">
+          </div>
+          
+          <!-- Cost Display -->
+          <div class="cost-display">
+            <div class="cost-row">
+              <span><strong>Cost:</strong></span>
+              <span class="cost-amount" id="cost-amount">$0.00</span>
+            </div>
+            <div class="cost-breakdown" id="cost-breakdown"></div>
+            <div id="balance-status" class="balance-status"></div>
+          </div>
+          
+          <!-- Upload Button -->
+          <div style="margin-top: 1.5rem;">
+            <button type="submit" id="upload-button" class="btn btn-primary" disabled>
+              Upload Content
+            </button>
+          </div>
+        </form>
+        
+        <!-- Upload Progress -->
+        <div id="upload-progress" class="card" style="display: none;">
+          <div class="progress-section">
+            <p><strong>Uploading content...</strong></p>
+            <div class="spinner"></div>
+            <button type="button" id="cancel-upload" class="btn btn-secondary" style="margin-top: 1rem;">
+              Cancel Upload
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -70,5 +171,20 @@
     requireAuth();
   </script>
   <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/upload.js"></script>
+  
+  <script>
+    // Show custom retention input when "Custom" is selected
+    document.addEventListener('DOMContentLoaded', () => {
+      const retentionSelect = document.getElementById('retention-preset');
+      const customGroup = document.getElementById('custom-retention-group');
+      
+      if (retentionSelect) {
+        retentionSelect.addEventListener('change', (e) => {
+          customGroup.style.display = e.target.value === 'custom' ? 'block' : 'none';
+        });
+      }
+    });
+  </script>
 </body>
 </html>
