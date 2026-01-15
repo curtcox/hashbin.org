@@ -56,19 +56,27 @@ async function waitForClerkInit(maxWait = 5000) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   
-  // If Clerk exists but hasn't loaded yet, wait for it to load
-  if (window.Clerk && !window.Clerk.loaded) {
+  // If Clerk doesn't exist after waiting, return
+  if (!window.Clerk) {
+    return;
+  }
+  
+  // Now wait for Clerk to be fully loaded
+  // Poll the loaded property instead of relying on Promise.race
+  while (!window.Clerk.loaded && (Date.now() - startTime) < maxWait) {
     try {
-      const remainingTime = maxWait - (Date.now() - startTime);
-      if (remainingTime > 0) {
-        // Wait for Clerk to finish loading
-        await Promise.race([
-          window.Clerk.load(),
-          new Promise(resolve => setTimeout(resolve, remainingTime))
-        ]);
+      // Trigger load if not already loading
+      if (window.Clerk.load && typeof window.Clerk.load === 'function') {
+        // Note: We don't await here because we're polling the loaded property
+        window.Clerk.load().catch(err => {
+          console.warn('Clerk load error:', err);
+        });
       }
+      // Wait a bit before checking again
+      await new Promise(resolve => setTimeout(resolve, 100));
     } catch (error) {
-      console.warn('Error waiting for Clerk to load:', error);
+      console.warn('Error checking Clerk loaded state:', error);
+      break;
     }
   }
 }
