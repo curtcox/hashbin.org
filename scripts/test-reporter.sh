@@ -25,9 +25,10 @@ trap cleanup EXIT INT TERM
 
 # Helper function to escape output for markdown code blocks
 # Replaces triple backticks with a safe alternative to prevent breaking the code block
+# Uses zero-width joiner characters (U+200D) between backticks: ` ‍ ` ‍ `
 escape_for_markdown() {
   local text="$1"
-  # Replace triple backticks with a safe alternative
+  # Replace ``` with `‍`‍` (backtick + zero-width joiner between each)
   echo "$text" | sed 's/```/`‍`‍`/g'
 }
 
