@@ -53,21 +53,27 @@ API keys can be provided via:
 |--------|----------|---------------|-------------|
 | POST | `/api/auth/apikeys` | Clerk session | Create new API key |
 | GET | `/api/auth/apikeys` | Clerk session | List user's API keys |
+| POST | `/api/auth/apikeys/:keyId/reveal` | Fresh Clerk session | Reveal full API key (requires re-auth) |
 | DELETE | `/api/auth/apikeys/:keyId` | Clerk session | Revoke an API key |
 
-**Note**: API keys cannot be used to manage other API keys (create/list/revoke). This prevents a compromised key from creating more keys.
+**Notes**:
+- API keys cannot be used to manage other API keys (create/list/revoke/reveal). This prevents a compromised key from accessing other keys.
+- The reveal endpoint requires a "fresh" Clerk session (authenticated within the last 5 minutes) to prevent session hijacking attacks.
 
 ### Key Properties
 
 | Property | Type | Description |
 |----------|------|-------------|
 | `key_id` | UUID | Unique identifier for the key |
-| `key_hash` | string | SHA-256 hash of the actual key |
+| `key_hash` | string | SHA-256 hash of the actual key (for validation) |
+| `key_encrypted` | string | AES-256-GCM encrypted key (for reveal functionality) |
 | `name` | string | User-provided name (1-255 chars) |
 | `created_at` | ISO8601 | When the key was created |
 | `expires_at` | ISO8601 | When the key expires |
 | `revoked_at` | ISO8601 | When the key was revoked (null if active) |
 | `last_used_at` | ISO8601 | Last time the key was used (null if never) |
+
+**Storage Security**: Keys are stored both hashed (for fast O(1) validation via KeyRegistry) and encrypted (for reveal functionality). The encryption key is stored as a Cloudflare secret (`API_KEY_ENCRYPTION_KEY`).
 
 ### Constraints
 
@@ -224,6 +230,46 @@ TEST: validateExpiration - invalid date format
 TEST: generateKeyId - returns valid UUID
   WHEN: generateKeyId() is called
   THEN: returns a valid UUID v4 string
+
+TEST: encryptApiKey - produces encrypted output
+  GIVEN: apiKey = 'hb_test_ABCDEFGHIJKLMNOPQRSTUVWXYZab'
+  AND: encryptionKey = <valid 256-bit key>
+  WHEN: encryptApiKey(apiKey, encryptionKey) is called
+  THEN: returns base64-encoded ciphertext
+  AND: ciphertext is different from plaintext
+
+TEST: decryptApiKey - recovers original key
+  GIVEN: encryptedKey from encryptApiKey()
+  AND: same encryptionKey used for encryption
+  WHEN: decryptApiKey(encryptedKey, encryptionKey) is called
+  THEN: returns original apiKey
+
+TEST: decryptApiKey - fails with wrong key
+  GIVEN: encryptedKey from encryptApiKey()
+  AND: different encryptionKey
+  WHEN: decryptApiKey(encryptedKey, wrongKey) is called
+  THEN: throws decryption error
+
+TEST: encryptApiKey - unique ciphertext each time (random IV)
+  GIVEN: same apiKey and encryptionKey
+  WHEN: encryptApiKey is called twice
+  THEN: both ciphertexts are different
+  AND: both decrypt to same plaintext
+
+TEST: isSessionFresh - returns true for recent session
+  GIVEN: session.iat = 2 minutes ago
+  WHEN: isSessionFresh(session, 5) is called
+  THEN: returns true
+
+TEST: isSessionFresh - returns false for stale session
+  GIVEN: session.iat = 10 minutes ago
+  WHEN: isSessionFresh(session, 5) is called
+  THEN: returns false
+
+TEST: isSessionFresh - returns false for exactly threshold
+  GIVEN: session.iat = exactly 5 minutes ago
+  WHEN: isSessionFresh(session, 5) is called
+  THEN: returns false (must be strictly less than threshold)
 ```
 
 ### Integration Tests: API Endpoints
@@ -330,6 +376,44 @@ TEST: DELETE /api/auth/apikeys/:keyId - reject API key authentication
   GIVEN: valid API key (even the one being revoked)
   WHEN: DELETE /api/auth/apikeys/:keyId
   THEN: status = 403
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - reveal with fresh session
+  GIVEN: valid Clerk session authenticated < 5 minutes ago
+  AND: user owns the API key
+  WHEN: POST /api/auth/apikeys/:keyId/reveal
+  THEN: status = 200
+  AND: response contains full api_key value
+  AND: response contains warning about key exposure
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - reject stale session
+  GIVEN: valid Clerk session authenticated > 5 minutes ago
+  WHEN: POST /api/auth/apikeys/:keyId/reveal
+  THEN: status = 403
+  AND: error = 'FRESH_AUTH_REQUIRED'
+  AND: message indicates re-authentication needed
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - reject API key authentication
+  GIVEN: valid API key in Authorization header
+  WHEN: POST /api/auth/apikeys/:keyId/reveal
+  THEN: status = 403
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - reject for revoked key
+  GIVEN: fresh Clerk session
+  AND: API key has been revoked
+  WHEN: POST /api/auth/apikeys/:keyId/reveal
+  THEN: status = 400
+  AND: error = 'KEY_REVOKED'
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - reject for non-existent key
+  GIVEN: fresh Clerk session
+  WHEN: POST /api/auth/apikeys/non-existent-id/reveal
+  THEN: status = 404
+
+TEST: POST /api/auth/apikeys/:keyId/reveal - reject for other user's key
+  GIVEN: fresh Clerk session for User A
+  AND: key belongs to User B
+  WHEN: POST /api/auth/apikeys/:keyId/reveal
+  THEN: status = 404
 ```
 
 ### Integration Tests: API Key Authentication
@@ -541,6 +625,17 @@ TEST: different identifiers - isolated counters
   AND: 'key:xyz' has 0 requests
   WHEN: POST /increment for 'key:xyz'
   THEN: returns { count: 1, allowed: true }
+
+TEST: DO failure - returns fail-closed response
+  GIVEN: RateLimiter DO is unavailable (timeout/error)
+  WHEN: POST /increment
+  THEN: returns { allowed: false, error: 'RATE_LIMIT_UNAVAILABLE' }
+
+TEST: DO timeout - fails closed within reasonable time
+  GIVEN: RateLimiter DO takes > 5 seconds to respond
+  WHEN: POST /increment with 5 second timeout
+  THEN: returns 503 status
+  AND: error = 'RATE_LIMIT_UNAVAILABLE'
 ```
 
 ### Integration Tests: KeyRegistry Durable Object
@@ -647,6 +742,14 @@ TEST: key expiration - expires at correct time
   2. Use key immediately - succeeds
   3. Wait 61 seconds
   4. Use key again - fails with AUTH_EXPIRED
+
+TEST: key reveal - requires fresh authentication
+  1. Login with Clerk, create API key
+  2. Wait 6 minutes (session becomes stale)
+  3. Attempt to reveal key - fails with FRESH_AUTH_REQUIRED
+  4. Re-authenticate with Clerk (fresh login)
+  5. Reveal key - succeeds, shows full key
+  6. Verify revealed key matches original
 ```
 
 ---
@@ -668,6 +771,8 @@ The following design decisions have been finalized:
 | 9 | Frontend UI location | **Dedicated /settings/api-keys page** | Clear, focused location for key management |
 | 10 | Key creation audit log | **api_keys array is sufficient** | Timestamps in UserProfile provide adequate audit trail |
 | 11 | RateLimiter DO architecture | **Dedicated DO per identifier** | Separate RateLimiter class; instances keyed by `key:<id>`, `user:<id>`, `anon:<ip>` |
+| 12 | RateLimiter DO failure behavior | **Fail closed (503)** | Security over availability; deny requests if rate limiting unavailable |
+| 13 | API key reveal after creation | **Re-authenticate to reveal** | User can reveal key again after fresh Clerk session or 2FA |
 
 ---
 
@@ -686,11 +791,20 @@ The following design decisions have been finalized:
 4. Write integration tests for API key authentication in middleware
 5. Verify max key limit (25) is enforced
 
-### Phase 3: Fix Any Issues Found
+### Phase 3: Key Reveal & Encryption
+1. Generate API_KEY_ENCRYPTION_KEY secret (256-bit AES key)
+2. Add encryption key to wrangler.toml secrets
+3. Implement encryptApiKey() and decryptApiKey() in auth/utils.js
+4. Update key creation to store key_encrypted alongside key_hash
+5. Implement POST /api/auth/apikeys/:keyId/reveal endpoint
+6. Add isSessionFresh() helper for fresh session validation
+7. Write tests for reveal endpoint (fresh session, stale session, etc.)
+
+### Phase 4: Fix Any Issues Found
 1. Address any bugs discovered during testing
 2. Implement any missing functionality identified by tests
 
-### Phase 4: Production Rate Limiting (Durable Objects)
+### Phase 5: Production Rate Limiting (Durable Objects)
 1. Create dedicated RateLimiter Durable Object class
 2. Configure wrangler.toml with RATE_LIMITER binding
 3. Implement DO identification scheme:
@@ -699,41 +813,48 @@ The following design decisions have been finalized:
    - Anonymous: `env.RATE_LIMITER.idFromName('anon:' + ipAddress)`
 4. Implement sliding window counter with 60-second TTL
 5. Add rate limit check to authenticate middleware
-6. Handle concurrent request counting with DO transactions
-7. Add rate limit tests for distributed scenarios
+6. Implement fail-closed behavior (503 on DO failure)
+7. Handle concurrent request counting with DO transactions
+8. Add rate limit tests for distributed scenarios
 
-### Phase 5: Frontend UI
-1. Design API key management interface
-2. Implement key creation form
-3. Implement key listing with copy/reveal functionality
-4. Implement key revocation with confirmation
+### Phase 6: Frontend UI
+1. Design API key management interface at /settings/api-keys
+2. Implement key creation form with name and expiration inputs
+3. Implement key listing with masked display (last 4 chars visible)
+4. Implement "Reveal Key" button with re-authentication flow
+5. Implement key revocation with confirmation dialog
 
-### Phase 6: Documentation
-1. Update API.md with API key endpoints
-2. Add API key usage examples
+### Phase 7: Documentation
+1. Update API.md with API key endpoints (including reveal)
+2. Add API key usage examples (curl, fetch, SDKs)
 3. Document security best practices
+4. Document key reveal re-authentication requirement
 
 ---
 
 ## Security Considerations
 
-1. **Keys shown once**: The actual API key is only returned at creation time
-2. **Keys hashed**: Stored as SHA-256 hashes, not plaintext
+1. **Keys hashed + encrypted**: Stored as SHA-256 hashes (for validation) and AES-256-GCM encrypted (for reveal)
+2. **Reveal requires fresh auth**: Key reveal requires Clerk session < 5 minutes old
 3. **Environment isolation**: Test keys can't be used in production
-4. **Can't self-replicate**: API keys cannot create other API keys
+4. **Can't self-replicate**: API keys cannot create/list/revoke/reveal other API keys
 5. **Rate limited**: 500 req/min per key prevents abuse
-6. **Expiration**: Max 5 years forces periodic review
-7. **Revocable**: Keys can be immediately revoked
-8. **User deletion**: Deleted users' keys are invalidated
+6. **Fail-closed rate limiting**: Requests denied if RateLimiter DO unavailable
+7. **Expiration**: Max 5 years forces periodic review
+8. **Revocable**: Keys can be immediately revoked
+9. **User deletion**: Deleted users' keys are invalidated
+10. **Usage tracking**: last_used_at updated even for failed auth attempts (security signal)
 
 ---
 
 ## Success Criteria
 
-- [x] All design decisions finalized (11/11 resolved)
+- [x] All design decisions finalized (13/13 resolved)
 - [ ] All unit tests pass
 - [ ] All integration tests pass
 - [ ] All E2E tests pass
+- [ ] Key reveal with fresh authentication works
 - [ ] Rate limiting works in production environment (Durable Objects)
+- [ ] Rate limiting fails closed on DO errors
 - [ ] Frontend UI at /settings/api-keys is functional and secure
 - [ ] Documentation is complete
