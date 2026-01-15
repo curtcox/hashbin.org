@@ -48,11 +48,28 @@ export async function requireAuth(options = {}) {
  * @param {number} maxWait Maximum wait time in ms
  * @returns {Promise<void>}
  */
-async function waitForClerkInit(maxWait = 3000) {
+async function waitForClerkInit(maxWait = 5000) {
   const startTime = Date.now();
   
+  // First, wait for window.Clerk to exist
   while (!window.Clerk && (Date.now() - startTime) < maxWait) {
     await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  // If Clerk exists but hasn't loaded yet, wait for it to load
+  if (window.Clerk && !window.Clerk.loaded) {
+    try {
+      const remainingTime = maxWait - (Date.now() - startTime);
+      if (remainingTime > 0) {
+        // Wait for Clerk to finish loading
+        await Promise.race([
+          window.Clerk.load(),
+          new Promise(resolve => setTimeout(resolve, remainingTime))
+        ]);
+      }
+    } catch (error) {
+      console.warn('Error waiting for Clerk to load:', error);
+    }
   }
 }
 
