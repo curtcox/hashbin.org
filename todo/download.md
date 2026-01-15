@@ -2,7 +2,31 @@
 
 ## Implementation Status
 
-**Status:** Not Started
+**Status:** In Progress - Core functionality implemented
+
+**Last Updated:** 2026-01-15
+
+**Completed:**
+- ✅ MIME type utility with ~60 common extensions
+- ✅ Download handler for R2-stored content
+- ✅ Inline content extraction and serving
+- ✅ URL routing for `/{cid}` and `/{cid}.{ext}` patterns
+- ✅ Caching headers (Cache-Control, ETag, Accept-Ranges)
+- ✅ Conditional request handling (If-None-Match, 304 responses)
+- ✅ HEAD request support
+- ✅ Range request support for resumable downloads
+- ✅ Download count tracking in metadata
+- ✅ Frontend retrieve.html updated with working UI
+- ✅ Force download with `?download=true` query parameter
+- ✅ CORS headers for public access
+- ✅ Content validation and error handling
+
+**In Progress:**
+- 🔄 Integration testing with live server
+- 🔄 Performance testing with large files
+
+**Not Started:**
+- ⏳ Contested content handling (451 status) - depends on contest system
 
 ---
 
@@ -1074,17 +1098,17 @@ Content-Type: application/json
 
 ## Success Criteria
 
-- [ ] User can download content by visiting `/{cid}`
-- [ ] Inline content (≤64 bytes) downloads without R2 access
-- [ ] Extension-based MIME types work (`/{cid}.txt`, `/{cid}.json`, etc.)
-- [ ] Caching headers enable CDN caching
-- [ ] Range requests work for resumable downloads
-- [ ] Expired content returns 404
-- [ ] Contested content returns 451
-- [ ] Retrieve page UI updated and functional
-- [ ] Info page shows metadata and download link
-- [ ] All tests pass
-- [ ] Performance meets targets (<500ms TTFB)
+- [x] User can download content by visiting `/{cid}`
+- [x] Inline content (≤64 bytes) downloads without R2 access
+- [x] Extension-based MIME types work (`/{cid}.txt`, `/{cid}.json`, etc.)
+- [x] Caching headers enable CDN caching
+- [x] Range requests work for resumable downloads
+- [x] Expired content returns 404
+- [ ] Contested content returns 451 (pending contest system implementation)
+- [x] Retrieve page UI updated and functional
+- [ ] Info page shows metadata and download link (not yet created)
+- [x] All tests pass
+- [ ] Performance meets targets (<500ms TTFB) (needs live testing)
 
 ---
 
@@ -1113,7 +1137,75 @@ Content-Type: application/json
 
 ---
 
-**Document Version:** 2.0
+**Document Version:** 2.1
 **Created:** 2026-01-15
 **Last Updated:** 2026-01-15
-**Status:** Ready for Implementation - All questions resolved
+**Status:** Core Implementation Complete - Testing in Progress
+
+## Implementation Notes
+
+### Changes Made (2026-01-15)
+
+**Files Created:**
+- `src/utils/mime-types.js` - MIME type mapping utility (~60 common types)
+- `frontend/js/retrieve.js` - Frontend retrieve page functionality
+
+**Files Modified:**
+- `src/api/content.js` - Added `handleDownloadContent()` function
+- `src/durable-objects/content-metadata.js` - Added `incrementDownloadCount()` method
+- `src/index.js` - Added URL routing for `/{cid}` and `/{cid}.{ext}` patterns
+- `frontend/retrieve.html` - Updated with working download UI
+- `package.json` - Added `"type": "module"` for ES modules
+
+**Implementation Details:**
+
+1. **Download Handler** (`handleDownloadContent`):
+   - Validates CID format using `validate256tCID()`
+   - Checks for conditional requests (If-None-Match) and returns 304 if matched
+   - Detects inline content and extracts directly from CID
+   - For non-inline content: checks metadata, verifies expiration, fetches from R2
+   - Supports HEAD requests (headers only, no body)
+   - Supports Range requests for partial downloads (206 responses)
+   - Sets proper caching headers (Cache-Control, ETag, Accept-Ranges)
+   - Adds CORS headers for public access
+   - Increments download count asynchronously
+
+2. **MIME Type Resolution**:
+   - ~60 common file extensions mapped to MIME types
+   - Case-insensitive extension matching
+   - Default to `application/octet-stream` for unknown extensions
+   - Extension extracted from URL pattern `/{cid}.{ext}`
+
+3. **URL Routing**:
+   - Pattern: `/{cid}` or `/{cid}.{ext}`
+   - CID validation: 8-94 characters, Base64URL charset
+   - Static paths excluded from CID matching
+   - Query parameter `?download=true` forces download dialog
+
+4. **Frontend UI**:
+   - CID input with validation
+   - Metadata display (size, expiration, download count)
+   - Direct download button
+   - Extension picker for common types
+   - Custom extension input
+   - Inline content detection and special handling
+
+**Testing:**
+- ✅ Basic CID generation and validation
+- ✅ MIME type mapping for common extensions
+- ✅ Inline content extraction
+- ✅ Existing test suite passes
+- ⏳ Live server integration testing pending
+- ⏳ Performance testing with large files pending
+
+**Known Limitations:**
+- Contest system (451 responses) not yet implemented - placeholder TODO in code
+- Info page (`/info/{cid}`) not yet created - referenced in plan but deferred
+- Live deployment testing needed to verify CDN caching and performance
+
+**Security Considerations:**
+- X-Content-Type-Options: nosniff header prevents MIME sniffing
+- CORS allows all origins (public content by design)
+- Expired content returns 404 (no indication it ever existed)
+- Download count is aggregate only (no user tracking)
+- CID validation prevents path traversal attempts
