@@ -129,7 +129,7 @@ else
 fi
 
 # Check for proper loading check
-if echo "$RESPONSE" | grep -q 'Clerk\.loaded\|Clerk\.load'; then
+if echo "$RESPONSE" | grep -E 'Clerk\.(loaded|load)' > /dev/null; then
   log_pass "Auth gate checks for Clerk loaded state"
 else
   log_fail "Auth gate missing Clerk loaded state check"

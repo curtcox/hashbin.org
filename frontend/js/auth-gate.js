@@ -64,7 +64,7 @@ async function waitForClerkInit(maxWait = 5000) {
   // Now wait for Clerk to be fully loaded
   // Poll the loaded property instead of relying on Promise.race
   let loadInitiated = false;
-  while (!window.Clerk.loaded && (Date.now() - startTime) < maxWait) {
+  while ((!window.Clerk.loaded) && (Date.now() - startTime) < maxWait) {
     try {
       // Trigger load once if not already loading/loaded
       if (!loadInitiated && window.Clerk.load && typeof window.Clerk.load === 'function') {
