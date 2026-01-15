@@ -84,7 +84,6 @@ run_test_suite() {
   local temp_file
   
   temp_file=$(mktemp)
-  TEMP_FILES+=("$temp_file")  # Track for cleanup
   
   bash "$suite_script" > "$temp_file" 2>&1
   exit_code=$?
@@ -199,7 +198,9 @@ if [ -n "$GITHUB_STEP_SUMMARY" ]; then
       fi
       echo ""
       echo "\`\`\`text"
-      escape_for_markdown "$output"
+      # Escape output to prevent markdown injection
+      escaped_output=$(escape_for_markdown "$output")
+      echo "$escaped_output"
       echo "\`\`\`"
       echo ""
     done
