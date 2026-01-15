@@ -58,21 +58,21 @@ echo ""
 # ==========================================
 log_test "Protected pages serve HTML content (not immediate API redirect)"
 
-# Test deposit.html
-RESPONSE=$(curl -s "$BASE_URL/deposit.html")
+# Test deposit page (extensionless URL)
+RESPONSE=$(curl -s "$BASE_URL/deposit")
 if echo "$RESPONSE" | grep -q '<title>Add Funds - HashBin.org</title>'; then
-  log_pass "deposit.html serves HTML content"
+  log_pass "deposit page serves HTML content"
 else
-  log_fail "deposit.html does not serve expected HTML"
+  log_fail "deposit page does not serve expected HTML"
   echo "Response preview: ${RESPONSE:0:200}"
 fi
 
-# Test upload.html
-RESPONSE=$(curl -s "$BASE_URL/upload.html")
+# Test upload page (extensionless URL)
+RESPONSE=$(curl -s "$BASE_URL/upload")
 if echo "$RESPONSE" | grep -q '<title>Upload Content - HashBin.org</title>'; then
-  log_pass "upload.html serves HTML content"
+  log_pass "upload page serves HTML content"
 else
-  log_fail "upload.html does not serve expected HTML"
+  log_fail "upload page does not serve expected HTML"
   echo "Response preview: ${RESPONSE:0:200}"
 fi
 
@@ -81,20 +81,20 @@ fi
 # ==========================================
 log_test "Auth gate protection script is present in protected pages"
 
-# Test deposit.html
-RESPONSE=$(curl -s "$BASE_URL/deposit.html")
+# Test deposit page
+RESPONSE=$(curl -s "$BASE_URL/deposit")
 if echo "$RESPONSE" | grep -q 'auth-gate.js'; then
-  log_pass "deposit.html includes auth-gate.js"
+  log_pass "deposit page includes auth-gate.js"
 else
-  log_fail "deposit.html missing auth-gate.js"
+  log_fail "deposit page missing auth-gate.js"
 fi
 
-# Test upload.html
-RESPONSE=$(curl -s "$BASE_URL/upload.html")
+# Test upload page
+RESPONSE=$(curl -s "$BASE_URL/upload")
 if echo "$RESPONSE" | grep -q 'auth-gate.js'; then
-  log_pass "upload.html includes auth-gate.js"
+  log_pass "upload page includes auth-gate.js"
 else
-  log_fail "upload.html missing auth-gate.js"
+  log_fail "upload page missing auth-gate.js"
 fi
 
 # ==========================================
@@ -140,13 +140,13 @@ fi
 # ==========================================
 log_test "Dashboard page (where authenticated users should land) exists"
 
-RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/dashboard.html")
+RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/dashboard")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 
 if [ "$HTTP_CODE" = "200" ]; then
-  log_pass "dashboard.html is accessible"
+  log_pass "dashboard page is accessible"
 else
-  log_fail "dashboard.html not accessible (HTTP $HTTP_CODE)"
+  log_fail "dashboard page not accessible (HTTP $HTTP_CODE)"
 fi
 
 # ==========================================
@@ -154,20 +154,20 @@ fi
 # ==========================================
 log_test "Protected pages don't contain server-side redirects"
 
-# Check deposit.html for redirect meta tags
-RESPONSE=$(curl -s "$BASE_URL/deposit.html")
+# Check deposit page for redirect meta tags
+RESPONSE=$(curl -s "$BASE_URL/deposit")
 if echo "$RESPONSE" | grep -qi '<meta.*http-equiv.*refresh'; then
-  log_fail "deposit.html contains meta refresh redirect"
+  log_fail "deposit page contains meta refresh redirect"
 else
-  log_pass "deposit.html has no meta refresh redirect"
+  log_pass "deposit page has no meta refresh redirect"
 fi
 
-# Check upload.html for redirect meta tags
-RESPONSE=$(curl -s "$BASE_URL/upload.html")
+# Check upload page for redirect meta tags
+RESPONSE=$(curl -s "$BASE_URL/upload")
 if echo "$RESPONSE" | grep -qi '<meta.*http-equiv.*refresh'; then
-  log_fail "upload.html contains meta refresh redirect"
+  log_fail "upload page contains meta refresh redirect"
 else
-  log_pass "upload.html has no meta refresh redirect"
+  log_pass "upload page has no meta refresh redirect"
 fi
 
 # ==========================================
