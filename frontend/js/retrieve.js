@@ -267,6 +267,10 @@ function downloadWithCustomExtension() {
     return;
   }
   
+  // Validate extension format
+  // Note: We only allow alphanumeric characters to prevent potential security issues
+  // and ensure MIME type mapping works correctly. Complex extensions like "tar.gz"
+  // are handled at the server level where the last extension (.gz) is extracted.
   if (!/^[a-zA-Z0-9]+$/.test(ext)) {
     showExtensionError(input, 'Invalid extension. Use only letters and numbers.');
     return;

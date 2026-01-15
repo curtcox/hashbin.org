@@ -698,7 +698,8 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     }
 
     // TODO: Check if content is contested (451 status)
-    // This will be implemented when contest system is added
+    // This will be implemented when the contest system is added (Phase 5 of master plan)
+    // See: todo/master_plan.md - Phase 5: Contest System
 
     // Fetch content from R2
     const rangeHeader = request.headers.get('Range');
@@ -706,6 +707,9 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     
     if (rangeHeader) {
       // Parse Range header (format: "bytes=start-end" or "bytes=start-")
+      // Note: Only single ranges are supported. Multiple ranges (RFC 7233) are not implemented
+      // as they are rarely used and add significant complexity. Clients needing multiple ranges
+      // can make separate requests.
       const rangeMatch = rangeHeader.match(/bytes=(\d+)-(\d*)/);
       
       if (rangeMatch) {

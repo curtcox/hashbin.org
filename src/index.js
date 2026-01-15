@@ -48,6 +48,8 @@ const VALID_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
 const HEALTH_CHECK_ID = 'health-check';
 
 // Static paths that should not be matched as CIDs
+// These paths are served by the ASSETS binding (frontend files)
+// Note: In a larger application, consider moving this to a configuration file
 const STATIC_PATHS = [
   'index.html',
   'upload.html',
