@@ -126,6 +126,10 @@ function handleAmountChange() {
 /**
  * Calculate fees for a desired credit amount
  * User pays fees on top of the credit they want
+ * 
+ * NOTE: This calculation is duplicated in the backend (src/utils/pricing.js)
+ * for API validation. Frontend duplication provides instant feedback without
+ * requiring an API call. If fee structure changes, update both locations.
  */
 function calculateFees(creditCents) {
   const feeCents = Math.round(creditCents * STRIPE_FEE_PERCENTAGE + STRIPE_FEE_FIXED_CENTS);
