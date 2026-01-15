@@ -36,7 +36,8 @@ import {
   handleUploadContent,
   handleGetContent,
   handleCheckContentExists,
-  handleExtendContent
+  handleExtendContent,
+  handleDownloadContent
 } from './api/content.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
@@ -68,6 +69,30 @@ export default {
     if (url.pathname.startsWith('/api/') || url.pathname === '/health') {
       // Handle API routes (existing logic below)
       return handleApiRoutes(url, request, env);
+    }
+
+    // Content download routes: /{cid} or /{cid}.{ext}
+    // Match CID pattern at root level (excluding known static paths)
+    const pathWithoutLeadingSlash = url.pathname.substring(1);
+    
+    // Skip if it's a known static path
+    const staticPaths = ['index.html', 'upload.html', 'retrieve.html', 'dashboard.html', 
+                         'deposit.html', 'info.html', 'css/', 'js/', 'docs/'];
+    const isStaticPath = staticPaths.some(path => pathWithoutLeadingSlash.startsWith(path));
+    
+    if (!isStaticPath && pathWithoutLeadingSlash) {
+      // Check if this looks like a CID (256t format)
+      const cidMatch = pathWithoutLeadingSlash.match(/^([A-Za-z0-9_-]{8,94})(?:\.([a-zA-Z0-9]+))?$/);
+      
+      if (cidMatch) {
+        const cid = cidMatch[1];
+        const extension = cidMatch[2] || null;
+        
+        // Only handle GET and HEAD methods for download
+        if (request.method === 'GET' || request.method === 'HEAD') {
+          return handleDownloadContent(request, env, cid, extension);
+        }
+      }
     }
 
     // Try to serve static assets for non-API paths

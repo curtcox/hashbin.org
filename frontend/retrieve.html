@@ -75,23 +75,7 @@
   </footer>
 
   <!-- Scripts -->
-  <script type="module">
-    // Retrieve form handling (placeholder - actual implementation in Phase 2)
-    document.getElementById('retrieve-form').addEventListener('submit', (e) => {
-      e.preventDefault();
-      
-      const hash = document.getElementById('content-hash').value;
-      const resultDiv = document.getElementById('retrieve-result');
-      
-      resultDiv.classList.remove('hidden');
-      resultDiv.innerHTML = `
-        <div class="alert alert-warning">
-          <strong>Coming Soon:</strong> Content retrieval will be available in Phase 2. 
-          You entered hash: <code>${hash}</code>
-        </div>
-      `;
-    });
-  </script>
+  <script type="module" src="/js/retrieve.js"></script>
   <script type="module" src="/js/app.js"></script>
 </body>
 </html>

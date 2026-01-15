@@ -15,8 +15,10 @@ import {
   isInlineContent, 
   verifyContent,
   validate256tCID,
-  getContentSize
+  getContentSize,
+  extractInlineContent
 } from '../utils/hash256t.js';
+import { getMimeType } from '../utils/mime-types.js';
 
 /**
  * POST /api/content
@@ -567,5 +569,227 @@ export async function handleExtendContent(request, env, cid) {
         headers: { 'content-type': 'application/json' }
       }
     );
+  }
+}
+
+/**
+ * GET /{cid} or /{cid}.{ext}
+ * Download content (public, no authentication required)
+ */
+export async function handleDownloadContent(request, env, cid, extension = null) {
+  try {
+    const url = new URL(request.url);
+    const method = request.method;
+    
+    // Validate CID format
+    if (!validate256tCID(cid)) {
+      return new Response(
+        JSON.stringify({
+          error: 'invalid_cid',
+          message: 'The provided CID is not a valid 256t identifier'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Determine MIME type from extension
+    const mimeType = extension ? getMimeType(extension) : 'application/octet-stream';
+
+    // Build base headers
+    const headers = {
+      'Content-Type': mimeType,
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'ETag': `"${cid}"`,
+      'Accept-Ranges': 'bytes',
+      'Access-Control-Allow-Origin': '*',
+      'X-Content-Type-Options': 'nosniff'
+    };
+
+    // Check If-None-Match header for conditional requests
+    const ifNoneMatch = request.headers.get('If-None-Match');
+    if (ifNoneMatch) {
+      // Handle multiple ETags
+      const etags = ifNoneMatch.split(',').map(tag => tag.trim().replace(/^W\//, ''));
+      if (etags.includes(`"${cid}"`) || etags.includes(cid)) {
+        return new Response(null, {
+          status: 304,
+          headers: headers
+        });
+      }
+    }
+
+    // Check if this is inline content
+    if (isInlineContent(cid)) {
+      // Extract content from CID itself
+      const contentBytes = extractInlineContent(cid);
+      
+      headers['Content-Length'] = contentBytes.length.toString();
+      
+      // Add Content-Disposition if ?download=true
+      const forceDownload = url.searchParams.get('download') === 'true';
+      if (forceDownload) {
+        const filename = extension ? `${cid}.${extension}` : cid;
+        headers['Content-Disposition'] = `attachment; filename="${filename}"`;
+      }
+
+      // For HEAD requests, return headers only
+      if (method === 'HEAD') {
+        return new Response(null, {
+          status: 200,
+          headers: headers
+        });
+      }
+
+      // Return inline content
+      return new Response(contentBytes, {
+        status: 200,
+        headers: headers
+      });
+    }
+
+    // For non-inline content, check metadata first
+    const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);
+    const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);
+    
+    const metadataResponse = await contentMetadataStub.fetch(
+      new Request('http://internal/content')
+    );
+
+    if (!metadataResponse.ok) {
+      if (metadataResponse.status === 404) {
+        return new Response(
+          JSON.stringify({
+            error: 'not_found',
+            message: 'Content not found'
+          }),
+          {
+            status: 404,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      
+      // Other metadata errors
+      return metadataResponse;
+    }
+
+    const metadata = await metadataResponse.json();
+
+    // Check if content is expired
+    const expiresAt = new Date(metadata.expires_at);
+    if (expiresAt < new Date()) {
+      return new Response(
+        JSON.stringify({
+          error: 'not_found',
+          message: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // TODO: Check if content is contested (451 status)
+    // This will be implemented when contest system is added
+
+    // Fetch content from R2
+    const rangeHeader = request.headers.get('Range');
+    let r2Object;
+    
+    if (rangeHeader) {
+      // Handle range request
+      r2Object = await env.CONTENT_BUCKET.get(cid, {
+        range: request.headers
+      });
+    } else {
+      r2Object = await env.CONTENT_BUCKET.get(cid);
+    }
+
+    if (!r2Object) {
+      return new Response(
+        JSON.stringify({
+          error: 'not_found',
+          message: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Set Content-Length header
+    if (r2Object.size) {
+      headers['Content-Length'] = r2Object.size.toString();
+    }
+
+    // Handle range response
+    if (r2Object.range) {
+      headers['Content-Range'] = `bytes ${r2Object.range.offset}-${r2Object.range.offset + r2Object.range.length - 1}/${metadata.size_bytes}`;
+      headers['Content-Length'] = r2Object.range.length.toString();
+    }
+
+    // Add Content-Disposition if ?download=true
+    const forceDownload = url.searchParams.get('download') === 'true';
+    if (forceDownload) {
+      const filename = extension ? `${cid}.${extension}` : cid;
+      headers['Content-Disposition'] = `attachment; filename="${filename}"`;
+    }
+
+    // For HEAD requests, return headers only
+    if (method === 'HEAD') {
+      return new Response(null, {
+        status: r2Object.range ? 206 : 200,
+        headers: headers
+      });
+    }
+
+    // Increment download count (fire and forget)
+    incrementDownloadCount(env, cid).catch(err => {
+      console.error('Failed to increment download count:', err);
+    });
+
+    // Stream content
+    return new Response(r2Object.body, {
+      status: r2Object.range ? 206 : 200,
+      headers: headers
+    });
+  } catch (error) {
+    console.error('Download error:', error);
+    return new Response(
+      JSON.stringify({
+        error: 'Download failed',
+        message: error.message
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+}
+
+/**
+ * Increment download count for content
+ * @param {Object} env - Environment bindings
+ * @param {string} cid - Content ID
+ */
+async function incrementDownloadCount(env, cid) {
+  try {
+    const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);
+    const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);
+    
+    await contentMetadataStub.fetch(
+      new Request('http://internal/increment-download', {
+        method: 'POST'
+      })
+    );
+  } catch (error) {
+    // Ignore errors - download count is not critical
+    console.error('Error incrementing download count:', error);
   }
 }

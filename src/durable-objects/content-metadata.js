@@ -35,6 +35,11 @@ export class ContentMetadata {
         return await this.extendRetention(data);
       }
 
+      // Increment download count
+      if (url.pathname === '/increment-download' && method === 'POST') {
+        return await this.incrementDownloadCount();
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -208,6 +213,45 @@ export class ContentMetadata {
         expires_at: content.expires_at,
         months_added: data.months_to_add,
         total_payments: content.retention_payments.length
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Increment download count
+   */
+  async incrementDownloadCount() {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Initialize download count if not present
+    if (typeof content.download_count === 'undefined') {
+      content.download_count = 0;
+    }
+
+    content.download_count += 1;
+    content.last_downloaded_at = new Date().toISOString();
+
+    await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({
+        download_count: content.download_count
       }),
       {
         status: 200,
