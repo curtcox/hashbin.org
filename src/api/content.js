@@ -116,14 +116,6 @@ export async function handleUploadContent(request, env) {
       }
     }
 
-    // TODO: Calculate actual content hash (256t)
-    // SECURITY NOTE: This placeholder is NOT suitable for production
-    // - It's predictable and doesn't detect identical content with different names
-    // - A proper implementation should use 256t hash of actual content bytes
-    // - Hash should be calculated before balance check to avoid wasting user funds
-    // For now, use a placeholder based on file name and size
-    const hash_256t = `hash_${file.name}_${size_bytes}`;
-
     // Check if content already exists
     const contentMetadataId = env.CONTENT_METADATA.idFromName(hash_256t);
     const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);

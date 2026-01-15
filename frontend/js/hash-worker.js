@@ -5,7 +5,6 @@
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
 const INLINE_CONTENT_THRESHOLD = 64; // bytes
-const CHUNK_SIZE = 1024 * 1024; // 1MB chunks for streaming
 
 // Listen for messages from main thread
 self.onmessage = async function(event) {
