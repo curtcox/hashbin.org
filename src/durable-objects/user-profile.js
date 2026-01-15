@@ -69,6 +69,11 @@ export class UserProfile {
         return await this.updateLastUsed(keyId);
       }
 
+      if (url.pathname.startsWith('/apikeys/') && url.pathname.endsWith('/reveal') && method === 'POST') {
+        const keyId = url.pathname.split('/')[2];
+        return await this.revealApiKey(keyId);
+      }
+
       if (url.pathname === '/balance' && method === 'GET') {
         return await this.getBalance();
       }
@@ -284,11 +289,13 @@ export class UserProfile {
     const apiKey = {
       key_id: data.key_id,
       key_hash: data.key_hash,
+      key_encrypted: data.key_encrypted, // AES-256-GCM encrypted key for reveal
       name: data.name,
       created_at: new Date().toISOString(),
       expires_at: data.expires_at,
       last_used_at: null,
-      revoked_at: null
+      revoked_at: null,
+      reveal_timestamps: [] // Track last 3 reveal times for rate limiting
     };
 
     profile.api_keys.push(apiKey);
@@ -415,12 +422,15 @@ export class UserProfile {
     }
 
     if (apiKey.revoked_at) {
+      // Idempotent - already revoked, return success
       return new Response(
         JSON.stringify({
-          error: 'API key already revoked'
+          success: true,
+          message: 'API key already revoked',
+          revoked_at: apiKey.revoked_at
         }),
         {
-          status: 400,
+          status: 200,
           headers: { 'content-type': 'application/json' }
         }
       );
@@ -435,6 +445,117 @@ export class UserProfile {
       JSON.stringify({
         success: true,
         message: 'API key revoked successfully'
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Reveal an API key (with rate limiting)
+   * Returns encrypted key data if within rate limits
+   */
+  async revealApiKey(keyId) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({
+          error: 'Profile not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const apiKey = profile.api_keys.find(key => key.key_id === keyId);
+
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          error: 'API key not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Check if key is revoked
+    if (apiKey.revoked_at) {
+      return new Response(
+        JSON.stringify({
+          error: 'KEY_REVOKED',
+          message: 'Cannot reveal a revoked API key'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Check rate limiting (3 reveals per hour)
+    const now = new Date();
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    
+    // Initialize reveal_timestamps if not present (backward compatibility)
+    if (!apiKey.reveal_timestamps) {
+      apiKey.reveal_timestamps = [];
+    }
+
+    // Filter to only recent reveals (within last hour)
+    const recentReveals = apiKey.reveal_timestamps
+      .map(ts => new Date(ts))
+      .filter(ts => ts > oneHourAgo);
+
+    if (recentReveals.length >= 3) {
+      // Calculate when the oldest reveal will be outside the window
+      const oldestReveal = recentReveals.sort((a, b) => a - b)[0];
+      const resetTime = new Date(oldestReveal.getTime() + 60 * 60 * 1000);
+      const retryAfterSeconds = Math.ceil((resetTime.getTime() - now.getTime()) / 1000);
+
+      return new Response(
+        JSON.stringify({
+          error: 'REVEAL_RATE_LIMITED',
+          message: 'Maximum 3 reveals per hour exceeded',
+          retry_after_seconds: retryAfterSeconds
+        }),
+        {
+          status: 429,
+          headers: {
+            'content-type': 'application/json',
+            'Retry-After': retryAfterSeconds.toString()
+          }
+        }
+      );
+    }
+
+    // Record this reveal
+    apiKey.reveal_timestamps.push(now.toISOString());
+    
+    // Keep only last 3 timestamps (sliding window)
+    if (apiKey.reveal_timestamps.length > 3) {
+      apiKey.reveal_timestamps = apiKey.reveal_timestamps.slice(-3);
+    }
+
+    profile.updated_at = new Date().toISOString();
+    await this.state.storage.put('profile', profile);
+
+    // Return encrypted key data (decryption happens in API handler with encryption key)
+    return new Response(
+      JSON.stringify({
+        key_id: apiKey.key_id,
+        key_encrypted: apiKey.key_encrypted,
+        name: apiKey.name,
+        created_at: apiKey.created_at,
+        expires_at: apiKey.expires_at,
+        last_used_at: apiKey.last_used_at
       }),
       {
         status: 200,

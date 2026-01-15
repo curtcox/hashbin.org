@@ -4,7 +4,7 @@
  */
 
 import { authenticate, requireAuth, AUTH_ERROR_CODES } from '../auth/middleware.js';
-import { generateApiKey, hashApiKey, generateKeyId, validateKeyName, validateExpiration } from '../auth/utils.js';
+import { generateApiKey, hashApiKey, generateKeyId, validateKeyName, validateExpiration, encryptApiKey, decryptApiKey, isSessionFresh } from '../auth/utils.js';
 import { createClerkClient } from '@clerk/backend';
 
 /**
@@ -313,6 +313,21 @@ export async function handleCreateApiKey(request, env) {
   const keyHash = await hashApiKey(apiKey);
   const keyId = generateKeyId();
 
+  // Encrypt the API key for reveal functionality
+  if (!env.API_KEY_ENCRYPTION_KEY) {
+    return new Response(
+      JSON.stringify({
+        error: 'Encryption key not configured',
+        message: 'API_KEY_ENCRYPTION_KEY secret must be set'
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+  const keyEncrypted = await encryptApiKey(apiKey, env.API_KEY_ENCRYPTION_KEY);
+
   // Store in UserProfile DO
   const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
   const userProfileStub = env.USER_PROFILES.get(userProfileId);
@@ -324,6 +339,7 @@ export async function handleCreateApiKey(request, env) {
       body: JSON.stringify({
         key_id: keyId,
         key_hash: keyHash,
+        key_encrypted: keyEncrypted,
         name: body.name,
         expires_at: expirationValidation.expiresAt
       })
@@ -470,6 +486,138 @@ export async function handleRevokeApiKey(request, env, keyId) {
     status: 200,
     headers: { 'content-type': 'application/json' }
   });
+}
+
+/**
+ * Handle reveal API key
+ * POST /api/auth/apikeys/:keyId/reveal
+ */
+export async function handleRevealApiKey(request, env, keyId) {
+  const authResult = await authenticate(request, env);
+
+  // Require Clerk session (API keys cannot reveal other keys)
+  const authError = requireAuth(authResult);
+  if (authError) return authError;
+
+  if (authResult.user.authMethod !== 'clerk') {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid authentication method',
+        message: 'API keys cannot reveal other API keys. Use Clerk session.'
+      }),
+      {
+        status: 403,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  // Verify session is fresh (authenticated within last 5 minutes)
+  try {
+    if (!env.CLERK_SECRET_KEY) {
+      throw new Error('CLERK_SECRET_KEY not configured');
+    }
+
+    const clerkClient = createClerkClient({
+      secretKey: env.CLERK_SECRET_KEY
+    });
+
+    const sessionId = authResult.user.sessionId;
+    const session = await clerkClient.sessions.getSession(sessionId);
+
+    // Check if session is fresh
+    if (!isSessionFresh(session, 5)) {
+      return new Response(
+        JSON.stringify({
+          error: 'FRESH_AUTH_REQUIRED',
+          message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
+        }),
+        {
+          status: 403,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: 'Session verification failed',
+        message: error.message
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  // Get encrypted key from UserProfile DO (includes rate limiting)
+  const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
+  const userProfileStub = env.USER_PROFILES.get(userProfileId);
+
+  const response = await userProfileStub.fetch(
+    new Request(`http://internal/apikeys/${keyId}/reveal`, {
+      method: 'POST'
+    })
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    return new Response(
+      JSON.stringify(error),
+      {
+        status: response.status,
+        headers: response.headers
+      }
+    );
+  }
+
+  const keyData = await response.json();
+
+  // Decrypt the API key
+  if (!env.API_KEY_ENCRYPTION_KEY) {
+    return new Response(
+      JSON.stringify({
+        error: 'Encryption key not configured',
+        message: 'API_KEY_ENCRYPTION_KEY secret must be set'
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  try {
+    const apiKey = await decryptApiKey(keyData.key_encrypted, env.API_KEY_ENCRYPTION_KEY);
+
+    return new Response(
+      JSON.stringify({
+        key_id: keyData.key_id,
+        name: keyData.name,
+        api_key: apiKey,
+        created_at: keyData.created_at,
+        expires_at: keyData.expires_at,
+        last_used_at: keyData.last_used_at,
+        warning: 'Keep this API key secure. Limit how often you reveal it.'
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: 'Decryption failed',
+        message: 'Unable to decrypt API key'
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
 }
 
 /**

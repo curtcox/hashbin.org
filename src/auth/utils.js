@@ -216,3 +216,101 @@ export function validateExpiration(expiresAt) {
     expiresAt: expirationDate.toISOString()
   };
 }
+
+/**
+ * Encrypt API key using AES-256-GCM
+ * Returns base64-encoded ciphertext with IV prepended
+ * Format: <12-byte IV><ciphertext><16-byte auth tag>
+ */
+export async function encryptApiKey(apiKey, encryptionKey) {
+  // Convert encryption key from base64 to CryptoKey
+  const keyData = Uint8Array.from(atob(encryptionKey), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt']
+  );
+
+  // Generate random IV (12 bytes for AES-GCM)
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  // Encrypt the API key
+  const encoder = new TextEncoder();
+  const plaintext = encoder.encode(apiKey);
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    cryptoKey,
+    plaintext
+  );
+
+  // Combine IV and ciphertext
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+
+  // Return base64-encoded result
+  return btoa(String.fromCharCode(...combined));
+}
+
+/**
+ * Decrypt API key using AES-256-GCM
+ * Expects base64-encoded ciphertext with IV prepended
+ */
+export async function decryptApiKey(encryptedKey, encryptionKey) {
+  // Convert encryption key from base64 to CryptoKey
+  const keyData = Uint8Array.from(atob(encryptionKey), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['decrypt']
+  );
+
+  // Decode base64
+  const combined = Uint8Array.from(atob(encryptedKey), c => c.charCodeAt(0));
+
+  // Extract IV (first 12 bytes)
+  const iv = combined.slice(0, 12);
+
+  // Extract ciphertext (remaining bytes)
+  const ciphertext = combined.slice(12);
+
+  // Decrypt
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      cryptoKey,
+      ciphertext
+    );
+
+    const decoder = new TextDecoder();
+    return decoder.decode(plaintext);
+  } catch (error) {
+    throw new Error('Decryption failed: Invalid key or corrupted data');
+  }
+}
+
+/**
+ * Check if a Clerk session is "fresh" (authenticated within threshold minutes)
+ * Used for sensitive operations like key reveal
+ * @param {Object} session - Clerk session object with 'iat' (issued at) timestamp
+ * @param {number} thresholdMinutes - Maximum age in minutes (default: 5)
+ * @returns {boolean} True if session is fresh
+ */
+export function isSessionFresh(session, thresholdMinutes = 5) {
+  if (!session || !session.iat) {
+    return false;
+  }
+
+  // session.iat is Unix timestamp in seconds
+  const issuedAt = new Date(session.iat * 1000);
+  const now = new Date();
+  const thresholdMs = thresholdMinutes * 60 * 1000;
+  const ageMs = now.getTime() - issuedAt.getTime();
+
+  // Must be strictly less than threshold (not equal)
+  return ageMs < thresholdMs;
+}
