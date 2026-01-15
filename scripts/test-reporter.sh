@@ -84,6 +84,7 @@ run_test_suite() {
   local temp_file
   
   temp_file=$(mktemp)
+  TEMP_FILES+=("$temp_file")  # Track for safety (cleanup trap handles unexpected exits)
   
   bash "$suite_script" > "$temp_file" 2>&1
   exit_code=$?
