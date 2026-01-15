@@ -48,11 +48,38 @@ export async function requireAuth(options = {}) {
  * @param {number} maxWait Maximum wait time in ms
  * @returns {Promise<void>}
  */
-async function waitForClerkInit(maxWait = 3000) {
+async function waitForClerkInit(maxWait = 5000) {
   const startTime = Date.now();
   
+  // First, wait for window.Clerk to exist
   while (!window.Clerk && (Date.now() - startTime) < maxWait) {
     await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  // If Clerk doesn't exist after waiting, return
+  if (!window.Clerk) {
+    return;
+  }
+  
+  // Now wait for Clerk to be fully loaded
+  // Poll the loaded property instead of relying on Promise.race
+  let loadInitiated = false;
+  while ((!window.Clerk.loaded) && (Date.now() - startTime) < maxWait) {
+    try {
+      // Trigger load once if not already loading/loaded
+      if (!loadInitiated && window.Clerk.load && typeof window.Clerk.load === 'function') {
+        loadInitiated = true;
+        // Note: We don't await here because we're polling the loaded property
+        window.Clerk.load().catch(err => {
+          console.warn('Clerk load error:', err);
+        });
+      }
+      // Wait a bit before checking again
+      await new Promise(resolve => setTimeout(resolve, 100));
+    } catch (error) {
+      console.warn('Error checking Clerk loaded state:', error);
+      break;
+    }
   }
 }
 
