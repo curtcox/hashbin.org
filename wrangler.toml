@@ -17,6 +17,7 @@ vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
 # CLERK_PUBLISHABLE_KEY (required for development)
 # STRIPE_SECRET_KEY (required for payments)
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
+# API_KEY_ENCRYPTION_KEY (required for API key reveal - 256-bit AES key in base64)
 
 # Production environment
 [env.production]
@@ -33,6 +34,7 @@ vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
 # CLERK_PUBLISHABLE_KEY (required for production)
 # STRIPE_SECRET_KEY (required for payments)
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
+# API_KEY_ENCRYPTION_KEY (required for API key reveal - 256-bit AES key in base64)
 
 # Production Durable Objects bindings
 [[env.production.durable_objects.bindings]]

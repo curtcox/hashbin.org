@@ -146,6 +146,98 @@ The script verifies the following Stripe webhook features:
    - Confirms webhook endpoint route is defined in index.js
    - Ensures proper routing setup
 
+## test-api-keys.sh
+
+Comprehensive test script for API Keys feature implementation validation.
+
+### Usage
+
+```bash
+# Run API keys tests
+./scripts/test-api-keys.sh
+
+# Or use npm script
+npm run test:apikeys
+```
+
+### What It Tests
+
+The script verifies the following API keys features:
+
+1. **Core Functions**
+   - `generateApiKey()` uses correct production/development prefixes
+   - `validateApiKeyFormat()` function exists and validates key structure
+   - `hashApiKey()` hashes keys with SHA-256
+
+2. **Encryption/Decryption**
+   - `encryptApiKey()` function exists and uses AES-256-GCM
+   - `decryptApiKey()` function exists and decrypts properly
+   - Encryption produces unique ciphertext with random IV
+
+3. **Session Freshness**
+   - `isSessionFresh()` function exists for 5-minute threshold validation
+   - Used in reveal endpoint to require recent authentication
+
+4. **UserProfile Storage**
+   - Stores `key_encrypted` field for reveal functionality
+   - Stores `reveal_timestamps` array for rate limiting
+   - Initializes reveal_timestamps as empty array
+
+5. **Reveal Endpoint**
+   - `revealApiKey()` method exists in UserProfile
+   - Reveal route registered in UserProfile router
+   - `handleRevealApiKey()` handler exists in API layer
+   - Main router includes reveal endpoint
+   - Checks session freshness (< 5 minutes)
+   - Enforces rate limiting (3 per hour)
+   - Rejects revoked keys
+   - Requires Clerk session (not API key)
+
+6. **Idempotent Revoke**
+   - Revoke operation returns 200 for already revoked keys
+   - No error thrown on duplicate revoke
+
+7. **Configuration**
+   - API_KEY_ENCRYPTION_KEY documented in wrangler.toml
+   - Encryption key generation script exists
+   - Create endpoint validates encryption key presence
+
+8. **Integration**
+   - API key creation encrypts keys before storage
+   - Reveal endpoint decrypts keys before returning
+   - All components properly wired together
+
+### Exit Codes
+
+- `0` - All tests passed (21/21)
+- `1` - One or more tests failed
+
+### Example Output
+
+```
+==========================================
+API Keys Feature Tests
+==========================================
+
+Testing against: http://localhost:8787
+
+==========================================
+TEST: generateApiKey produces correct production format
+==========================================
+✅ PASS: generateApiKey implementation uses correct prefix logic
+
+...
+
+==========================================
+Test Summary
+==========================================
+Total Tests:  21
+Passed:       21
+Failed:       0
+
+✅ All tests passed!
+```
+
 ### Background
 
 Cloudflare Workers use the SubtleCrypto API which only supports async operations. Stripe's Node.js SDK provides two methods for webhook signature verification:
