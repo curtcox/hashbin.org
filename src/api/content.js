@@ -10,6 +10,13 @@ import {
   checkBalanceSufficient,
   formatCents
 } from '../utils/pricing.js';
+import { 
+  generate256tHash, 
+  isInlineContent, 
+  verifyContent,
+  validate256tCID,
+  getContentSize
+} from '../utils/hash256t.js';
 
 /**
  * POST /api/content
@@ -65,10 +72,19 @@ export async function handleUploadContent(request, env) {
     const size_bytes = file.size;
     const userId = authResult.user.userId;
 
-    // Calculate cost
-    const cost_cents = calculateRetentionCost(size_bytes, retention_months);
+    // Read file content for hashing
+    const contentData = await file.arrayBuffer();
+    
+    // Calculate actual 256t hash
+    const hash_256t = await generate256tHash(contentData);
+    
+    // Check if this is inline content (≤64 bytes)
+    const isInline = isInlineContent(hash_256t);
+    
+    // Calculate cost (inline content is free)
+    const cost_cents = isInline ? 0 : calculateRetentionCost(size_bytes, retention_months);
 
-    // Check balance
+    // Check balance (skip for inline content which is free)
     const userProfileId = env.USER_PROFILES.idFromName(userId);
     const userProfileStub = env.USER_PROFILES.get(userProfileId);
     
@@ -78,33 +94,27 @@ export async function handleUploadContent(request, env) {
     const balanceData = await balanceResponse.json();
     const balance_cents = balanceData.balance_cents;
 
-    // Check if balance is sufficient
-    const balanceCheck = checkBalanceSufficient(balance_cents, size_bytes, retention_months);
-    
-    if (!balanceCheck.sufficient) {
-      return new Response(
-        JSON.stringify({
-          error: 'insufficient_balance',
-          message: generateInsufficientBalanceMessage(balance_cents, balanceCheck.required),
-          required_cents: balanceCheck.required,
-          balance_cents: balance_cents,
-          shortfall_cents: balanceCheck.shortfall,
-          deposit_url: '/balance/deposit'
-        }),
-        {
-          status: 400,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+    // Check if balance is sufficient (inline content doesn't need balance)
+    if (!isInline) {
+      const balanceCheck = checkBalanceSufficient(balance_cents, size_bytes, retention_months);
+      
+      if (!balanceCheck.sufficient) {
+        return new Response(
+          JSON.stringify({
+            error: 'insufficient_balance',
+            message: generateInsufficientBalanceMessage(balance_cents, balanceCheck.required),
+            required_cents: balanceCheck.required,
+            balance_cents: balance_cents,
+            shortfall_cents: balanceCheck.shortfall,
+            deposit_url: '/balance/deposit'
+          }),
+          {
+            status: 400,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
     }
-
-    // TODO: Calculate actual content hash (256t)
-    // SECURITY NOTE: This placeholder is NOT suitable for production
-    // - It's predictable and doesn't detect identical content with different names
-    // - A proper implementation should use 256t hash of actual content bytes
-    // - Hash should be calculated before balance check to avoid wasting user funds
-    // For now, use a placeholder based on file name and size
-    const hash_256t = `hash_${file.name}_${size_bytes}`;
 
     // Check if content already exists
     const contentMetadataId = env.CONTENT_METADATA.idFromName(hash_256t);
@@ -118,45 +128,51 @@ export async function handleUploadContent(request, env) {
     if (existsData.exists) {
       // Content already exists - extend retention by minimum 30 days
       const minRetention = Math.max(retention_months, 1);
-      const extensionCost = calculateRetentionCost(size_bytes, minRetention);
+      const extensionCost = isInline ? 0 : calculateRetentionCost(size_bytes, minRetention);
 
-      // Check balance for extension
-      const extensionCheck = checkBalanceSufficient(balance_cents, size_bytes, minRetention);
-      if (!extensionCheck.sufficient) {
-        return new Response(
-          JSON.stringify({
-            error: 'insufficient_balance',
-            message: generateInsufficientBalanceMessage(balance_cents, extensionCheck.required),
-            required_cents: extensionCheck.required,
-            balance_cents: balance_cents,
-            shortfall_cents: extensionCheck.shortfall,
-            deposit_url: '/balance/deposit'
-          }),
-          {
-            status: 400,
-            headers: { 'content-type': 'application/json' }
-          }
+      // Check balance for extension (skip for inline content)
+      if (!isInline) {
+        const extensionCheck = checkBalanceSufficient(balance_cents, size_bytes, minRetention);
+        if (!extensionCheck.sufficient) {
+          return new Response(
+            JSON.stringify({
+              error: 'insufficient_balance',
+              message: generateInsufficientBalanceMessage(balance_cents, extensionCheck.required),
+              required_cents: extensionCheck.required,
+              balance_cents: balance_cents,
+              shortfall_cents: extensionCheck.shortfall,
+              deposit_url: '/balance/deposit'
+            }),
+            {
+              status: 400,
+              headers: { 'content-type': 'application/json' }
+            }
+          );
+        }
+      }
+
+      // Debit balance for extension (only if not inline content)
+      let debitData = { balance_after_cents: balance_cents, balance_before_cents: balance_cents };
+      
+      if (!isInline && extensionCost > 0) {
+        const debitResponse = await userProfileStub.fetch(
+          new Request('http://internal/balance/debit', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ amount_cents: extensionCost })
+          })
         );
+
+        if (!debitResponse.ok) {
+          const error = await debitResponse.json();
+          return new Response(JSON.stringify(error), {
+            status: debitResponse.status,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+
+        debitData = await debitResponse.json();
       }
-
-      // Debit balance for extension
-      const debitResponse = await userProfileStub.fetch(
-        new Request('http://internal/balance/debit', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ amount_cents: extensionCost })
-        })
-      );
-
-      if (!debitResponse.ok) {
-        const error = await debitResponse.json();
-        return new Response(JSON.stringify(error), {
-          status: debitResponse.status,
-          headers: { 'content-type': 'application/json' }
-        });
-      }
-
-      const debitData = await debitResponse.json();
 
       // Extend retention
       const transactionId = crypto.randomUUID();
@@ -173,26 +189,28 @@ export async function handleUploadContent(request, env) {
         })
       );
 
-      // Record transaction
-      const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
-      const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
+      // Record transaction (only if cost > 0)
+      if (!isInline && extensionCost > 0) {
+        const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
+        const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
 
-      await paymentRecordStub.fetch(
-        new Request('http://internal/transaction', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            transaction_id: transactionId,
-            type: 'cid_extension',
-            user_id: userId,
-            amount_cents: -extensionCost,
-            balance_before_cents: debitData.balance_before_cents,
-            balance_after_cents: debitData.balance_after_cents,
-            cid: hash_256t,
-            retention_months: minRetention
+        await paymentRecordStub.fetch(
+          new Request('http://internal/transaction', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              transaction_id: transactionId,
+              type: 'cid_extension',
+              user_id: userId,
+              amount_cents: -extensionCost,
+              balance_before_cents: debitData.balance_before_cents,
+              balance_after_cents: debitData.balance_after_cents,
+              cid: hash_256t,
+              retention_months: minRetention
+            })
           })
-        })
-      );
+        );
+      }
 
       return new Response(
         JSON.stringify({
@@ -210,32 +228,38 @@ export async function handleUploadContent(request, env) {
       );
     }
 
-    // Debit balance
-    const debitResponse = await userProfileStub.fetch(
-      new Request('http://internal/balance/debit', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ amount_cents: cost_cents })
-      })
-    );
+    // Debit balance (only if not inline content)
+    let debitData = { balance_after_cents: balance_cents, balance_before_cents: balance_cents };
+    
+    if (!isInline && cost_cents > 0) {
+      const debitResponse = await userProfileStub.fetch(
+        new Request('http://internal/balance/debit', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ amount_cents: cost_cents })
+        })
+      );
 
-    if (!debitResponse.ok) {
-      const error = await debitResponse.json();
-      return new Response(JSON.stringify(error), {
-        status: debitResponse.status,
-        headers: { 'content-type': 'application/json' }
-      });
+      if (!debitResponse.ok) {
+        const error = await debitResponse.json();
+        return new Response(JSON.stringify(error), {
+          status: debitResponse.status,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+
+      debitData = await debitResponse.json();
     }
 
-    const debitData = await debitResponse.json();
-
-    // Store content in R2
-    const contentData = await file.arrayBuffer();
-    await env.CONTENT_BUCKET.put(hash_256t, contentData, {
-      httpMetadata: {
-        contentType: file.type || 'application/octet-stream'
-      }
-    });
+    // Store content in R2 (only if not inline content)
+    if (!isInline) {
+      await env.CONTENT_BUCKET.put(hash_256t, contentData, {
+        httpMetadata: {
+          contentType: file.type || 'application/octet-stream'
+        }
+      });
+    }
+    // For inline content, no R2 storage needed - content is in the CID itself
 
     // Create content metadata
     const transactionId = crypto.randomUUID();
@@ -256,26 +280,28 @@ export async function handleUploadContent(request, env) {
 
     const metadata = await metadataResponse.json();
 
-    // Record transaction
-    const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
-    const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
+    // Record transaction (only if cost > 0)
+    if (!isInline && cost_cents > 0) {
+      const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
+      const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
 
-    await paymentRecordStub.fetch(
-      new Request('http://internal/transaction', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          transaction_id: transactionId,
-          type: 'upload_payment',
-          user_id: userId,
-          amount_cents: -cost_cents,
-          balance_before_cents: debitData.balance_before_cents,
-          balance_after_cents: debitData.balance_after_cents,
-          cid: hash_256t,
-          retention_months: retention_months
+      await paymentRecordStub.fetch(
+        new Request('http://internal/transaction', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            transaction_id: transactionId,
+            type: 'upload_payment',
+            user_id: userId,
+            amount_cents: -cost_cents,
+            balance_before_cents: debitData.balance_before_cents,
+            balance_after_cents: debitData.balance_after_cents,
+            cid: hash_256t,
+            retention_months: retention_months
+          })
         })
-      })
-    );
+      );
+    }
 
     // Add to user's upload history
     await userProfileStub.fetch(

@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Content Information - HashBin.org">
+  <title>Content Info - HashBin.org</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .info-card {
+      background: var(--color-bg-secondary);
+      padding: 2rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+    
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    
+    .info-label {
+      font-weight: 500;
+      color: var(--color-text-light);
+    }
+    
+    .info-value {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    
+    .cid-value {
+      font-family: 'Courier New', monospace;
+      word-break: break-all;
+      font-size: 0.9rem;
+    }
+    
+    .copy-button {
+      margin-left: 0.5rem;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+    }
+    
+    .success-banner {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      color: white;
+      padding: 1.5rem;
+      border-radius: 8px;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    
+    .success-banner h2 {
+      margin: 0 0 0.5rem 0;
+      font-size: 1.5rem;
+    }
+    
+    .download-link {
+      display: inline-block;
+      padding: 0.75rem 1.5rem;
+      background: white;
+      color: var(--color-primary);
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 600;
+      margin-top: 1rem;
+    }
+    
+    .download-link:hover {
+      background: var(--color-bg-secondary);
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header">
+    <a href="/" class="logo">HashBin</a>
+    <nav>
+      <a href="/upload.html">Upload</a>
+      <a href="/retrieve.html">Retrieve</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+    <div id="auth-section">
+      <!-- Auth UI will be rendered here by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <div id="loading" style="text-align: center; padding: 2rem;">
+        <p>Loading content information...</p>
+      </div>
+      
+      <div id="content" style="display: none;">
+        <div class="success-banner">
+          <h2>✓ Upload Successful!</h2>
+          <p>Your content has been stored and is now accessible.</p>
+        </div>
+        
+        <h1>Content Information</h1>
+        
+        <div class="info-card">
+          <div class="info-row">
+            <span class="info-label">Content ID (CID)</span>
+            <span class="info-value cid-value">
+              <span id="cid-display"></span>
+              <button id="copy-cid" class="btn btn-secondary copy-button">Copy</button>
+            </span>
+          </div>
+          
+          <div class="info-row">
+            <span class="info-label">Size</span>
+            <span class="info-value" id="size-display"></span>
+          </div>
+          
+          <div class="info-row">
+            <span class="info-label">Expires In</span>
+            <span class="info-value" id="expires-relative"></span>
+          </div>
+          
+          <div class="info-row">
+            <span class="info-label">Expiration Date</span>
+            <span class="info-value" id="expires-exact"></span>
+          </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 2rem;">
+          <a id="download-link" href="#" class="btn btn-primary" style="margin-right: 1rem;">
+            Download Content
+          </a>
+          <a href="/upload.html" class="btn btn-secondary">
+            Upload Another File
+          </a>
+        </div>
+      </div>
+      
+      <div id="error" style="display: none;">
+        <div class="alert alert-error">
+          <strong>Error</strong>
+          <p id="error-message"></p>
+        </div>
+        <div style="margin-top: 2rem;">
+          <a href="/upload.html" class="btn btn-primary">Back to Upload</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source | 
+      <a href="/docs/">Documentation</a> | 
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+  <script type="module">
+    import { getContentSize, formatFileSize } from './js/hash256t.js';
+    
+    // Get CID from URL parameter
+    const params = new URLSearchParams(window.location.search);
+    const cid = params.get('cid');
+    
+    if (!cid) {
+      showError('No content ID provided');
+    } else {
+      loadContentInfo(cid);
+    }
+    
+    async function loadContentInfo(cid) {
+      try {
+        const response = await fetch(`/api/content/${cid}`);
+        
+        if (!response.ok) {
+          throw new Error('Content not found');
+        }
+        
+        const data = await response.json();
+        
+        // Display content info
+        document.getElementById('cid-display').textContent = cid;
+        document.getElementById('size-display').textContent = formatFileSize(data.size_bytes);
+        document.getElementById('expires-relative').textContent = formatRelativeTime(data.expires_at);
+        document.getElementById('expires-exact').textContent = new Date(data.expires_at).toLocaleString();
+        
+        // Set download link
+        document.getElementById('download-link').href = `/${cid}`;
+        
+        // Show content
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+        
+      } catch (error) {
+        showError(error.message);
+      }
+    }
+    
+    function formatRelativeTime(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = date - now;
+      
+      if (diffMs < 0) {
+        return 'Expired';
+      }
+      
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const diffMonths = Math.floor(diffDays / 30);
+      const diffYears = Math.floor(diffDays / 365);
+      
+      if (diffYears > 0) {
+        return `${diffYears} year${diffYears > 1 ? 's' : ''}`;
+      } else if (diffMonths > 0) {
+        return `${diffMonths} month${diffMonths > 1 ? 's' : ''}`;
+      } else {
+        return `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+      }
+    }
+    
+    function showError(message) {
+      document.getElementById('error-message').textContent = message;
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+    }
+    
+    // Copy CID to clipboard
+    document.getElementById('copy-cid').addEventListener('click', async () => {
+      const cid = document.getElementById('cid-display').textContent;
+      try {
+        await navigator.clipboard.writeText(cid);
+        const button = document.getElementById('copy-cid');
+        const originalText = button.textContent;
+        button.textContent = 'Copied!';
+        setTimeout(() => {
+          button.textContent = originalText;
+        }, 2000);
+      } catch (error) {
+        alert('Failed to copy to clipboard');
+      }
+    });
+  </script>
+</body>
+</html>
