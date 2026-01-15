@@ -3,7 +3,8 @@
 # Runs all tests and generates a summary for GitHub Actions
 # This makes test results visible directly on the PR
 
-set -e
+# Note: Not using 'set -e' because we need to continue running
+# even when individual test suites fail to collect all results
 
 # Initialize counters
 TOTAL_TEST_SUITES=0
@@ -35,15 +36,28 @@ run_test_suite() {
   TOTAL_TEST_SUITES=$((TOTAL_TEST_SUITES + 1))
   SUITE_NAMES+=("$suite_name")
   
+  # Validate that the test script exists
+  if [ ! -f "$suite_script" ]; then
+    echo -e "${RED}ERROR${NC}: Test script not found: $suite_script"
+    echo ""
+    SUITE_RESULTS+=("FAIL")
+    SUITE_OUTPUTS+=("Test script not found: $suite_script")
+    FAILED_TEST_SUITES=$((FAILED_TEST_SUITES + 1))
+    
+    # Add GitHub Actions annotation if running in CI
+    if [ -n "$GITHUB_ACTIONS" ]; then
+      echo "::error title=Test Script Not Found::$suite_name - script not found: $suite_script"
+    fi
+    
+    return 1
+  fi
+  
   # Capture output and exit code
   local output
   local exit_code
   
-  if output=$(bash "$suite_script" 2>&1); then
-    exit_code=0
-  else
-    exit_code=$?
-  fi
+  output=$(bash "$suite_script" 2>&1)
+  exit_code=$?
   
   # Store results
   SUITE_OUTPUTS+=("$output")
