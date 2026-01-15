@@ -104,6 +104,136 @@ npm run test:auth
 
 See the script file for detailed documentation of what it tests.
 
+## test-stripe-webhook.sh
+
+Tests for Stripe webhook signature verification to ensure proper async handling in Cloudflare Workers.
+
+### Usage
+
+```bash
+# Run webhook tests
+./scripts/test-stripe-webhook.sh
+
+# Or use npm script
+npm run test:webhook
+```
+
+### What It Tests
+
+The script verifies the following Stripe webhook features:
+
+1. **Async constructEventAsync Usage**
+   - Verifies that `constructEventAsync` is used (async method for Cloudflare Workers)
+   - Ensures compatibility with SubtleCryptoProvider
+
+2. **No Synchronous constructEvent**
+   - Confirms the synchronous `constructEvent` method is NOT used
+   - Prevents "SubtleCryptoProvider cannot be used in a synchronous context" error
+
+3. **Proper Await Handling**
+   - Checks that `await` is used with `constructEventAsync`
+   - Ensures proper async/await pattern
+
+4. **Event Handling**
+   - Verifies `checkout.session.completed` event case exists
+   - Confirms webhook processes payment events correctly
+
+5. **Error Responses**
+   - Tests that signature validation errors return 400 status
+   - Validates error message includes "Invalid signature"
+
+6. **Endpoint Configuration**
+   - Confirms webhook endpoint route is defined in index.js
+   - Ensures proper routing setup
+
+### Background
+
+Cloudflare Workers use the SubtleCrypto API which only supports async operations. Stripe's Node.js SDK provides two methods for webhook signature verification:
+
+- `constructEvent()` - Synchronous method (does NOT work in Workers)
+- `constructEventAsync()` - Async method (required for Workers)
+
+This test ensures the correct async method is used to prevent 400 errors from Stripe webhooks.
+
+### Exit Codes
+
+- `0` - All tests passed
+- `1` - One or more tests failed
+
+### Example Output
+
+```
+==========================================
+Stripe Webhook Signature Verification Tests
+==========================================
+
+Testing webhook handler implementation
+
+==========================================
+TEST: Webhook handler uses async constructEventAsync
+==========================================
+✅ PASS: payments.js uses constructEventAsync for webhook signature verification
+
+==========================================
+TEST: Webhook handler does not use synchronous constructEvent method
+==========================================
+✅ PASS: payments.js does not use synchronous constructEvent
+
+...
+
+==========================================
+Test Summary
+==========================================
+Total tests: 6
+Passed: 6
+Failed: 0
+
+✅ All tests passed
+```
+
+## test-auth-gate.sh
+
+Tests for authentication gate functionality on protected pages.
+
+### Usage
+
+```bash
+# Run auth gate tests
+./scripts/test-auth-gate.sh
+
+# Or use npm script
+npm run test:auth-gate
+```
+
+### What It Tests
+
+The script verifies the following auth gate features:
+
+1. **Protected Pages Serve HTML Content**
+   - Verifies protected pages (deposit, upload) serve HTML content
+   - Ensures no immediate API redirects
+
+2. **Auth Gate Script Integration**
+   - Confirms auth-gate.js is included in protected pages
+   - Validates script reference in HTML files
+
+3. **Auth Gate Module Exists**
+   - Verifies auth-gate.js file exists
+   - Checks for proper Clerk initialization logic
+
+4. **Dashboard Page Configuration**
+   - Confirms dashboard.html exists
+   - Tests redirect target for authenticated users
+
+5. **No Meta Refresh Redirects**
+   - Ensures HTML files don't contain server-side redirects
+   - Validates client-side auth handling
+
+### Exit Codes
+
+- `0` - All tests passed
+- `1` - One or more tests failed
+
 ## verify-deployment.sh
 
 Comprehensive deployment verification script that tests all critical endpoints and services.

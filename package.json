@@ -10,11 +10,12 @@
     "verify:dev": "scripts/verify-deployment.sh development",
     "verify:prod": "scripts/verify-deployment.sh production",
     "verify:custom": "scripts/verify-deployment.sh https://hashbin.org",
-    "test": "bash scripts/test-grep-patterns.sh && bash scripts/test-user-balance.sh && bash scripts/test-auth-gate.sh",
+    "test": "bash scripts/test-grep-patterns.sh && bash scripts/test-user-balance.sh && bash scripts/test-auth-gate.sh && bash scripts/test-stripe-webhook.sh",
     "test:grep": "bash scripts/test-grep-patterns.sh",
     "test:balance": "bash scripts/test-user-balance.sh",
     "test:auth": "bash scripts/test-auth-system.sh",
-    "test:auth-gate": "bash scripts/test-auth-gate.sh"
+    "test:auth-gate": "bash scripts/test-auth-gate.sh",
+    "test:webhook": "bash scripts/test-stripe-webhook.sh"
   },
   "keywords": [
     "256t",

@@ -183,7 +183,7 @@ export async function handleStripeWebhook(request, env) {
     // Verify webhook signature
     let event;
     try {
-      event = stripe.webhooks.constructEvent(
+      event = await stripe.webhooks.constructEventAsync(
         body,
         signature,
         env.STRIPE_WEBHOOK_SECRET
