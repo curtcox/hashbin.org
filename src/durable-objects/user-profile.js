@@ -74,6 +74,7 @@ export class UserProfile {
         return await this.revealApiKey(keyId);
       }
 
+      // Note: Internal route uses '/update' suffix for clarity and consistency with '/reveal' pattern
       if (url.pathname.startsWith('/apikeys/') && url.pathname.endsWith('/update') && method === 'PATCH') {
         const keyId = url.pathname.split('/')[2];
         return await this.updateApiKeyName(keyId, request);
@@ -665,12 +666,8 @@ export class UserProfile {
 
     apiKey.last_used_at = new Date().toISOString();
     
-    // Initialize usage_count if not present (backward compatibility)
-    if (typeof apiKey.usage_count !== 'number') {
-      apiKey.usage_count = 0;
-    }
-    // Increment usage count
-    apiKey.usage_count++;
+    // Increment usage count (initialize to 0 if not present for backward compatibility)
+    apiKey.usage_count = (apiKey.usage_count || 0) + 1;
     
     profile.updated_at = new Date().toISOString();
 
