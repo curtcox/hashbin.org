@@ -1,6 +1,6 @@
 # Key Management Backend Implementation Plan
 
-**Status:** Ready for Implementation
+**Status:** Implementation Complete - Ready for Testing
 **Date:** 2026-01-16
 **Related:** `todo/key_management_ui.md`
 
@@ -22,6 +22,8 @@ These features must be implemented before UI work can begin.
 ---
 
 ## Feature 1: Usage Count Tracking
+
+**✅ IMPLEMENTATION COMPLETE**
 
 ### Objective
 Track the total number of API requests made with each API key and return this count in the API key list response.
@@ -226,6 +228,8 @@ curl -X GET http://localhost:8787/api/auth/apikeys \
 ---
 
 ## Feature 2: PATCH Endpoint for Name Updates
+
+**✅ IMPLEMENTATION COMPLETE**
 
 ### Objective
 Implement an endpoint to update API key names with fresh authentication required.

@@ -21,6 +21,7 @@ import {
   handleListApiKeys,
   handleRevokeApiKey,
   handleRevealApiKey,
+  handleUpdateApiKey,
   handleDeleteAccount
 } from './api/auth.js';
 
@@ -212,6 +213,11 @@ function handleApiRoutes(url, request, env) {
   if (url.pathname.startsWith('/api/auth/apikeys/') && url.pathname.endsWith('/reveal') && request.method === 'POST') {
     const keyId = url.pathname.split('/')[4];
     return handleRevealApiKey(request, env, keyId);
+  }
+
+  if (url.pathname.startsWith('/api/auth/apikeys/') && !url.pathname.endsWith('/reveal') && request.method === 'PATCH') {
+    const keyId = url.pathname.split('/')[4];
+    return handleUpdateApiKey(request, env, keyId);
   }
 
   if (url.pathname === '/api/auth/account' && request.method === 'DELETE') {
