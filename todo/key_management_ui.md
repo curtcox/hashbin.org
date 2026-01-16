@@ -1,8 +1,9 @@
 # Key Management UI Plan
 
-**Status:** Draft v4.0 - DECISION: IMPLEMENT BACKEND FEATURES FIRST
+**Status:** ✅ IMPLEMENTATION COMPLETE - UI Ready for Testing
 **Date:** 2026-01-16
 **Changelog:**
+- v5.0: UI implementation complete - all core features implemented
 - v4.0: Decision to implement Option B - add backend features (usageCount, PATCH endpoint) before UI
 - v3.0: Backend investigation complete - identified missing features (usageCount, PATCH endpoint)
 - v2.0: Resolved 11 of 15 open questions, added key editing, usage count, expiration sorting/highlighting
@@ -977,48 +978,128 @@ The implementation will be considered complete when:
 - Need to add: API Keys link/card
 - Need to add: Sidebar navigation (if applicable)
 
-## Next Steps
+## ✅ Implementation Complete
 
-### 1. ✅ Implement Backend Features (FIRST - BLOCKING)
+### Files Created:
 
-**See:** `todo/key_management_backend.md` for detailed implementation plan
+1. **`/frontend/js/api-keys.js`** - API client module with utilities
+   - `listApiKeys()` - Fetch all API keys
+   - `createApiKey()` - Create new API key
+   - `updateApiKeyName()` - Update key name (requires fresh auth)
+   - `revealApiKey()` - Reveal full key (requires fresh auth)
+   - `revokeApiKey()` - Delete API key
+   - Helper functions for formatting and date calculations
 
-**Tasks:**
-1. Add usage count tracking to API keys
-2. Implement PATCH endpoint for name updates
-3. Add tests for new functionality
-4. Deploy backend changes
+2. **`/frontend/api-keys.html`** - API Keys list page
+   - Empty state UI
+   - Table view with sorting by expiration date
+   - Usage count display with K/M formatting
+   - Expiration warnings (30-day threshold)
+   - Status badges (Active/Expired)
+   - Environment badges (Live/Test)
+   - Copy key ID button with 3-second feedback
+   - Key count display (X/25)
+   - Warning alerts for approaching/reaching limit
+   - Responsive design
 
-**Timeline:** ~2-3 days (12-18 hours)
+3. **`/frontend/api-keys-create.html`** - Create API key page
+   - Form with validation (name, environment, expiration)
+   - Environment selector (Live/Test)
+   - Date picker with constraints (max 5 years)
+   - One-time key display modal
+   - Copy to clipboard with 3-second feedback
+   - "I have saved this key" checkbox requirement
+   - Warning about one-time display
+   - Breadcrumb navigation
 
----
+4. **`/frontend/api-keys-detail.html`** - API key detail page
+   - Full key details display
+   - Inline name editing with fresh auth check
+   - Reveal key modal (requires fresh auth)
+   - Revoke key with confirmation dialog
+   - Usage statistics
+   - Expiration warnings
+   - Copy key ID functionality
+   - Status indicators
+   - Breadcrumb navigation
 
-### 2. Design Review (Can be done in parallel with backend work)
-   - Create mockups/wireframes for all three pages
-   - Review with stakeholders
-   - Confirm UI patterns and components
-   - Finalize expiration warning visual treatment
+5. **`/frontend/dashboard.html`** (updated)
+   - Added API Keys card
+   - Shows key count (X/25)
+   - Link to manage keys
 
----
+### Features Implemented:
 
-### 3. Technical Spike (After backend is deployed)
-   - Test new usage count field in API response
-   - Test PATCH endpoint with name updates
-   - Verify fresh authentication flow with Clerk (5-minute threshold)
-   - Verify clipboard API compatibility across browsers
-   - Test 3-second copy feedback auto-dismiss
+✅ **Core Functionality:**
+- List all API keys with sorting by expiration
+- Create new API keys with validation
+- View individual key details
+- Edit key names (requires fresh authentication)
+- Reveal full keys (requires fresh authentication)
+- Revoke keys with confirmation
+- Copy to clipboard with 3-second feedback
 
----
+✅ **Security:**
+- Fresh authentication check (5-minute threshold) for reveal/edit
+- Session freshness error handling
+- Rate limit error handling for reveals
+- Confirmation dialogs for destructive actions
+- One-time key display on creation
 
-### 4. Begin UI Implementation (After backend is complete)
-   - Start with Phase 1 (Core List & Create with sorting/usage)
-   - Use test-driven development approach (277 tests)
-   - Iterate based on feedback
+✅ **UX Features:**
+- Usage count display with K/M formatting
+- Relative time display for "last used"
+- Expiration warnings (30-day threshold)
+- Keys sorted by expiration (soonest first)
+- Visual highlighting for expiring keys
+- Status badges (Active/Expired)
+- Environment badges (Live/Test)
+- Empty state messaging
+- Loading states
+- Error handling with user-friendly messages
+- Responsive design (desktop-first)
 
----
+✅ **25-Key Limit:**
+- Key count display (X/25)
+- Warning at 23-24 keys
+- Error message and disabled create button at 25 keys
+- Redirect with error if attempting to create at limit
 
-**Notes:**
-- Backend work is blocking for UI implementation
-- All 277 tests can be implemented once backend is complete
-- Plan delivers full feature set from day one
-- Plan follows existing HashBin.org patterns and architecture
+### Next Steps for Testing:
+
+1. **Manual Browser Testing:**
+   - Test all pages load correctly
+   - Test authentication flow
+   - Test creating API keys
+   - Test revealing keys (with fresh auth requirement)
+   - Test editing key names (with fresh auth requirement)
+   - Test revoking keys
+   - Test copy to clipboard functionality
+   - Verify expiration warnings display correctly
+   - Test responsive design on mobile
+
+2. **Edge Case Testing:**
+   - Test with 0 keys (empty state)
+   - Test with 25 keys (limit reached)
+   - Test expired keys (cannot edit/reveal/revoke)
+   - Test keys expiring within 30 days (warnings)
+   - Test very long key names (truncation)
+   - Test fresh auth timeout (>5 minutes)
+   - Test rate limiting for reveals
+
+3. **Browser Compatibility:**
+   - Chrome/Edge
+   - Firefox
+   - Safari
+
+4. **Accessibility:**
+   - Keyboard navigation
+   - Screen reader compatibility
+   - Focus indicators
+
+### Known Limitations:
+
+- No formal unit/integration tests (project uses bash verification scripts)
+- Desktop-first design (mobile functional but not optimized)
+- No search/filter functionality (not in v1 scope)
+- No bulk operations (not in v1 scope)

@@ -54,6 +54,20 @@
         </div>
       </div>
 
+      <!-- API Keys Card -->
+      <div class="card" style="margin-top: 2rem;">
+        <h2 class="card-title">🔑 API Keys</h2>
+        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+          Manage your API credentials for programmatic access
+        </p>
+        <div id="api-keys-summary">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div class="spinner"></div>
+            <span>Loading API keys...</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Placeholder for future features -->
       <div class="card" style="margin-top: 2rem;">
         <h2 class="card-title">Recent Uploads</h2>
@@ -126,8 +140,49 @@
       }
     }
     
-    // Load balance when page loads
+    // Load and display API keys summary
+    async function loadApiKeysSummary() {
+      const summaryEl = document.getElementById('api-keys-summary');
+      
+      try {
+        const response = await authenticatedFetch('/api/auth/apikeys');
+        await handleApiError(response);
+        
+        const keys = await response.json();
+        const keyCount = keys.length;
+        const maxKeys = 25;
+        
+        summaryEl.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <p style="font-size: 1.5rem; font-weight: 600; color: var(--color-text);">
+                ${keyCount} / ${maxKeys} keys
+              </p>
+              <p style="color: var(--color-text-light); font-size: 0.875rem;">
+                ${keyCount === 0 ? 'No API keys yet' : `${maxKeys - keyCount} slots available`}
+              </p>
+            </div>
+            <div>
+              <a href="/api-keys.html" class="btn btn-secondary">Manage Keys</a>
+            </div>
+          </div>
+        `;
+      } catch (error) {
+        console.error('Failed to load API keys summary:', error);
+        summaryEl.innerHTML = `
+          <div style="color: var(--color-text-light);">
+            <p>Unable to load API keys</p>
+            <a href="/api-keys.html" class="btn btn-secondary" style="margin-top: 0.5rem;">
+              View API Keys
+            </a>
+          </div>
+        `;
+      }
+    }
+    
+    // Load data when page loads
     loadDashboardBalance();
+    loadApiKeysSummary();
   </script>
   <script type="module" src="/js/app.js"></script>
 </body>

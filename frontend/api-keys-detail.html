@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="API Key Details">
+  <title>API Key Details - HashBin.org</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-lg);
+      color: var(--color-text-light);
+      font-size: var(--font-size-sm);
+    }
+    
+    .breadcrumb a {
+      color: var(--color-primary);
+      text-decoration: none;
+    }
+    
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+    
+    .key-header {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-xl);
+    }
+    
+    .key-name-display {
+      font-size: var(--font-size-2xl);
+      font-weight: 600;
+      margin: 0;
+    }
+    
+    .edit-icon {
+      cursor: pointer;
+      color: var(--color-primary);
+      font-size: var(--font-size-lg);
+      padding: var(--spacing-xs);
+      border-radius: var(--radius-sm);
+      transition: background-color 0.2s;
+    }
+    
+    .edit-icon:hover {
+      background-color: var(--color-surface);
+    }
+    
+    .key-name-edit {
+      display: flex;
+      gap: var(--spacing-sm);
+      align-items: center;
+    }
+    
+    .key-name-edit input {
+      font-size: var(--font-size-2xl);
+      font-weight: 600;
+      padding: var(--spacing-sm);
+      border: 2px solid var(--color-primary);
+      border-radius: var(--radius-md);
+    }
+    
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-xl);
+    }
+    
+    .detail-item {
+      padding: var(--spacing-md);
+      background-color: var(--color-surface);
+      border-radius: var(--radius-md);
+    }
+    
+    .detail-label {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-light);
+      margin-bottom: var(--spacing-xs);
+      display: block;
+    }
+    
+    .detail-value {
+      font-size: var(--font-size-lg);
+      font-weight: 500;
+      color: var(--color-text);
+    }
+    
+    .key-prefix {
+      font-family: 'Courier New', monospace;
+      background-color: var(--color-background);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-base);
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+    }
+    
+    .key-env {
+      display: inline-block;
+      padding: 4px var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+    }
+    
+    .key-env.live {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+    
+    .key-env.test {
+      background-color: #e0e7ff;
+      color: #3730a3;
+    }
+    
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+    }
+    
+    .status-badge.active {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+    
+    .status-badge.expired {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+    
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: var(--radius-full);
+    }
+    
+    .status-dot.active {
+      background-color: #10b981;
+    }
+    
+    .status-dot.expired {
+      background-color: #ef4444;
+    }
+    
+    .actions-section {
+      display: flex;
+      gap: var(--spacing-md);
+      flex-wrap: wrap;
+      margin-top: var(--spacing-xl);
+    }
+    
+    .btn-danger {
+      background-color: #ef4444;
+      color: white;
+    }
+    
+    .btn-danger:hover:not(:disabled) {
+      background-color: #dc2626;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .modal.show {
+      display: flex;
+    }
+    
+    .modal-content {
+      background-color: var(--color-background);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-xl);
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .modal-header h2 {
+      margin: 0 0 var(--spacing-lg) 0;
+      font-size: var(--font-size-xl);
+    }
+    
+    .modal-body {
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--spacing-md);
+    }
+    
+    .key-display {
+      background-color: var(--color-surface);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      margin: var(--spacing-lg) 0;
+      word-break: break-all;
+      font-family: 'Courier New', monospace;
+      font-size: var(--font-size-sm);
+    }
+    
+    .copy-btn-inline {
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      cursor: pointer;
+      padding: var(--spacing-xs);
+      font-size: var(--font-size-base);
+    }
+    
+    .copy-btn-inline:hover {
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header">
+    <a href="/" class="logo">HashBin</a>
+    <nav>
+      <a href="/upload.html">Upload</a>
+      <a href="/retrieve.html">Retrieve</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+    <div id="auth-section">
+      <!-- Auth UI will be rendered here by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <nav class="breadcrumb">
+        <a href="/dashboard.html">Dashboard</a>
+        <span>›</span>
+        <a href="/api-keys.html">API Keys</a>
+        <span>›</span>
+        <span id="breadcrumb-name">Loading...</span>
+      </nav>
+      
+      <!-- Loading State -->
+      <div id="loading-state" class="card">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div class="spinner"></div>
+          <span>Loading API key details...</span>
+        </div>
+      </div>
+      
+      <!-- Error State -->
+      <div id="error-state" class="card hidden">
+        <div class="alert alert-error">
+          <p id="error-message"></p>
+          <a href="/api-keys.html" class="btn btn-secondary" style="margin-top: 1rem;">
+            Back to API Keys
+          </a>
+        </div>
+      </div>
+      
+      <!-- Key Details -->
+      <div id="details-container" class="hidden">
+        <!-- Expiration Warning Banner -->
+        <div id="expiration-warning" class="alert alert-warning hidden" style="margin-bottom: var(--spacing-lg);">
+          <!-- Will be populated by JS -->
+        </div>
+        
+        <!-- Key Name (Editable) -->
+        <div class="key-header">
+          <h1 id="key-name-display" class="key-name-display"></h1>
+          <span id="edit-name-btn" class="edit-icon" title="Edit name">✏️</span>
+        </div>
+        
+        <div class="card">
+          <!-- Key Details Grid -->
+          <div class="detail-grid">
+            <div class="detail-item">
+              <span class="detail-label">Key ID</span>
+              <div class="detail-value">
+                <span class="key-prefix">
+                  <span id="key-prefix"></span>
+                  <button class="copy-btn-inline" id="copy-prefix-btn" title="Copy key ID">📋</button>
+                </span>
+              </div>
+            </div>
+            
+            <div class="detail-item">
+              <span class="detail-label">Environment</span>
+              <div class="detail-value">
+                <span id="key-environment" class="key-env"></span>
+              </div>
+            </div>
+            
+            <div class="detail-item">
+              <span class="detail-label">Status</span>
+              <div class="detail-value" id="key-status"></div>
+            </div>
+            
+            <div class="detail-item">
+              <span class="detail-label">Total Requests</span>
+              <div class="detail-value" id="key-usage"></div>
+            </div>
+            
+            <div class="detail-item">
+              <span class="detail-label">Last Used</span>
+              <div class="detail-value" id="key-last-used"></div>
+            </div>
+            
+            <div class="detail-item">
+              <span class="detail-label">Created</span>
+              <div class="detail-value" id="key-created"></div>
+            </div>
+            
+            <div class="detail-item">
+              <span class="detail-label">Expires</span>
+              <div class="detail-value" id="key-expires"></div>
+            </div>
+          </div>
+          
+          <!-- Actions -->
+          <div class="actions-section">
+            <button id="reveal-btn" class="btn btn-primary">
+              🔓 Reveal Key
+            </button>
+            <button id="revoke-btn" class="btn btn-danger">
+              🗑️ Revoke Key
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Reveal Key Modal -->
+  <div id="reveal-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>API Key Revealed</h2>
+      </div>
+      <div class="modal-body">
+        <p>Here is your full API key:</p>
+        
+        <div class="key-display" id="revealed-key-display">
+          <!-- Key will be displayed here -->
+        </div>
+        
+        <button id="copy-revealed-key-btn" class="btn btn-secondary" style="width: 100%;">
+          📋 Copy to Clipboard
+        </button>
+      </div>
+      <div class="modal-footer">
+        <button id="close-reveal-modal-btn" class="btn btn-primary">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revoke Confirmation Modal -->
+  <div id="revoke-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Revoke API Key?</h2>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to revoke "<strong id="revoke-key-name"></strong>"?</p>
+        <p style="margin-top: 1rem; color: var(--color-text-light);">
+          This action cannot be undone. Any applications using this key will immediately lose access.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-revoke-btn" class="btn btn-secondary">
+          Cancel
+        </button>
+        <button id="confirm-revoke-btn" class="btn btn-danger">
+          Revoke Key
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source | 
+      <a href="/docs/">Documentation</a> | 
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { requireAuth } from './js/auth-gate.js';
+    import { showToast, showElement, hideElement, setLoading } from './js/utils.js';
+    import { 
+      listApiKeys,
+      updateApiKeyName,
+      revealApiKey,
+      revokeApiKey,
+      formatUsageCount,
+      formatRelativeTime,
+      getDaysUntilExpiration,
+      isExpiringSoon,
+      isExpired,
+      getKeyPrefix,
+      copyToClipboard
+    } from './js/api-keys.js';
+    import { getSessionToken } from './js/auth.js';
+    
+    // Protect this page - require authentication
+    await requireAuth();
+    
+    // Get key ID from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyId = urlParams.get('id');
+    
+    if (!keyId) {
+      showError('No key ID provided');
+      showElement('#error-state');
+      hideElement('#loading-state');
+    } else {
+      loadKeyDetails();
+    }
+    
+    let currentKey = null;
+    
+    async function loadKeyDetails() {
+      try {
+        const keys = await listApiKeys();
+        currentKey = keys.find(k => k.key_id === keyId);
+        
+        if (!currentKey) {
+          showError('API key not found');
+          return;
+        }
+        
+        displayKeyDetails(currentKey);
+        hideElement('#loading-state');
+        showElement('#details-container');
+        
+      } catch (error) {
+        console.error('Failed to load key details:', error);
+        showError(error.message || 'Failed to load API key details');
+      }
+    }
+    
+    function displayKeyDetails(key) {
+      const expired = isExpired(key.expires_at);
+      const expiringSoon = isExpiringSoon(key.expires_at);
+      const daysUntilExpiration = getDaysUntilExpiration(key.expires_at);
+      const environment = key.key_id.startsWith('hb_live_') ? 'live' : 'test';
+      
+      // Breadcrumb
+      document.getElementById('breadcrumb-name').textContent = key.name;
+      
+      // Key name
+      document.getElementById('key-name-display').textContent = key.name;
+      
+      // Key prefix
+      document.getElementById('key-prefix').textContent = getKeyPrefix(key.key_id);
+      
+      // Environment
+      const envEl = document.getElementById('key-environment');
+      envEl.textContent = environment.toUpperCase();
+      envEl.className = `key-env ${environment}`;
+      
+      // Status
+      const statusEl = document.getElementById('key-status');
+      const statusClass = expired ? 'expired' : 'active';
+      statusEl.innerHTML = `
+        <span class="status-badge ${statusClass}">
+          <span class="status-dot ${statusClass}"></span>
+          ${statusClass === 'active' ? 'Active' : 'Expired'}
+        </span>
+      `;
+      
+      // Usage
+      document.getElementById('key-usage').textContent = 
+        formatUsageCount(key.usage_count || 0) + ' requests';
+      
+      // Last used
+      document.getElementById('key-last-used').textContent = 
+        formatRelativeTime(key.last_used_at);
+      
+      // Created
+      document.getElementById('key-created').textContent = 
+        new Date(key.created_at).toLocaleDateString();
+      
+      // Expires
+      document.getElementById('key-expires').textContent = 
+        new Date(key.expires_at).toLocaleDateString();
+      
+      // Expiration warning
+      if (expiringSoon && !expired) {
+        const warningEl = document.getElementById('expiration-warning');
+        warningEl.innerHTML = `
+          <strong>⚠️ Expiration Warning</strong><br>
+          This API key will expire in ${daysUntilExpiration} ${daysUntilExpiration === 1 ? 'day' : 'days'} 
+          on ${new Date(key.expires_at).toLocaleDateString()}.
+          Consider creating a replacement key before expiration.
+        `;
+        showElement(warningEl);
+      }
+      
+      // Hide revoke button if expired
+      if (expired) {
+        document.getElementById('revoke-btn').style.display = 'none';
+      }
+      
+      // Hide edit and reveal buttons if expired
+      if (expired) {
+        document.getElementById('edit-name-btn').style.display = 'none';
+        document.getElementById('reveal-btn').style.display = 'none';
+      }
+    }
+    
+    function showError(message) {
+      document.getElementById('error-message').textContent = message;
+      showElement('#error-state');
+      hideElement('#loading-state');
+      hideElement('#details-container');
+    }
+    
+    // Copy prefix button
+    document.getElementById('copy-prefix-btn').addEventListener('click', async () => {
+      await copyToClipboard(currentKey.key_id);
+      showToast('Copied to clipboard', 'success', 3000);
+    });
+    
+    // Edit name functionality
+    const keyNameDisplay = document.getElementById('key-name-display');
+    const editNameBtn = document.getElementById('edit-name-btn');
+    let isEditing = false;
+    
+    editNameBtn.addEventListener('click', async () => {
+      if (isEditing) return;
+      
+      isEditing = true;
+      const originalName = keyNameDisplay.textContent;
+      
+      // Replace with input
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = originalName;
+      input.className = 'form-input';
+      input.style.fontSize = 'var(--font-size-2xl)';
+      input.style.fontWeight = '600';
+      input.style.padding = 'var(--spacing-sm)';
+      input.style.border = '2px solid var(--color-primary)';
+      input.style.width = 'auto';
+      input.style.minWidth = '300px';
+      input.maxLength = 100;
+      
+      keyNameDisplay.replaceWith(input);
+      input.focus();
+      input.select();
+      
+      // Save button
+      const saveBtn = document.createElement('button');
+      saveBtn.textContent = '✓';
+      saveBtn.className = 'btn btn-sm btn-primary';
+      saveBtn.style.marginLeft = 'var(--spacing-sm)';
+      
+      // Cancel button
+      const cancelBtn = document.createElement('button');
+      cancelBtn.textContent = '✕';
+      cancelBtn.className = 'btn btn-sm btn-secondary';
+      cancelBtn.style.marginLeft = 'var(--spacing-sm)';
+      
+      editNameBtn.after(saveBtn, cancelBtn);
+      editNameBtn.style.display = 'none';
+      
+      async function saveName() {
+        const newName = input.value.trim();
+        
+        if (newName.length < 1 || newName.length > 100) {
+          showToast('Name must be between 1 and 100 characters', 'error');
+          return;
+        }
+        
+        if (newName === originalName) {
+          cancel();
+          return;
+        }
+        
+        setLoading(saveBtn, true);
+        saveBtn.disabled = true;
+        cancelBtn.disabled = true;
+        
+        try {
+          await updateApiKeyName(currentKey.key_id, newName);
+          
+          currentKey.name = newName;
+          
+          const newDisplay = document.createElement('h1');
+          newDisplay.id = 'key-name-display';
+          newDisplay.className = 'key-name-display';
+          newDisplay.textContent = newName;
+          
+          input.replaceWith(newDisplay);
+          saveBtn.remove();
+          cancelBtn.remove();
+          editNameBtn.style.display = 'inline';
+          isEditing = false;
+          
+          // Update breadcrumb
+          document.getElementById('breadcrumb-name').textContent = newName;
+          
+          showToast('Name updated successfully', 'success');
+          
+        } catch (error) {
+          console.error('Failed to update name:', error);
+          
+          if (error.status === 403 && error.data?.error === 'FRESH_AUTH_REQUIRED') {
+            showToast('Please re-authenticate to edit key names (session must be less than 5 minutes old)', 'error', 5000);
+          } else {
+            showToast(error.message || 'Failed to update name', 'error');
+          }
+          
+          setLoading(saveBtn, false);
+          saveBtn.disabled = false;
+          cancelBtn.disabled = false;
+        }
+      }
+      
+      function cancel() {
+        const newDisplay = document.createElement('h1');
+        newDisplay.id = 'key-name-display';
+        newDisplay.className = 'key-name-display';
+        newDisplay.textContent = originalName;
+        
+        input.replaceWith(newDisplay);
+        saveBtn.remove();
+        cancelBtn.remove();
+        editNameBtn.style.display = 'inline';
+        isEditing = false;
+      }
+      
+      saveBtn.addEventListener('click', saveName);
+      cancelBtn.addEventListener('click', cancel);
+      
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          saveName();
+        } else if (e.key === 'Escape') {
+          cancel();
+        }
+      });
+    });
+    
+    // Reveal key functionality
+    const revealBtn = document.getElementById('reveal-btn');
+    const revealModal = document.getElementById('reveal-modal');
+    const revealedKeyDisplay = document.getElementById('revealed-key-display');
+    const copyRevealedKeyBtn = document.getElementById('copy-revealed-key-btn');
+    const closeRevealModalBtn = document.getElementById('close-reveal-modal-btn');
+    
+    revealBtn.addEventListener('click', async () => {
+      setLoading(revealBtn, true);
+      revealBtn.disabled = true;
+      
+      try {
+        const result = await revealApiKey(currentKey.key_id);
+        
+        revealedKeyDisplay.textContent = result.key;
+        revealModal.classList.add('show');
+        
+      } catch (error) {
+        console.error('Failed to reveal key:', error);
+        
+        if (error.status === 403 && error.data?.error === 'FRESH_AUTH_REQUIRED') {
+          showToast('Please re-authenticate to reveal keys (session must be less than 5 minutes old)', 'error', 5000);
+        } else if (error.status === 429) {
+          showToast(error.data?.message || 'Rate limit exceeded. Please try again later.', 'error', 5000);
+        } else {
+          showToast(error.message || 'Failed to reveal key', 'error');
+        }
+      } finally {
+        setLoading(revealBtn, false);
+        revealBtn.disabled = false;
+      }
+    });
+    
+    copyRevealedKeyBtn.addEventListener('click', async () => {
+      const key = revealedKeyDisplay.textContent;
+      await copyToClipboard(key);
+      showToast('Copied to clipboard', 'success', 3000);
+      copyRevealedKeyBtn.textContent = '✓ Copied!';
+      setTimeout(() => {
+        copyRevealedKeyBtn.textContent = '📋 Copy to Clipboard';
+      }, 3000);
+    });
+    
+    closeRevealModalBtn.addEventListener('click', () => {
+      revealModal.classList.remove('show');
+    });
+    
+    revealModal.addEventListener('click', (e) => {
+      if (e.target === revealModal) {
+        revealModal.classList.remove('show');
+      }
+    });
+    
+    // Revoke key functionality
+    const revokeBtn = document.getElementById('revoke-btn');
+    const revokeModal = document.getElementById('revoke-modal');
+    const revokeKeyName = document.getElementById('revoke-key-name');
+    const cancelRevokeBtn = document.getElementById('cancel-revoke-btn');
+    const confirmRevokeBtn = document.getElementById('confirm-revoke-btn');
+    
+    revokeBtn.addEventListener('click', () => {
+      revokeKeyName.textContent = currentKey.name;
+      revokeModal.classList.add('show');
+    });
+    
+    cancelRevokeBtn.addEventListener('click', () => {
+      revokeModal.classList.remove('show');
+    });
+    
+    confirmRevokeBtn.addEventListener('click', async () => {
+      setLoading(confirmRevokeBtn, true);
+      confirmRevokeBtn.disabled = true;
+      cancelRevokeBtn.disabled = true;
+      
+      try {
+        await revokeApiKey(currentKey.key_id);
+        
+        showToast('API key revoked successfully', 'success');
+        
+        // Redirect to list page
+        setTimeout(() => {
+          window.location.href = '/api-keys.html';
+        }, 1000);
+        
+      } catch (error) {
+        console.error('Failed to revoke key:', error);
+        showToast(error.message || 'Failed to revoke key', 'error');
+        
+        setLoading(confirmRevokeBtn, false);
+        confirmRevokeBtn.disabled = false;
+        cancelRevokeBtn.disabled = false;
+      }
+    });
+    
+    revokeModal.addEventListener('click', (e) => {
+      if (e.target === revokeModal) {
+        revokeModal.classList.remove('show');
+      }
+    });
+  </script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
