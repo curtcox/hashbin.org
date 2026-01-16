@@ -45,6 +45,12 @@ This document contains user stories for the HashBin.org platform, organized by u
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to log out of my session so that I can secure my account when done.
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to delete my account with 2FA confirmation so that I can remove my data when I no longer need the service.
 
+### Navigation & Discoverability
+- [UI: 📋 | API: N/A] **As a user**, I would like to access my dashboard from the navigation menu so that I can easily find my account information.
+- [UI: 📋 | API: N/A] **As a user**, I would like to navigate to API key management from the dashboard so that I can create and manage my API keys.
+- [UI: 📋 | API: N/A] **As a user**, I would like to see all available features in a clear menu structure so that I can discover what the platform offers.
+- [UI: 📋 | API: N/A] **As a user**, I would like consistent navigation across all pages so that I can move between features easily.
+
 ### Balance and Payments
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to view my current account balance so that I know how much credit I have available.
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to view my transaction history so that I can track my spending and deposits.
@@ -104,16 +110,17 @@ This document contains user stories for the HashBin.org platform, organized by u
 ## API Developers
 
 ### API Keys
-- [UI: ✅ | API: ✅] **As a developer**, I would like to generate API keys so that I can access the platform programmatically.
-- [UI: ✅ | API: ✅] **As a developer**, I would like to create up to 25 API keys so that I can separate keys by application or environment.
+- [UI: 📋 | API: ✅] **As a developer**, I would like to generate API keys so that I can access the platform programmatically.
+- [UI: 📋 | API: ✅] **As a developer**, I would like to create up to 25 API keys so that I can separate keys by application or environment.
 - [UI: N/A | API: ✅] **As a developer**, I would like keys with format `hb_live_*` (production) or `hb_test_*` (development) so that I can distinguish environments.
 - [UI: N/A | API: ✅] **As a developer**, I would like keys to expire after a maximum of 5 years so that I'm forced to rotate credentials periodically.
-- [UI: ✅ | API: ✅] **As a developer**, I would like to name my API keys so that I can identify their purpose.
-- [UI: ✅ | API: N/A] **As a developer**, I would like to see API keys only once at creation so that security is maintained.
-- [UI: ✅ | API: ✅] **As a developer**, I would like to list my API keys (without plaintext values) so that I can manage active credentials.
-- [UI: ✅ | API: ✅] **As a developer**, I would like to revoke API keys so that I can disable compromised credentials.
+- [UI: 📋 | API: ✅] **As a developer**, I would like to name my API keys so that I can identify their purpose.
+- [UI: 📋 | API: N/A] **As a developer**, I would like to see API keys only once at creation so that security is maintained.
+- [UI: 📋 | API: ✅] **As a developer**, I would like to list my API keys (without plaintext values) so that I can manage active credentials.
+- [UI: 📋 | API: ✅] **As a developer**, I would like to revoke API keys so that I can disable compromised credentials.
 - [UI: N/A | API: ✅] **As a developer**, I would like keys stored as SHA-256 hashes so that plaintext keys are never exposed in storage.
-- [UI: N/A | API: ✅] **As a developer**, I would like to track when keys were last used so that I can identify inactive keys.
+- [UI: 📋 | API: ✅] **As a developer**, I would like to see when keys were last used so that I can identify inactive keys.
+- [UI: 📋 | API: ✅] **As a developer**, I would like to reveal an API key with fresh session authentication so that I can recover a key if needed.
 
 ### Rate Limits
 - [UI: N/A | API: ✅] **As a developer**, I would like 500 requests/minute per API key so that I can build automated tools.
@@ -252,14 +259,14 @@ This document contains user stories for the HashBin.org platform, organized by u
 ### By Implementation Channel
 
 #### Web UI Status
-- **UI Complete (✅)**: 61 stories
-- **UI Planned (📋)**: 21 stories
-- **UI Not Applicable (N/A)**: 66 stories
+- **UI Complete (✅)**: 55 stories
+- **UI Planned (📋)**: 32 stories
+- **UI Not Applicable (N/A)**: 65 stories
 
 #### API Status
-- **API Complete (✅)**: 95 stories
+- **API Complete (✅)**: 96 stories
 - **API Planned (📋)**: 47 stories
-- **API Not Applicable (N/A)**: 6 stories
+- **API Not Applicable (N/A)**: 9 stories
 
 ### By User Type
 
@@ -268,19 +275,19 @@ This document contains user stories for the HashBin.org platform, organized by u
 - UI Planned: 1 | API Planned: 1
 - UI N/A: 2 | API N/A: 0
 
-#### Content Publishers (32 stories)
+#### Content Publishers (36 stories)
 - UI Complete: 19 | API Complete: 28
-- UI Planned: 3 | API Planned: 2
-- UI N/A: 10 | API N/A: 2
+- UI Planned: 7 | API Planned: 2
+- UI N/A: 10 | API N/A: 6
 
 #### Content Consumers (10 stories)
 - UI Complete: 6 | API Complete: 10
 - UI Planned: 0 | API Planned: 0
 - UI N/A: 4 | API N/A: 0
 
-#### API Developers (17 stories)
-- UI Complete: 6 | API Complete: 14
-- UI Planned: 0 | API Planned: 2
+#### API Developers (18 stories)
+- UI Complete: 0 | API Complete: 15
+- UI Planned: 7 | API Planned: 2
 - UI N/A: 11 | API N/A: 1
 
 #### Content Donors (5 stories)
@@ -303,13 +310,13 @@ This document contains user stories for the HashBin.org platform, organized by u
 - UI Planned: 8 | API Planned: 18
 - UI N/A: 42 | API N/A: 3
 
-### Total User Stories: 148
+### Total User Stories: 152
 
 ### Overall Progress
-- **Fully Complete (UI ✅ & API ✅)**: 56 stories (38%)
-- **Partially Complete (UI ✅ or API ✅)**: 45 stories (30%)
-- **Fully Planned (UI 📋 & API 📋)**: 41 stories (28%)
-- **Mixed Status**: 6 stories (4%)
+- **Fully Complete (UI ✅ & API ✅)**: 55 stories (36%)
+- **Partially Complete (UI ✅ or API ✅)**: 41 stories (27%)
+- **Fully Planned (UI 📋 & API 📋)**: 45 stories (30%)
+- **Mixed Status**: 11 stories (7%)
 
 ---
 
@@ -338,9 +345,17 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ---
 
-**Document Version:** 2.0
+**Document Version:** 2.1
 **Last Updated:** 2026-01-16
 **Status:** Comprehensive list with separate UI/API status tracking
+
+**Changes in v2.1:**
+- Corrected API key management stories: UI is 📋 (planned), not ✅ (complete)
+- Added 4 new "Navigation & Discoverability" stories under Content Publishers
+- Added 1 new story: reveal API key with fresh session authentication
+- Updated summary: 152 total stories (was 148)
+- Updated stats: UI 55 complete (was 61), UI 32 planned (was 21)
+
 **Changes in v2.0:**
 - Added separate status indicators for Web UI and API implementation
 - Each story now shows [UI: status | API: status] format
