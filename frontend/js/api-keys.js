@@ -84,10 +84,13 @@ export async function revokeApiKey(keyId) {
  * @returns {string} Formatted count (e.g., "1.2K", "3.4M")
  */
 export function formatUsageCount(count) {
+  const THOUSAND = 1000;
+  const MILLION = 1000000;
+  
   if (count === 0) return '0';
-  if (count < 1000) return count.toString();
-  if (count < 1000000) return (count / 1000).toFixed(1) + 'K';
-  return (count / 1000000).toFixed(1) + 'M';
+  if (count < THOUSAND) return count.toString();
+  if (count < MILLION) return (count / THOUSAND).toFixed(1) + 'K';
+  return (count / MILLION).toFixed(1) + 'M';
 }
 
 /**
@@ -98,21 +101,26 @@ export function formatUsageCount(count) {
 export function formatRelativeTime(timestamp) {
   if (!timestamp) return 'Never';
   
+  const SECONDS_PER_MINUTE = 60;
+  const SECONDS_PER_HOUR = 3600;
+  const SECONDS_PER_DAY = 86400;
+  const SECONDS_PER_MONTH = 2592000;
+  
   const now = new Date();
   const date = new Date(timestamp);
   const seconds = Math.floor((now - date) / 1000);
   
-  if (seconds < 60) return 'Just now';
-  if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60);
+  if (seconds < SECONDS_PER_MINUTE) return 'Just now';
+  if (seconds < SECONDS_PER_HOUR) {
+    const minutes = Math.floor(seconds / SECONDS_PER_MINUTE);
     return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`;
   }
-  if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600);
+  if (seconds < SECONDS_PER_DAY) {
+    const hours = Math.floor(seconds / SECONDS_PER_HOUR);
     return `${hours} hour${hours !== 1 ? 's' : ''} ago`;
   }
-  if (seconds < 2592000) {
-    const days = Math.floor(seconds / 86400);
+  if (seconds < SECONDS_PER_MONTH) {
+    const days = Math.floor(seconds / SECONDS_PER_DAY);
     return `${days} day${days !== 1 ? 's' : ''} ago`;
   }
   

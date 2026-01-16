@@ -320,8 +320,9 @@
       let hasError = false;
       
       if (name.length < 1 || name.length > 100) {
-        document.getElementById('name-error').textContent = 'Name must be between 1 and 100 characters';
-        showElement('#name-error');
+        const nameError = document.getElementById('name-error');
+        nameError.textContent = 'Name must be between 1 and 100 characters';
+        nameError.classList.remove('hidden');
         hasError = true;
       }
       
@@ -330,8 +331,9 @@
       expirationDate.setHours(0, 0, 0, 0);
       
       if (expirationDate < now) {
-        document.getElementById('expiration-error').textContent = 'Expiration date cannot be in the past';
-        showElement('#expiration-error');
+        const expirationError = document.getElementById('expiration-error');
+        expirationError.textContent = 'Expiration date cannot be in the past';
+        expirationError.classList.remove('hidden');
         hasError = true;
       }
       
@@ -340,8 +342,9 @@
       maxDate.setHours(0, 0, 0, 0);
       
       if (expirationDate > maxDate) {
-        document.getElementById('expiration-error').textContent = 'Expiration date cannot be more than 5 years from now';
-        showElement('#expiration-error');
+        const expirationError = document.getElementById('expiration-error');
+        expirationError.textContent = 'Expiration date cannot be more than 5 years from now';
+        expirationError.classList.remove('hidden');
         hasError = true;
       }
       
