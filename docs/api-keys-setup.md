@@ -26,11 +26,8 @@ This will output a base64-encoded encryption key. **Save this key securely!**
 Add the encryption key as a Cloudflare secret using Wrangler:
 
 ```bash
-# For development environment
-echo 'YOUR_KEY_HERE' | wrangler secret put API_KEY_ENCRYPTION_KEY --env development
-
-# For production environment
-echo 'YOUR_KEY_HERE' | wrangler secret put API_KEY_ENCRYPTION_KEY --env production
+# For production (there is only one environment)
+echo 'YOUR_KEY_HERE' | wrangler secret put API_KEY_ENCRYPTION_KEY
 ```
 
 **Important:** Replace `YOUR_KEY_HERE` with the actual key from step 1.
@@ -40,11 +37,8 @@ echo 'YOUR_KEY_HERE' | wrangler secret put API_KEY_ENCRYPTION_KEY --env producti
 Deploy your Worker with the new API keys functionality:
 
 ```bash
-# Deploy to development
-npm run deploy:dev
-
 # Deploy to production
-npm run deploy:prod
+npm run deploy
 ```
 
 ## API Endpoints
@@ -57,7 +51,7 @@ Authorization: Bearer <clerk-jwt>
 Content-Type: application/json
 
 {
-  "name": "My CI/CD Key",
+  "name": "My CI/CD Key",  # Optional, defaults to "Hosting" or "Hosting n"
   "expires_at": "2025-12-31T23:59:59Z"  # Optional, defaults to 5 years
 }
 ```
@@ -66,15 +60,17 @@ Response:
 ```json
 {
   "key_id": "uuid-here",
-  "name": "My CI/CD Key",
+  "name": "Hosting",
   "created_at": "2024-01-15T12:00:00Z",
   "expires_at": "2029-01-15T12:00:00Z",
-  "api_key": "hb_live_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234",
+  "api_key": "hb_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234",
   "warning": "Save this API key securely. It will not be shown again."
 }
 ```
 
-**Note:** The `api_key` is only returned once during creation.
+**Note:** 
+- The `api_key` is only returned once during creation.
+- If no name is provided, defaults to "Hosting" for first key, or "Hosting n" (n >= 2) for subsequent keys.
 
 ### List API Keys
 
@@ -111,7 +107,7 @@ Response:
 {
   "key_id": "uuid-here",
   "name": "My CI/CD Key",
-  "api_key": "hb_live_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234",
+  "api_key": "hb_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234",
   "created_at": "2024-01-15T12:00:00Z",
   "expires_at": "2029-01-15T12:00:00Z",
   "last_used_at": "2024-01-16T08:30:00Z",
@@ -146,11 +142,11 @@ API keys can be used instead of Clerk sessions for authenticated requests:
 
 ```bash
 # Method 1: Authorization header
-curl -H "Authorization: ApiKey hb_live_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234" \
+curl -H "Authorization: ApiKey hb_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234" \
   https://hashbin.org/api/content
 
 # Method 2: X-API-Key header
-curl -H "X-API-Key: hb_live_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234" \
+curl -H "X-API-Key: hb_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234" \
   https://hashbin.org/api/content
 ```
 
@@ -159,7 +155,7 @@ curl -H "X-API-Key: hb_live_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234" \
 1. **Encryption at Rest:** API keys are stored both hashed (SHA-256) and encrypted (AES-256-GCM)
 2. **Fresh Session Required:** Revealing keys requires recent authentication
 3. **Rate Limited:** Reveals are limited to 3 per hour per key
-4. **Environment Isolation:** Test keys (`hb_test_*`) won't work in production
+4. **Backward Compatible:** Legacy formats (`hb_live_*`, `hb_test_*`) still supported
 5. **Non-Replicating:** API keys cannot create/list/revoke/reveal other keys
 6. **Expiration:** Keys expire after maximum 5 years
 7. **Revocable:** Keys can be immediately revoked
@@ -193,10 +189,11 @@ Your Clerk session is older than 5 minutes. Re-authenticate in your app to get a
 
 You've revealed this key 3 times in the last hour. Wait for the rate limit to reset (check `retry_after_seconds` in response).
 
-### Test/Live key environment mismatch
+### Backward Compatibility
 
-- Test keys (`hb_test_*`) can only be used in development
-- Live keys (`hb_live_*`) can only be used in production
+- New keys use the `hb_` prefix format
+- Legacy formats (`hb_test_*`, `hb_live_*`) are still accepted for existing keys
+- All formats work in production (there is only one environment)
 
 ## Next Steps
 

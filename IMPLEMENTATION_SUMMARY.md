@@ -37,7 +37,8 @@ The Key Management UI has been fully implemented as specified in `todo/key_manag
   - Warning about one-time display
   - "I have saved this key" checkbox (required to close)
   - Confirmation if user tries to close without checking
-- **Key Prefix**: `hb_live_*`
+- **Key Prefix**: `hb_*` (legacy formats `hb_live_*` and `hb_test_*` still supported)
+- **Smart Default Naming**: Defaults to "Hosting" for first key, or "Hosting n" for subsequent keys
 
 #### 3. API Key Detail Page (`/api-keys-detail.html`)
 - **Key Details Display**:

@@ -172,19 +172,18 @@
         <form id="create-key-form">
           <!-- Name Field -->
           <div class="form-group">
-            <label for="key-name" class="form-label">Key Name *</label>
+            <label for="key-name" class="form-label">Key Name</label>
             <input 
               type="text" 
               id="key-name" 
               name="name" 
               class="form-input" 
-              placeholder="My API Key"
-              required
+              placeholder="Leave empty for auto-generated name"
               minlength="1"
               maxlength="100"
             >
             <span class="form-help">
-              A descriptive name to help you identify this key (1-100 characters)
+              A descriptive name to help you identify this key. If left empty, defaults to "Hosting" (or "Hosting n" if that name already exists)
             </span>
             <span id="name-error" class="form-error hidden"></span>
           </div>
@@ -305,9 +304,10 @@
       
       let hasError = false;
       
-      if (name.length < 1 || name.length > 100) {
+      // Name is optional, but if provided must be valid
+      if (name.length > 100) {
         const nameError = document.getElementById('name-error');
-        nameError.textContent = 'Name must be between 1 and 100 characters';
+        nameError.textContent = 'Name must be 100 characters or less';
         nameError.classList.remove('hidden');
         hasError = true;
       }
@@ -343,13 +343,19 @@
       submitBtn.disabled = true;
       
       try {
-        const result = await createApiKey({
-          name: name,
+        const payload = {
           expiresAt: expirationInput.value + 'T00:00:00Z'
-        });
+        };
+        
+        // Only include name if provided
+        if (name.length > 0) {
+          payload.name = name;
+        }
+        
+        const result = await createApiKey(payload);
         
         // Show the key in modal
-        showKeyModal(result.key);
+        showKeyModal(result.api_key);
         
       } catch (error) {
         console.error('Failed to create API key:', error);

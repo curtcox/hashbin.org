@@ -76,12 +76,55 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Verify required secrets
+        run: |
+          echo "Verifying required secrets are configured..."
+          
+          # Check for required secrets
+          MISSING_SECRETS=""
+          
+          if [ -z "$CLERK_SECRET_KEY" ]; then
+            MISSING_SECRETS="$MISSING_SECRETS CLERK_SECRET_KEY"
+          fi
+          
+          if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
+            MISSING_SECRETS="$MISSING_SECRETS CLERK_PUBLISHABLE_KEY"
+          fi
+          
+          if [ -z "$API_KEY_ENCRYPTION_KEY" ]; then
+            MISSING_SECRETS="$MISSING_SECRETS API_KEY_ENCRYPTION_KEY"
+          fi
+          
+          if [ -z "$STRIPE_SECRET_KEY" ]; then
+            MISSING_SECRETS="$MISSING_SECRETS STRIPE_SECRET_KEY"
+          fi
+          
+          if [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
+            MISSING_SECRETS="$MISSING_SECRETS STRIPE_WEBHOOK_SECRET"
+          fi
+          
+          if [ -n "$MISSING_SECRETS" ]; then
+            echo "❌ ERROR: The following required secrets are missing:$MISSING_SECRETS"
+            echo ""
+            echo "Please configure these secrets in your GitHub repository settings:"
+            echo "Settings > Secrets and variables > Actions > New repository secret"
+            echo ""
+            echo "For more information, see docs/api-keys-setup.md"
+            exit 1
+          fi
+          
+          echo "✅ All required secrets are configured"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
       - name: Configure Clerk secrets
         run: |
-          if [ -z "$CLERK_SECRET_KEY" ] || [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
-            echo "⚠️  Skipping Clerk secrets configuration (secrets not set)"
-            exit 0
-          fi
           echo "Configuring Clerk secrets..."
           echo "$CLERK_SECRET_KEY" | npx wrangler secret put CLERK_SECRET_KEY
           echo "$CLERK_PUBLISHABLE_KEY" | npx wrangler secret put CLERK_PUBLISHABLE_KEY
@@ -94,10 +137,6 @@ jobs:
 
       - name: Configure Stripe secrets
         run: |
-          if [ -z "$STRIPE_SECRET_KEY" ] || [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
-            echo "⚠️  Skipping Stripe secrets configuration (secrets not set)"
-            exit 0
-          fi
           echo "Configuring Stripe secrets..."
           echo "$STRIPE_SECRET_KEY" | npx wrangler secret put STRIPE_SECRET_KEY
           echo "$STRIPE_WEBHOOK_SECRET" | npx wrangler secret put STRIPE_WEBHOOK_SECRET
@@ -107,6 +146,16 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+
+      - name: Configure API key encryption secret
+        run: |
+          echo "Configuring API key encryption secret..."
+          echo "$API_KEY_ENCRYPTION_KEY" | npx wrangler secret put API_KEY_ENCRYPTION_KEY
+          echo "✅ API key encryption secret configured"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
 
       - name: Wait for deployment propagation
         run: sleep 10

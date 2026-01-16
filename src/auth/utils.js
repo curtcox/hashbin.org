@@ -7,15 +7,16 @@ import { AUTH_ERROR_CODES } from './middleware.js';
 
 // API key format constants
 const API_KEY_LENGTH = 32; // Random alphanumeric characters
-const LIVE_PREFIX = 'hb_live_';
+const PREFIX = 'hb_';
+const LEGACY_PREFIX = 'hb_live_'; // Legacy format for backward compatibility
 
 /**
  * Generate a cryptographically secure API key
- * Format: hb_live_<32-chars>
+ * Format: hb_<32-chars>
  */
 export function generateApiKey() {
   const randomPart = generateRandomString(API_KEY_LENGTH);
-  return LIVE_PREFIX + randomPart;
+  return PREFIX + randomPart;
 }
 
 /**
@@ -65,7 +66,7 @@ export async function hashApiKey(apiKey) {
 /**
  * Validate API key format
  * Checks prefix and length
- * Accepts both hb_live_ and legacy hb_test_ prefixes for backward compatibility
+ * Accepts both current hb_ prefix and legacy hb_live_ and hb_test_ prefixes for backward compatibility
  */
 export function validateApiKeyFormat(apiKey) {
   if (!apiKey || typeof apiKey !== 'string') {
@@ -76,20 +77,29 @@ export function validateApiKeyFormat(apiKey) {
     };
   }
 
-  // Check for correct prefix (accept both live and legacy test prefixes)
-  const hasLivePrefix = apiKey.startsWith(LIVE_PREFIX);
+  // Check for correct prefix (accept current and legacy prefixes)
+  const hasPrefix = apiKey.startsWith(PREFIX);
+  const hasLegacyLivePrefix = apiKey.startsWith(LEGACY_PREFIX);
   const hasLegacyTestPrefix = apiKey.startsWith('hb_test_');
 
-  if (!hasLivePrefix && !hasLegacyTestPrefix) {
+  if (!hasPrefix && !hasLegacyLivePrefix && !hasLegacyTestPrefix) {
     return {
       valid: false,
       error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
-      message: 'API key must start with hb_live_'
+      message: 'API key must start with hb_'
     };
   }
 
-  // Check length
-  const prefix = hasLivePrefix ? LIVE_PREFIX : 'hb_test_';
+  // Check length based on prefix
+  let prefix;
+  if (hasPrefix) {
+    prefix = PREFIX;
+  } else if (hasLegacyLivePrefix) {
+    prefix = LEGACY_PREFIX;
+  } else {
+    prefix = 'hb_test_';
+  }
+  
   const expectedLength = prefix.length + API_KEY_LENGTH;
 
   if (apiKey.length !== expectedLength) {
@@ -127,12 +137,21 @@ export function generateKeyId() {
 
 /**
  * Validate key name
+ * Empty names are allowed (will use smart default)
  */
 export function validateKeyName(name) {
-  if (!name || typeof name !== 'string') {
+  // Empty name is allowed - will use smart default
+  if (!name || name.trim() === '') {
+    return {
+      valid: true,
+      message: null
+    };
+  }
+  
+  if (typeof name !== 'string') {
     return {
       valid: false,
-      message: 'Key name is required'
+      message: 'Key name must be a string'
     };
   }
 
