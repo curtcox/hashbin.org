@@ -4,6 +4,8 @@
  */
 
 import { generate256tHash, getContentSize, formatFileSize, isInlineContent } from './hash256t.js';
+import { authenticatedFetch } from './utils.js';
+import { getSessionToken } from './auth.js';
 
 // Constants
 const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
@@ -56,9 +58,7 @@ async function init() {
  */
 async function loadBalance() {
   try {
-    const response = await fetch('/api/balance', {
-      credentials: 'include'
-    });
+    const response = await authenticatedFetch('/api/balance');
     
     if (response.ok) {
       const data = await response.json();
@@ -331,11 +331,21 @@ async function handleUpload(event) {
     // Create abort controller
     uploadAbortController = new AbortController();
     
+    // Get auth token
+    const token = await getSessionToken();
+    if (!token) {
+      hideUploadProgress();
+      showError('Not authenticated. Please sign in again.');
+      return;
+    }
+    
     // Upload
     const response = await fetch('/api/content', {
       method: 'POST',
       body: formData,
-      credentials: 'include',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
       signal: uploadAbortController.signal
     });
     
