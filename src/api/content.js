@@ -627,6 +627,7 @@ export async function handleDownloadContent(request, env, cid, extension = null)
 
     // Check if this is inline content
     if (isInlineContent(cid)) {
+      // Inline content has no rate limit - serve immediately
       // Extract content from CID itself
       const contentBytes = extractInlineContent(cid);
       
@@ -647,7 +648,7 @@ export async function handleDownloadContent(request, env, cid, extension = null)
         });
       }
 
-      // Return inline content
+      // Return inline content (no rate limit check)
       return new Response(contentBytes, {
         status: 200,
         headers: headers
@@ -696,6 +697,26 @@ export async function handleDownloadContent(request, env, cid, extension = null)
         }
       );
     }
+
+    // Check rate limit before serving content
+    const rateLimitResponse = await contentMetadataStub.fetch(
+      new Request('http://internal/rate-limit/check', {
+        method: 'POST'
+      })
+    );
+
+    if (!rateLimitResponse.ok) {
+      // Rate limit exceeded (429) or other error
+      if (rateLimitResponse.status === 429) {
+        // Return the rate limit error response as-is
+        return rateLimitResponse;
+      }
+      // Other errors (404, 500, etc.)
+      return rateLimitResponse;
+    }
+
+    // Rate limit check passed, get the rate limit info for headers
+    const rateLimitData = await rateLimitResponse.json();
 
     // TODO: Check if content is contested (451 status)
     // This will be implemented when the contest system is added (Phase 5 of master plan)
@@ -761,6 +782,15 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     // Set Content-Length header
     if (r2Object.size) {
       headers['Content-Length'] = r2Object.size.toString();
+    }
+
+    // Add rate limit headers
+    if (rateLimitData.next_available_at) {
+      const nextAvailableTimestamp = Math.floor(new Date(rateLimitData.next_available_at).getTime() / 1000);
+      headers['X-RateLimit-Content-Reset'] = nextAvailableTimestamp.toString();
+    }
+    if (rateLimitData.effective_mtbr_ms) {
+      headers['X-RateLimit-Content-MTBR-Ms'] = rateLimitData.effective_mtbr_ms.toString();
     }
 
     // Handle range response

@@ -41,6 +41,11 @@ import {
   handleDownloadContent
 } from './api/content.js';
 
+import { 
+  handlePurchaseRateLimit, 
+  handleGetRateLimit 
+} from './api/rate-limit.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -251,6 +256,16 @@ function handleApiRoutes(url, request, env) {
   if (url.pathname.startsWith('/api/content/') && url.pathname.endsWith('/extend') && request.method === 'POST') {
     const cid = url.pathname.split('/')[3];
     return handleExtendContent(request, env, cid);
+  }
+
+  // Rate limit API routes
+  if (url.pathname === '/api/content/rate-limit/purchase' && request.method === 'POST') {
+    return handlePurchaseRateLimit(request, env);
+  }
+
+  if (url.pathname.startsWith('/api/content/') && url.pathname.endsWith('/rate-limit') && request.method === 'GET') {
+    const cid = url.pathname.split('/')[3];
+    return handleGetRateLimit(request, env, cid);
   }
 
   // Donation API route (public - no auth required)

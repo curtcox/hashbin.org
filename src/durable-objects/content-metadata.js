@@ -2,6 +2,11 @@
  * ContentMetadata Durable Object
  * Stores metadata for uploaded content including hash, size, expiration, and contest status
  */
+
+// Rate limiting constants
+const DEFAULT_RATE_LIMIT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
+const MINIMUM_MTBR_MS = 100; // Minimum time between requests: 100ms
+
 export class ContentMetadata {
   constructor(state, env) {
     this.state = state;
@@ -38,6 +43,22 @@ export class ContentMetadata {
       // Increment download count
       if (url.pathname === '/increment-download' && method === 'POST') {
         return await this.incrementDownloadCount();
+      }
+
+      // Check and update rate limit
+      if (url.pathname === '/rate-limit/check' && method === 'POST') {
+        return await this.checkRateLimit();
+      }
+
+      // Get rate limit status
+      if (url.pathname === '/rate-limit' && method === 'GET') {
+        return await this.getRateLimitStatus();
+      }
+
+      // Purchase rate limit
+      if (url.pathname === '/rate-limit/purchase' && method === 'POST') {
+        const data = await request.json();
+        return await this.purchaseRateLimit(data);
       }
 
       return new Response('Not Found', { status: 404 });
@@ -86,6 +107,10 @@ export class ContentMetadata {
       expires_at.setDate(0); // Sets to last day of previous month
     }
 
+    // Determine if content is inline (≤64 bytes)
+    // Inline content doesn't need rate limiting
+    const isInline = data.size_bytes <= 64;
+
     const content = {
       hash_256t: data.hash_256t,
       size_bytes: data.size_bytes,
@@ -100,7 +125,15 @@ export class ContentMetadata {
           payer_id: data.uploader_id,
           created_at: created_at.toISOString()
         }
-      ]
+      ],
+      // Rate limiting fields
+      last_served_at: null,
+      rate_limit_records: [],
+      // Set default rate limit for non-inline content only
+      default_rate_limit: isInline ? null : {
+        min_time_between_requests_ms: DEFAULT_RATE_LIMIT_MS,
+        expires_at: new Date(created_at.getTime() + DEFAULT_RATE_LIMIT_MS).toISOString()
+      }
     };
 
     await this.state.storage.put('content', content);
@@ -258,5 +291,259 @@ export class ContentMetadata {
         headers: { 'content-type': 'application/json' }
       }
     );
+  }
+
+  /**
+   * Check rate limit and update last_served_at if allowed
+   * Returns 200 if allowed, 429 if rate limited
+   */
+  async checkRateLimit() {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const now = new Date();
+    const effectiveMTBR = this.getEffectiveMTBR(content, now);
+
+    // If MTBR is infinite, content is rate limited
+    if (effectiveMTBR === Infinity) {
+      return new Response(
+        JSON.stringify({
+          error: 'rate_limit_exceeded',
+          message: 'Rate limit exceeded. Purchase bandwidth to serve this content.',
+          cid: content.hash_256t,
+          retry_after_seconds: null,
+          next_available_at: null
+        }),
+        {
+          status: 429,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Check if this is the first request (last_served_at is null)
+    if (!content.last_served_at) {
+      // Allow the first request
+      content.last_served_at = now.toISOString();
+      await this.state.storage.put('content', content);
+
+      const nextAvailableAt = new Date(now.getTime() + effectiveMTBR);
+      return new Response(
+        JSON.stringify({
+          allowed: true,
+          next_available_at: nextAvailableAt.toISOString(),
+          effective_mtbr_ms: effectiveMTBR
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Check if enough time has passed
+    const lastServedAt = new Date(content.last_served_at);
+    const timeSinceLastServed = now.getTime() - lastServedAt.getTime();
+
+    if (timeSinceLastServed >= effectiveMTBR) {
+      // Allow the request
+      content.last_served_at = now.toISOString();
+      await this.state.storage.put('content', content);
+
+      const nextAvailableAt = new Date(now.getTime() + effectiveMTBR);
+      return new Response(
+        JSON.stringify({
+          allowed: true,
+          next_available_at: nextAvailableAt.toISOString(),
+          effective_mtbr_ms: effectiveMTBR
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Rate limited
+    const nextAvailableAt = new Date(lastServedAt.getTime() + effectiveMTBR);
+    const retryAfterSeconds = Math.ceil((nextAvailableAt.getTime() - now.getTime()) / 1000);
+
+    return new Response(
+      JSON.stringify({
+        error: 'rate_limit_exceeded',
+        message: `Rate limit exceeded. Wait until ${nextAvailableAt.toISOString()}`,
+        cid: content.hash_256t,
+        retry_after_seconds: retryAfterSeconds,
+        next_available_at: nextAvailableAt.toISOString()
+      }),
+      {
+        status: 429,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Get rate limit status (does not update last_served_at)
+   */
+  async getRateLimitStatus() {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const now = new Date();
+    const isInline = content.size_bytes <= 64;
+    const effectiveMTBR = this.getEffectiveMTBR(content, now);
+
+    // Get active rate limits
+    const activeRateLimits = (content.rate_limit_records || [])
+      .filter(record => {
+        const startsAt = new Date(record.starts_at);
+        const expiresAt = new Date(record.expires_at);
+        return startsAt <= now && expiresAt > now;
+      })
+      .map(record => ({
+        record_id: record.record_id,
+        min_time_between_requests_ms: record.min_time_between_requests_ms,
+        expires_at: record.expires_at
+      }));
+
+    // Calculate next_available_at
+    let nextAvailableAt = null;
+    if (content.last_served_at && effectiveMTBR !== Infinity) {
+      const lastServedAt = new Date(content.last_served_at);
+      const calculatedNextAvailable = new Date(lastServedAt.getTime() + effectiveMTBR);
+      if (calculatedNextAvailable > now) {
+        nextAvailableAt = calculatedNextAvailable.toISOString();
+      }
+    }
+
+    return new Response(
+      JSON.stringify({
+        cid: content.hash_256t,
+        size_bytes: content.size_bytes,
+        is_inline: isInline,
+        last_served_at: content.last_served_at,
+        effective_mtbr_ms: effectiveMTBR === Infinity ? null : effectiveMTBR,
+        next_available_at: nextAvailableAt,
+        is_rate_limited: effectiveMTBR === Infinity,
+        active_rate_limits: activeRateLimits,
+        default_rate_limit: content.default_rate_limit,
+        content_expires_at: content.expires_at
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Purchase rate limit bandwidth for this content
+   */
+  async purchaseRateLimit(data) {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Create rate limit record
+    const now = new Date();
+    const record = {
+      record_id: data.record_id,
+      payer_id: data.payer_id,
+      min_time_between_requests_ms: data.min_time_between_requests_ms,
+      starts_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + data.duration_seconds * 1000).toISOString(),
+      max_requests: data.max_requests,
+      max_bytes: data.max_bytes,
+      price_cents: data.price_cents,
+      created_at: now.toISOString()
+    };
+
+    // Initialize rate_limit_records if not present (for existing content)
+    if (!content.rate_limit_records) {
+      content.rate_limit_records = [];
+    }
+
+    content.rate_limit_records.push(record);
+    await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({
+        record_id: record.record_id,
+        starts_at: record.starts_at,
+        expires_at: record.expires_at
+      }),
+      {
+        status: 201,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Calculate effective minimum time between requests
+   * Returns Infinity if no active rate limits exist
+   */
+  getEffectiveMTBR(content, now) {
+    const activeRateLimits = [];
+
+    // Check purchased rate limits
+    if (content.rate_limit_records) {
+      for (const record of content.rate_limit_records) {
+        const startsAt = new Date(record.starts_at);
+        const expiresAt = new Date(record.expires_at);
+        if (startsAt <= now && expiresAt > now) {
+          activeRateLimits.push(record.min_time_between_requests_ms);
+        }
+      }
+    }
+
+    // Check default rate limit
+    if (content.default_rate_limit) {
+      const expiresAt = new Date(content.default_rate_limit.expires_at);
+      if (expiresAt > now) {
+        activeRateLimits.push(content.default_rate_limit.min_time_between_requests_ms);
+      }
+    }
+
+    // If no active rate limits, return Infinity (blocked)
+    if (activeRateLimits.length === 0) {
+      return Infinity;
+    }
+
+    // Return the lowest MTBR (most permissive)
+    return Math.min(...activeRateLimits);
   }
 }
