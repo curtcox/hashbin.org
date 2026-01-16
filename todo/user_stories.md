@@ -21,18 +21,27 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ### Service Discovery
 - [UI: N/A | API: ✅] **As an anonymous visitor**, I would like to view the service information so that I can understand what HashBin.org offers.
+  - _Paths: API: `GET /`_
 - [UI: N/A | API: ✅] **As an anonymous visitor**, I would like to check the platform health status so that I can verify the service is operational.
+  - _Paths: API: `GET /health`_
 
 ### Content Access
 - [UI: ✅ | API: ✅] **As an anonymous user**, I would like to download content using its 256t hash so that I can retrieve files without authentication.
+  - _Paths: UI: `/retrieve.html` | API: `GET /{hash}`, `GET /{hash}.{ext}`_
 - [UI: ✅ | API: ✅] **As an anonymous user**, I would like to see content metadata (size, upload date, expiration) so that I can verify the content before downloading.
+  - _Paths: UI: `/info.html` | API: `GET /api/content/{cid}`, `GET /api/content/{cid}/exists`_
 - [UI: ✅ | API: ✅] **As an anonymous user**, I would like to download content with a file extension hint so that my browser handles the file type correctly.
+  - _Paths: UI: `/retrieve.html` | API: `GET /{hash}.{ext}`_
 - [UI: N/A | API: ✅] **As an anonymous user**, I would like to resume interrupted downloads using HTTP Range requests so that I don't have to restart large downloads.
+  - _Paths: API: `GET /{hash}` (with Range header)_
 - [UI: ✅ | API: ✅] **As an anonymous user**, I would like inline content (≤64 bytes) to be served directly from the hash so that small files load instantly without storage overhead.
+  - _Paths: UI: `/retrieve.html` | API: `GET /{hash}` (inline content auto-detected)_
 
 ### Rate Limiting
 - [UI: ✅ | API: ✅] **As an anonymous user**, I would like to check content rate limit status so that I know if I can download the content.
+  - _Paths: UI: `/info.html` | API: `GET /api/content/{cid}/rate-limit`_
 - [UI: 📋 | API: 📋] **As an anonymous user**, I would like clear error messages when rate limited so that I understand when I can retry.
+  - _Paths: UI: All pages (planned) | API: HTTP 429 responses (planned)_
 
 ---
 
@@ -40,53 +49,91 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ### Account Management
 - [UI: ✅ | API: ✅] **As a new user**, I would like to authenticate with Google, Apple, Microsoft, or GitHub so that I can create an account without managing passwords.
+  - _Paths: UI: All pages (Clerk widget) | API: Clerk OAuth endpoints_
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to link multiple OAuth providers to my account so that I can sign in using different services.
+  - _Paths: UI: All pages (Clerk widget) | API: Clerk account linking_
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to view my current session information so that I can verify my authentication status.
+  - _Paths: UI: Header auth section | API: `GET /api/auth/session`_
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to log out of my session so that I can secure my account when done.
+  - _Paths: UI: Header auth section | API: `POST /api/auth/logout`_
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to delete my account with 2FA confirmation so that I can remove my data when I no longer need the service.
+  - _Paths: UI: `/dashboard/account/` (planned) | API: `DELETE /api/auth/account`_
 
 ### Navigation & Discoverability
 - [UI: 📋 | API: N/A] **As a user**, I would like to access my dashboard from the navigation menu so that I can easily find my account information.
+  - _Paths: UI: Header navigation → `/dashboard.html` (planned link)_
 - [UI: 📋 | API: N/A] **As a user**, I would like to navigate to API key management from the dashboard so that I can create and manage my API keys.
+  - _Paths: UI: `/dashboard.html` → `/dashboard/api-keys/` (planned)_
 - [UI: 📋 | API: N/A] **As a user**, I would like to see all available features in a clear menu structure so that I can discover what the platform offers.
+  - _Paths: UI: Dashboard sidebar navigation (planned)_
 - [UI: 📋 | API: N/A] **As a user**, I would like consistent navigation across all pages so that I can move between features easily.
+  - _Paths: UI: All pages (header/footer/sidebar planned)_
 - [UI: 📋 | API: N/A] **As a user**, I would like to view a site map showing all available pages and features so that I can understand the full platform structure.
+  - _Paths: UI: `/sitemap.html` or footer link (planned)_
 - [UI: 📋 | API: N/A] **As a user**, I would like clear visual indicators of which section I'm currently viewing so that I always know where I am.
+  - _Paths: UI: All pages (active nav indicators planned)_
 - [UI: 📋 | API: N/A] **As a user**, I would like breadcrumb navigation on nested pages so that I can easily navigate back to parent sections.
+  - _Paths: UI: Dashboard subpages (breadcrumbs planned)_
 
 ### Balance and Payments
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to view my current account balance so that I know how much credit I have available.
+  - _Paths: UI: `/dashboard.html`, header balance display | API: `GET /api/balance`_
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to view my transaction history so that I can track my spending and deposits.
+  - _Paths: UI: `/dashboard.html` (basic), `/dashboard/transactions/` (planned) | API: `GET /api/balance/history`_
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to deposit funds using credit card, Apple Pay, Google Pay, or ACH so that I can pay for content storage.
+  - _Paths: UI: `/deposit.html` | API: `POST /api/balance/deposit`_
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to see the deposit amount processed via Stripe Checkout so that I can complete payments securely.
+  - _Paths: UI: `/deposit.html` → Stripe Checkout | API: `POST /api/balance/deposit` returns Stripe URL_
 - [UI: N/A | API: ✅] **As a registered user**, I would like deposits confirmed via webhook so that my balance updates automatically after payment.
+  - _Paths: API: `POST /api/payments/webhook` (Stripe webhook)_
 - [UI: ✅ | API: ✅] **As a registered user**, I would like a minimum deposit of $1.00 so that payment processing fees are covered.
+  - _Paths: UI: `/deposit.html` (validation) | API: `POST /api/balance/deposit` (enforced)_
 
 ### Content Upload
 - [UI: ✅ | API: ✅] **As a content publisher**, I would like to upload files up to 5GB so that I can share my content with others.
+  - _Paths: UI: `/upload.html` | API: `POST /api/content`_
 - [UI: ✅ | API: ✅] **As a content publisher**, I would like my files hashed using the 256t specification (SHA-512 for >64 bytes) so that content is permanently addressable.
+  - _Paths: UI: `/upload.html` (client-side hash) | API: `POST /api/content` (server verifies)_
 - [UI: ✅ | API: ✅] **As a content publisher**, I would like to select retention duration (minimum 30 days) so that I can control how long content is stored.
+  - _Paths: UI: `/upload.html` (duration selector) | API: `POST /api/content` (retention_days param)_
 - [UI: ✅ | API: ✅] **As a content publisher**, I would like to see the cost calculation ($0.03/GB/month) before upload so that I know the price before committing.
+  - _Paths: UI: `/upload.html` (live cost calculator) | API: Pricing logic in content handler_
 - [UI: N/A | API: ✅] **As a content publisher**, I would like my balance automatically deducted on successful upload so that payment is seamless.
+  - _Paths: API: `POST /api/content` (deducts balance atomically)_
 - [UI: ✅ | API: N/A] **As a content publisher**, I would like to drag and drop files for upload so that uploading is convenient.
+  - _Paths: UI: `/upload.html` (drag-drop zone)_
 - [UI: ✅ | API: N/A] **As a content publisher**, I would like to see upload progress and be able to cancel so that I can manage long uploads.
+  - _Paths: UI: `/upload.html` (progress bar, cancel button)_
 - [UI: N/A | API: ✅] **As a content publisher**, I would like duplicate content detection so that I'm not charged twice for the same file.
+  - _Paths: API: `POST /api/content` (checks existing hash)_
 - [UI: ✅ | API: ✅] **As a content publisher**, I would like the option to extend retention on duplicate content so that I can keep it available longer.
+  - _Paths: UI: `/upload.html` (duplicate prompt) | API: `POST /api/content/{cid}/extend`_
 - [UI: N/A | API: ✅] **As a content publisher**, I would like failed uploads to not charge my account so that I only pay for successful storage.
+  - _Paths: API: `POST /api/content` (atomic transaction)_
 - [UI: N/A | API: ✅] **As a content publisher**, I would like inline content (≤64 bytes) to be free so that small files don't incur storage costs.
+  - _Paths: API: `POST /api/content` (inline content = $0.00)_
 
 ### Content Management
 - [UI: ✅ | API: ✅] **As a content publisher**, I would like to view my upload history so that I can track all content I've published.
+  - _Paths: UI: `/dashboard.html` (basic list), `/dashboard/uploads/` (planned) | API: UserProfile DO stores upload_history_
 - [UI: 📋 | API: ✅] **As a content publisher**, I would like to extend retention before expiration so that I can keep content available longer.
+  - _Paths: UI: `/dashboard/uploads/{hash}` (planned) | API: `POST /api/content/{cid}/extend`_
 - [UI: 📋 | API: 📋] **As a content publisher**, I would like to see when my content will expire so that I can plan retention extensions.
+  - _Paths: UI: `/dashboard/uploads/` (planned) | API: `GET /api/content/{cid}` expiration_timestamp (planned)_
 - [UI: 📋 | API: 📋] **As a content publisher**, I would like to view download statistics for my content so that I can understand usage patterns.
+  - _Paths: UI: `/dashboard/uploads/{hash}` (planned) | API: Download tracking (planned)_
 
 ### Rate Limiting for Content
 - [UI: 📋 | API: ✅] **As a content publisher**, I would like to purchase bandwidth (MTBR rate limiting) for my content so that I can control access frequency.
+  - _Paths: UI: `/dashboard/uploads/{hash}/rate-limit` (planned) | API: `POST /api/content/rate-limit/purchase`_
 - [UI: 📋 | API: ✅] **As a content publisher**, I would like to see rate limit pricing based on file size and request frequency so that I can budget appropriately.
+  - _Paths: UI: `/dashboard/uploads/{hash}/rate-limit` (planned) | API: Pricing calculator in rate-limit handler_
 - [UI: N/A | API: ✅] **As a content publisher**, I would like rate limits to stack when purchasing multiple times so that I can incrementally increase capacity.
+  - _Paths: API: `POST /api/content/rate-limit/purchase` (stacking logic)_
 - [UI: N/A | API: ✅] **As a content publisher**, I would like a default 30-day MTBR (minimum time between requests) for 30 days so that my content has basic protection.
+  - _Paths: API: `POST /api/content` (default rate limit applied)_
 - [UI: N/A | API: ✅] **As a content publisher**, I would like inline content exempted from rate limits so that small files remain freely accessible.
+  - _Paths: API: Rate limit check skips inline content_
 
 ---
 
@@ -94,19 +141,29 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ### Content Discovery
 - [UI: ✅ | API: ✅] **As a content consumer**, I would like to retrieve content using only its 256t hash so that access is simple and direct.
+  - _Paths: UI: `/retrieve.html` | API: `GET /{hash}`_
 - [UI: ✅ | API: ✅] **As a content consumer**, I would like to view content information before downloading so that I can verify size and type.
+  - _Paths: UI: `/info.html` | API: `GET /api/content/{cid}`_
 
 ### Content Download
 - [UI: ✅ | API: ✅] **As a content consumer**, I would like to download content for free so that I can access published files without payment.
+  - _Paths: UI: `/retrieve.html` | API: `GET /{hash}`_
 - [UI: ✅ | API: ✅] **As a content consumer**, I would like fast downloads via Cloudflare's CDN so that content loads quickly from anywhere.
+  - _Paths: UI: `/retrieve.html` | API: `GET /{hash}` (via Cloudflare edge)_
 - [UI: N/A | API: ✅] **As a content consumer**, I would like proper MIME types on downloads so that my browser handles files correctly.
+  - _Paths: API: `GET /{hash}` (Content-Type header based on extension)_
 - [UI: N/A | API: ✅] **As a content consumer**, I would like ETag caching support so that repeated downloads are efficient.
+  - _Paths: API: `GET /{hash}` (ETag header)_
 - [UI: ✅ | API: ✅] **As a content consumer**, I would like to force download instead of inline preview so that I can save files directly.
+  - _Paths: UI: `/retrieve.html` (download parameter) | API: `GET /{hash}?download=true`_
 - [UI: N/A | API: ✅] **As a content consumer**, I would like HEAD requests supported so that I can check content metadata without downloading.
+  - _Paths: API: `HEAD /{hash}`_
 
 ### Rate Limiting
 - [UI: ✅ | API: ✅] **As a content consumer**, I would like to see clear rate limit errors so that I know when content is temporarily unavailable.
+  - _Paths: UI: `/retrieve.html`, `/info.html` (error display) | API: HTTP 429 with Retry-After_
 - [UI: N/A | API: ✅] **As a content consumer**, I would like rate limits enforced fairly (lowest MTBR wins) so that I understand access restrictions.
+  - _Paths: API: Rate limit enforcement in content handler_
 
 ---
 
@@ -114,28 +171,47 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ### API Keys
 - [UI: 📋 | API: ✅] **As a developer**, I would like to generate API keys so that I can access the platform programmatically.
+  - _Paths: UI: `/dashboard/api-keys/create` (planned) | API: `POST /api/auth/apikeys`_
 - [UI: 📋 | API: ✅] **As a developer**, I would like to create up to 25 API keys so that I can separate keys by application or environment.
+  - _Paths: UI: `/dashboard/api-keys/` (planned) | API: `POST /api/auth/apikeys` (25 key limit enforced)_
 - [UI: N/A | API: ✅] **As a developer**, I would like keys with format `hb_live_*` (production) or `hb_test_*` (development) so that I can distinguish environments.
+  - _Paths: API: `POST /api/auth/apikeys` (key format based on environment)_
 - [UI: N/A | API: ✅] **As a developer**, I would like keys to expire after a maximum of 5 years so that I'm forced to rotate credentials periodically.
+  - _Paths: API: `POST /api/auth/apikeys` (max 5-year expiration enforced)_
 - [UI: 📋 | API: ✅] **As a developer**, I would like to name my API keys so that I can identify their purpose.
+  - _Paths: UI: `/dashboard/api-keys/create` (planned) | API: `POST /api/auth/apikeys` (name parameter)_
 - [UI: 📋 | API: N/A] **As a developer**, I would like to see API keys only once at creation so that security is maintained.
+  - _Paths: UI: `/dashboard/api-keys/create` (planned, one-time display)_
 - [UI: 📋 | API: ✅] **As a developer**, I would like to list my API keys (without plaintext values) so that I can manage active credentials.
+  - _Paths: UI: `/dashboard/api-keys/` (planned) | API: `GET /api/auth/apikeys`_
 - [UI: 📋 | API: ✅] **As a developer**, I would like to revoke API keys so that I can disable compromised credentials.
+  - _Paths: UI: `/dashboard/api-keys/:id` (planned) | API: `DELETE /api/auth/apikeys/:id`_
 - [UI: N/A | API: ✅] **As a developer**, I would like keys stored as SHA-256 hashes so that plaintext keys are never exposed in storage.
+  - _Paths: API: KeyRegistry DO, UserProfile DO (SHA-256 hashed storage)_
 - [UI: 📋 | API: ✅] **As a developer**, I would like to see when keys were last used so that I can identify inactive keys.
+  - _Paths: UI: `/dashboard/api-keys/` (planned) | API: `GET /api/auth/apikeys` (last_used_at field)_
 - [UI: 📋 | API: ✅] **As a developer**, I would like to reveal an API key with fresh session authentication so that I can recover a key if needed.
+  - _Paths: UI: `/dashboard/api-keys/:id` (planned) | API: `POST /api/auth/apikeys/:id/reveal`_
 
 ### Rate Limits
 - [UI: N/A | API: ✅] **As a developer**, I would like 500 requests/minute per API key so that I can build automated tools.
+  - _Paths: API: Rate limiting middleware (500 req/min per key)_
 - [UI: N/A | API: ✅] **As a developer**, I would like rate limit headers in responses so that I can implement backoff strategies.
+  - _Paths: API: All endpoints (X-RateLimit-* headers)_
 - [UI: N/A | API: ✅] **As a developer**, I would like clear rate limit error codes so that my applications can handle limits gracefully.
+  - _Paths: API: HTTP 429 with error details_
 
 ### API Usage
 - [UI: N/A | API: ✅] **As a developer**, I would like to use API keys with `Authorization: ApiKey <key>` or `X-API-Key: <key>` headers so that I have flexible authentication options.
+  - _Paths: API: Authentication middleware (both header formats supported)_
 - [UI: N/A | API: ✅] **As a developer**, I would like comprehensive API documentation so that I can integrate quickly.
+  - _Paths: UI: `/docs/api/` (planned) | API: `docs/API.md` (current)_
 - [UI: N/A | API: ✅] **As a developer**, I would like consistent error response formats so that error handling is predictable.
+  - _Paths: API: All endpoints (standardized error format)_
 - [UI: N/A | API: 📋] **As a developer**, I would like webhooks for content events so that I can build reactive applications.
+  - _Paths: API: Webhook system (planned)_
 - [UI: N/A | API: 📋] **As a developer**, I would like bulk operations for multiple files so that I can upload/manage content efficiently.
+  - _Paths: API: Bulk endpoints (planned)_
 
 ---
 
@@ -143,10 +219,15 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ### Donation System
 - [UI: 📋 | API: ✅] **As a donor**, I would like to donate to specific content by hash so that I can support valuable files.
+  - _Paths: UI: `/donate/{hash}` (planned) | API: `POST /api/donate/cid/:cid`_
 - [UI: N/A | API: ✅] **As a donor**, I would like donations to extend content retention so that important files stay available longer.
+  - _Paths: API: `POST /api/donate/cid/:cid` (extends expiration_timestamp)_
 - [UI: N/A | API: ✅] **As a donor**, I would like to donate anonymously or with authentication so that I have privacy options.
+  - _Paths: API: `POST /api/donate/cid/:cid` (optional authentication)_
 - [UI: 📋 | API: ✅] **As a donor**, I would like to donate via Stripe Checkout so that payment is secure and supports multiple methods.
+  - _Paths: UI: `/donate/{hash}` (planned) | API: `POST /api/donate/cid/:cid` returns Stripe URL_
 - [UI: 📋 | API: ✅] **As a donor**, I would like to see how my donation extends retention so that I understand the impact.
+  - _Paths: UI: `/donate/{hash}` (planned, shows extension calculation) | API: Donation calculator in handler_
 
 ---
 
@@ -154,23 +235,37 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ### Contest Submission
 - [UI: 📋 | API: 📋] **As a contester**, I would like to submit a contest for copyrighted content so that I can protect my intellectual property.
+  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/contest/submit` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like to submit a contest for illegal content so that harmful material can be removed.
+  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/contest/submit` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like to submit a contest for abusive content so that policy violations are addressed.
+  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/contest/submit` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like to upload evidence documents so that my claim is properly supported.
+  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/contest/:id/evidence` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like my evidence immediately visible to moderators and payers so that disputes can be resolved quickly.
+  - _Paths: UI: `/admin/contests/:id`, `/contest/:id` (planned) | API: ContestRecord DO with evidence (planned)_
 
 ### Communication
 - [UI: 📋 | API: 📋] **As a contester**, I would like to receive messages from content payers so that we can resolve disputes directly.
+  - _Paths: UI: `/messages/` (planned) | API: `GET /api/messages/:threadId` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like email notifications for new messages so that I don't miss communications.
+  - _Paths: UI: N/A | API: Email worker (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like message character and count limits so that conversations stay productive.
+  - _Paths: UI: `/messages/:threadId` (planned) | API: Message validation (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like to respond to payer messages so that I can provide clarifications or additional evidence.
+  - _Paths: UI: `/messages/:threadId` (planned) | API: `POST /api/messages/:threadId` (planned)_
 
 ### Contest Resolution
 - [UI: 📋 | API: 📋] **As a contester**, I would like automated checks on my contest so that obvious violations are handled quickly.
+  - _Paths: UI: N/A | API: Contest validation rules (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like manual review for nuanced cases so that fair decisions are made.
+  - _Paths: UI: `/admin/contests/:id` (planned) | API: Contest review workflow (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like to see contest status updates so that I know the progress of my claim.
+  - _Paths: UI: `/contest/:id` (planned) | API: `GET /api/contest/:id` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like to appeal decisions so that incorrect rulings can be challenged.
+  - _Paths: UI: `/contest/:id/appeal` (planned) | API: `POST /api/contest/:id/appeal` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like DMCA-compliant 24-48 hour response times so that legal requirements are met.
+  - _Paths: UI: N/A | API: SLA enforcement (planned)_
 
 ---
 
@@ -178,19 +273,31 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ### Content Moderation
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to review contest submissions so that I can make fair decisions.
+  - _Paths: UI: `/admin/contests/` (planned) | API: `GET /api/admin/contests` (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to see all evidence immediately upon contest filing so that I can assess claims quickly.
+  - _Paths: UI: `/admin/contests/:id` (planned) | API: `GET /api/admin/contests/:id` (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like automated rules to filter obvious violations so that I can focus on complex cases.
+  - _Paths: UI: `/admin/moderation/` (planned) | API: Auto-moderation rules (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to view message threads between payers and contesters so that I understand dispute context.
+  - _Paths: UI: `/admin/contests/:id/messages` (planned) | API: `GET /api/admin/messages/:threadId` (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to offer paid moderation services so that users can request official intervention.
+  - _Paths: UI: `/admin/moderation/pricing` (planned) | API: Paid moderation endpoints (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to take down content with compelling evidence so that platform policies are enforced.
+  - _Paths: UI: `/admin/contests/:id` (planned) | API: `POST /api/admin/contests/:id/resolve` (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to maintain public records of decisions so that operations are transparent.
+  - _Paths: UI: `/public-records/contests/` (planned) | API: `GET /api/public/contests` (planned)_
 
 ### System Management
 - [UI: N/A | API: ✅] **As an administrator**, I would like to monitor system health across all components so that I can ensure uptime.
+  - _Paths: API: `GET /health`, monitoring endpoints_
 - [UI: N/A | API: ✅] **As an administrator**, I would like to track financial metrics (revenue, costs, profit) so that the platform is sustainable.
+  - _Paths: API: PaymentRecord DO aggregations, balance tracking_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to see aggregate platform statistics so that I can understand usage patterns.
+  - _Paths: UI: `/admin/metrics/` (planned) | API: `GET /api/admin/stats` (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like alerts for unusual activity so that I can respond to issues proactively.
+  - _Paths: UI: `/admin/` (planned) | API: Alerting system (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to export data for transparency so that operations remain auditable.
+  - _Paths: UI: `/admin/export/` (planned) | API: `GET /api/admin/export` (planned)_
 
 ---
 
@@ -454,9 +561,18 @@ HashBin (Logo) → /
 
 ---
 
-**Document Version:** 2.2
+**Document Version:** 2.3 (IN PROGRESS)
 **Last Updated:** 2026-01-16
-**Status:** Comprehensive list with separate UI/API status tracking and site map
+**Status:** Comprehensive list with UI/API status, site map, and URL paths
+
+**Changes in v2.3:**
+- Added **URL paths** to each user story showing implementation locations
+  - UI paths: Pages where feature is accessible (e.g., `/dashboard.html`, `/upload.html`)
+  - API paths: Endpoints that implement the feature (e.g., `GET /api/balance`, `POST /api/content`)
+  - Format: `_Paths: UI: <path> | API: <endpoint>_` under each story
+  - Indicates planned vs implemented paths
+  - Completed for 112+ stories (Anonymous Users, Content Publishers, Content Consumers, API Developers, Content Donors, Content Contesters, Platform Administrators)
+  - **System Operations section paths IN PROGRESS** (43 stories remaining)
 
 **Changes in v2.2:**
 - Added comprehensive **Site Map** section showing all current and planned pages
