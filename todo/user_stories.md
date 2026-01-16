@@ -50,6 +50,9 @@ This document contains user stories for the HashBin.org platform, organized by u
 - [UI: 📋 | API: N/A] **As a user**, I would like to navigate to API key management from the dashboard so that I can create and manage my API keys.
 - [UI: 📋 | API: N/A] **As a user**, I would like to see all available features in a clear menu structure so that I can discover what the platform offers.
 - [UI: 📋 | API: N/A] **As a user**, I would like consistent navigation across all pages so that I can move between features easily.
+- [UI: 📋 | API: N/A] **As a user**, I would like to view a site map showing all available pages and features so that I can understand the full platform structure.
+- [UI: 📋 | API: N/A] **As a user**, I would like clear visual indicators of which section I'm currently viewing so that I always know where I am.
+- [UI: 📋 | API: N/A] **As a user**, I would like breadcrumb navigation on nested pages so that I can easily navigate back to parent sections.
 
 ### Balance and Payments
 - [UI: ✅ | API: ✅] **As a registered user**, I would like to view my current account balance so that I know how much credit I have available.
@@ -260,13 +263,13 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 #### Web UI Status
 - **UI Complete (✅)**: 55 stories
-- **UI Planned (📋)**: 32 stories
+- **UI Planned (📋)**: 35 stories
 - **UI Not Applicable (N/A)**: 65 stories
 
 #### API Status
 - **API Complete (✅)**: 96 stories
 - **API Planned (📋)**: 47 stories
-- **API Not Applicable (N/A)**: 9 stories
+- **API Not Applicable (N/A)**: 12 stories
 
 ### By User Type
 
@@ -275,10 +278,10 @@ This document contains user stories for the HashBin.org platform, organized by u
 - UI Planned: 1 | API Planned: 1
 - UI N/A: 2 | API N/A: 0
 
-#### Content Publishers (36 stories)
+#### Content Publishers (39 stories)
 - UI Complete: 19 | API Complete: 28
-- UI Planned: 7 | API Planned: 2
-- UI N/A: 10 | API N/A: 6
+- UI Planned: 10 | API Planned: 2
+- UI N/A: 10 | API N/A: 9
 
 #### Content Consumers (10 stories)
 - UI Complete: 6 | API Complete: 10
@@ -310,13 +313,119 @@ This document contains user stories for the HashBin.org platform, organized by u
 - UI Planned: 8 | API Planned: 18
 - UI N/A: 42 | API N/A: 3
 
-### Total User Stories: 152
+### Total User Stories: 155
 
 ### Overall Progress
-- **Fully Complete (UI ✅ & API ✅)**: 55 stories (36%)
-- **Partially Complete (UI ✅ or API ✅)**: 41 stories (27%)
-- **Fully Planned (UI 📋 & API 📋)**: 45 stories (30%)
+- **Fully Complete (UI ✅ & API ✅)**: 55 stories (35%)
+- **Partially Complete (UI ✅ or API ✅)**: 41 stories (26%)
+- **Fully Planned (UI 📋 & API 📋)**: 48 stories (31%)
 - **Mixed Status**: 11 stories (7%)
+
+---
+
+## Site Map
+
+This section shows the current and planned page structure for HashBin.org.
+
+### Public Pages (No Authentication Required)
+
+**Implemented ✅**
+- `/` - Landing page with service information
+- `/retrieve.html` - Content retrieval/download interface
+- `/info.html` - Content information viewer
+- `/{hash}` - Direct content download (API endpoint, works in browser)
+- `/{hash}.{ext}` - Download with file extension hint
+
+**Planned 📋**
+- `/docs/` - Documentation hub
+- `/docs/api/` - API documentation
+- `/docs/getting-started/` - Getting started guide
+- `/public-records/` - Public transparency records viewer
+- `/public-records/contests/` - Contest history
+- `/public-records/deletions/` - Deletion history
+- `/stats/` - Platform statistics dashboard
+
+### Authenticated Pages (Login Required)
+
+**Implemented ✅**
+- `/dashboard.html` - User dashboard with balance and quick actions
+- `/upload.html` - Content upload interface
+- `/deposit.html` - Add funds / deposit interface
+
+**Planned 📋**
+- `/dashboard/api-keys/` - API key management
+- `/dashboard/api-keys/create` - Create new API key
+- `/dashboard/api-keys/:id` - View/manage specific key
+- `/dashboard/uploads/` - Upload history and management
+- `/dashboard/uploads/:hash` - Manage specific upload
+- `/dashboard/transactions/` - Full transaction history
+- `/dashboard/balance/` - Detailed balance information
+- `/dashboard/account/` - Account settings
+- `/dashboard/account/providers` - Linked OAuth providers
+- `/dashboard/account/security` - Security settings (2FA, etc.)
+- `/donate/:hash` - Donation flow for specific content
+- `/contest/submit` - Submit content contest
+- `/contest/:id` - View contest status
+- `/messages/` - Message inbox (for contest communications)
+- `/messages/:threadId` - Specific message thread
+
+### Admin Pages (Admin Role Required)
+
+**Planned 📋**
+- `/admin/` - Admin dashboard
+- `/admin/contests/` - Contest review queue
+- `/admin/contests/:id` - Review specific contest
+- `/admin/moderation/` - Moderation tools
+- `/admin/users/` - User management
+- `/admin/metrics/` - Platform metrics and analytics
+
+### Navigation Structure
+
+```
+HashBin (Logo) → /
+├── Upload → /upload.html [Auth Required]
+├── Retrieve → /retrieve.html [Public]
+├── Docs → /docs/ [Public]
+└── Dashboard → /dashboard.html [Auth Required]
+    ├── Overview (default view)
+    ├── API Keys → /dashboard/api-keys/ [Planned]
+    ├── Uploads → /dashboard/uploads/ [Planned]
+    ├── Transactions → /dashboard/transactions/ [Planned]
+    ├── Balance → /dashboard/balance/ [Planned]
+    ├── Messages → /messages/ [Planned]
+    └── Account Settings → /dashboard/account/ [Planned]
+```
+
+### Current Implementation Status
+
+**Pages Implemented**: 6
+- Landing (/)
+- Retrieve
+- Info
+- Dashboard
+- Upload
+- Deposit
+
+**Pages Planned**: 23+
+- API key management (3 pages)
+- Upload management (2 pages)
+- Account settings (3 pages)
+- Transaction history (1 page)
+- Donation flow (1 page)
+- Contest system (2 pages)
+- Messaging (2 pages)
+- Documentation (3 pages)
+- Public records (3 pages)
+- Admin interface (5 pages)
+
+**Navigation Implementation**
+- ✅ Header with logo and main links
+- ✅ Auth section in header (sign in/out, user info)
+- ✅ Footer with links
+- 📋 Dashboard sidebar navigation
+- 📋 Breadcrumb navigation
+- 📋 Active page indicators
+- 📋 Responsive mobile menu
 
 ---
 
@@ -345,9 +454,23 @@ This document contains user stories for the HashBin.org platform, organized by u
 
 ---
 
-**Document Version:** 2.1
+**Document Version:** 2.2
 **Last Updated:** 2026-01-16
-**Status:** Comprehensive list with separate UI/API status tracking
+**Status:** Comprehensive list with separate UI/API status tracking and site map
+
+**Changes in v2.2:**
+- Added comprehensive **Site Map** section showing all current and planned pages
+  - Public pages: 5 implemented, 7 planned
+  - Authenticated pages: 3 implemented, 14 planned
+  - Admin pages: 5 planned
+  - Navigation structure diagram
+  - Implementation status breakdown (6 pages done, 23+ planned)
+- Added 3 new "Navigation & Discoverability" stories:
+  - View site map
+  - Visual indicators for current section
+  - Breadcrumb navigation
+- Updated summary: 155 total stories (was 152)
+- Updated stats: UI 35 planned (was 32), Content Publishers 39 stories (was 36)
 
 **Changes in v2.1:**
 - Corrected API key management stories: UI is 📋 (planned), not ✅ (complete)
