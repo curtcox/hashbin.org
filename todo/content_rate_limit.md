@@ -305,7 +305,7 @@ function getEffectiveMTBR(contentMetadata, now) {
 ### Price Calculation
 
 ```javascript
-const RATE_PER_BYTE = ???; // TBD - see Follow-up Question #1
+const RATE_PER_BYTE = 0.01 / (1024 * 1024 * 1024); // $0.01 per GB
 
 function calculateRateLimitPrice(sizeBytes, mtbrMs, durationSeconds) {
   const mtbrSeconds = mtbrMs / 1000;
@@ -619,15 +619,12 @@ TEST-EDGE-016: Zero-byte content (empty file) → is inline, no rate limit
 4. User purchases 14-day rate limit → succeeds
 5. At day 15, content expires (even if rate limit still "active")
 
-## Follow-up Questions
+## Follow-up Questions (Resolved)
 
 1. **What is the rate per byte for pricing?**
-   - Need a specific number (e.g., $0.00000001 per byte = $10.74 per TB)
+   - **Decision:** $0.01 per GB ($10.24 per TB)
+   - Rate per byte: $0.01 / 1,073,741,824 = ~$0.00000000000931 per byte
    - This determines all pricing in the system
 
 2. **Should edge caching be disabled for rate-limited content?**
-   - Since this is about paying for bandwidth, edge cache hits would bypass the payment mechanism
-   - Options:
-     - A) Disable caching entirely for non-inline content (Cache-Control: no-store)
-     - B) Set cache TTL to match MTBR (complex, may not work with infinite MTBR)
-     - C) Accept that edge cache may serve some "unpaid" requests (simpler, some revenue leakage)
+   - **Decision:** See [todo/edge_cache.md](edge_cache.md) for detailed analysis and recommendation
