@@ -771,6 +771,33 @@ export class UserProfile {
 
     const { name } = body;
 
+    // Validate name (same validation as in auth handler for consistency)
+    if (!name || typeof name !== 'string') {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid name',
+          message: 'Name is required and must be a string'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    if (name.length < 1 || name.length > 100) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid name length',
+          message: 'Name must be between 1 and 100 characters'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
     // Update the name
     apiKey.name = name;
     profile.updated_at = new Date().toISOString();
