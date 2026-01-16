@@ -355,7 +355,7 @@
         const result = await createApiKey(payload);
         
         // Show the key in modal
-        showKeyModal(result.key);
+        showKeyModal(result.api_key);
         
       } catch (error) {
         console.error('Failed to create API key:', error);

@@ -32,18 +32,18 @@ Create API keys via the `/api/auth/apikeys` endpoint (requires Clerk session), t
 
 **Option A: Authorization Header**
 ```http
-Authorization: ApiKey hb_live_abcd1234...
+Authorization: ApiKey hb_abcd1234...
 ```
 
 **Option B: X-API-Key Header**
 ```http
-X-API-Key: hb_live_abcd1234...
+X-API-Key: hb_abcd1234...
 ```
 
 **API Key Format:**
-- Production: `hb_live_<32-alphanumeric-characters>`
-- Development: `hb_test_<32-alphanumeric-characters>`
-- Total length: 40 characters
+- Current: `hb_<32-alphanumeric-characters>`
+- Legacy formats (still supported): `hb_live_*` and `hb_test_*`
+- Total length: 35 characters (current format)
 
 **Constraints:**
 - Maximum 25 API keys per user
@@ -297,14 +297,16 @@ Create a new API key.
 ```json
 {
   "key_id": "key_abc123",
-  "api_key": "hb_live_abcd1234efgh5678ijkl9012mnop3456",
-  "name": "Production API Key",
+  "api_key": "hb_abcd1234efgh5678ijkl9012mnop3456",
+  "name": "Hosting",
   "created_at": "2026-01-14T00:00:00.000Z",
   "expires_at": "2031-01-14T00:00:00.000Z"
 }
 ```
 
 **⚠️ Important:** The `api_key` value is only shown once. Store it securely.
+
+**Note:** If no name is provided, the system defaults to "Hosting" for the first key, or "Hosting n" (where n >= 2) for subsequent keys.
 
 **Error Responses:**
 - `400` - Invalid key name or expiration
@@ -522,11 +524,11 @@ curl -X POST https://hashbin.org/api/auth/apikeys \
 ```bash
 # List your API keys
 curl -X GET https://hashbin.org/api/auth/apikeys \
-  -H "X-API-Key: hb_live_abcd1234efgh5678ijkl9012mnop3456"
+  -H "X-API-Key: hb_abcd1234efgh5678ijkl9012mnop3456"
 
 # Get session info
 curl -X GET https://hashbin.org/api/auth/session \
-  -H "Authorization: ApiKey hb_live_abcd1234efgh5678ijkl9012mnop3456"
+  -H "Authorization: ApiKey hb_abcd1234efgh5678ijkl9012mnop3456"
 ```
 
 ### Example: Checking Health
