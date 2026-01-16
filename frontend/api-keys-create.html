@@ -305,9 +305,9 @@
       let hasError = false;
       
       // Name is optional, but if provided must be valid
-      if (name.length > 0 && (name.length < 1 || name.length > 100)) {
+      if (name.length > 100) {
         const nameError = document.getElementById('name-error');
-        nameError.textContent = 'Name must be between 1 and 100 characters';
+        nameError.textContent = 'Name must be 100 characters or less';
         nameError.classList.remove('hidden');
         hasError = true;
       }

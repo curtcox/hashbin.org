@@ -286,25 +286,35 @@ export async function handleCreateApiKey(request, env) {
   
   // If no name provided, generate a smart default
   if (!keyName || keyName.trim() === '') {
-    const existingKeysResponse = await userProfileStub.fetch(
-      new Request('http://internal/apikeys', {
-        method: 'GET'
-      })
-    );
-    
-    const existingKeys = await existingKeysResponse.json();
-    const existingNames = existingKeys.map(key => key.name);
-    
-    // Default to "Hosting" if no keys exist
-    if (existingKeys.length === 0 || !existingNames.includes('Hosting')) {
-      keyName = 'Hosting';
-    } else {
-      // Find next available "Hosting n" name
-      let n = 2;
-      while (existingNames.includes(`Hosting ${n}`)) {
-        n++;
+    try {
+      const existingKeysResponse = await userProfileStub.fetch(
+        new Request('http://internal/apikeys', {
+          method: 'GET'
+        })
+      );
+      
+      if (!existingKeysResponse.ok) {
+        // If we can't fetch existing keys, just use "Hosting" as default
+        keyName = 'Hosting';
+      } else {
+        const existingKeys = await existingKeysResponse.json();
+        const existingNames = existingKeys.map(key => key.name);
+        
+        // Default to "Hosting" if no keys exist
+        if (existingKeys.length === 0 || !existingNames.includes('Hosting')) {
+          keyName = 'Hosting';
+        } else {
+          // Find next available "Hosting n" name
+          let n = 2;
+          while (existingNames.includes(`Hosting ${n}`)) {
+            n++;
+          }
+          keyName = `Hosting ${n}`;
+        }
       }
-      keyName = `Hosting ${n}`;
+    } catch (error) {
+      // If error fetching keys, default to "Hosting"
+      keyName = 'Hosting';
     }
   }
 
