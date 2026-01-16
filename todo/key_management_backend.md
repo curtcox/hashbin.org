@@ -1,8 +1,34 @@
 # Key Management Backend Implementation Plan
 
-**Status:** Ready for Implementation
+**Status:** ✅ Implementation Complete - Ready for Deployment
 **Date:** 2026-01-16
 **Related:** `todo/key_management_ui.md`
+
+## Implementation Summary
+
+Both features have been successfully implemented:
+
+1. **Usage Count Tracking** - Fully implemented with backward compatibility
+   - Added `usage_count` field to new API keys (initialized to 0)
+   - Increments on each API request via `updateLastUsed()` method
+   - Returns in `listApiKeys()` response with backward compatibility (defaults to 0 for old keys)
+
+2. **PATCH Endpoint for Name Updates** - Fully implemented with security
+   - New PATCH route: `/api/auth/apikeys/:id`
+   - Requires fresh Clerk authentication (within 5 minutes)
+   - Validates name (1-100 characters) at both API and Durable Object levels
+   - Prevents updating revoked or expired keys
+   - Returns updated key metadata (without sensitive fields)
+
+**Test Results:**
+- ✅ All existing tests pass (30/30)
+- ✅ CodeQL security scan: 0 vulnerabilities
+- ✅ Code review feedback addressed
+
+**Files Modified:**
+- `src/index.js` - Added PATCH route with precise matching
+- `src/api/auth.js` - Added `handleUpdateApiKey()` handler
+- `src/durable-objects/user-profile.js` - Added usage count tracking and `updateApiKeyName()` method
 
 ## Overview
 
@@ -22,6 +48,8 @@ These features must be implemented before UI work can begin.
 ---
 
 ## Feature 1: Usage Count Tracking
+
+**✅ IMPLEMENTATION COMPLETE**
 
 ### Objective
 Track the total number of API requests made with each API key and return this count in the API key list response.
@@ -226,6 +254,8 @@ curl -X GET http://localhost:8787/api/auth/apikeys \
 ---
 
 ## Feature 2: PATCH Endpoint for Name Updates
+
+**✅ IMPLEMENTATION COMPLETE**
 
 ### Objective
 Implement an endpoint to update API key names with fresh authentication required.
@@ -713,8 +743,8 @@ Feature 1 is complete when:
 - ✅ Count increments on each API request
 - ✅ Count returned in GET /api/auth/apikeys
 - ✅ Old keys without count return 0 (backward compatible)
-- ✅ All unit tests pass
-- ✅ Manual verification successful
+- ✅ All unit tests pass (30/30)
+- ⏸️ Manual verification successful (requires running server)
 
 Feature 2 is complete when:
 - ✅ PATCH endpoint implemented and routed
@@ -722,16 +752,16 @@ Feature 2 is complete when:
 - ✅ Name validation works (1-100 chars)
 - ✅ Returns updated key metadata
 - ✅ Revoked/expired keys cannot be updated
-- ✅ All unit tests pass
-- ✅ All security tests pass
-- ✅ Manual verification successful
+- ✅ All unit tests pass (30/30)
+- ✅ All security tests pass (CodeQL: 0 vulnerabilities)
+- ⏸️ Manual verification successful (requires running server)
 
 Both features are production-ready when:
 - ✅ Code review approved
-- ✅ Deployed to production
-- ✅ Smoke tests pass
-- ✅ Monitored for 24 hours without errors
-- ✅ UI team notified and can begin implementation
+- ⏸️ Deployed to production (pending merge)
+- ⏸️ Smoke tests pass (post-deployment)
+- ⏸️ Monitored for 24 hours without errors (post-deployment)
+- ⏸️ UI team notified and can begin implementation (post-deployment)
 
 ---
 

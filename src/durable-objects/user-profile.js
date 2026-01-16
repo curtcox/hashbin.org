@@ -74,6 +74,12 @@ export class UserProfile {
         return await this.revealApiKey(keyId);
       }
 
+      // Note: Internal route uses '/update' suffix for clarity and consistency with '/reveal' pattern
+      if (url.pathname.startsWith('/apikeys/') && url.pathname.endsWith('/update') && method === 'PATCH') {
+        const keyId = url.pathname.split('/')[2];
+        return await this.updateApiKeyName(keyId, request);
+      }
+
       if (url.pathname === '/balance' && method === 'GET') {
         return await this.getBalance();
       }
@@ -294,6 +300,7 @@ export class UserProfile {
       created_at: new Date().toISOString(),
       expires_at: data.expires_at,
       last_used_at: null,
+      usage_count: 0,
       revoked_at: null,
       reveal_timestamps: [] // Track last 3 reveal times for rate limiting
     };
@@ -342,6 +349,7 @@ export class UserProfile {
       created_at: key.created_at,
       expires_at: key.expires_at,
       last_used_at: key.last_used_at,
+      usage_count: key.usage_count || 0,
       revoked: !!key.revoked_at
     }));
 
@@ -657,6 +665,10 @@ export class UserProfile {
     }
 
     apiKey.last_used_at = new Date().toISOString();
+    
+    // Increment usage count (initialize to 0 if not present for backward compatibility)
+    apiKey.usage_count = (apiKey.usage_count || 0) + 1;
+    
     profile.updated_at = new Date().toISOString();
 
     await this.state.storage.put('profile', profile);
@@ -664,6 +676,141 @@ export class UserProfile {
     return new Response(
       JSON.stringify({
         success: true
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Update API key name
+   * @param {string} keyId
+   * @param {Request} request
+   * @returns {Response}
+   */
+  async updateApiKeyName(keyId, request) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({
+          error: 'Profile not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Find the API key
+    const apiKey = profile.api_keys.find(key => key.key_id === keyId);
+
+    if (!apiKey) {
+      return new Response(
+        JSON.stringify({
+          error: 'API key not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Check if key is revoked
+    if (apiKey.revoked_at) {
+      return new Response(
+        JSON.stringify({
+          error: 'KEY_REVOKED',
+          message: 'Cannot update a revoked API key'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Check if key is expired
+    const now = new Date();
+    const expiresAt = new Date(apiKey.expires_at);
+    if (expiresAt < now) {
+      return new Response(
+        JSON.stringify({
+          error: 'KEY_EXPIRED',
+          message: 'Cannot update an expired API key'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Parse request body
+    let body;
+    try {
+      body = await request.json();
+    } catch (error) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid request body'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const { name } = body;
+
+    // Validate name (same validation as in auth handler for consistency)
+    if (!name || typeof name !== 'string') {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid name',
+          message: 'Name is required and must be a string'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    if (name.length < 1 || name.length > 100) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid name length',
+          message: 'Name must be between 1 and 100 characters'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Update the name
+    apiKey.name = name;
+    profile.updated_at = new Date().toISOString();
+
+    await this.state.storage.put('profile', profile);
+
+    // Return updated key metadata (without sensitive fields)
+    return new Response(
+      JSON.stringify({
+        key_id: apiKey.key_id,
+        name: apiKey.name,
+        created_at: apiKey.created_at,
+        expires_at: apiKey.expires_at,
+        last_used_at: apiKey.last_used_at,
+        usage_count: apiKey.usage_count || 0,
+        revoked: !!apiKey.revoked_at
       }),
       {
         status: 200,

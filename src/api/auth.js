@@ -621,6 +621,141 @@ export async function handleRevealApiKey(request, env, keyId) {
 }
 
 /**
+ * Update API key name
+ * Requires fresh Clerk session (authenticated within last 5 minutes)
+ * PATCH /api/auth/apikeys/:keyId
+ * @param {Request} request
+ * @param {Object} env
+ * @param {string} keyId
+ * @returns {Response}
+ */
+export async function handleUpdateApiKey(request, env, keyId) {
+  const authResult = await authenticate(request, env);
+
+  // Require Clerk session (API keys cannot update themselves)
+  const authError = requireAuth(authResult);
+  if (authError) return authError;
+
+  if (authResult.user.authMethod !== 'clerk') {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid authentication method',
+        message: 'API keys cannot update other API keys. Use Clerk session.'
+      }),
+      {
+        status: 403,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  // Verify session is fresh (authenticated within last 5 minutes)
+  try {
+    if (!env.CLERK_SECRET_KEY) {
+      throw new Error('CLERK_SECRET_KEY not configured');
+    }
+
+    const clerkClient = createClerkClient({
+      secretKey: env.CLERK_SECRET_KEY
+    });
+
+    const sessionId = authResult.user.sessionId;
+    const session = await clerkClient.sessions.getSession(sessionId);
+
+    // Check if session is fresh (5 minutes)
+    if (!isSessionFresh(session, 5)) {
+      return new Response(
+        JSON.stringify({
+          error: 'FRESH_AUTH_REQUIRED',
+          message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
+        }),
+        {
+          status: 403,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: 'Session verification failed',
+        message: error.message
+      }),
+      {
+        status: 500,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  // Parse request body
+  let body;
+  try {
+    body = await request.json();
+  } catch (error) {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid request body',
+        message: 'Request body must be valid JSON'
+      }),
+      {
+        status: 400,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  // Validate name
+  const { name } = body;
+
+  if (!name || typeof name !== 'string') {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid name',
+        message: 'Name is required and must be a string'
+      }),
+      {
+        status: 400,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  // Validate name length (1-100 characters)
+  if (name.length < 1 || name.length > 100) {
+    return new Response(
+      JSON.stringify({
+        error: 'Invalid name length',
+        message: 'Name must be between 1 and 100 characters'
+      }),
+      {
+        status: 400,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  // Get user profile DO
+  const userId = authResult.user.userId;
+  const userProfileId = env.USER_PROFILES.idFromName(userId);
+  const userProfileStub = env.USER_PROFILES.get(userProfileId);
+
+  // Update API key name
+  const updateResponse = await userProfileStub.fetch(
+    new Request(`http://internal/apikeys/${keyId}/update`, {
+      method: 'PATCH',
+      headers: {
+        'content-type': 'application/json'
+      },
+      body: JSON.stringify({ name })
+    })
+  );
+
+  // Return response from DO
+  return updateResponse;
+}
+
+/**
  * Handle account deletion
  * DELETE /api/auth/account
  */
