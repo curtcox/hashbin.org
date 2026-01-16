@@ -1,8 +1,9 @@
 # Key Management UI Plan
 
-**Status:** Draft v2.0
+**Status:** Draft v3.0 - BACKEND INVESTIGATION COMPLETE
 **Date:** 2026-01-16
 **Changelog:**
+- v3.0: Backend investigation complete - identified missing features (usageCount, PATCH endpoint)
 - v2.0: Resolved 11 of 15 open questions, added key editing, usage count, expiration sorting/highlighting
 **Related:** `todo/user_stories.md` (API Developers section, lines 172-194)
 
@@ -714,35 +715,198 @@ async function revealApiKey(id: string): Promise<{ key: string }>
 12. **Mobile Experience:** ✅ Desktop-first approach, functional on mobile but not primary focus
 13. **Key Detail Page vs. Modal:** ✅ Separate page (`/dashboard/api-keys/:id`)
 
-## Open Questions (Awaiting Backend Clarification)
+## Backend Investigation Results ✅
 
-### 1. API Response Format
-- **Question:** What's the exact response format from the backend API?
-- **Need to verify:**
-  - Field names and types for `GET /api/auth/apikeys`
-  - Does `usageCount` field exist? If not, needs to be added
-  - Error response structure (format, error codes, messages)
-  - Session freshness validation mechanism
-  - Does `PATCH /api/auth/apikeys/:id` endpoint exist for name updates?
-- **Action Required:**
-  - Review backend code for API key endpoints
-  - Verify API contracts match TypeScript interfaces in this plan
-  - Check if backend tracks usage count per key
-- **Blocking:** Cannot finalize implementation without this information
+### Investigation Date: 2026-01-16
 
-### 2. Rate Limiting on Reveal and Edit
-- **Question:** What are the rate limits for reveal and edit endpoints?
-- **Need to verify:**
-  - Reveal endpoint (`POST /api/auth/apikeys/:id/reveal`) rate limits
-  - Edit endpoint (`PATCH /api/auth/apikeys/:id`) rate limits
-  - Is it per-user, per-key, or per-IP?
-  - Time-based (X requests per minute) or count-based (X per day)?
-  - What HTTP status and error message for rate limit exceeded?
-- **Action Required:**
-  - Check backend implementation for rate limiting
-  - Document limits for UI error handling
-  - Verify if rate limits are different for reveal vs. edit
-- **Blocking:** Need to know limits to show appropriate UI errors and messaging
+### Finding 1: API Response Format (VERIFIED)
+
+**Current API Response from `GET /api/auth/apikeys`:**
+```typescript
+interface ApiKeyResponse {
+  key_id: string;
+  name: string;
+  created_at: string;     // ISO 8601 timestamp
+  expires_at: string;     // ISO 8601 timestamp
+  last_used_at: string | null;  // ISO 8601 timestamp or null
+  revoked: boolean;       // Computed from revoked_at field
+}
+```
+
+**Source:** `/home/user/hashbin.org/src/durable-objects/user-profile.js:323-352`
+
+**❌ MISSING: `usageCount` field**
+- Backend does NOT track usage count
+- Only tracks `last_used_at` timestamp when API key is used
+- **Required Action:** Backend must be updated to track usage count if this feature is desired
+
+**Error Response Format:**
+```typescript
+interface ErrorResponse {
+  error: string;          // Error code (e.g., "FRESH_AUTH_REQUIRED", "REVEAL_RATE_LIMITED")
+  message: string;        // Human-readable message
+  retry_after?: number;   // Seconds until retry (for 429 errors)
+  retry_after_seconds?: number;  // Alternative field name in some endpoints
+}
+```
+
+---
+
+### Finding 2: PATCH Endpoint (DOES NOT EXIST)
+
+**Status:** ❌ `PATCH /api/auth/apikeys/:id` endpoint is NOT implemented
+
+**Current Endpoints:**
+- ✅ `POST /api/auth/apikeys` - Create key
+- ✅ `GET /api/auth/apikeys` - List keys
+- ✅ `DELETE /api/auth/apikeys/:id` - Revoke key
+- ✅ `POST /api/auth/apikeys/:id/reveal` - Reveal key
+- ❌ `PATCH /api/auth/apikeys/:id` - **Does not exist**
+
+**Required Action:** Backend must implement PATCH endpoint for name updates if editing feature is desired
+
+---
+
+### Finding 3: Session Freshness (IMPLEMENTED ✅)
+
+**Status:** ✅ Fully implemented for reveal endpoint
+
+**Implementation:** `/home/user/hashbin.org/src/api/auth.js:515-540`
+
+**Function:** `isSessionFresh(session, thresholdMinutes = 5)`
+- Located in `/home/user/hashbin.org/src/auth/utils.js:303-316`
+- Uses Clerk session `iat` (issued at) timestamp
+- Threshold: 5 minutes (configurable)
+- Returns 403 with error code `FRESH_AUTH_REQUIRED` if session is stale
+
+**Current Usage:**
+- ✅ Applied to: `POST /api/auth/apikeys/:id/reveal`
+- ❌ NOT applied to: PATCH endpoint (doesn't exist)
+
+**Error Response when session not fresh:**
+```json
+{
+  "error": "FRESH_AUTH_REQUIRED",
+  "message": "This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate."
+}
+```
+Status: `403 Forbidden`
+
+---
+
+### Finding 4: Rate Limiting (IMPLEMENTED ✅)
+
+#### General API Key Usage Rate Limits
+**Source:** `/home/user/hashbin.org/src/auth/middleware.js:21-25, 435-476`
+
+**Limits:**
+- **API Key requests:** 500 requests per minute
+- **Clerk session requests:** 1000 requests per minute
+- **Anonymous requests:** 100 requests per minute
+
+**Scope:** Per-key for API keys, per-user for Clerk sessions, per-IP for anonymous
+
+**Headers returned:**
+```
+X-RateLimit-Limit: 500
+X-RateLimit-Remaining: 250
+X-RateLimit-Reset: 1234567890  (Unix timestamp)
+```
+
+**Error Response (429):**
+```json
+{
+  "error": "AUTH_RATE_LIMITED",
+  "message": "Rate limit exceeded",
+  "retry_after": 45  // seconds
+}
+```
+
+#### Reveal Endpoint Rate Limits
+**Source:** `/home/user/hashbin.org/src/durable-objects/user-profile.js:503-537`
+
+**Limits:**
+- **3 reveals per hour** per API key
+- Sliding window implementation
+- Tracked via `reveal_timestamps` array in API key record
+
+**Error Response (429):**
+```json
+{
+  "error": "REVEAL_RATE_LIMITED",
+  "message": "Maximum 3 reveals per hour exceeded",
+  "retry_after_seconds": 3245
+}
+```
+Headers: `Retry-After: 3245` (seconds)
+
+**Edit Endpoint Rate Limits:**
+- N/A - PATCH endpoint does not exist
+
+---
+
+## Open Questions (REQUIRES DECISIONS)
+
+### Question 1: Should `usageCount` feature be implemented?
+
+**Current State:** Backend does NOT track usage count
+
+**Options:**
+
+**Option A: Remove usage count from UI plan (RECOMMENDED)**
+- Pros: No backend changes required, can implement UI immediately
+- Cons: Loses visibility into API key usage patterns
+- Impact: Remove ~20 tests related to usage count display/formatting
+- Effort: Update plan only (~30 minutes)
+
+**Option B: Implement usage count in backend**
+- Pros: Valuable feature for users to understand API usage
+- Cons: Requires backend changes before UI implementation
+- Impact: Must implement backend first, delays UI work
+- Effort: Backend implementation (~4-8 hours) + testing
+
+**Recommendation:** Choose Option A for faster delivery, add usage count in v2 if needed
+
+---
+
+### Question 2: Should key name editing be implemented?
+
+**Current State:** PATCH endpoint does NOT exist
+
+**Options:**
+
+**Option A: Remove name editing from UI plan (RECOMMENDED)**
+- Pros: No backend changes required, simplifies UI implementation
+- Cons: Users cannot rename keys after creation (must revoke and recreate)
+- Impact: Remove ~25 tests related to editing functionality
+- Effort: Update plan only (~30 minutes)
+
+**Option B: Implement PATCH endpoint in backend**
+- Pros: Better UX - users can fix typos or reorganize keys
+- Cons: Requires backend implementation and fresh auth enforcement
+- Impact: Must implement backend first, delays UI work
+- Effort: Backend implementation (~4-6 hours) + testing
+
+**Recommendation:** Choose Option A for faster delivery, add editing in v2 if needed
+
+---
+
+### Question 3: Should we proceed with current backend capabilities?
+
+**Option A: Simplified MVP (RECOMMENDED)**
+- Remove: usage count display, name editing
+- Keep: create, list, reveal, revoke, expiration warnings
+- Result: Fully implementable with current backend
+- Tests: ~230 tests (down from 277)
+- Timeline: Can start implementation immediately
+
+**Option B: Wait for backend updates**
+- Implement: usage count tracking, PATCH endpoint
+- Result: Full feature set as originally planned
+- Tests: All 277 tests
+- Timeline: Blocked until backend work complete (~1-2 weeks)
+
+**Recommendation:** Choose Option A - deliver working UI now, enhance later
 
 ## Implementation Phases
 
