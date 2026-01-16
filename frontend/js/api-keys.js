@@ -19,7 +19,6 @@ export async function listApiKeys() {
  * Create a new API key
  * @param {Object} data API key data
  * @param {string} data.name Key name (1-100 characters)
- * @param {string} data.environment 'live' or 'test'
  * @param {string} data.expiresAt ISO 8601 timestamp
  * @returns {Promise<Object>} Created API key with full key value
  */

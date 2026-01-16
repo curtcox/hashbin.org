@@ -367,7 +367,6 @@
             const daysUntilExpiration = getDaysUntilExpiration(key.expires_at);
             const statusClass = expired ? 'expired' : 'active';
             const rowClass = expiringSoon && !expired ? 'expiring-soon' : '';
-            const environment = key.key_id.startsWith('hb_live_') ? 'live' : 'test';
             
             let expirationDisplay = '';
             if (expired) {
@@ -387,7 +386,6 @@
               <tr class="${rowClass}" data-key-id="${key.key_id}">
                 <td>
                   <span class="key-name">${escapeHtml(key.name)}</span>
-                  <span class="key-env ${environment}">${environment.toUpperCase()}</span>
                 </td>
                 <td>
                   <span class="key-prefix">${getKeyPrefix(key.key_id)}</span>

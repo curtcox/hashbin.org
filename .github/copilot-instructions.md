@@ -138,15 +138,14 @@ export class MyDurableObject {
 
 ### Development vs Production
 
-- **Development**: Branch `develop`, worker `hashbin-worker-dev`
-- **Production**: Branch `main`, worker `hashbin-worker-prod`
-- Configuration in `wrangler.toml` under `[env.development]` and `[env.production]`
+- **Production**: Branch `main`, worker `hashbin-worker`
+- Single production environment configuration in `wrangler.toml`
 
 ### Environment Variables
 
 Available via `env` parameter:
-- `env.ENVIRONMENT`: "development" or "production"
-- `env.LOG_LEVEL`: "debug", "warn", or "error"
+- `env.ENVIRONMENT`: "production" (for logging purposes)
+- `env.LOG_LEVEL`: "warn" for production
 - `env.CONTENT_BUCKET`: R2 bucket binding
 - `env.BACKUP_BUCKET`: R2 bucket binding
 - `env.CONTENT_METADATA`: Durable Object binding
@@ -163,11 +162,8 @@ Available via `env` parameter:
 # Start local development server
 npm run dev
 
-# Deploy to development environment
-npm run deploy:dev
-
-# Deploy to production environment
-npm run deploy:prod
+# Deploy to production
+npm run deploy
 ```
 
 ### Verification
@@ -175,8 +171,8 @@ npm run deploy:prod
 After any deployment:
 
 ```bash
-# Verify development deployment
-npm run verify:dev -- <account-id>
+# Verify production deployment
+npm run verify -- <account-id>
 
 # Verify production deployment
 npm run verify:prod -- <account-id>
@@ -234,7 +230,7 @@ Standard format for `/health` endpoint:
 {
   status: "healthy" | "degraded" | "unhealthy",
   timestamp: "ISO 8601 timestamp",
-  environment: "development" | "production",
+  environment: "production",
   services: {
     worker: "operational" | "degraded" | "down",
     durableObjects: "operational" | "degraded" | "down",
@@ -351,7 +347,7 @@ When implementing new features, consider:
 - Updating health check endpoint if adding new services
 - Adding verification tests in `scripts/verify-deployment.sh`
 - Documenting new endpoints in this file
-- Testing in development before production deployment
+- Testing locally before production deployment
 
 ## Future Phases
 

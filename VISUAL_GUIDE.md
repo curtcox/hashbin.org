@@ -22,10 +22,10 @@
   │ Name              | Prefix        | Status | Usage  | Last Used | Expires      │
   │───────────────────|───────────────|────────|────────|───────────|──────────────│
   │ Production API    | hb_live_abc.. | 🟢 Act | 1.2K   | 2 hrs ago | ⚠️ 15 days   │
-  │ LIVE             | 📋            |        | req    |           |              │
+  │                  | 📋            |        | req    |           |              │
   │───────────────────|───────────────|────────|────────|───────────|──────────────│
-  │ Test Key          | hb_test_def.. | 🟢 Act | 42     | Never     | Jan 15, 2027 │
-  │ TEST             | 📋            |        | req    |           |              │
+  │ Backup API        | hb_live_def.. | 🟢 Act | 42     | Never     | Jan 15, 2027 │
+  │                  | 📋            |        | req    |           |              │
   │───────────────────|───────────────|────────|────────|───────────|──────────────│
   │ Old Key           | hb_live_ghi.. | 🔴 Exp | 3.4M   | 3 days    | Expired      │
   │ LIVE             | 📋            |        | req    | ago       |              │
@@ -64,10 +64,6 @@ Empty State (when no keys exist):
   │  Key Name *                                                    │
   │  [My API Key_______________________________________________]   │
   │  A descriptive name to help you identify this key (1-100)     │
-  │                                                                │
-  │  Environment *                                                 │
-  │  [Live (hb_live_*) ▼]                                         │
-  │  Live keys are for production use. Test keys for development  │
   │                                                                │
   │  Expiration Date *                                             │
   │  [01/16/2027______]                                           │
@@ -126,13 +122,13 @@ One-Time Key Display Modal (after successful creation):
   ┌───────────────────────────────────────────────────────────────┐
   │                                                                │
   │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐│
-  │  │ Key ID           │  │ Environment      │  │ Status       ││
-  │  │ hb_live_abc... 📋│  │ LIVE             │  │ 🟢 Active    ││
+  │  │ Key ID           │  │ Status           │  │ Created      ││
+  │  │ hb_live_abc... 📋│  │ 🟢 Active        │  │ Jan 16, 2025 ││
   │  └──────────────────┘  └──────────────────┘  └──────────────┘│
   │                                                                │
   │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐│
-  │  │ Total Requests   │  │ Last Used        │  │ Created      ││
-  │  │ 1.2K requests    │  │ 2 hours ago      │  │ Jan 16, 2025 ││
+  │  │ Total Requests   │  │ Last Used        │  │ Expires      ││
+  │  │ 1.2K requests    │  │ 2 hours ago      │  │ Jan 16, 2027 ││
   │  └──────────────────┘  └──────────────────┘  └──────────────┘│
   │                                                                │
   │  ┌──────────────────┐                                         │
@@ -225,10 +221,6 @@ Revoke Confirmation Modal (after clicking 🗑️ Revoke Key):
 - **Active (Green)**: `#10b981` (emerald-500)
 - **Expired (Red)**: `#ef4444` (red-500)
 - **Warning (Yellow)**: `#f59e0b` (amber-500)
-
-### Environment Badges
-- **Live (Blue)**: `#1e40af` text on `#dbeafe` background
-- **Test (Purple)**: `#3730a3` text on `#e0e7ff` background
 
 ### Alerts
 - **Info**: Blue border and background

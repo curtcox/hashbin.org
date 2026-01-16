@@ -13,7 +13,6 @@ export const AUTH_ERROR_CODES = {
   AUTH_EXPIRED: 'AUTH_EXPIRED',
   AUTH_REVOKED: 'AUTH_REVOKED',
   AUTH_USER_DELETED: 'AUTH_USER_DELETED',
-  AUTH_ENV_MISMATCH: 'AUTH_ENV_MISMATCH',
   AUTH_RATE_LIMITED: 'AUTH_RATE_LIMITED',
   AUTH_KEY_LIMIT: 'AUTH_KEY_LIMIT'
 };
@@ -112,7 +111,7 @@ async function validateClerkToken(token, env) {
  */
 async function validateApiKey(apiKey, env) {
   // Validate format first
-  const formatValidation = validateApiKeyFormat(apiKey, env.ENVIRONMENT);
+  const formatValidation = validateApiKeyFormat(apiKey);
   if (!formatValidation.valid) {
     return {
       valid: false,
@@ -488,7 +487,6 @@ function getErrorMessage(errorCode) {
     [AUTH_ERROR_CODES.AUTH_EXPIRED]: 'Authentication token expired',
     [AUTH_ERROR_CODES.AUTH_REVOKED]: 'API key has been revoked',
     [AUTH_ERROR_CODES.AUTH_USER_DELETED]: 'User account has been deleted',
-    [AUTH_ERROR_CODES.AUTH_ENV_MISMATCH]: 'API key environment mismatch',
     [AUTH_ERROR_CODES.AUTH_RATE_LIMITED]: 'Rate limit exceeded',
     [AUTH_ERROR_CODES.AUTH_KEY_LIMIT]: 'Maximum API keys limit reached'
   };

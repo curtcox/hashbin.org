@@ -7,70 +7,26 @@ compatibility_date = "2024-01-01"
 directory = "./frontend"
 binding = "ASSETS"
 
-# Development environment
-[env.development]
-name = "hashbin-worker-dev"
-vars = { ENVIRONMENT = "development", LOG_LEVEL = "debug" }
+# Production environment variables
+[vars]
+ENVIRONMENT = "production"
+LOG_LEVEL = "warn"
 
-# Note: Add these secrets using: wrangler secret put CLERK_SECRET_KEY --env development
-# CLERK_SECRET_KEY (required for development)
-# CLERK_PUBLISHABLE_KEY (required for development)
-# STRIPE_SECRET_KEY (required for payments)
-# STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
-# API_KEY_ENCRYPTION_KEY (required for API key reveal - 256-bit AES key in base64)
-
-# Production environment
-[env.production]
-name = "hashbin-worker-prod"
+# Production routes
 routes = [
   { pattern = "hashbin.org/*", zone_name = "hashbin.org" },
   { pattern = "www.hashbin.org/*", zone_name = "hashbin.org" }
 ]
 workers_dev = true
-vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
 
-# Note: Add these secrets using: wrangler secret put CLERK_SECRET_KEY --env production
-# CLERK_SECRET_KEY (required for production)
-# CLERK_PUBLISHABLE_KEY (required for production)
+# Note: Add these secrets using: wrangler secret put <SECRET_NAME>
+# CLERK_SECRET_KEY (required)
+# CLERK_PUBLISHABLE_KEY (required)
 # STRIPE_SECRET_KEY (required for payments)
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
 # API_KEY_ENCRYPTION_KEY (required for API key reveal - 256-bit AES key in base64)
 
-# Production Durable Objects bindings
-[[env.production.durable_objects.bindings]]
-name = "CONTENT_METADATA"
-class_name = "ContentMetadata"
-
-[[env.production.durable_objects.bindings]]
-name = "USER_PROFILES"
-class_name = "UserProfile"
-
-[[env.production.durable_objects.bindings]]
-name = "PAYMENT_RECORDS"
-class_name = "PaymentRecord"
-
-[[env.production.durable_objects.bindings]]
-name = "CONTEST_RECORDS"
-class_name = "ContestRecord"
-
-[[env.production.durable_objects.bindings]]
-name = "MESSAGE_THREADS"
-class_name = "MessageThread"
-
-[[env.production.durable_objects.bindings]]
-name = "KEY_REGISTRY"
-class_name = "KeyRegistry"
-
-# Production R2 bucket bindings
-[[env.production.r2_buckets]]
-binding = "CONTENT_BUCKET"
-bucket_name = "hashbin-content-prod"
-
-[[env.production.r2_buckets]]
-binding = "BACKUP_BUCKET"
-bucket_name = "hashbin-backups-prod"
-
-# Durable Objects bindings (top-level for local dev)
+# Durable Objects bindings
 [[durable_objects.bindings]]
 name = "CONTENT_METADATA"
 class_name = "ContentMetadata"
@@ -105,12 +61,10 @@ script_name = "hashbin-worker"
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
 bucket_name = "hashbin-content-prod"
-preview_bucket_name = "hashbin-content-dev"
 
 [[r2_buckets]]
 binding = "BACKUP_BUCKET"
 bucket_name = "hashbin-backups-prod"
-preview_bucket_name = "hashbin-backups-dev"
 
 # Durable Objects migrations
 [[migrations]]

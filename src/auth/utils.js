@@ -8,16 +8,14 @@ import { AUTH_ERROR_CODES } from './middleware.js';
 // API key format constants
 const API_KEY_LENGTH = 32; // Random alphanumeric characters
 const LIVE_PREFIX = 'hb_live_';
-const TEST_PREFIX = 'hb_test_';
 
 /**
  * Generate a cryptographically secure API key
- * Format: hb_live_<32-chars> or hb_test_<32-chars>
+ * Format: hb_live_<32-chars>
  */
-export function generateApiKey(environment) {
-  const prefix = environment === 'production' ? LIVE_PREFIX : TEST_PREFIX;
+export function generateApiKey() {
   const randomPart = generateRandomString(API_KEY_LENGTH);
-  return prefix + randomPart;
+  return LIVE_PREFIX + randomPart;
 }
 
 /**
@@ -66,9 +64,10 @@ export async function hashApiKey(apiKey) {
 
 /**
  * Validate API key format
- * Checks prefix, length, and environment match
+ * Checks prefix and length
+ * Accepts both hb_live_ and legacy hb_test_ prefixes for backward compatibility
  */
-export function validateApiKeyFormat(apiKey, environment) {
+export function validateApiKeyFormat(apiKey) {
   if (!apiKey || typeof apiKey !== 'string') {
     return {
       valid: false,
@@ -77,37 +76,20 @@ export function validateApiKeyFormat(apiKey, environment) {
     };
   }
 
-  // Check for correct prefix
+  // Check for correct prefix (accept both live and legacy test prefixes)
   const hasLivePrefix = apiKey.startsWith(LIVE_PREFIX);
-  const hasTestPrefix = apiKey.startsWith(TEST_PREFIX);
+  const hasLegacyTestPrefix = apiKey.startsWith('hb_test_');
 
-  if (!hasLivePrefix && !hasTestPrefix) {
+  if (!hasLivePrefix && !hasLegacyTestPrefix) {
     return {
       valid: false,
       error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
-      message: 'API key must start with hb_live_ or hb_test_'
-    };
-  }
-
-  // Check environment match
-  if (environment === 'production' && !hasLivePrefix) {
-    return {
-      valid: false,
-      error: AUTH_ERROR_CODES.AUTH_ENV_MISMATCH,
-      message: 'Test keys cannot be used in production environment'
-    };
-  }
-
-  if (environment === 'development' && !hasTestPrefix) {
-    return {
-      valid: false,
-      error: AUTH_ERROR_CODES.AUTH_ENV_MISMATCH,
-      message: 'Live keys cannot be used in development environment'
+      message: 'API key must start with hb_live_'
     };
   }
 
   // Check length
-  const prefix = hasLivePrefix ? LIVE_PREFIX : TEST_PREFIX;
+  const prefix = hasLivePrefix ? LIVE_PREFIX : 'hb_test_';
   const expectedLength = prefix.length + API_KEY_LENGTH;
 
   if (apiKey.length !== expectedLength) {

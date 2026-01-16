@@ -314,13 +314,6 @@
             </div>
             
             <div class="detail-item">
-              <span class="detail-label">Environment</span>
-              <div class="detail-value">
-                <span id="key-environment" class="key-env"></span>
-              </div>
-            </div>
-            
-            <div class="detail-item">
               <span class="detail-label">Status</span>
               <div class="detail-value" id="key-status"></div>
             </div>
@@ -476,7 +469,6 @@
       const expired = isExpired(key.expires_at);
       const expiringSoon = isExpiringSoon(key.expires_at);
       const daysUntilExpiration = getDaysUntilExpiration(key.expires_at);
-      const environment = key.key_id.startsWith('hb_live_') ? 'live' : 'test';
       
       // Breadcrumb
       document.getElementById('breadcrumb-name').textContent = key.name;
@@ -486,11 +478,6 @@
       
       // Key prefix
       document.getElementById('key-prefix').textContent = getKeyPrefix(key.key_id);
-      
-      // Environment
-      const envEl = document.getElementById('key-environment');
-      envEl.textContent = environment.toUpperCase();
-      envEl.className = `key-env ${environment}`;
       
       // Status
       const statusEl = document.getElementById('key-status');

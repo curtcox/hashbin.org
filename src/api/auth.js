@@ -309,7 +309,7 @@ export async function handleCreateApiKey(request, env) {
   }
 
   // Generate API key
-  const apiKey = generateApiKey(env.ENVIRONMENT);
+  const apiKey = generateApiKey();
   const keyHash = await hashApiKey(apiKey);
   const keyId = generateKeyId();
 

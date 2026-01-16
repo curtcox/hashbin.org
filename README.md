@@ -32,7 +32,7 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 ### ✅ Phase 1: Foundation & Infrastructure (Complete)
 - Cloudflare infrastructure setup
 - GitHub Actions CI/CD pipeline
-- Development and production environments
+- Single production environment
 - Health monitoring and logging
 
 ### ✅ Phase 3: Authentication & Authorization (Complete)
@@ -106,10 +106,8 @@ The development server runs at `http://localhost:8787`
 ### Available Scripts
 
 - `npm run dev` - Start local development server
-- `npm run deploy:dev` - Deploy to development environment
-- `npm run deploy:prod` - Deploy to production environment
-- `npm run verify:dev` - Verify development deployment
-- `npm run verify:prod` - Verify production deployment
+- `npm run deploy` - Deploy to production
+- `npm run verify` - Verify production deployment
 - `npm test` - Run test suite
 
 ## Architecture
@@ -155,7 +153,7 @@ HashBin.org supports two authentication methods:
 2. **API Keys** (for programmatic access)
    - Create via `/api/auth/apikeys` endpoint (requires Clerk session)
    - Include in `Authorization: ApiKey <key>` or `X-API-Key: <key>` header
-   - Format: `hb_live_<32-chars>` (production) or `hb_test_<32-chars>` (development)
+   - Format: `hb_live_<32-chars>`
 
 ### Core Endpoints
 

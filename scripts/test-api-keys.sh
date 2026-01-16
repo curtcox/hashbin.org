@@ -57,14 +57,14 @@ echo ""
 # ==========================================
 # Test 1: generateApiKey - production format
 # ==========================================
-log_test "generateApiKey produces correct production format"
+log_test "generateApiKey produces correct format"
 
 # This test checks the implementation directly by examining the code
 # In a real test we'd need to actually call the function
-if grep -q "const prefix = environment === 'production' ? LIVE_PREFIX : TEST_PREFIX;" /home/runner/work/hashbin.org/hashbin.org/src/auth/utils.js; then
-  log_pass "generateApiKey implementation uses correct prefix logic"
+if grep -q "LIVE_PREFIX + randomPart" /home/runner/work/hashbin.org/hashbin.org/src/auth/utils.js; then
+  log_pass "generateApiKey implementation uses LIVE_PREFIX"
 else
-  log_fail "generateApiKey prefix logic not found or incorrect"
+  log_fail "generateApiKey implementation not found or incorrect"
 fi
 
 # ==========================================

@@ -161,64 +161,6 @@ else
 fi
 
 # ==========================================
-# Test 6: Test Key in Production Environment
-# ==========================================
-log_test "Test API key rejected in production environment"
-
-# This test only runs if ENVIRONMENT is production
-RESPONSE=$(curl -s "$BASE_URL/")
-if echo "$RESPONSE" | grep -q '"environment"[[:space:]]*:[[:space:]]*"production"'; then
-  RESPONSE=$(curl -s -w "\n%{http_code}" \
-    -H "Authorization: ApiKey hb_test_abcdefghijklmnopqrstuvwxyz123456" \
-    "$BASE_URL/api/auth/session")
-  HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-  BODY=$(echo "$RESPONSE" | sed '$d')
-
-  if [ "$HTTP_CODE" = "401" ]; then
-    if echo "$BODY" | grep -q '"error"[[:space:]]*:[[:space:]]*"AUTH_ENV_MISMATCH"'; then
-      log_pass "Test key rejected in production with AUTH_ENV_MISMATCH"
-    else
-      log_fail "Test key rejected but wrong error code"
-      echo "Response: $BODY"
-    fi
-  else
-    log_fail "Test key should be rejected in production (got $HTTP_CODE)"
-    echo "Response: $BODY"
-  fi
-else
-  log_skip "Environment is not production, skipping test key validation"
-fi
-
-# ==========================================
-# Test 7: Live Key in Development Environment
-# ==========================================
-log_test "Live API key rejected in development environment"
-
-# This test only runs if ENVIRONMENT is development
-RESPONSE=$(curl -s "$BASE_URL/")
-if echo "$RESPONSE" | grep -q '"environment"[[:space:]]*:[[:space:]]*"development"'; then
-  RESPONSE=$(curl -s -w "\n%{http_code}" \
-    -H "Authorization: ApiKey hb_live_abcdefghijklmnopqrstuvwxyz123456" \
-    "$BASE_URL/api/auth/session")
-  HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-  BODY=$(echo "$RESPONSE" | sed '$d')
-
-  if [ "$HTTP_CODE" = "401" ]; then
-    if echo "$BODY" | grep -q '"error"[[:space:]]*:[[:space:]]*"AUTH_ENV_MISMATCH"'; then
-      log_pass "Live key rejected in development with AUTH_ENV_MISMATCH"
-    else
-      log_fail "Live key rejected but wrong error code"
-      echo "Response: $BODY"
-    fi
-  else
-    log_fail "Live key should be rejected in development (got $HTTP_CODE)"
-    echo "Response: $BODY"
-  fi
-else
-  log_skip "Environment is not development, skipping live key validation"
-fi
-
-# ==========================================
 # Test 8: API Key Length Validation
 # ==========================================
 log_test "API key with incorrect length is rejected"

@@ -189,18 +189,6 @@
             <span id="name-error" class="form-error hidden"></span>
           </div>
           
-          <!-- Environment Field -->
-          <div class="form-group">
-            <label for="key-environment" class="form-label">Environment *</label>
-            <select id="key-environment" name="environment" class="form-select" required>
-              <option value="live">Live (hb_live_*)</option>
-              <option value="test">Test (hb_test_*)</option>
-            </select>
-            <span class="form-help">
-              Live keys are for production use. Test keys are for development and testing.
-            </span>
-          </div>
-          
           <!-- Expiration Date Field -->
           <div class="form-group">
             <label for="key-expiration" class="form-label">Expiration Date *</label>
@@ -303,7 +291,6 @@
     const form = document.getElementById('create-key-form');
     const submitBtn = document.getElementById('submit-btn');
     const nameInput = document.getElementById('key-name');
-    const environmentInput = document.getElementById('key-environment');
     
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -314,7 +301,6 @@
       
       // Validate
       const name = nameInput.value.trim();
-      const environment = environmentInput.value;
       const expirationDate = new Date(expirationInput.value);
       
       let hasError = false;
@@ -359,7 +345,6 @@
       try {
         const result = await createApiKey({
           name: name,
-          environment: environment,
           expiresAt: expirationInput.value + 'T00:00:00Z'
         });
         

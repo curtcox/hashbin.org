@@ -1,20 +1,20 @@
 #!/bin/bash
 # Deployment Verification Script
-# Usage: ./scripts/verify-deployment.sh <environment> [account-id]
-# Example: ./scripts/verify-deployment.sh development abc123...
+# Usage: ./scripts/verify-deployment.sh [environment] [account-id]
+# Example: ./scripts/verify-deployment.sh production abc123...
+# Note: 'environment' parameter kept for backward compatibility but only 'production' is used
 
 set -e
 
-ENVIRONMENT=$1
+ENVIRONMENT=${1:-production}
 ACCOUNT_ID=$2
 
 if [ -z "$ENVIRONMENT" ]; then
-  echo "Usage: $0 <environment> [account-id]"
-  echo "  environment: development, production, or custom URL"
-  echo "  account-id: Cloudflare account ID (required for development/production)"
+  echo "Usage: $0 [environment] [account-id]"
+  echo "  environment: production or custom URL (default: production)"
+  echo "  account-id: Cloudflare account ID (required for production)"
   echo ""
   echo "Examples:"
-  echo "  $0 development abc123def456"
   echo "  $0 production abc123def456"
   echo "  $0 https://hashbin.org"
   exit 1
@@ -24,23 +24,16 @@ fi
 if [[ "$ENVIRONMENT" == http* ]]; then
   BASE_URL="$ENVIRONMENT"
   ENV_NAME="custom"
-elif [ "$ENVIRONMENT" = "development" ]; then
+elif [ "$ENVIRONMENT" = "development" ] || [ "$ENVIRONMENT" = "production" ]; then
   if [ -z "$ACCOUNT_ID" ]; then
-    echo "Error: Account ID required for development environment"
+    echo "Error: Account ID required for workers.dev URL"
     exit 1
   fi
-  BASE_URL="https://hashbin-worker-dev.${ACCOUNT_ID}.workers.dev"
-  ENV_NAME="development"
-elif [ "$ENVIRONMENT" = "production" ]; then
-  if [ -z "$ACCOUNT_ID" ]; then
-    echo "Error: Account ID required for production environment"
-    exit 1
-  fi
-  BASE_URL="https://hashbin-worker-prod.${ACCOUNT_ID}.workers.dev"
+  BASE_URL="https://hashbin-worker.${ACCOUNT_ID}.workers.dev"
   ENV_NAME="production"
 else
   echo "Error: Invalid environment '$ENVIRONMENT'"
-  echo "Must be 'development', 'production', or a full URL"
+  echo "Must be 'production' or a full URL"
   exit 1
 fi
 
