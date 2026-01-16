@@ -1,11 +1,14 @@
 # Key Management UI Plan
 
-**Status:** Draft v3.0 - BACKEND INVESTIGATION COMPLETE
+**Status:** Draft v4.0 - DECISION: IMPLEMENT BACKEND FEATURES FIRST
 **Date:** 2026-01-16
 **Changelog:**
+- v4.0: Decision to implement Option B - add backend features (usageCount, PATCH endpoint) before UI
 - v3.0: Backend investigation complete - identified missing features (usageCount, PATCH endpoint)
 - v2.0: Resolved 11 of 15 open questions, added key editing, usage count, expiration sorting/highlighting
-**Related:** `todo/user_stories.md` (API Developers section, lines 172-194)
+**Related:**
+- `todo/user_stories.md` (API Developers section, lines 172-194)
+- `todo/key_management_backend.md` (Backend implementation plan)
 
 ## Overview
 
@@ -845,68 +848,39 @@ Headers: `Retry-After: 3245` (seconds)
 
 ---
 
-## Open Questions (REQUIRES DECISIONS)
+## Decision: Implement Backend Features First ✅
 
-### Question 1: Should `usageCount` feature be implemented?
+**Chosen Approach:** Option B - Implement backend features before UI
 
-**Current State:** Backend does NOT track usage count
+### Features to Implement in Backend:
 
-**Options:**
+1. **✅ Usage Count Tracking**
+   - Add `usage_count` field to API key records
+   - Increment counter in `updateLastUsed()` method
+   - Return in `GET /api/auth/apikeys` response
+   - Effort: ~4-6 hours
+   - Details: See `todo/key_management_backend.md`
 
-**Option A: Remove usage count from UI plan (RECOMMENDED)**
-- Pros: No backend changes required, can implement UI immediately
-- Cons: Loses visibility into API key usage patterns
-- Impact: Remove ~20 tests related to usage count display/formatting
-- Effort: Update plan only (~30 minutes)
+2. **✅ PATCH Endpoint for Name Updates**
+   - Implement `PATCH /api/auth/apikeys/:id` endpoint
+   - Require fresh authentication (5-minute threshold)
+   - Validate name (1-100 characters)
+   - Return updated key metadata
+   - Effort: ~4-6 hours
+   - Details: See `todo/key_management_backend.md`
 
-**Option B: Implement usage count in backend**
-- Pros: Valuable feature for users to understand API usage
-- Cons: Requires backend changes before UI implementation
-- Impact: Must implement backend first, delays UI work
-- Effort: Backend implementation (~4-8 hours) + testing
+### Timeline:
+- **Backend implementation:** ~8-12 hours (1-2 days)
+- **Backend testing:** ~4-6 hours
+- **Total before UI work:** ~12-18 hours (2-3 days)
+- **UI implementation:** Can begin after backend is complete
 
-**Recommendation:** Choose Option A for faster delivery, add usage count in v2 if needed
-
----
-
-### Question 2: Should key name editing be implemented?
-
-**Current State:** PATCH endpoint does NOT exist
-
-**Options:**
-
-**Option A: Remove name editing from UI plan (RECOMMENDED)**
-- Pros: No backend changes required, simplifies UI implementation
-- Cons: Users cannot rename keys after creation (must revoke and recreate)
-- Impact: Remove ~25 tests related to editing functionality
-- Effort: Update plan only (~30 minutes)
-
-**Option B: Implement PATCH endpoint in backend**
-- Pros: Better UX - users can fix typos or reorganize keys
-- Cons: Requires backend implementation and fresh auth enforcement
-- Impact: Must implement backend first, delays UI work
-- Effort: Backend implementation (~4-6 hours) + testing
-
-**Recommendation:** Choose Option A for faster delivery, add editing in v2 if needed
-
----
-
-### Question 3: Should we proceed with current backend capabilities?
-
-**Option A: Simplified MVP (RECOMMENDED)**
-- Remove: usage count display, name editing
-- Keep: create, list, reveal, revoke, expiration warnings
-- Result: Fully implementable with current backend
-- Tests: ~230 tests (down from 277)
-- Timeline: Can start implementation immediately
-
-**Option B: Wait for backend updates**
-- Implement: usage count tracking, PATCH endpoint
-- Result: Full feature set as originally planned
-- Tests: All 277 tests
-- Timeline: Blocked until backend work complete (~1-2 weeks)
-
-**Recommendation:** Choose Option A - deliver working UI now, enhance later
+### Benefits of This Approach:
+- Full feature set from day one
+- Better UX (users can rename keys, see usage stats)
+- All 277 tests can be implemented
+- No need for v2 enhancements
+- Cleaner architecture (no workarounds)
 
 ## Implementation Phases
 
@@ -1005,50 +979,38 @@ The implementation will be considered complete when:
 
 ## Next Steps
 
-### 1. Resolve Remaining Open Questions (PRIORITY)
+### 1. ✅ Implement Backend Features (FIRST - BLOCKING)
 
-**Backend API verification needed:**
+**See:** `todo/key_management_backend.md` for detailed implementation plan
 
-a) **API Response Format Investigation:**
-   - Read backend code for `GET /api/auth/apikeys` endpoint
-   - Verify if `usageCount` field exists in response
-   - Check if backend tracks API key usage per key
-   - Document actual field names and types
-   - Verify error response format
+**Tasks:**
+1. Add usage count tracking to API keys
+2. Implement PATCH endpoint for name updates
+3. Add tests for new functionality
+4. Deploy backend changes
 
-b) **PATCH Endpoint Verification:**
-   - Check if `PATCH /api/auth/apikeys/:id` endpoint exists
-   - If not, needs to be implemented in backend first
-   - Verify it accepts `{ name: string }` in request body
-   - Verify it requires fresh authentication
+**Timeline:** ~2-3 days (12-18 hours)
 
-c) **Rate Limiting Documentation:**
-   - Document rate limits for reveal endpoint
-   - Document rate limits for edit endpoint (if exists)
-   - Specify: per-user, per-key, or per-IP?
-   - Specify: time window and request count
-   - Specify: error response format (HTTP 429)
+---
 
-**Questions to investigate:**
-1. Does the backend track `usageCount` (total requests per API key)?
-2. Does the `PATCH /api/auth/apikeys/:id` endpoint exist?
-3. How is session freshness validated? Is there a 5-minute mechanism?
-4. What are the rate limits for reveal and edit operations?
-5. Can you share the actual API response format from `GET /api/auth/apikeys`?
-
-### 2. Design Review
+### 2. Design Review (Can be done in parallel with backend work)
    - Create mockups/wireframes for all three pages
    - Review with stakeholders
    - Confirm UI patterns and components
    - Finalize expiration warning visual treatment
 
-### 3. Technical Spike
-   - Investigate fresh authentication flow with Clerk (5-minute threshold)
+---
+
+### 3. Technical Spike (After backend is deployed)
+   - Test new usage count field in API response
+   - Test PATCH endpoint with name updates
+   - Verify fresh authentication flow with Clerk (5-minute threshold)
    - Verify clipboard API compatibility across browsers
    - Test 3-second copy feedback auto-dismiss
-   - Test API endpoints directly
 
-### 4. Begin Implementation
+---
+
+### 4. Begin UI Implementation (After backend is complete)
    - Start with Phase 1 (Core List & Create with sorting/usage)
    - Use test-driven development approach (277 tests)
    - Iterate based on feedback
@@ -1056,8 +1018,7 @@ c) **Rate Limiting Documentation:**
 ---
 
 **Notes:**
-- This plan assumes backend APIs are functional as indicated in user_stories.md
-- Test plan is comprehensive (277 tests) to drive out all ambiguity
-- **BLOCKING:** Need answers to open questions before implementation
+- Backend work is blocking for UI implementation
+- All 277 tests can be implemented once backend is complete
+- Plan delivers full feature set from day one
 - Plan follows existing HashBin.org patterns and architecture
-- v2.0 adds: key editing, usage count, expiration warnings, 5-min fresh auth
