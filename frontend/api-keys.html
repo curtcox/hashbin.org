@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Manage your API keys">
+  <title>API Keys - HashBin.org</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .api-keys-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--spacing-xl);
+      flex-wrap: wrap;
+      gap: var(--spacing-md);
+    }
+    
+    .api-keys-header h1 {
+      margin: 0;
+      font-size: var(--font-size-2xl);
+    }
+    
+    .key-count {
+      font-size: var(--font-size-base);
+      color: var(--color-text-light);
+      font-weight: normal;
+      margin-left: var(--spacing-md);
+    }
+    
+    .api-keys-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: var(--spacing-lg);
+    }
+    
+    .api-keys-table th {
+      text-align: left;
+      padding: var(--spacing-md);
+      background-color: var(--color-surface);
+      border-bottom: 2px solid var(--color-border);
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    
+    .api-keys-table td {
+      padding: var(--spacing-md);
+      border-bottom: 1px solid var(--color-border);
+      vertical-align: middle;
+    }
+    
+    .api-keys-table tr:hover {
+      background-color: var(--color-surface);
+      cursor: pointer;
+    }
+    
+    .api-keys-table tr.expiring-soon {
+      background-color: #fef3c7;
+    }
+    
+    .api-keys-table tr.expiring-soon:hover {
+      background-color: #fde68a;
+    }
+    
+    .key-prefix {
+      font-family: 'Courier New', monospace;
+      background-color: var(--color-surface);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+    }
+    
+    .key-name {
+      font-weight: 500;
+      color: var(--color-text);
+      display: block;
+      margin-bottom: var(--spacing-xs);
+    }
+    
+    .key-env {
+      display: inline-block;
+      padding: 2px var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-xs);
+      font-weight: 500;
+    }
+    
+    .key-env.live {
+      background-color: #dbeafe;
+      color: #1e40af;
+    }
+    
+    .key-env.test {
+      background-color: #e0e7ff;
+      color: #3730a3;
+    }
+    
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border-radius: var(--radius-sm);
+      font-size: var(--font-size-sm);
+      font-weight: 500;
+    }
+    
+    .status-badge.active {
+      background-color: #d1fae5;
+      color: #065f46;
+    }
+    
+    .status-badge.expired {
+      background-color: #fee2e2;
+      color: #991b1b;
+    }
+    
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: var(--radius-full);
+    }
+    
+    .status-dot.active {
+      background-color: #10b981;
+    }
+    
+    .status-dot.expired {
+      background-color: #ef4444;
+    }
+    
+    .expiration-warning {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+      color: #92400e;
+      font-size: var(--font-size-sm);
+    }
+    
+    .warning-icon {
+      color: #f59e0b;
+      font-weight: bold;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: var(--spacing-2xl) var(--spacing-lg);
+    }
+    
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .empty-state h2 {
+      margin-bottom: var(--spacing-md);
+      color: var(--color-text);
+    }
+    
+    .empty-state p {
+      color: var(--color-text-light);
+      margin-bottom: var(--spacing-xl);
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .copy-btn {
+      background: none;
+      border: none;
+      color: var(--color-primary);
+      cursor: pointer;
+      padding: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+      border-radius: var(--radius-sm);
+      transition: background-color 0.2s;
+    }
+    
+    .copy-btn:hover {
+      background-color: var(--color-surface);
+    }
+    
+    .copy-btn.copied {
+      color: #10b981;
+    }
+    
+    @media (max-width: 768px) {
+      .api-keys-table {
+        display: block;
+        overflow-x: auto;
+      }
+      
+      .api-keys-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header">
+    <a href="/" class="logo">HashBin</a>
+    <nav>
+      <a href="/upload.html">Upload</a>
+      <a href="/retrieve.html">Retrieve</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+    <div id="auth-section">
+      <!-- Auth UI will be rendered here by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <div class="api-keys-header">
+        <div>
+          <h1>
+            API Keys
+            <span id="key-count" class="key-count"></span>
+          </h1>
+          <p style="color: var(--color-text-light); margin-top: var(--spacing-sm);">
+            Manage your API credentials for programmatic access
+          </p>
+        </div>
+        <a href="/api-keys-create.html" id="create-key-btn" class="btn btn-primary">
+          Create New Key
+        </a>
+      </div>
+      
+      <!-- Warning when approaching limit -->
+      <div id="limit-warning" class="alert alert-warning hidden" style="margin-bottom: var(--spacing-lg);">
+        <!-- Will be populated by JS -->
+      </div>
+      
+      <!-- Loading State -->
+      <div id="loading-state" class="card">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+          <div class="spinner"></div>
+          <span>Loading API keys...</span>
+        </div>
+      </div>
+      
+      <!-- Empty State -->
+      <div id="empty-state" class="card hidden">
+        <div class="empty-state">
+          <div class="empty-state-icon">🔑</div>
+          <h2>No API Keys Yet</h2>
+          <p>
+            Create your first API key to start using the HashBin API programmatically.
+          </p>
+          <a href="/api-keys-create.html" class="btn btn-primary">Create API Key</a>
+        </div>
+      </div>
+      
+      <!-- Keys Table -->
+      <div id="keys-table-container" class="card hidden">
+        <table class="api-keys-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Key Prefix</th>
+              <th>Status</th>
+              <th>Usage</th>
+              <th>Last Used</th>
+              <th>Expires</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="keys-table-body">
+            <!-- Will be populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source | 
+      <a href="/docs/">Documentation</a> | 
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { requireAuth } from './js/auth-gate.js';
+    import { showToast, showElement, hideElement } from './js/utils.js';
+    import { 
+      listApiKeys, 
+      formatUsageCount, 
+      formatRelativeTime,
+      getDaysUntilExpiration,
+      isExpiringSoon,
+      isExpired,
+      getKeyPrefix,
+      copyToClipboard
+    } from './js/api-keys.js';
+    
+    const MAX_API_KEYS = 25;
+    
+    // Protect this page - require authentication
+    await requireAuth();
+    
+    // Load and display API keys
+    async function loadApiKeys() {
+      const loadingState = document.getElementById('loading-state');
+      const emptyState = document.getElementById('empty-state');
+      const tableContainer = document.getElementById('keys-table-container');
+      const tableBody = document.getElementById('keys-table-body');
+      const keyCountEl = document.getElementById('key-count');
+      const limitWarningEl = document.getElementById('limit-warning');
+      const createKeyBtn = document.getElementById('create-key-btn');
+      
+      try {
+        const keys = await listApiKeys();
+        
+        // Hide loading
+        hideElement(loadingState);
+        
+        // Update key count
+        keyCountEl.textContent = `(${keys.length}/${MAX_API_KEYS})`;
+        
+        // Show warning if approaching limit
+        if (keys.length >= 23 && keys.length < MAX_API_KEYS) {
+          limitWarningEl.innerHTML = `
+            <strong>⚠️ Approaching API Key Limit</strong><br>
+            You have ${keys.length} of ${MAX_API_KEYS} keys. 
+            Consider revoking unused keys before creating new ones.
+          `;
+          showElement(limitWarningEl);
+        } else if (keys.length >= MAX_API_KEYS) {
+          limitWarningEl.innerHTML = `
+            <strong>🚫 API Key Limit Reached</strong><br>
+            You have reached the maximum of ${MAX_API_KEYS} keys. 
+            You must revoke an existing key before creating a new one.
+          `;
+          limitWarningEl.className = 'alert alert-error';
+          showElement(limitWarningEl);
+          createKeyBtn.disabled = true;
+          createKeyBtn.title = 'Maximum API keys reached';
+        }
+        
+        // Show empty state or table
+        if (keys.length === 0) {
+          showElement(emptyState);
+        } else {
+          // Sort keys by expiration date (soonest first)
+          keys.sort((a, b) => {
+            const daysA = getDaysUntilExpiration(a.expires_at);
+            const daysB = getDaysUntilExpiration(b.expires_at);
+            return daysA - daysB;
+          });
+          
+          // Populate table
+          tableBody.innerHTML = keys.map(key => {
+            const expired = isExpired(key.expires_at);
+            const expiringSoon = isExpiringSoon(key.expires_at);
+            const daysUntilExpiration = getDaysUntilExpiration(key.expires_at);
+            const statusClass = expired ? 'expired' : 'active';
+            const rowClass = expiringSoon && !expired ? 'expiring-soon' : '';
+            const environment = key.key_id.startsWith('hb_live_') ? 'live' : 'test';
+            
+            let expirationDisplay = '';
+            if (expired) {
+              expirationDisplay = `<span style="color: #991b1b;">Expired</span>`;
+            } else if (expiringSoon) {
+              expirationDisplay = `
+                <span class="expiration-warning">
+                  <span class="warning-icon">⚠️</span>
+                  ${daysUntilExpiration} ${daysUntilExpiration === 1 ? 'day' : 'days'}
+                </span>
+              `;
+            } else {
+              expirationDisplay = new Date(key.expires_at).toLocaleDateString();
+            }
+            
+            return `
+              <tr class="${rowClass}" data-key-id="${key.key_id}">
+                <td>
+                  <span class="key-name">${escapeHtml(key.name)}</span>
+                  <span class="key-env ${environment}">${environment.toUpperCase()}</span>
+                </td>
+                <td>
+                  <span class="key-prefix">${getKeyPrefix(key.key_id)}</span>
+                  <button class="copy-btn" data-copy="${key.key_id}" title="Copy key ID">
+                    📋
+                  </button>
+                </td>
+                <td>
+                  <span class="status-badge ${statusClass}">
+                    <span class="status-dot ${statusClass}"></span>
+                    ${statusClass === 'active' ? 'Active' : 'Expired'}
+                  </span>
+                </td>
+                <td>${formatUsageCount(key.usage_count || 0)} requests</td>
+                <td style="color: var(--color-text-light);">
+                  ${formatRelativeTime(key.last_used_at)}
+                </td>
+                <td>${expirationDisplay}</td>
+                <td>
+                  <a href="/api-keys-detail.html?id=${key.key_id}" class="btn btn-sm btn-secondary">
+                    View
+                  </a>
+                </td>
+              </tr>
+            `;
+          }).join('');
+          
+          // Add click handlers to rows
+          tableBody.querySelectorAll('tr').forEach(row => {
+            row.addEventListener('click', (e) => {
+              // Don't navigate if clicking a button
+              if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A') {
+                return;
+              }
+              const keyId = row.dataset.keyId;
+              window.location.href = `/api-keys-detail.html?id=${keyId}`;
+            });
+          });
+          
+          // Add copy button handlers
+          tableBody.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              e.stopPropagation();
+              const text = btn.dataset.copy;
+              await copyToClipboard(text);
+              
+              // Show feedback
+              const originalText = btn.textContent;
+              btn.textContent = '✓';
+              btn.classList.add('copied');
+              showToast('Copied to clipboard', 'success', 3000);
+              
+              setTimeout(() => {
+                btn.textContent = originalText;
+                btn.classList.remove('copied');
+              }, 3000);
+            });
+          });
+          
+          showElement(tableContainer);
+        }
+      } catch (error) {
+        console.error('Failed to load API keys:', error);
+        hideElement(loadingState);
+        
+        const errorCard = document.createElement('div');
+        errorCard.className = 'card';
+        errorCard.innerHTML = `
+          <div class="alert alert-error">
+            <p><strong>Failed to load API keys</strong></p>
+            <p>${error.message}</p>
+            <button class="btn btn-secondary" onclick="location.reload()">
+              Retry
+            </button>
+          </div>
+        `;
+        document.querySelector('.container').appendChild(errorCard);
+      }
+    }
+    
+    // Helper to escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Load keys when page loads
+    loadApiKeys();
+  </script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

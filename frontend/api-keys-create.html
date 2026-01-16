@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Create a new API key">
+  <title>Create API Key - HashBin.org</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-lg);
+      color: var(--color-text-light);
+      font-size: var(--font-size-sm);
+    }
+    
+    .breadcrumb a {
+      color: var(--color-primary);
+      text-decoration: none;
+    }
+    
+    .breadcrumb a:hover {
+      text-decoration: underline;
+    }
+    
+    .form-help {
+      display: block;
+      margin-top: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+      color: var(--color-text-light);
+    }
+    
+    .form-error {
+      display: block;
+      margin-top: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+      color: #ef4444;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    
+    .modal.show {
+      display: flex;
+    }
+    
+    .modal-content {
+      background-color: var(--color-background);
+      border-radius: var(--radius-lg);
+      padding: var(--spacing-xl);
+      max-width: 600px;
+      width: 90%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+    }
+    
+    .modal-header {
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .modal-header h2 {
+      margin: 0;
+      font-size: var(--font-size-xl);
+    }
+    
+    .modal-body {
+      margin-bottom: var(--spacing-lg);
+    }
+    
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: var(--spacing-md);
+    }
+    
+    .key-display {
+      background-color: var(--color-surface);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      margin: var(--spacing-lg) 0;
+      word-break: break-all;
+      font-family: 'Courier New', monospace;
+      font-size: var(--font-size-sm);
+    }
+    
+    .warning-box {
+      background-color: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: var(--radius-md);
+      padding: var(--spacing-md);
+      margin: var(--spacing-lg) 0;
+      display: flex;
+      align-items: start;
+      gap: var(--spacing-md);
+    }
+    
+    .warning-box .icon {
+      font-size: var(--font-size-xl);
+      flex-shrink: 0;
+    }
+    
+    .checkbox-container {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-lg);
+    }
+    
+    .checkbox-container input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    
+    .checkbox-container label {
+      cursor: pointer;
+      user-select: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header">
+    <a href="/" class="logo">HashBin</a>
+    <nav>
+      <a href="/upload.html">Upload</a>
+      <a href="/retrieve.html">Retrieve</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+    <div id="auth-section">
+      <!-- Auth UI will be rendered here by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <nav class="breadcrumb">
+        <a href="/dashboard.html">Dashboard</a>
+        <span>›</span>
+        <a href="/api-keys.html">API Keys</a>
+        <span>›</span>
+        <span>Create</span>
+      </nav>
+      
+      <h1>Create API Key</h1>
+      <p style="color: var(--color-text-light); margin-bottom: var(--spacing-xl);">
+        Generate a new API key for programmatic access to HashBin
+      </p>
+      
+      <div class="card">
+        <form id="create-key-form">
+          <!-- Name Field -->
+          <div class="form-group">
+            <label for="key-name" class="form-label">Key Name *</label>
+            <input 
+              type="text" 
+              id="key-name" 
+              name="name" 
+              class="form-input" 
+              placeholder="My API Key"
+              required
+              minlength="1"
+              maxlength="100"
+            >
+            <span class="form-help">
+              A descriptive name to help you identify this key (1-100 characters)
+            </span>
+            <span id="name-error" class="form-error hidden"></span>
+          </div>
+          
+          <!-- Environment Field -->
+          <div class="form-group">
+            <label for="key-environment" class="form-label">Environment *</label>
+            <select id="key-environment" name="environment" class="form-select" required>
+              <option value="live">Live (hb_live_*)</option>
+              <option value="test">Test (hb_test_*)</option>
+            </select>
+            <span class="form-help">
+              Live keys are for production use. Test keys are for development and testing.
+            </span>
+          </div>
+          
+          <!-- Expiration Date Field -->
+          <div class="form-group">
+            <label for="key-expiration" class="form-label">Expiration Date *</label>
+            <input 
+              type="date" 
+              id="key-expiration" 
+              name="expiration" 
+              class="form-input" 
+              required
+            >
+            <span class="form-help">
+              Maximum 5 years from today. Default is 1 year.
+            </span>
+            <span id="expiration-error" class="form-error hidden"></span>
+          </div>
+          
+          <!-- Form Actions -->
+          <div style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-xl);">
+            <button type="submit" id="submit-btn" class="btn btn-primary">
+              Create API Key
+            </button>
+            <a href="/api-keys.html" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <!-- One-Time Key Display Modal -->
+  <div id="key-modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>API Key Created Successfully</h2>
+      </div>
+      <div class="modal-body">
+        <p>Your API key has been created. <strong>Save it now</strong> - you won't be able to see it again!</p>
+        
+        <div class="key-display" id="key-display">
+          <!-- Key will be displayed here -->
+        </div>
+        
+        <button id="copy-key-btn" class="btn btn-secondary" style="width: 100%;">
+          📋 Copy to Clipboard
+        </button>
+        
+        <div class="warning-box">
+          <span class="icon">⚠️</span>
+          <div>
+            <strong>Important:</strong> This is the only time you'll see this key. 
+            Make sure to copy it and store it securely before closing this window.
+          </div>
+        </div>
+        
+        <div class="checkbox-container">
+          <input type="checkbox" id="confirm-saved" />
+          <label for="confirm-saved">I have saved this key securely</label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="close-modal-btn" class="btn btn-primary" disabled>
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source | 
+      <a href="/docs/">Documentation</a> | 
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { requireAuth } from './js/auth-gate.js';
+    import { showToast, setLoading, showElement, hideElement } from './js/utils.js';
+    import { createApiKey, copyToClipboard } from './js/api-keys.js';
+    
+    // Protect this page - require authentication
+    await requireAuth();
+    
+    // Set default expiration date (1 year from now)
+    const expirationInput = document.getElementById('key-expiration');
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    expirationInput.value = oneYearFromNow.toISOString().split('T')[0];
+    
+    // Set min date (today)
+    const today = new Date().toISOString().split('T')[0];
+    expirationInput.min = today;
+    
+    // Set max date (5 years from today)
+    const fiveYearsFromNow = new Date();
+    fiveYearsFromNow.setFullYear(fiveYearsFromNow.getFullYear() + 5);
+    expirationInput.max = fiveYearsFromNow.toISOString().split('T')[0];
+    
+    // Form submission
+    const form = document.getElementById('create-key-form');
+    const submitBtn = document.getElementById('submit-btn');
+    const nameInput = document.getElementById('key-name');
+    const environmentInput = document.getElementById('key-environment');
+    
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      // Clear previous errors
+      document.getElementById('name-error').classList.add('hidden');
+      document.getElementById('expiration-error').classList.add('hidden');
+      
+      // Validate
+      const name = nameInput.value.trim();
+      const environment = environmentInput.value;
+      const expirationDate = new Date(expirationInput.value);
+      
+      let hasError = false;
+      
+      if (name.length < 1 || name.length > 100) {
+        document.getElementById('name-error').textContent = 'Name must be between 1 and 100 characters';
+        showElement('#name-error');
+        hasError = true;
+      }
+      
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      expirationDate.setHours(0, 0, 0, 0);
+      
+      if (expirationDate < now) {
+        document.getElementById('expiration-error').textContent = 'Expiration date cannot be in the past';
+        showElement('#expiration-error');
+        hasError = true;
+      }
+      
+      const maxDate = new Date();
+      maxDate.setFullYear(maxDate.getFullYear() + 5);
+      maxDate.setHours(0, 0, 0, 0);
+      
+      if (expirationDate > maxDate) {
+        document.getElementById('expiration-error').textContent = 'Expiration date cannot be more than 5 years from now';
+        showElement('#expiration-error');
+        hasError = true;
+      }
+      
+      if (hasError) {
+        return;
+      }
+      
+      // Submit
+      setLoading(submitBtn, true);
+      submitBtn.disabled = true;
+      
+      try {
+        const result = await createApiKey({
+          name: name,
+          environment: environment,
+          expiresAt: expirationInput.value + 'T00:00:00Z'
+        });
+        
+        // Show the key in modal
+        showKeyModal(result.key);
+        
+      } catch (error) {
+        console.error('Failed to create API key:', error);
+        
+        if (error.status === 409) {
+          showToast('Maximum of 25 API keys reached. Please revoke an existing key first.', 'error', 5000);
+        } else {
+          showToast(error.message || 'Failed to create API key', 'error');
+        }
+        
+        setLoading(submitBtn, false);
+        submitBtn.disabled = false;
+      }
+    });
+    
+    // Modal functionality
+    const modal = document.getElementById('key-modal');
+    const keyDisplay = document.getElementById('key-display');
+    const copyKeyBtn = document.getElementById('copy-key-btn');
+    const confirmSavedCheckbox = document.getElementById('confirm-saved');
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    let currentKey = null;
+    
+    function showKeyModal(key) {
+      currentKey = key;
+      keyDisplay.textContent = key;
+      modal.classList.add('show');
+    }
+    
+    // Copy key button
+    copyKeyBtn.addEventListener('click', async () => {
+      await copyToClipboard(currentKey);
+      showToast('Copied to clipboard', 'success', 3000);
+      copyKeyBtn.textContent = '✓ Copied!';
+      setTimeout(() => {
+        copyKeyBtn.textContent = '📋 Copy to Clipboard';
+      }, 3000);
+    });
+    
+    // Enable close button when checkbox is checked
+    confirmSavedCheckbox.addEventListener('change', () => {
+      closeModalBtn.disabled = !confirmSavedCheckbox.checked;
+    });
+    
+    // Close modal and redirect
+    closeModalBtn.addEventListener('click', () => {
+      modal.classList.remove('show');
+      window.location.href = '/api-keys.html';
+    });
+    
+    // Prevent accidental close
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal && !confirmSavedCheckbox.checked) {
+        if (confirm('Are you sure? You haven\'t confirmed saving your API key. If you close this window, you won\'t be able to see this key again.')) {
+          modal.classList.remove('show');
+          window.location.href = '/api-keys.html';
+        }
+      } else if (e.target === modal && confirmSavedCheckbox.checked) {
+        modal.classList.remove('show');
+        window.location.href = '/api-keys.html';
+      }
+    });
+  </script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
