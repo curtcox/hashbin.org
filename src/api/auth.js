@@ -278,8 +278,38 @@ export async function handleCreateApiKey(request, env) {
     );
   }
 
+  // Get existing keys to determine default name
+  const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
+  const userProfileStub = env.USER_PROFILES.get(userProfileId);
+
+  let keyName = body.name;
+  
+  // If no name provided, generate a smart default
+  if (!keyName || keyName.trim() === '') {
+    const existingKeysResponse = await userProfileStub.fetch(
+      new Request('http://internal/apikeys', {
+        method: 'GET'
+      })
+    );
+    
+    const existingKeys = await existingKeysResponse.json();
+    const existingNames = existingKeys.map(key => key.name);
+    
+    // Default to "Hosting" if no keys exist
+    if (existingKeys.length === 0 || !existingNames.includes('Hosting')) {
+      keyName = 'Hosting';
+    } else {
+      // Find next available "Hosting n" name
+      let n = 2;
+      while (existingNames.includes(`Hosting ${n}`)) {
+        n++;
+      }
+      keyName = `Hosting ${n}`;
+    }
+  }
+
   // Validate key name
-  const nameValidation = validateKeyName(body.name);
+  const nameValidation = validateKeyName(keyName);
   if (!nameValidation.valid) {
     return new Response(
       JSON.stringify({
@@ -329,9 +359,6 @@ export async function handleCreateApiKey(request, env) {
   const keyEncrypted = await encryptApiKey(apiKey, env.API_KEY_ENCRYPTION_KEY);
 
   // Store in UserProfile DO
-  const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
-  const userProfileStub = env.USER_PROFILES.get(userProfileId);
-
   const response = await userProfileStub.fetch(
     new Request('http://internal/apikeys', {
       method: 'POST',
@@ -340,7 +367,7 @@ export async function handleCreateApiKey(request, env) {
         key_id: keyId,
         key_hash: keyHash,
         key_encrypted: keyEncrypted,
-        name: body.name,
+        name: keyName,
         expires_at: expirationValidation.expiresAt
       })
     })

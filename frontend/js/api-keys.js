@@ -159,14 +159,14 @@ export function isExpired(expiresAt) {
 }
 
 /**
- * Get key prefix (first 12 chars + ellipsis)
+ * Get key prefix (first 8 chars + ellipsis)
  * @param {string} key Full API key or key_id
- * @returns {string} Key prefix (e.g., "hb_live_abc...")
+ * @returns {string} Key prefix (e.g., "hb_abc...")
  */
 export function getKeyPrefix(key) {
   if (!key) return '';
-  if (key.length <= 15) return key;
-  return key.substring(0, 12) + '...';
+  if (key.length <= 11) return key;
+  return key.substring(0, 8) + '...';
 }
 
 /**
