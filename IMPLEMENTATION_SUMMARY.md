@@ -37,15 +37,12 @@ The Key Management UI has been fully implemented as specified in `todo/key_manag
   - Warning about one-time display
   - "I have saved this key" checkbox (required to close)
   - Confirmation if user tries to close without checking
-- **Environment Prefixes**:
-  - Live: `hb_live_*`
-  - Test: `hb_test_*`
+- **Key Prefix**: `hb_live_*`
 
 #### 3. API Key Detail Page (`/api-keys-detail.html`)
 - **Key Details Display**:
   - Key name (editable inline)
   - Key ID/prefix with copy button
-  - Environment badge (Live/Test)
   - Status (Active/Expired)
   - Total requests (usage count)
   - Last used timestamp
@@ -234,11 +231,10 @@ The Key Management UI has been fully implemented as specified in `todo/key_manag
 
 ## Next Steps
 
-1. **Deploy to Development**: Test on actual Cloudflare Workers environment
+1. **Deploy to Production**: Test on actual Cloudflare Workers environment
 2. **Manual Testing**: Follow testing checklist above
 3. **Screenshot Documentation**: Take screenshots of each page
 4. **User Acceptance**: Get feedback from stakeholders
-5. **Deploy to Production**: After successful testing
 
 ## Notes for Developer
 
