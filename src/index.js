@@ -122,6 +122,15 @@ export default {
     // Try to serve static assets for non-API paths
     if (env.ASSETS) {
       try {
+        // Special handling for /dashboard/uploads/{cid}/ -> serve detail.html
+        if (url.pathname.match(/^\/dashboard\/uploads\/[^\/]+\/?$/)) {
+          const detailRequest = new Request(new URL('/dashboard/uploads/detail.html', url), request);
+          const detailAsset = await env.ASSETS.fetch(detailRequest);
+          if (detailAsset.status !== 404) {
+            return detailAsset;
+          }
+        }
+        
         // Serve static files
         const asset = await env.ASSETS.fetch(request);
         
