@@ -64,11 +64,13 @@ const STATIC_PATHS = [
   'upload.html',
   'retrieve.html',
   'dashboard.html',
+  'dashboard/',
   'deposit.html',
   'info.html',
   'css/',
   'js/',
-  'docs/'
+  'docs/',
+  'api-keys'
 ];
 
 /**
