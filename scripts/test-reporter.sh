@@ -129,6 +129,8 @@ echo ""
 
 # Run test suites
 run_test_suite "Grep Patterns Test" "scripts/test-grep-patterns.sh"
+run_test_suite "Git SHA Injection Test" "scripts/test-git-sha-injection.sh"
+run_test_suite "Git SHA Code Injection Test" "scripts/test-git-sha-code-injection.sh"
 run_test_suite "User Balance Test" "scripts/test-user-balance.sh"
 run_test_suite "Auth Gate Test" "scripts/test-auth-gate.sh"
 

@@ -50,13 +50,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Inject git SHA into frontend and wrangler config
+      - name: Inject git SHA into frontend, source code, and wrangler config
         run: |
           GIT_SHA=$(git rev-parse HEAD)
           echo "Git SHA: $GIT_SHA"
+          
+          # Inject SHA into HTML files
           bash scripts/inject-git-sha.sh "$GIT_SHA"
           
-          # Update GIT_SHA in wrangler.toml
+          # Inject SHA directly into source code (ensures it's in the bundle)
+          bash scripts/inject-git-sha-code.sh "$GIT_SHA"
+          
+          # Update GIT_SHA in wrangler.toml (for consistency)
           echo "Updating wrangler.toml with GIT_SHA..."
           
           # Verify GIT_SHA line exists
