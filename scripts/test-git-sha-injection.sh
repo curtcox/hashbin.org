@@ -33,9 +33,9 @@ cp scripts/inject-git-sha.sh "$TEST_DIR/"
 
 # Test 1: Inject with a test SHA
 echo ""
-echo "==========================================
-TEST: Inject SHA into HTML files
-=========================================="
+echo "=========================================="
+echo "TEST: Inject SHA into HTML files"
+echo "=========================================="
 cd "$TEST_DIR"
 TEST_SHA="1234567890abcdef1234567890abcdef12345678"
 bash inject-git-sha.sh "$TEST_SHA" > /dev/null
@@ -71,9 +71,9 @@ fi
 
 # Test 2: Update existing SHA
 echo ""
-echo "==========================================
-TEST: Update existing SHA
-=========================================="
+echo "=========================================="
+echo "TEST: Update existing SHA"
+echo "=========================================="
 NEW_SHA="fedcba0987654321fedcba0987654321fedcba09"
 bash inject-git-sha.sh "$NEW_SHA" > /dev/null
 
@@ -101,9 +101,9 @@ fi
 
 # Test 3: No duplicate SHAs
 echo ""
-echo "==========================================
-TEST: No duplicate SHA comments
-=========================================="
+echo "=========================================="
+echo "TEST: No duplicate SHA comments"
+echo "=========================================="
 SHA_COUNT=$(grep -c "git-sha:" frontend/test1.html)
 if [ "$SHA_COUNT" == "1" ]; then
   echo "✅ PASS: Only one SHA comment in test1.html"
