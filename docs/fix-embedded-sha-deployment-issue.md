@@ -140,9 +140,47 @@ curl https://hashbin.org/ | grep "git-sha:"
 - **Simpler**: Removed complex injection logic
 - **High Confidence**: Secrets are Cloudflare's recommended approach
 
+## Update: Binding Conflict Issue (Jan 2026)
+
+### Problem
+After implementing the secret-based solution (PR #134), deployments started failing with:
+```
+✘ [ERROR] A request to the Cloudflare API (/accounts/***/workers/scripts/hashbin-worker/secrets) failed.
+
+  Binding name 'GIT_SHA' already in use. Please use a different name and try again. [code: 10053]
+```
+
+### Root Cause
+The issue was caused by **defining GIT_SHA in two places**:
+1. In `wrangler.toml` as an environment variable in the `[vars]` section: `GIT_SHA = "local-dev"`
+2. In the deployment workflow as a Cloudflare secret via `wrangler secret put GIT_SHA`
+
+Cloudflare Workers doesn't allow the same binding name to be used for both a variable and a secret.
+
+### Solution
+**Remove GIT_SHA from `wrangler.toml` [vars] section** - keep only the secret configuration in the deployment workflow.
+
+The code already handles the missing default gracefully with `env.GIT_SHA || 'unknown'`, so local development will show "unknown" for the git SHA, which is acceptable.
+
+**Change made**:
+```diff
+ # Production environment variables
+ [vars]
+ ENVIRONMENT = "production"
+ LOG_LEVEL = "warn"
+-GIT_SHA = "local-dev"
+```
+
+### Lessons Learned
+- A binding name can only be used once - either as a variable OR as a secret, not both
+- Always check `wrangler.toml` for existing bindings before adding secrets
+- The error message "Binding name already in use" indicates a conflict between vars/secrets/bindings
+
 ## Related Issues
 
-- Current Issue: #131 - Bug: Deployed site does not contain embedded SHA
+- Latest Fix: Fix deployment error with GIT_SHA binding conflict
+- Previous Issue: #131 - Bug: Deployed site does not contain embedded SHA
+- Previous Success: PR #134 - Fix: Configure GIT_SHA as Cloudflare secret
 - Previous Attempt: PR #132 - Fix: Inject GIT_SHA into source code (FAILED)
 - Previous Attempt: PR #130 - Fix: Redeploy after secret updates (FAILED)
 - Previous Attempt: PR #128 - Fix: Write GIT_SHA to wrangler.toml (FAILED)
