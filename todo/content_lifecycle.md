@@ -7,10 +7,11 @@ This document outlines the plan to automate the content lifecycle for HashBin.or
 2. **Content deletion** - Immediate deletion of expired content from R2 and Durable Objects
 3. **Public deletion records** - Transparent record of all deleted content
 
-**Status:** Planning Phase - Decisions Received
+**Status:** Planning Complete - Ready for Implementation
 **Target:** Phase 5 Implementation
 **Last Updated:** 2026-01-17
 **Decision Review:** 2026-01-17
+**Follow-Up Resolved:** 2026-01-17
 
 ---
 
@@ -134,35 +135,31 @@ async function deleteContent(env, hash_256t, reason = 'expired')
 
 **Steps:**
 1. Fetch metadata from ContentMetadata DO
-2. Record deletion in DeletionRecord DO
-3. Delete from R2 storage (if not inline content)
-4. Mark metadata as deleted (soft delete with tombstone)
-5. Log deletion to console
-6. Return deletion record
+2. **Validate expiration** - Check if `expires_at > now()` (extension wins logic)
+3. If extended, skip deletion and return early
+4. Record deletion in DeletionRecord DO (with hashed uploader_id)
+5. Delete from R2 storage (if not inline content)
+6. Hard delete metadata from ContentMetadata DO
+7. Log deletion to console
+8. Return deletion record
 
 **Key Considerations:**
+- **Extension wins:** Always check `expires_at` before deletion - abort if extended
 - Handle inline content (≤64 bytes) - no R2 deletion needed
 - Idempotent - safe to call multiple times
-- Transaction ordering - record first, delete second
+- Transaction ordering - record first, delete second, metadata last
 - Error handling - partial failures should be logged
 
-#### 2.2 Soft Delete vs Hard Delete Strategy
+#### 2.2 Delete Strategy: HARD DELETE
 
-**Decision Required:** Should we hard delete metadata or use tombstones?
+**Decision:** Hard delete metadata from ContentMetadata DO
 
-**Option A: Hard Delete (Recommended)**
-- Completely remove from ContentMetadata DO
+**Implementation:**
+- Completely remove ContentMetadata DO entry
 - Frees storage immediately
 - Simpler implementation
-- Deletion record provides audit trail
-
-**Option B: Soft Delete with Tombstone**
-- Keep metadata with `deleted: true` flag
-- Allows resurrection if needed
-- More complex queries
-- Uses more storage
-
-**Recommendation:** Hard delete metadata, rely on DeletionRecord for audit trail
+- DeletionRecord provides complete audit trail
+- No resurrection capability (by design)
 
 ---
 
@@ -227,7 +224,7 @@ crons = ["0 2 * * *"]  # Daily at 2 AM UTC
 - `POST /register` - Add content to expiration date bucket
 - `POST /update` - Change expiration date (when extended)
 - `POST /remove` - Remove from index (when deleted)
-- `GET /expired` - Get all hashes that expired on or before a date
+- `GET /expired?date=YYYY-MM-DD&limit=5000` - Get hashes expired on/before date (oldest-first, max 5000)
 - `DELETE /cleanup` - Remove old date buckets (housekeeping)
 
 **Integration Points:**
@@ -248,16 +245,16 @@ async scheduled(event, env, ctx) {
     // 1. Get today's date
     const today = new Date().toISOString().split('T')[0];
 
-    // 2. Query ExpirationIndex for expired content
+    // 2. Query ExpirationIndex for expired content (max 5,000 per day)
     const expirationIndexId = env.EXPIRATION_INDEX.idFromName('global');
     const expirationIndex = env.EXPIRATION_INDEX.get(expirationIndexId);
     const expiredHashes = await expirationIndex.fetch(
-      new Request(`http://internal/expired?date=${today}`, { method: 'GET' })
+      new Request(`http://internal/expired?date=${today}&limit=5000`, { method: 'GET' })
     ).then(r => r.json());
 
-    console.log(`Found ${expiredHashes.length} expired items`);
+    console.log(`Found ${expiredHashes.length} expired items (max 5000/day)`);
 
-    // 3. Delete each expired content
+    // 3. Delete each expired content (with "extension wins" validation inside deleteContent)
     const deletionService = await import('./services/content-deletion.js');
     const results = await Promise.allSettled(
       expiredHashes.map(hash =>
@@ -268,10 +265,11 @@ async scheduled(event, env, ctx) {
     // 4. Log results
     const successful = results.filter(r => r.status === 'fulfilled').length;
     const failed = results.filter(r => r.status === 'rejected').length;
+    const skipped = results.filter(r => r.value?.skipped === true).length; // Extended content
 
-    console.log(`Expiration job completed: ${successful} deleted, ${failed} failed`);
+    console.log(`Expiration job completed: ${successful} deleted, ${skipped} skipped (extended), ${failed} failed`);
 
-    return { success: true, deleted: successful, failed };
+    return { success: true, deleted: successful, skipped, failed };
   } catch (error) {
     console.error('Scheduled job error:', error);
     throw error;
@@ -499,15 +497,15 @@ Add link to public records in footer/header
 
 #### Large-Scale Operations
 
-35. **Test: Delete 10,000 items in single cron run**
+35. **Test: Batch size limit enforced**
     - Given: 10,000 items expired today
     - When: Cron job runs
-    - Then: All deleted within execution time limit
+    - Then: First 5,000 deleted (oldest-first), remaining 5,000 processed next day
 
-36. **Test: Cron execution timeout handling**
-    - Given: 50,000 items expired, exceeds worker time limit
-    - When: Cron job runs
-    - Then: Processes as many as possible, continuation token for next run
+36. **Test: Multiple days of backlog processing**
+    - Given: 50,000 items expired (10 days of backlog at 5,000/day)
+    - When: Cron job runs daily
+    - Then: Processes 5,000/day for 10 days until all cleared
 
 37. **Test: Index with 365 day buckets**
     - Given: ExpirationIndex has 365 date buckets (1 year of content)
@@ -648,11 +646,11 @@ All critical design questions have been answered. Implementation can proceed wit
    - Simpler implementation, frees storage immediately
    - No content resurrection capability
 
-3. **✅ Deletion Batch Size: FIXED BATCH SIZE PER RUN**
-   - Process fixed batch of expired content per cron run
+3. **✅ Deletion Batch Size: 5,000 ITEMS PER DAY**
+   - Process up to 5,000 expired content items per daily cron run
    - Predictable execution time, simple implementation
-   - If more items exist, they're processed next day
-   - **FOLLOW-UP NEEDED:** What batch size? (1000? 5000? 10000?)
+   - If more items exist, they're processed the next day
+   - Balanced approach: ~8 minutes processing time, well within 30-second CPU budget
 
 4. **✅ Public Records Data Retention: KEEP FOREVER**
    - Deletion records never expire
@@ -678,8 +676,8 @@ All critical design questions have been answered. Implementation can proceed wit
 8. **✅ User Notification Before Deletion: NO EMAIL WARNINGS**
    - No email notifications before content expires
    - Users responsible for tracking their own content
-   - Web UI may highlight upcoming expirations (see follow-up)
-   - **FOLLOW-UP NEEDED:** What does "highlighting in web UI" mean?
+   - Web UI expiration highlighting handled in separate plan (out of scope)
+   - This plan focuses solely on automated deletion job
 
 9. **✅ Deletion Record Public Fields: HASH UPLOADER_ID**
    - Public fields: hash_256t, deleted_at, reason, size_bytes, retention_days
@@ -689,10 +687,10 @@ All critical design questions have been answered. Implementation can proceed wit
 
 10. **✅ Concurrent Extension and Deletion: EXTENSION WINS**
     - If extension request happens during deletion, extension takes priority
-    - Deletion process checks for updated expiration before completing
-    - Expiration date updated, content remains available
-    - More complex but user-friendly (allows last-second extensions)
-    - **FOLLOW-UP NEEDED:** Implementation complexity - locking strategy needed?
+    - Implementation: Deletion reads `expires_at` from ContentMetadata before deleting
+    - If `expires_at` has changed or moved into future, deletion aborted
+    - Simple approach: No explicit locking, just timestamp validation
+    - User-friendly: Allows last-second extensions
 
 ### Technical Questions (Questions 11-15)
 
@@ -705,10 +703,11 @@ All critical design questions have been answered. Implementation can proceed wit
     - Current R2 account limits are acceptable
     - No special configuration needed
 
-13. **⏳ Durable Objects Concurrent Write Limits: TBD**
-    - Benchmark needed before production deployment
-    - Proceed with implementation, test concurrency before launch
-    - Monitor ExpirationIndex write performance during testing
+13. **✅ Durable Objects Concurrent Write Limits: PRODUCTION MONITORING**
+    - No explicit benchmark required upfront
+    - Monitor ExpirationIndex performance in production
+    - Address if/when performance issues identified
+    - Simple approach: Build first, optimize if needed
 
 14. **✅ Storage Costs for Deletion Records: NEGLIGIBLE**
     - ~36MB/year storage cost is acceptable
@@ -749,77 +748,78 @@ All critical design questions have been answered. Implementation can proceed wit
 
 ---
 
-## Follow-Up Questions
+## Final Resolved Clarifications
 
-Based on the resolved decisions, these clarifications are needed before implementation:
+All follow-up questions have been answered. Implementation details confirmed:
 
-### Question 1: Deletion Batch Size
+### ✅ Clarification 1: Deletion Batch Size - 5,000 ITEMS/DAY
 
-**Context:** Decision #3 says "Process fixed batch size per run" but didn't specify the size.
+**Decision:** Process up to 5,000 expired content items per daily cron run
 
-**Question:** What should the batch size be per daily cron run?
-- Option A: 1,000 items/day (conservative, safe for 30-second limit)
-- Option B: 5,000 items/day (moderate)
-- Option C: 10,000 items/day (aggressive, may approach timeout)
-- Option D: No limit - process all expired content (risky if thousands expire)
+**Rationale:**
+- Balanced approach between throughput and safety
+- Estimated ~8 minutes processing time, well within 30-second CPU budget
+- If more than 5,000 items expire on same day, remainder processed next day
+- Predictable, simple implementation
 
-**Recommendation:** 5,000 items/day is a good balance. With ~100ms per deletion, 5,000 items = ~8 minutes well within 30-second CPU budget if batched efficiently.
+**Implementation:** ExpirationIndex query returns first 5,000 hashes, sorted oldest-first
 
-### Question 2: Web UI Expiration Highlighting
+### ✅ Clarification 2: Web UI Expiration Highlighting - OUT OF SCOPE
 
-**Context:** Decision #8 mentions "No warnings (beyond highlighting in web UI)"
+**Decision:** Web UI features handled in separate plan, not part of this automation plan
 
-**Question:** What does "highlighting in web UI" mean?
-- Is there a dashboard page that shows upcoming expirations?
-- Should we add visual indicators (e.g., "Expires in 3 days" badge)?
-- Which pages should show this highlighting?
-  - `/dashboard/uploads/` - user's upload history page?
-  - `/info.html` - content information page?
-  - Other pages?
+**Scope:**
+- This plan focuses solely on automated deletion job (cron, deletion logic, public records API)
+- Web UI changes for showing expiration dates handled elsewhere
+- No UI implementation required in Phases 1-4
 
-**Clarification needed:** Where and how should expiration dates be visually emphasized?
+**Implementation:** None required for this plan
 
-### Question 3: Extension Wins - Implementation Strategy
+### ✅ Clarification 3: Extension Wins Implementation - METADATA CHECK
 
-**Context:** Decision #10 says "Extension wins" if concurrent with deletion
+**Decision:** Deletion validates `expires_at` hasn't changed before deleting
 
-**Question:** How should we implement the locking/coordination to ensure extension wins?
-- Option A: ContentMetadata check - deletion reads `expires_at` before deleting, aborts if changed
-- Option B: Explicit lock - use Durable Object transaction to prevent concurrent deletion
-- Option C: Delete-then-check - delete from R2, check metadata, restore if extended
-- Option D: Timestamp comparison - deletion only proceeds if `expires_at <= now()`
+**Implementation Strategy:**
+1. Cron job identifies expired hashes from ExpirationIndex
+2. For each hash, deletion service fetches ContentMetadata
+3. Compare `expires_at` to current time: `if (expires_at > now()) skip deletion`
+4. If `expires_at` still indicates expiration, proceed with deletion
+5. If `expires_at` moved to future (extension occurred), skip and remove from ExpirationIndex
 
-**Recommendation:** Option D with Option A - deletion always checks `expires_at` immediately before deleting. If `expires_at` moved into future, skip deletion. Simple, no explicit locking needed.
+**Key Points:**
+- No explicit locking needed
+- Simple timestamp comparison
+- Extension API doesn't need special logic
+- Naturally handles race condition
 
-**Additional consideration:** Should extension API return different success message if extension happened during active deletion window?
+### ✅ Clarification 4: DO Concurrent Write Benchmark - PRODUCTION MONITORING
 
-### Question 4: DO Concurrent Write Benchmark Timing
+**Decision:** No explicit benchmark required; monitor in production
 
-**Context:** Decision #13 says benchmark ExpirationIndex concurrent writes (TBD)
+**Approach:**
+- Build and deploy ExpirationIndex without upfront benchmarking
+- Monitor performance metrics in production (write latency, errors)
+- Optimize if/when issues identified
+- Simple: Ship first, optimize later if needed
 
-**Question:** When should this benchmark happen?
-- During development (before Phase 3 completion)?
-- During testing (after implementation, before production)?
-- After initial deployment (monitor in production)?
-
-**Recommendation:** Benchmark during testing phase, before production deployment. Include in test plan as performance test #52.
+**Monitoring:**
+- Log ExpirationIndex write operations
+- Track registration failures
+- Alert if write latency exceeds threshold (TBD during implementation)
 
 ---
 
-## Updated Edge Cases Summary
+## Edge Cases Summary
 
-### ✅ Resolved Design Decisions
-- ~~Simultaneous extension and deletion (which wins?)~~ → **Extension wins**
-- ~~Failed deletion retry strategy~~ → **Leave in index, retry next day**
-- ~~Worker timeout with large batches~~ → **Fixed batch size per run**
-- ~~User notification policy (warnings or not?)~~ → **No email warnings, possible UI highlighting**
-- ~~Deletion record retention period~~ → **Keep forever**
-
-### ⏳ Needs Clarification (Follow-Up Questions 1-4)
-- Specific batch size number (1K, 5K, 10K?)
-- Web UI expiration highlighting details
-- Extension-wins implementation strategy
-- DO concurrent write benchmark timing
+### ✅ All Design Decisions Resolved
+- Simultaneous extension and deletion → **Extension wins (metadata check)**
+- Failed deletion retry strategy → **Leave in index, retry next day**
+- Worker timeout with large batches → **Fixed batch: 5,000 items/day**
+- User notification policy → **No email warnings, UI handled separately**
+- Deletion record retention period → **Keep forever**
+- Deletion batch size → **5,000 items per daily cron run**
+- Extension-wins implementation → **Timestamp validation before deletion**
+- DO concurrent write benchmarking → **Production monitoring approach**
 
 ### 🔮 Future Enhancements (Out of Scope)
 - Multi-region R2 bucket support
@@ -827,64 +827,83 @@ Based on the resolved decisions, these clarifications are needed before implemen
 - Bulk admin deletion API
 - Deletion webhooks
 - Advanced metrics dashboard and alerting
+- Web UI expiration highlighting (separate plan)
 
 ---
 
 ## Success Criteria
 
-This plan is complete when:
+### Planning Phase ✅ COMPLETE
 
-1. 🔄 All **Open Questions** are answered and documented (20/20 resolved, 4 follow-ups pending)
+1. ✅ All **Open Questions** answered and documented (20/20 resolved)
 2. ✅ All **Critical Decisions** have clear resolutions (10/10 resolved)
-3. ⏳ All **Tests** (57 total) are written and pass
-4. ⏳ Implementation follows test-driven development
-5. ✅ Zero edge cases are unhandled (all identified and tested)
-6. 🔄 Documentation is complete and up-to-date (plan documented, follow-ups needed)
+3. ✅ All **Follow-Up Clarifications** answered (4/4 resolved)
+4. ✅ Zero ambiguity in design decisions
+5. ✅ All edge cases identified and covered by tests
+6. ✅ Documentation complete and up-to-date
 
-**Current Status:** Ready for follow-up clarifications (4 questions), then implementation can begin
+**Planning Status:** ✅ COMPLETE - Implementation can begin
+
+### Implementation Phase ⏳ PENDING
+
+1. ⏳ All **Tests** (57 total) written and passing
+2. ⏳ Implementation follows test-driven development
+3. ⏳ All 4 phases implemented (Deletion Records, Deletion Logic, Cron Job, Public UI)
+4. ⏳ Production deployment successful
+5. ⏳ Monitoring confirms no performance issues
 
 ---
 
 ## Next Steps
 
-### Immediate (Before Implementation)
+### ✅ Planning Complete
 
 1. ✅ **Review this plan** with stakeholders - COMPLETE
 2. ✅ **Answer all Open Questions** - 20/20 RESOLVED
-3. 🔄 **Answer Follow-Up Questions** - 4 clarifications needed:
-   - Deletion batch size (1K, 5K, or 10K items/day?)
-   - Web UI expiration highlighting (where and how?)
-   - Extension-wins implementation strategy
-   - DO concurrent write benchmark timing
+3. ✅ **Answer Follow-Up Questions** - 4/4 RESOLVED:
+   - Deletion batch size: **5,000 items/day**
+   - Web UI highlighting: **Out of scope (separate plan)**
+   - Extension-wins strategy: **Metadata check (Option A)**
+   - DO benchmarking: **Production monitoring**
 
-### Implementation (After Follow-Ups Resolved)
+### 🚀 Ready for Implementation
 
-4. **Write tests first** (TDD approach)
-   - 57 tests covering all edge cases
-   - Unit tests → Integration tests → Performance tests
-5. **Implement Phase 1** (Deletion Records infrastructure)
-   - DeletionRecord DO
-   - Public API endpoints
-   - Migration configuration
-6. **Implement Phase 2** (Content deletion logic)
-   - Content deletion service
-   - Hard delete implementation
-   - Idempotency handling
-7. **Implement Phase 3** (Scheduled expiration job)
-   - ExpirationIndex DO
-   - Daily cron configuration
-   - Batch processing logic with "extension wins" check
-8. **Implement Phase 4** (Public UI)
-   - Public deletion records viewer
-   - Web UI expiration highlighting (based on clarification)
-9. **Benchmark & Test**
-   - DO concurrent write performance
-   - Batch deletion throughput
-   - 30-second worker limit validation
-10. **Deploy & Monitor**
-    - Production deployment
-    - Monitor deletion metrics
-    - Iterate based on real-world performance
+**Phase 1: Deletion Record Infrastructure**
+- Create `DeletionRecord` Durable Object
+- Implement storage for deletion history
+- Create public API endpoints: `/api/public/deletions`, `/api/public/deletions/{hash}`, `/api/public/deletions/stats`
+- Add migration to `wrangler.toml`
+- Hash uploader_id for privacy in public API
+
+**Phase 2: Content Deletion Logic**
+- Create `src/services/content-deletion.js`
+- Implement hard delete: R2 + ContentMetadata cleanup
+- Handle inline content (no R2 deletion)
+- Idempotent deletion handling
+- Create deletion record for each deleted item
+
+**Phase 3: Scheduled Expiration Job**
+- Create `ExpirationIndex` Durable Object (single global instance)
+- Implement date bucket storage (YYYY-MM-DD → hash array)
+- Configure daily cron: `[triggers] crons = ["0 2 * * *"]`
+- Update `src/index.js` scheduled handler
+- Implement batch processing (5,000 items max per run)
+- Implement "extension wins" check (validate `expires_at` before deletion)
+- Integration: Update upload/extend/donate APIs to register with ExpirationIndex
+
+**Phase 4: Public Records UI**
+- Create `public/public-records.html` page
+- Display deletion history with filtering
+- Pagination support
+- Statistics dashboard
+
+**Phase 5: Testing & Deployment**
+- Write all 57 tests (TDD approach)
+- Validate batch deletion throughput
+- Confirm 30-second worker limit compliance
+- Deploy to production
+- Monitor ExpirationIndex write performance
+- Monitor deletion job metrics
 
 ---
 
