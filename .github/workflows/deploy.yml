@@ -50,32 +50,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Inject git SHA into frontend, source code, and wrangler config
+      - name: Inject git SHA into frontend HTML files
         run: |
           GIT_SHA=$(git rev-parse HEAD)
           echo "Git SHA: $GIT_SHA"
           
           # Inject SHA into HTML files
           bash scripts/inject-git-sha.sh "$GIT_SHA"
-          
-          # Inject SHA directly into source code (ensures it's in the bundle)
-          bash scripts/inject-git-sha-code.sh "$GIT_SHA"
-          
-          # Update GIT_SHA in wrangler.toml (for consistency)
-          echo "Updating wrangler.toml with GIT_SHA..."
-          
-          # Verify GIT_SHA line exists
-          if ! grep -q "GIT_SHA = " wrangler.toml; then
-            echo "❌ ERROR: GIT_SHA line not found in wrangler.toml"
-            exit 1
-          fi
-          
-          # Update the value
-          sed -i "s/^\([[:space:]]*\)GIT_SHA = .*/\1GIT_SHA = \"$GIT_SHA\"/" wrangler.toml
-          
-          # Verify the update
-          echo "Updated wrangler.toml [vars] section:"
-          grep -A 3 "\[vars\]" wrangler.toml
+          echo "✅ Git SHA injected into HTML files"
           
       - name: Create R2 buckets
         run: |
@@ -184,11 +166,12 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
 
-      - name: Final deployment to restore correct code and configuration
+      - name: Configure GIT_SHA as secret
         run: |
-          echo "Re-deploying to ensure correct code and GIT_SHA after secret updates..."
-          npx wrangler deploy
-          echo "✅ Final deployment complete"
+          GIT_SHA=$(git rev-parse HEAD)
+          echo "Configuring GIT_SHA as secret: $GIT_SHA"
+          echo "$GIT_SHA" | npx wrangler secret put GIT_SHA
+          echo "✅ GIT_SHA secret configured: $GIT_SHA"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

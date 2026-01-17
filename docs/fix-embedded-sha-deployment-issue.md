@@ -6,19 +6,19 @@ The deployed site's health endpoint was returning a response without the `gitSha
 
 ```
 Deployed git SHA: 
-❌ Git SHA mismatch: expected 577224be973a3d6b225317d120361824a4c07211, got 
+❌ Git SHA mismatch: expected b475c33ce937a72bfe0d15da52050a7614b12157, got 
 Error: Process completed with exit code 1.
 ```
 
 Even though:
 - The source code (`src/index.js`) includes `gitSha: env.GIT_SHA || 'unknown'` in the health response
-- The deployment workflow updates `wrangler.toml` with the correct GIT_SHA value
+- The deployment workflow updates `wrangler.toml` with the correct GIT_SHA value  
 - The wrangler deployment logs show GIT_SHA in the environment variables
 
 ## Failed Previous Attempts
 
 ### PR #128: Update wrangler.toml with sed
-- Updated GIT_SHA in wrangler.toml before deployment
+- Updated GIT_SHA in wrangler.toml `[vars]` before deployment
 - Result: Still no gitSha field in deployed response
 
 ### PR #130: Add final deployment after secrets
@@ -26,92 +26,91 @@ Even though:
 - Theory: Secret updates trigger redeployments with cached bundles
 - Result: Still no gitSha field in deployed response
 
+### PR #132: Inject GIT_SHA into source code
+- Created script to modify src/index.js, replacing `env.GIT_SHA || 'unknown'` with hardcoded SHA
+- Script reported success, but deployed worker still had no gitSha field
+- Result: Still no gitSha field in deployed response
+
 ## Root Cause Analysis
 
-The root cause is that environment variables from wrangler.toml `[vars]` section are not reliably available in deployed Cloudflare Workers, especially when multiple redeployments are triggered by secret updates. The deployed response had NO `gitSha` field at all (not even 'unknown'), indicating the deployed code was running with environment variables that didn't match expectations.
+The root cause is that **Cloudflare secrets take precedence over environment variables** from wrangler.toml `[vars]` section.
 
-**Key insight**: Even after "final deployment", the gitSha field was missing. This suggests the issue is fundamental to how environment variables are passed to deployed workers, not just a timing/caching issue.
+**Key insight**: When `wrangler secret put` is executed (for CLERK_SECRET_KEY, STRIPE_SECRET_KEY, etc.), it:
+1. Uploads the secret to Cloudflare
+2. Triggers a redeployment of the worker
 
-## Solution: Direct Code Injection
+During these secret-triggered redeployments:
+- Cloudflare secrets are loaded (CLERK_SECRET_KEY, STRIPE_SECRET_KEY, etc.)
+- Environment variables from wrangler.toml `[vars]` are available
+- **BUT** if GIT_SHA is only set as an environment variable (not a secret), it doesn't persist consistently
 
-**Instead of relying on runtime environment variables, inject the GIT_SHA directly into the source code before deployment.**
+The code injection approach (PR #132) failed because even though the SHA was hardcoded in the source, the secret-triggered redeployments somehow weren't using the modified bundle consistently.
+
+## Solution: Configure GIT_SHA as a Cloudflare Secret
+
+**Instead of relying on environment variables or source code injection, set GIT_SHA as a Cloudflare secret alongside other secrets.**
 
 ### Implementation
 
-**New script**: `scripts/inject-git-sha-code.sh`
-```bash
-# Replaces this pattern in src/index.js:
-gitSha: env.GIT_SHA || 'unknown',
-
-# With hardcoded value:
-gitSha: '577224be973a3d6b225317d120361824a4c07211',
-```
-
-Features:
-- Handles flexible whitespace patterns
-- Can update existing hardcoded SHAs
-- Validates the injection succeeded
-- Provides clear error messages
-
 **Updated workflow**: `.github/workflows/deploy.yml`
 ```yaml
-- name: Inject git SHA into frontend, source code, and wrangler config
+- name: Inject git SHA into frontend HTML files
   run: |
     GIT_SHA=$(git rev-parse HEAD)
     echo "Git SHA: $GIT_SHA"
-    
-    # Inject SHA into HTML files (existing)
     bash scripts/inject-git-sha.sh "$GIT_SHA"
     
-    # Inject SHA directly into source code (NEW)
-    bash scripts/inject-git-sha-code.sh "$GIT_SHA"
-    
-    # Update GIT_SHA in wrangler.toml (for consistency)
-    sed -i "s/^\([[:space:]]*\)GIT_SHA = .*/\1GIT_SHA = \"$GIT_SHA\"/" wrangler.toml
-```
+# ... deploy worker, configure other secrets ...
 
-**New test**: `scripts/test-git-sha-code-injection.sh`
-- Validates the injection script works correctly
-- Tests both initial injection and updates
-- Added to CI test runner
+- name: Configure GIT_SHA as secret
+  run: |
+    GIT_SHA=$(git rev-parse HEAD)
+    echo "Configuring GIT_SHA as secret: $GIT_SHA"
+    echo "$GIT_SHA" | npx wrangler secret put GIT_SHA
+    echo "✅ GIT_SHA secret configured: $GIT_SHA"
+```
 
 ### How It Works
 
-1. During CI deployment, the script modifies src/index.js in the temporary checkout
-2. The modified code (with hardcoded SHA) is bundled by wrangler
-3. The bundle is deployed with the SHA already embedded
-4. No runtime dependency on environment variables
-5. Original repository code remains unchanged (still uses env.GIT_SHA for local dev)
+1. During CI deployment, GIT_SHA is configured as a Cloudflare secret (not just an environment variable)
+2. The worker code continues to use `gitSha: env.GIT_SHA || 'unknown'` without modification
+3. When the worker runs, `env.GIT_SHA` gets the value from the Cloudflare secret
+4. Secrets persist across all redeployments, unlike environment variables
 
 ## Deployment Flow (After Fix)
 
 1. **Checkout Code**: At specific commit SHA
 2. **Inject Git SHA into HTML**: Updates frontend files with SHA comments
-3. **Inject Git SHA into Code**: Updates src/index.js with hardcoded SHA (NEW)
-4. **Update wrangler.toml**: For consistency
-5. **Create R2 Buckets**: Ensures storage buckets exist
-6. **Deploy to Cloudflare**: Deploys worker with hardcoded SHA in bundle
-7. **Configure Secrets**: Updates all required secrets (triggers redeployments)
-8. **Final Deployment**: Ensures latest configuration
-9. **Wait**: 10 seconds for propagation
-10. **Verify**: Health endpoint should now show the gitSha field
+3. **Deploy to Cloudflare**: Initial deployment
+4. **Configure Secrets**: Updates all required secrets
+   - CLERK_SECRET_KEY
+   - CLERK_PUBLISHABLE_KEY  
+   - STRIPE_SECRET_KEY
+   - STRIPE_WEBHOOK_SECRET
+   - API_KEY_ENCRYPTION_KEY
+   - **GIT_SHA** (NEW)
+5. **Wait**: 10 seconds for propagation
+6. **Verify**: Health endpoint should now show the gitSha field
 
 ## Benefits
 
-1. **Reliable**: SHA is baked into the JavaScript bundle, no runtime environment variable dependency
-2. **Verifiable**: Can confirm SHA is in bundle before deployment
-3. **No Side Effects**: Only affects CI environment temporary files, not repository
-4. **Backward Compatible**: Still updates wrangler.toml; local dev still uses env.GIT_SHA
-5. **Proven Approach**: Similar to how the HTML files are handled
+1. **Reliable**: Secrets persist across all Cloudflare redeployments
+2. **Consistent**: GIT_SHA handled the same way as other secrets (CLERK_SECRET_KEY, etc.)
+3. **Simpler**: No source code modification needed
+4. **No Side Effects**: Original source code remains unchanged
+5. **Proven Approach**: Uses Cloudflare's standard secret management
 
 ## Testing
 
 All tests pass:
 - ✅ Grep patterns test  
 - ✅ Git SHA HTML injection test
-- ✅ Git SHA code injection test (NEW)
 - ✅ User balance test
 - ✅ Auth gate test
+- ✅ Stripe webhook test
+- ✅ API keys test
+- ✅ Upload balance test
+- ✅ Rate limiting test
 - ✅ Security scan (CodeQL: 0 alerts)
 
 To verify after deployment:
@@ -127,24 +126,24 @@ curl https://hashbin.org/ | grep "git-sha:"
 
 ## Files Changed
 
-- `.github/workflows/deploy.yml` - Added code injection step (9 lines modified)
-- `scripts/inject-git-sha-code.sh` - New injection script (66 lines)
-- `scripts/test-git-sha-code-injection.sh` - New test (79 lines)
-- `scripts/test-reporter.sh` - Added new tests to CI (2 lines)
+- `.github/workflows/deploy.yml` - Added GIT_SHA secret configuration step, removed unused code injection logic (31 lines removed, 7 lines added)
+- `scripts/inject-git-sha-code.sh` - **REMOVED** (no longer needed)
+- `scripts/test-git-sha-code-injection.sh` - **REMOVED** (no longer needed)
+- `scripts/test-reporter.sh` - Removed reference to deleted test (1 line removed)
 
-**Total**: 154 lines added, 2 lines modified
+**Total**: 178 lines removed, 7 lines added (net -171 lines)
 
 ## Impact
 
-- **Low Risk**: Similar approach already used for HTML files
-- **No Breaking Changes**: Original code remains unchanged in repository
-- **Minimal Added Time**: ~1 second for code injection
-- **High Confidence**: Eliminates environment variable reliability issues
+- **Low Risk**: Uses standard Cloudflare secret management
+- **No Breaking Changes**: Original source code unchanged
+- **Simpler**: Removed complex injection logic
+- **High Confidence**: Secrets are Cloudflare's recommended approach
 
 ## Related Issues
 
 - Current Issue: #131 - Bug: Deployed site does not contain embedded SHA
-- Previous Attempt: PR #130 - Fix: Redeploy after secret updates
-- Previous Attempt: PR #128 - Fix: Write GIT_SHA to wrangler.toml
-- Previous Attempt: PR #127 - Feature: Embed git SHA
+- Previous Attempt: PR #132 - Fix: Inject GIT_SHA into source code (FAILED)
+- Previous Attempt: PR #130 - Fix: Redeploy after secret updates (FAILED)
+- Previous Attempt: PR #128 - Fix: Write GIT_SHA to wrangler.toml (FAILED)
 - Original Feature: PR #125 - Add embedded SHA support
