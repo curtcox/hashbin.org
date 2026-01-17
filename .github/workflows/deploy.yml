@@ -179,6 +179,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
 
+      - name: Final deployment to restore correct code and configuration
+        run: |
+          echo "Re-deploying to ensure correct code and GIT_SHA after secret updates..."
+          npx wrangler deploy
+          echo "✅ Final deployment complete"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
       - name: Wait for deployment propagation
         run: sleep 10
 
