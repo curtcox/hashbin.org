@@ -437,6 +437,76 @@ Services verified:
 ==========================================
 ```
 
+## generate-encryption-key.sh
+
+Generates a secure 256-bit AES encryption key for the `API_KEY_ENCRYPTION_KEY` secret. This key is required for API key encryption and reveal functionality.
+
+### Usage
+
+```bash
+# Generate a new encryption key
+./scripts/generate-encryption-key.sh
+```
+
+### What It Does
+
+The script generates a cryptographically secure 256-bit (32-byte) AES key using OpenSSL:
+
+1. Uses `openssl rand -base64 32` to generate 32 random bytes from `/dev/urandom`
+2. Encodes the key in base64 format for safe storage
+3. Outputs the key and instructions for adding it to Cloudflare
+
+### Adding the Key to Cloudflare
+
+After generating the key, add it as a Cloudflare Worker secret:
+
+```bash
+# For development environment
+echo 'YOUR_GENERATED_KEY' | wrangler secret put API_KEY_ENCRYPTION_KEY --env development
+
+# For production environment
+echo 'YOUR_GENERATED_KEY' | wrangler secret put API_KEY_ENCRYPTION_KEY --env production
+```
+
+### Alternative: Manual Key Generation
+
+If you prefer to generate the key manually without the script:
+
+```bash
+# Using OpenSSL (recommended)
+openssl rand -base64 32
+
+# Using /dev/urandom directly
+head -c 32 /dev/urandom | base64
+```
+
+### Security Notes
+
+- **Store securely**: Save this key in a secure password manager or secrets vault
+- **Cannot be recovered**: If lost, existing API keys can still be used but cannot be revealed to users
+- **Do not commit**: Never commit this key to version control
+- **One key per environment**: Use different keys for development and production
+
+### Example Output
+
+```
+Generating 256-bit AES encryption key...
+
+Generated encryption key:
+dGhpc2lzYW5leGFtcGxla2V5Zm9yZG9jdW1lbnRhdGlvbgo=
+
+To add this key to your Cloudflare Worker:
+
+For development:
+  echo 'dGhpc2lzYW5leGFtcGxla2V5Zm9yZG9jdW1lbnRhdGlvbgo=' | wrangler secret put API_KEY_ENCRYPTION_KEY --env development
+
+For production:
+  echo 'dGhpc2lzYW5leGFtcGxla2V5Zm9yZG9jdW1lbnRhdGlvbgo=' | wrangler secret put API_KEY_ENCRYPTION_KEY --env production
+
+⚠️  IMPORTANT: Save this key securely! Without it, you cannot reveal API keys.
+⚠️  If you lose this key, existing API keys can still be used but cannot be revealed.
+```
+
 ## Integration with CI/CD
 
 The verification tests are automatically run in GitHub Actions after each deployment:
