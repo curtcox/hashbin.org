@@ -109,8 +109,9 @@ function createUnauthenticatedHTML() {
  */
 function createAuthenticatedHTML(user) {
   const providerIcon = getProviderIcon(user.provider);
-  const providerIconHTML = providerIcon 
-    ? `<img class="provider-icon" src="${providerIcon}" alt="${user.provider}" title="Signed in with ${user.provider}">` 
+  // Only render provider icon if we have a valid data URL
+  const providerIconHTML = (providerIcon && providerIcon.startsWith('data:image/svg+xml,'))
+    ? `<img class="provider-icon" src="${providerIcon}" alt="${user.provider || ''}" title="Signed in with ${user.provider}">` 
     : '';
 
   return `
