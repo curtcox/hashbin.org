@@ -97,6 +97,13 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Verify git SHA in source before deployment
+        run: |
+          echo "Checking git SHA in src/index.js before deployment..."
+          grep "gitSha:" src/index.js || echo "ERROR: gitSha line not found!"
+          echo "Checking GIT_SHA in wrangler.toml..."
+          grep "GIT_SHA" wrangler.toml || echo "ERROR: GIT_SHA line not found!"
+
       - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy
         env:
@@ -183,6 +190,13 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
+
+      - name: Verify git SHA in source before final deployment
+        run: |
+          echo "Checking git SHA in src/index.js before final deployment..."
+          grep "gitSha:" src/index.js || echo "ERROR: gitSha line not found!"
+          echo "Checking GIT_SHA in wrangler.toml..."
+          grep "GIT_SHA" wrangler.toml || echo "ERROR: GIT_SHA line not found!"
 
       - name: Final deployment to restore correct code and configuration
         run: |
