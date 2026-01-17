@@ -5,6 +5,7 @@
 
 import Stripe from 'stripe';
 import { authenticate } from '../auth/middleware.js';
+import { handleLocalDepositUnavailable, handleLocalDonationUnavailable } from './local-payments.js';
 import { 
   calculateStripeFees, 
   calculateTotalWithFees,
@@ -18,6 +19,10 @@ import {
  * Create a Stripe checkout session for depositing funds
  */
 export async function handleCreateDeposit(request, env) {
+  if (env.ENVIRONMENT === 'local') {
+    return handleLocalDepositUnavailable();
+  }
+
   const authResult = await authenticate(request, env);
   
   if (!authResult.authenticated) {
@@ -158,6 +163,19 @@ export async function handleCreateDeposit(request, env) {
  * Handle Stripe webhook events
  */
 export async function handleStripeWebhook(request, env) {
+  if (env.ENVIRONMENT === 'local') {
+    return new Response(
+      JSON.stringify({
+        error: 'Stripe disabled in local mode',
+        message: 'Stripe webhooks are not processed in local mode.'
+      }),
+      {
+        status: 400,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
   try {
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
       apiVersion: '2024-11-20.acacia'
@@ -395,6 +413,10 @@ async function handleCheckoutSessionCompleted(session, env) {
  * Create a Stripe checkout session for donating to a CID (anonymous allowed)
  */
 export async function handleCreateDonation(request, env, cid) {
+  if (env.ENVIRONMENT === 'local') {
+    return handleLocalDonationUnavailable();
+  }
+
   try {
     const data = await request.json();
     const amount_cents = data.amount_cents;

@@ -5,6 +5,7 @@
 
 import { verifyToken } from '@clerk/backend';
 import { hashApiKey, validateApiKeyFormat } from './utils.js';
+import { getOrCreateLocalProfile, validateLocalUserId } from './local-auth.js';
 
 // Error codes for authentication failures
 export const AUTH_ERROR_CODES = {
@@ -56,6 +57,8 @@ function extractAuth(request) {
       return { type: 'clerk', value };
     } else if (normalizedScheme === 'apikey') {
       return { type: 'apikey', value };
+    } else if (normalizedScheme === 'localdev') {
+      return { type: 'local', value };
     } else {
       return { type: 'invalid', value: null };
     }
@@ -282,6 +285,7 @@ function checkRateLimit(identifier, limit) {
  */
 export async function authenticate(request, env) {
   const auth = extractAuth(request);
+  const isLocalMode = env.ENVIRONMENT === 'local';
 
   // No authentication provided
   if (auth.type === 'none') {
@@ -301,8 +305,65 @@ export async function authenticate(request, env) {
     };
   }
 
+  // Local development authentication
+  if (auth.type === 'local') {
+    if (!isLocalMode) {
+      return {
+        authenticated: false,
+        user: null,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
+      };
+    }
+
+    const validation = validateLocalUserId(auth.value);
+    if (!validation.valid) {
+      return {
+        authenticated: false,
+        user: null,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
+      };
+    }
+
+    try {
+      const { profile } = await getOrCreateLocalProfile(env, validation.userId);
+
+      if (profile.deleted_at) {
+        return {
+          authenticated: false,
+          user: null,
+          error: AUTH_ERROR_CODES.AUTH_USER_DELETED
+        };
+      }
+
+      return {
+        authenticated: true,
+        user: {
+          userId: profile.user_id,
+          sessionId: null,
+          authMethod: 'local',
+          profile
+        },
+        error: null
+      };
+    } catch (error) {
+      return {
+        authenticated: false,
+        user: null,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
+      };
+    }
+  }
+
   // Clerk JWT token
   if (auth.type === 'clerk') {
+    if (isLocalMode) {
+      return {
+        authenticated: false,
+        user: null,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
+      };
+    }
+
     const validation = await validateClerkToken(auth.value, env);
     if (!validation.valid) {
       return {

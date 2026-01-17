@@ -151,6 +151,10 @@ export class UserProfile {
       );
     }
 
+    const initialBalance = Number.isInteger(data.initial_balance_cents) && data.initial_balance_cents > 0
+      ? data.initial_balance_cents
+      : 0;
+
     const profile = {
       user_id: data.user_id,
       providers: data.providers || [],
@@ -159,8 +163,8 @@ export class UserProfile {
       deleted_at: null,
       api_keys: [],
       uploads: [],
-      balance_cents: 0,
-      total_deposited_cents: 0,
+      balance_cents: initialBalance,
+      total_deposited_cents: initialBalance,
       total_spent_cents: 0
     };
 

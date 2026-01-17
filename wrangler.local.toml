@@ -1,0 +1,65 @@
+name = "hashbin-worker-local"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Static assets (frontend files)
+[assets]
+directory = "./frontend"
+binding = "ASSETS"
+
+# Local development environment variables
+[vars]
+ENVIRONMENT = "local"
+LOG_LEVEL = "debug"
+
+# Local dev does not bind to production routes
+workers_dev = true
+
+# Durable Objects bindings
+[[durable_objects.bindings]]
+name = "CONTENT_METADATA"
+class_name = "ContentMetadata"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "USER_PROFILES"
+class_name = "UserProfile"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "PAYMENT_RECORDS"
+class_name = "PaymentRecord"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "CONTEST_RECORDS"
+class_name = "ContestRecord"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "MESSAGE_THREADS"
+class_name = "MessageThread"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "KEY_REGISTRY"
+class_name = "KeyRegistry"
+script_name = "hashbin-worker-local"
+
+# R2 bucket bindings (local emulation)
+[[r2_buckets]]
+binding = "CONTENT_BUCKET"
+bucket_name = "hashbin-content-local"
+
+[[r2_buckets]]
+binding = "BACKUP_BUCKET"
+bucket_name = "hashbin-backups-local"
+
+# Durable Objects migrations
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["ContentMetadata", "UserProfile", "PaymentRecord", "ContestRecord", "MessageThread"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["KeyRegistry"]
