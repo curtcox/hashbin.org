@@ -47,6 +47,8 @@ import {
   handleGetRateLimit 
 } from './api/rate-limit.js';
 
+import { handleGetUserUploads } from './api/user.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -282,6 +284,11 @@ function handleApiRoutes(url, request, env) {
   if (url.pathname.startsWith('/api/donate/cid/') && request.method === 'POST') {
     const cid = url.pathname.split('/')[4];
     return handleCreateDonation(request, env, cid);
+  }
+
+  // User API routes
+  if (url.pathname === '/api/user/uploads' && request.method === 'GET') {
+    return handleGetUserUploads(request, env);
   }
 
   // TODO: Add API routes for:
