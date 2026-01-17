@@ -32,52 +32,93 @@
   <!-- Main Content -->
   <main>
     <div class="container">
-      <h1>Add Funds</h1>
-      
-      <!-- Success Message (shown after redirect from Stripe) -->
-      <div id="success-message" class="alert alert-success hidden">
-        <strong>✓ Deposit Successful!</strong>
-        <p>Your payment has been processed. Redirecting to dashboard...</p>
-      </div>
+      <div class="dashboard-layout">
+        <!-- Dashboard Sidebar -->
+        <aside class="dashboard-sidebar">
+          <nav>
+            <a href="/dashboard.html">
+              <span class="nav-icon">📊</span>
+              <span>Overview</span>
+            </a>
+            <a href="/api-keys.html">
+              <span class="nav-icon">🔑</span>
+              <span>API Keys</span>
+            </a>
+            <a href="/dashboard/uploads/">
+              <span class="nav-icon">📦</span>
+              <span>My Uploads</span>
+            </a>
+            <a href="/deposit.html" class="nav-active">
+              <span class="nav-icon">💰</span>
+              <span>Add Funds</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">💳</span>
+              <span>Transactions</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">⚙️</span>
+              <span>Account Settings</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+          </nav>
+        </aside>
 
-      <!-- Cancel Message (shown after user cancels) -->
-      <div id="cancel-message" class="alert alert-warning hidden">
-        <strong>Deposit Cancelled</strong>
-        <p>You cancelled the payment. You can try again below.</p>
-      </div>
+        <!-- Dashboard Content -->
+        <div class="dashboard-content">
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a href="/dashboard.html">Dashboard</a>
+            <span class="separator">›</span>
+            <span class="current">Add Funds</span>
+          </nav>
 
-      <!-- Error Message -->
-      <div id="error-message" class="alert alert-error hidden"></div>
-      
-      <div class="card">
-        <h2 class="card-title">Deposit to Your Account</h2>
-        <p style="color: var(--color-text-light); margin-bottom: 2rem;">
-          Add funds to your account to pay for content storage retention.
-        </p>
-
-        <form id="deposit-form">
-          <div class="form-group">
-            <label for="amount">Credit Amount (USD)</label>
-            <div class="input-group">
-              <span class="input-prefix">$</span>
-              <input 
-                type="number" 
-                id="amount" 
-                name="amount" 
-                step="0.01" 
-                min="1.00" 
-                placeholder="10.00" 
-                required
-                autocomplete="off"
-              >
-            </div>
-            <small class="form-text">Minimum: $1.00</small>
+          <h1>Add Funds</h1>
+          
+          <!-- Success Message (shown after redirect from Stripe) -->
+          <div id="success-message" class="alert alert-success hidden">
+            <strong>✓ Deposit Successful!</strong>
+            <p>Your payment has been processed. Redirecting to dashboard...</p>
           </div>
 
-          <!-- Fee Breakdown Display -->
-          <div id="fee-breakdown" class="fee-breakdown hidden">
-            <div class="fee-line">
-              <span>Credit Amount:</span>
+          <!-- Cancel Message (shown after user cancels) -->
+          <div id="cancel-message" class="alert alert-warning hidden">
+            <strong>Deposit Cancelled</strong>
+            <p>You cancelled the payment. You can try again below.</p>
+          </div>
+
+          <!-- Error Message -->
+          <div id="error-message" class="alert alert-error hidden"></div>
+          
+          <div class="card">
+            <h2 class="card-title">Deposit to Your Account</h2>
+            <p style="color: var(--color-text-light); margin-bottom: 2rem;">
+              Add funds to your account to pay for content storage retention.
+            </p>
+
+            <form id="deposit-form">
+              <div class="form-group">
+                <label for="amount">Credit Amount (USD)</label>
+                <div class="input-group">
+                  <span class="input-prefix">$</span>
+                  <input 
+                    type="number" 
+                    id="amount" 
+                    name="amount" 
+                    step="0.01" 
+                    min="1.00" 
+                    placeholder="10.00" 
+                    required
+                    autocomplete="off"
+                  >
+                </div>
+                <small class="form-text">Minimum: $1.00</small>
+              </div>
+
+              <!-- Fee Breakdown Display -->
+              <div id="fee-breakdown" class="fee-breakdown hidden">
+                <div class="fee-line">
+                  <span>Credit Amount:</span>
               <span id="credit-amount">$0.00</span>
             </div>
             <div class="fee-line">
@@ -102,6 +143,8 @@
 
         <div style="margin-top: 1rem;">
           <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+      </div>
         </div>
       </div>
     </div>

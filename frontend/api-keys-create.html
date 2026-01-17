@@ -156,48 +156,83 @@
   <!-- Main Content -->
   <main>
     <div class="container">
-      <nav class="breadcrumb">
-        <a href="/dashboard.html">Dashboard</a>
-        <span>›</span>
-        <a href="/api-keys.html">API Keys</a>
-        <span>›</span>
-        <span>Create</span>
-      </nav>
-      
-      <h1>Create API Key</h1>
-      <p style="color: var(--color-text-light); margin-bottom: var(--spacing-xl);">
-        Generate a new API key for programmatic access to HashBin
-      </p>
-      
-      <div class="card">
-        <form id="create-key-form">
-          <!-- Name Field -->
-          <div class="form-group">
-            <label for="key-name" class="form-label">Key Name</label>
-            <input 
-              type="text" 
-              id="key-name" 
-              name="name" 
-              class="form-input" 
-              placeholder="Leave empty for auto-generated name"
-              minlength="1"
-              maxlength="100"
-            >
-            <span class="form-help">
-              A descriptive name to help you identify this key. If left empty, defaults to "Hosting" (or "Hosting n" if that name already exists)
-            </span>
-            <span id="name-error" class="form-error hidden"></span>
-          </div>
+      <div class="dashboard-layout">
+        <!-- Dashboard Sidebar -->
+        <aside class="dashboard-sidebar">
+          <nav>
+            <a href="/dashboard.html">
+              <span class="nav-icon">📊</span>
+              <span>Overview</span>
+            </a>
+            <a href="/api-keys.html" class="nav-active">
+              <span class="nav-icon">🔑</span>
+              <span>API Keys</span>
+            </a>
+            <a href="/dashboard/uploads/">
+              <span class="nav-icon">📦</span>
+              <span>My Uploads</span>
+            </a>
+            <a href="/deposit.html">
+              <span class="nav-icon">💰</span>
+              <span>Add Funds</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">💳</span>
+              <span>Transactions</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">⚙️</span>
+              <span>Account Settings</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+          </nav>
+        </aside>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard-content">
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a href="/dashboard.html">Dashboard</a>
+            <span class="separator">›</span>
+            <a href="/api-keys.html">API Keys</a>
+            <span class="separator">›</span>
+            <span class="current">Create New</span>
+          </nav>
           
-          <!-- Expiration Date Field -->
-          <div class="form-group">
-            <label for="key-expiration" class="form-label">Expiration Date *</label>
-            <input 
-              type="date" 
-              id="key-expiration" 
-              name="expiration" 
-              class="form-input" 
-              required
+          <h1>Create API Key</h1>
+          <p style="color: var(--color-text-light); margin-bottom: var(--spacing-xl);">
+            Generate a new API key for programmatic access to HashBin
+          </p>
+          
+          <div class="card">
+            <form id="create-key-form">
+              <!-- Name Field -->
+              <div class="form-group">
+                <label for="key-name" class="form-label">Key Name</label>
+                <input 
+                  type="text" 
+                  id="key-name" 
+                  name="name" 
+                  class="form-input" 
+                  placeholder="Leave empty for auto-generated name"
+                  minlength="1"
+                  maxlength="100"
+                >
+                <span class="form-help">
+                  A descriptive name to help you identify this key. If left empty, defaults to "Hosting" (or "Hosting n" if that name already exists)
+                </span>
+                <span id="name-error" class="form-error hidden"></span>
+              </div>
+              
+              <!-- Expiration Date Field -->
+              <div class="form-group">
+                <label for="key-expiration" class="form-label">Expiration Date *</label>
+                <input 
+                  type="date" 
+                  id="key-expiration" 
+                  name="expiration" 
+                  class="form-input" 
+                  required
             >
             <span class="form-help">
               Maximum 5 years from today. Default is 1 year.
@@ -213,6 +248,8 @@
             <a href="/api-keys.html" class="btn btn-secondary">Cancel</a>
           </div>
         </form>
+      </div>
+        </div>
       </div>
     </div>
   </main>

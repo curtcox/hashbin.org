@@ -261,43 +261,86 @@
   <!-- Main Content -->
   <main>
     <div class="container">
-      <div id="loading" style="text-align: center; padding: 2rem;">
-        <div class="spinner"></div>
-        <p>Loading content information...</p>
-      </div>
-      
-      <div id="content-management" style="display: none;">
-        <div class="content-header">
-          <h1 style="margin: 0;">📦 Content Management</h1>
-          <div class="content-cid" id="header-cid"></div>
-        </div>
-        
-        <!-- Content Info Card -->
-        <div class="info-card">
-          <h3 style="margin-bottom: 1rem;">Content Information</h3>
-          <div class="info-row">
-            <span class="info-label">Size</span>
-            <span class="info-value" id="content-size"></span>
+      <div class="dashboard-layout">
+        <!-- Dashboard Sidebar -->
+        <aside class="dashboard-sidebar">
+          <nav>
+            <a href="/dashboard.html">
+              <span class="nav-icon">📊</span>
+              <span>Overview</span>
+            </a>
+            <a href="/api-keys.html">
+              <span class="nav-icon">🔑</span>
+              <span>API Keys</span>
+            </a>
+            <a href="/dashboard/uploads/" class="nav-active">
+              <span class="nav-icon">📦</span>
+              <span>My Uploads</span>
+            </a>
+            <a href="/deposit.html">
+              <span class="nav-icon">💰</span>
+              <span>Add Funds</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">💳</span>
+              <span>Transactions</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">⚙️</span>
+              <span>Account Settings</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+          </nav>
+        </aside>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard-content">
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a href="/dashboard.html">Dashboard</a>
+            <span class="separator">›</span>
+            <a href="/dashboard/uploads/">My Uploads</a>
+            <span class="separator">›</span>
+            <span class="current" id="breadcrumb-hash">Loading...</span>
+          </nav>
+
+          <div id="loading" style="text-align: center; padding: 2rem;">
+            <div class="spinner"></div>
+            <p>Loading content information...</p>
           </div>
-          <div class="info-row">
-            <span class="info-label">Expires At</span>
-            <span class="info-value" id="content-expires"></span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">Downloads</span>
-            <span class="info-value" id="content-downloads"></span>
-          </div>
-          <div style="margin-top: 1rem; display: flex; gap: 1rem;">
-            <a id="view-link" href="#" class="btn btn-secondary" target="_blank">View Content</a>
-            <a id="download-link" href="#" class="btn btn-secondary" download>Download</a>
-          </div>
-        </div>
-        
-        <!-- Current Rate Limit Status -->
-        <div class="info-card">
-          <h3 style="margin-bottom: 1rem;">Current Rate Limit Status</h3>
-          <div id="current-rate-limit-status">
-            <p style="color: var(--color-text-light);">Loading rate limit status...</p>
+          
+          <div id="content-management" style="display: none;">
+            <div class="content-header">
+              <h1 style="margin: 0;">📦 Content Management</h1>
+              <div class="content-cid" id="header-cid"></div>
+            </div>
+            
+            <!-- Content Info Card -->
+            <div class="info-card">
+              <h3 style="margin-bottom: 1rem;">Content Information</h3>
+              <div class="info-row">
+                <span class="info-label">Size</span>
+                <span class="info-value" id="content-size"></span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Expires At</span>
+                <span class="info-value" id="content-expires"></span>
+              </div>
+              <div class="info-row">
+                <span class="info-label">Downloads</span>
+                <span class="info-value" id="content-downloads"></span>
+              </div>
+              <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                <a id="view-link" href="#" class="btn btn-secondary" target="_blank">View Content</a>
+                <a id="download-link" href="#" class="btn btn-secondary" download>Download</a>
+              </div>
+            </div>
+            
+            <!-- Current Rate Limit Status -->
+            <div class="info-card">
+              <h3 style="margin-bottom: 1rem;">Current Rate Limit Status</h3>
+              <div id="current-rate-limit-status">
+                <p style="color: var(--color-text-light);">Loading rate limit status...</p>
           </div>
         </div>
         
@@ -412,6 +455,8 @@
           <a href="/dashboard/uploads/" class="btn btn-secondary">Back to Uploads</a>
         </div>
       </div>
+        </div>
+      </div>
     </div>
   </main>
 
@@ -424,6 +469,17 @@
   </footer>
 
   <!-- Scripts -->
+  <script type="module">
+    // Update breadcrumb with truncated hash
+    const params = new URLSearchParams(window.location.search);
+    const cid = params.get('cid');
+    if (cid && cid.length > 8) {
+      const truncated = cid.substring(0, 4) + '...' + cid.substring(cid.length - 4);
+      document.getElementById('breadcrumb-hash').textContent = truncated;
+    } else if (cid) {
+      document.getElementById('breadcrumb-hash').textContent = cid;
+    }
+  </script>
   <script type="module" src="/js/app.js"></script>
   <script type="module" src="/js/rate-limit-purchase.js"></script>
 </body>

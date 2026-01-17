@@ -88,6 +88,11 @@ async function updateAuthUI() {
   
   // Update active page indicator
   updateActiveNavigation();
+  
+  // Update sidebar active navigation if sidebar exists
+  if (document.querySelector('.dashboard-sidebar')) {
+    updateSidebarActiveNavigation();
+  }
 }
 
 /**
