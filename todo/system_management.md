@@ -791,26 +791,19 @@ TEST: Export rate limiting enforced
 | 1 | How should admin users be identified? | **Separate admin authentication system** | Single admin with dedicated secret token, independent of Clerk |
 | 2 | Where should alerts be stored? | **Dedicated AlertStore Durable Object** | Provides durability and query capabilities |
 | 3 | Should alerts be sent externally? | **Only in-app alerts** | Simplifies implementation; admin polls API |
+| 4 | What anomaly thresholds should trigger alerts? | **See thresholds table below** | Balanced for low false positives |
 | 5 | How should platform statistics be aggregated? | **Hybrid approach** | Counters real-time, aggregates periodic |
 | 6 | What is the audit log retention period? | **1 year** | Balance between compliance and storage costs |
 | 7 | Should export rate be limited? | **1 export per minute** | Prevents system overload |
 | 8 | What format should large exports use? | **CSV only** | Simple, universal format |
 | 9 | Should there be an admin UI? | **API only** | Admin uses external tools (curl, Postman, scripts) |
 | 10 | How should the system handle admin account deletion? | **Not allowed** | Single admin; token rotated manually if needed |
+| 11 | What format should the admin secret token use? | **64-character hex string (256 bits)** | High entropy, easy to generate |
+| 12 | How should the admin authenticate? | **`X-Admin-Token` header** | Keeps token out of URLs/logs |
 
 ---
 
-## Open Questions
-
-The following questions need to be resolved before implementation:
-
-| # | Question | Proposed Answer | Notes |
-|---|----------|-----------------|-------|
-| 4 | What anomaly thresholds should trigger alerts? | See proposed thresholds below | Need confirmation |
-| 11 | What format should the admin secret token use? | 64-character hex string (256 bits) | Need confirmation |
-| 12 | How should the admin authenticate? | `X-Admin-Token` header | Need confirmation |
-
-### Proposed Anomaly Thresholds (Q4)
+## Anomaly Detection Thresholds
 
 | Alert Type | Threshold | Window | Cooldown |
 |------------|-----------|--------|----------|
@@ -844,8 +837,8 @@ The following questions need to be resolved before implementation:
 | Export rate limit | ✅ RESOLVED | 1 per minute |
 | Admin UI | ✅ RESOLVED | API only |
 | Admin deletion | ✅ RESOLVED | Not allowed (single admin) |
-| Anomaly thresholds | ⏳ PROPOSED | Awaiting confirmation |
-| Admin token format | ⏳ PROPOSED | 64-char hex, `X-Admin-Token` header |
+| Anomaly thresholds | ✅ RESOLVED | See thresholds table above |
+| Admin token format | ✅ RESOLVED | 64-char hex, `X-Admin-Token` header |
 
 ---
 
@@ -880,7 +873,7 @@ The following questions need to be resolved before implementation:
 6. Implement auto-resolution logic for health alerts
 7. Write tests for alert lifecycle
 
-### Phase 4: Anomaly Detection ⏳ AWAITING THRESHOLD CONFIRMATION
+### Phase 4: Anomaly Detection ✅ READY
 1. Implement anomaly detection scheduled job
 2. Add detection logic for each anomaly type:
    - high_error_rate (> 5% in 5 min)
@@ -951,7 +944,7 @@ The following questions need to be resolved before implementation:
 
 ---
 
-**Document Version:** 1.1
+**Document Version:** 2.0
 **Created:** 2026-01-17
 **Last Updated:** 2026-01-17
-**Status:** Nearly Ready - Awaiting confirmation on anomaly thresholds and admin token format
+**Status:** ✅ COMPLETE - All questions resolved, ready for implementation
