@@ -64,16 +64,25 @@ This document plans the system management functionality that enables administrat
 
 ### Admin Role & Authentication
 
-Administrators are identified by user ID in an allow-list stored as a Cloudflare secret.
+**Decision:** Separate admin authentication system (single admin only).
+
+The platform has exactly one administrator. Admin access is controlled via a dedicated admin secret token stored as a Cloudflare secret, independent of the Clerk user system.
 
 ```javascript
-// Environment variable: ADMIN_USER_IDS (comma-separated Clerk user IDs)
-// Example: "user_2abc123,user_2xyz789"
+// Cloudflare secret: ADMIN_SECRET_TOKEN
+// Format: A cryptographically secure token (e.g., 64-character hex string)
+// Example: "a1b2c3d4e5f6..." (generated via crypto.randomBytes(32).toString('hex'))
 ```
 
 Admin endpoints require:
-1. Valid Clerk session (not API key)
-2. User ID present in ADMIN_USER_IDS
+1. Valid `X-Admin-Token` header matching `ADMIN_SECRET_TOKEN`
+2. No Clerk session or API key required (admin auth is independent)
+
+**Important constraints:**
+- There is exactly ONE admin - no concept of multiple admins
+- Admin accounts cannot be added or removed programmatically
+- Admin deletion is not allowed
+- The admin token must be rotated manually via Cloudflare dashboard if compromised
 
 ### API Endpoints
 
@@ -172,6 +181,10 @@ Admin endpoints require:
 
 ### Alerting System
 
+**Decisions:**
+- Storage: Dedicated `AlertStore` Durable Object
+- Notifications: In-app alerts only (no external email/webhook)
+
 #### Alert Types
 
 | Alert Type | Trigger Condition | Severity |
@@ -207,6 +220,8 @@ Admin endpoints require:
 
 ### Statistics Durable Object
 
+**Decision:** Hybrid aggregation strategy - counters updated in real-time, complex aggregates computed periodically via scheduled jobs.
+
 A new `PlatformStats` Durable Object will aggregate and cache platform-wide statistics.
 
 ```javascript
@@ -229,6 +244,8 @@ class PlatformStats {
 
 ### Audit Log
 
+**Decision:** 1-year retention period with automatic cleanup.
+
 All admin actions and significant system events are logged.
 
 ```json
@@ -247,7 +264,9 @@ All admin actions and significant system events are logged.
 
 ### Data Export
 
-Export endpoints return paginated, filterable data in JSON or CSV format.
+**Decision:** CSV format only, rate limited to 1 export per minute.
+
+Export endpoints return paginated, filterable data in CSV format.
 
 | Export Type | Endpoint | Data |
 |-------------|----------|------|
@@ -256,6 +275,8 @@ Export endpoints return paginated, filterable data in JSON or CSV format.
 | Content | `/api/admin/export?type=content` | Content metadata |
 | Audit Log | `/api/admin/export?type=audit` | Audit log entries |
 
+**Rate Limit:** Maximum 1 export request per minute to prevent system overload.
+
 ---
 
 ## Test Plan
@@ -263,74 +284,94 @@ Export endpoints return paginated, filterable data in JSON or CSV format.
 ### Unit Tests: Admin Authorization
 
 ```
-TEST: isAdmin - returns true for admin user
-  GIVEN: ADMIN_USER_IDS = "user_admin1,user_admin2"
-  AND: userId = "user_admin1"
-  WHEN: isAdmin(userId, env) is called
+TEST: validateAdminToken - returns true for valid token
+  GIVEN: ADMIN_SECRET_TOKEN = "a1b2c3d4..." (64 hex chars)
+  AND: providedToken = "a1b2c3d4..." (matching)
+  WHEN: validateAdminToken(providedToken, env) is called
   THEN: returns true
 
-TEST: isAdmin - returns false for non-admin user
-  GIVEN: ADMIN_USER_IDS = "user_admin1,user_admin2"
-  AND: userId = "user_regular"
-  WHEN: isAdmin(userId, env) is called
+TEST: validateAdminToken - returns false for invalid token
+  GIVEN: ADMIN_SECRET_TOKEN = "a1b2c3d4..."
+  AND: providedToken = "wrong_token"
+  WHEN: validateAdminToken(providedToken, env) is called
   THEN: returns false
 
-TEST: isAdmin - handles empty admin list
-  GIVEN: ADMIN_USER_IDS = ""
-  WHEN: isAdmin(userId, env) is called
+TEST: validateAdminToken - returns false for empty token
+  GIVEN: ADMIN_SECRET_TOKEN = "a1b2c3d4..."
+  AND: providedToken = ""
+  WHEN: validateAdminToken(providedToken, env) is called
   THEN: returns false
 
-TEST: isAdmin - handles undefined admin list
-  GIVEN: ADMIN_USER_IDS is not set
-  WHEN: isAdmin(userId, env) is called
+TEST: validateAdminToken - returns false when secret not configured
+  GIVEN: ADMIN_SECRET_TOKEN is not set
+  AND: providedToken = "any_token"
+  WHEN: validateAdminToken(providedToken, env) is called
   THEN: returns false
 
-TEST: isAdmin - handles whitespace in admin list
-  GIVEN: ADMIN_USER_IDS = " user_admin1 , user_admin2 "
-  AND: userId = "user_admin1"
-  WHEN: isAdmin(userId, env) is called
-  THEN: returns true
+TEST: validateAdminToken - constant-time comparison
+  GIVEN: ADMIN_SECRET_TOKEN = "a1b2c3d4..."
+  WHEN: validateAdminToken is called with wrong token
+  THEN: uses constant-time comparison to prevent timing attacks
 
-TEST: isAdmin - case sensitive matching
-  GIVEN: ADMIN_USER_IDS = "user_Admin1"
-  AND: userId = "user_admin1"
-  WHEN: isAdmin(userId, env) is called
+TEST: validateAdminToken - case sensitive
+  GIVEN: ADMIN_SECRET_TOKEN = "A1B2C3D4..."
+  AND: providedToken = "a1b2c3d4..."
+  WHEN: validateAdminToken(providedToken, env) is called
   THEN: returns false
 ```
 
 ### Integration Tests: Admin Endpoints - Authentication
 
 ```
-TEST: GET /api/admin/stats - rejects unauthenticated request
-  GIVEN: no authentication
+TEST: GET /api/admin/stats - rejects request without X-Admin-Token
+  GIVEN: no X-Admin-Token header
   WHEN: GET /api/admin/stats
   THEN: status = 401
-  AND: error = "Authentication required"
+  AND: error = "Admin authentication required"
 
-TEST: GET /api/admin/stats - rejects non-admin user
-  GIVEN: valid Clerk session for non-admin user
+TEST: GET /api/admin/stats - rejects invalid admin token
+  GIVEN: X-Admin-Token = "wrong_token"
   WHEN: GET /api/admin/stats
-  THEN: status = 403
-  AND: error = "Admin access required"
+  THEN: status = 401
+  AND: error = "Invalid admin token"
 
-TEST: GET /api/admin/stats - rejects API key authentication
-  GIVEN: valid API key (even for admin user)
+TEST: GET /api/admin/stats - rejects Clerk session (wrong auth method)
+  GIVEN: valid Clerk session but no X-Admin-Token
   WHEN: GET /api/admin/stats
-  THEN: status = 403
-  AND: error = "Clerk session required for admin endpoints"
+  THEN: status = 401
+  AND: error = "Admin authentication required"
 
-TEST: GET /api/admin/stats - accepts admin user with Clerk session
-  GIVEN: valid Clerk session for admin user
+TEST: GET /api/admin/stats - rejects API key (wrong auth method)
+  GIVEN: valid API key but no X-Admin-Token
+  WHEN: GET /api/admin/stats
+  THEN: status = 401
+  AND: error = "Admin authentication required"
+
+TEST: GET /api/admin/stats - accepts valid admin token
+  GIVEN: X-Admin-Token = <valid ADMIN_SECRET_TOKEN>
   WHEN: GET /api/admin/stats
   THEN: status = 200
   AND: response contains statistics object
+
+TEST: All admin endpoints require X-Admin-Token
+  GIVEN: no X-Admin-Token header
+  WHEN: GET /api/admin/health
+  THEN: status = 401
+  WHEN: GET /api/admin/alerts
+  THEN: status = 401
+  WHEN: GET /api/admin/export
+  THEN: status = 401
+  WHEN: GET /api/admin/audit-log
+  THEN: status = 401
+  WHEN: POST /api/admin/alerts/:id/acknowledge
+  THEN: status = 401
 ```
 
 ### Integration Tests: Platform Statistics
 
 ```
 TEST: GET /api/admin/stats - returns complete statistics
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/stats
   THEN: status = 200
   AND: response.content contains total_files, total_size_bytes, etc.
@@ -339,14 +380,14 @@ TEST: GET /api/admin/stats - returns complete statistics
   AND: response.api_keys contains total_created, active_keys, etc.
 
 TEST: GET /api/admin/stats - returns zero values for empty platform
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: no content, users, or transactions exist
   WHEN: GET /api/admin/stats
   THEN: status = 200
   AND: all numeric fields are 0
 
 TEST: GET /api/admin/stats - content counts are accurate
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 10 active files uploaded
   AND: 2 expired files
   AND: 3 inline content items
@@ -357,7 +398,7 @@ TEST: GET /api/admin/stats - content counts are accurate
   AND: response.content.inline_content_count = 3
 
 TEST: GET /api/admin/stats - user counts are accurate
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 100 total user accounts
   AND: 5 deleted accounts
   WHEN: GET /api/admin/stats
@@ -366,7 +407,7 @@ TEST: GET /api/admin/stats - user counts are accurate
   AND: response.users.active_accounts = 95
 
 TEST: GET /api/admin/stats - financial totals are accurate
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: deposits totaling $500.00
   AND: upload payments totaling $300.00
   AND: donations totaling $50.00
@@ -375,7 +416,7 @@ TEST: GET /api/admin/stats - financial totals are accurate
   AND: response.financial.total_revenue_cents = 35000
 
 TEST: GET /api/admin/stats/financial - returns detailed breakdown
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 10 upload payments ($200 total)
   AND: 5 extensions ($50 total)
   AND: 3 donations ($30 total)
@@ -386,7 +427,7 @@ TEST: GET /api/admin/stats/financial - returns detailed breakdown
   AND: response.breakdown_by_type.donation_received.count = 3
 
 TEST: GET /api/admin/stats/financial - includes dispute information
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 2 disputes created (1 resolved, 1 pending)
   WHEN: GET /api/admin/stats/financial
   THEN: response.disputes.total_count = 2
@@ -394,14 +435,14 @@ TEST: GET /api/admin/stats/financial - includes dispute information
   AND: response.disputes.resolved_count = 1
 
 TEST: GET /api/admin/stats/content - returns content details
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/stats/content
   THEN: response contains size distribution
   AND: response contains retention duration distribution
   AND: response contains upload trends
 
 TEST: GET /api/admin/stats/users - returns user details
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/stats/users
   THEN: response contains registration trends
   AND: response contains balance distribution
@@ -412,7 +453,7 @@ TEST: GET /api/admin/stats/users - returns user details
 
 ```
 TEST: GET /api/admin/health - returns extended health information
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/health
   THEN: status = 200
   AND: includes all standard health checks
@@ -421,13 +462,13 @@ TEST: GET /api/admin/health - returns extended health information
   AND: includes request_count metrics
 
 TEST: GET /api/admin/health - returns component latencies
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/health
   THEN: response.checks.durable_objects.response_time_ms exists
   AND: response.checks.r2_bucket.response_time_ms exists
 
 TEST: GET /api/admin/health - includes error details for unhealthy components
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: R2 bucket is unavailable
   WHEN: GET /api/admin/health
   THEN: response.checks.r2_bucket.status = "down"
@@ -458,7 +499,7 @@ TEST: Alert creation - health degradation triggers warning
   AND: alert severity = "warning"
 
 TEST: GET /api/admin/alerts - returns active alerts
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 3 active alerts (1 critical, 2 warning)
   WHEN: GET /api/admin/alerts
   THEN: status = 200
@@ -466,20 +507,20 @@ TEST: GET /api/admin/alerts - returns active alerts
   AND: alerts sorted by severity (critical first) then created_at
 
 TEST: GET /api/admin/alerts - filters by severity
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 3 alerts (1 critical, 2 warning)
   WHEN: GET /api/admin/alerts?severity=critical
   THEN: response contains 1 alert
   AND: alert.severity = "critical"
 
 TEST: GET /api/admin/alerts - filters by acknowledged status
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 2 unacknowledged, 1 acknowledged alert
   WHEN: GET /api/admin/alerts?acknowledged=false
   THEN: response contains 2 alerts
 
 TEST: POST /api/admin/alerts/:id/acknowledge - acknowledges alert
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: unacknowledged alert exists
   WHEN: POST /api/admin/alerts/:id/acknowledge
   THEN: status = 200
@@ -487,14 +528,14 @@ TEST: POST /api/admin/alerts/:id/acknowledge - acknowledges alert
   AND: alert.acknowledged_by = admin user ID
 
 TEST: POST /api/admin/alerts/:id/acknowledge - idempotent for already acknowledged
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: alert already acknowledged
   WHEN: POST /api/admin/alerts/:id/acknowledge
   THEN: status = 200
   AND: acknowledged_at unchanged
 
 TEST: POST /api/admin/alerts/:id/acknowledge - rejects non-existent alert
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: POST /api/admin/alerts/non-existent/acknowledge
   THEN: status = 404
 
@@ -542,69 +583,75 @@ TEST: Anomaly detection - respects cooldown period
 ### Integration Tests: Data Export
 
 ```
-TEST: GET /api/admin/export - transactions export (JSON)
-  GIVEN: admin Clerk session
-  AND: 50 transactions exist
-  WHEN: GET /api/admin/export?type=transactions&format=json
-  THEN: status = 200
-  AND: Content-Type = "application/json"
-  AND: response contains array of transactions
-  AND: each transaction has id, type, amount_cents, created_at
-
 TEST: GET /api/admin/export - transactions export (CSV)
-  GIVEN: admin Clerk session
-  WHEN: GET /api/admin/export?type=transactions&format=csv
+  GIVEN: valid admin token
+  AND: 50 transactions exist
+  WHEN: GET /api/admin/export?type=transactions
   THEN: status = 200
   AND: Content-Type = "text/csv"
-  AND: Content-Disposition contains filename
+  AND: Content-Disposition = "attachment; filename=transactions_2026-01-17.csv"
   AND: response is valid CSV with headers
+  AND: headers include: id, type, amount_cents, user_id, created_at
 
 TEST: GET /api/admin/export - pagination support
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 500 transactions exist
   WHEN: GET /api/admin/export?type=transactions&limit=100&offset=0
-  THEN: response contains 100 transactions
-  AND: response.pagination.total = 500
-  AND: response.pagination.has_more = true
+  THEN: CSV contains 100 data rows (plus header)
+  AND: X-Total-Count header = 500
+  AND: X-Has-More header = true
 
 TEST: GET /api/admin/export - date range filtering
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: transactions from January 1-15
   WHEN: GET /api/admin/export?type=transactions&start_date=2026-01-05&end_date=2026-01-10
-  THEN: response only contains transactions from Jan 5-10
+  THEN: CSV only contains transactions from Jan 5-10
 
 TEST: GET /api/admin/export - users export (no PII)
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/export?type=users
-  THEN: response contains user metadata
-  AND: response does NOT contain email addresses
-  AND: response does NOT contain names
-  AND: response contains user_id, created_at, last_active_at, balance_cents
+  THEN: Content-Type = "text/csv"
+  AND: CSV does NOT contain email column
+  AND: CSV does NOT contain name column
+  AND: CSV contains columns: user_id, created_at, last_active_at, balance_cents
 
 TEST: GET /api/admin/export - content export
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/export?type=content
-  THEN: response contains content metadata
-  AND: each item has hash, size_bytes, created_at, expires_at, download_count
+  THEN: Content-Type = "text/csv"
+  AND: CSV contains columns: hash, size_bytes, created_at, expires_at, download_count
 
 TEST: GET /api/admin/export - audit log export
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/export?type=audit
-  THEN: response contains audit log entries
-  AND: each entry has timestamp, actor_type, actor_id, action, resource_type
+  THEN: Content-Type = "text/csv"
+  AND: CSV contains columns: timestamp, actor_type, actor_id, action, resource_type, resource_id
 
 TEST: GET /api/admin/export - rejects invalid type
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/export?type=invalid
   THEN: status = 400
-  AND: error = "Invalid export type"
+  AND: error = "Invalid export type. Valid types: transactions, users, content, audit"
 
-TEST: GET /api/admin/export - respects rate limit
-  GIVEN: admin Clerk session
-  AND: 5 exports already requested in last minute
+TEST: GET /api/admin/export - rate limit (1 per minute)
+  GIVEN: valid admin token
+  AND: 1 export already requested in last 60 seconds
   WHEN: GET /api/admin/export
   THEN: status = 429
-  AND: Retry-After header present
+  AND: Retry-After header present (seconds until next allowed request)
+
+TEST: GET /api/admin/export - rate limit resets after minute
+  GIVEN: valid admin token
+  AND: last export was 61 seconds ago
+  WHEN: GET /api/admin/export?type=transactions
+  THEN: status = 200
+  AND: CSV returned successfully
+
+TEST: GET /api/admin/export - CSV escapes special characters
+  GIVEN: valid admin token
+  AND: transaction exists with description containing comma and quotes
+  WHEN: GET /api/admin/export?type=transactions
+  THEN: special characters are properly escaped per RFC 4180
 ```
 
 ### Integration Tests: Audit Log
@@ -632,19 +679,19 @@ TEST: Audit log - records data export
   AND: entry.metadata.export_type = "transactions"
 
 TEST: GET /api/admin/audit-log - returns audit entries
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   AND: 25 audit log entries exist
   WHEN: GET /api/admin/audit-log
   THEN: status = 200
   AND: response contains entries sorted by timestamp (newest first)
 
 TEST: GET /api/admin/audit-log - filters by action
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/audit-log?action=alert_acknowledged
   THEN: response only contains alert_acknowledged entries
 
 TEST: GET /api/admin/audit-log - filters by actor
-  GIVEN: admin Clerk session
+  GIVEN: valid admin token
   WHEN: GET /api/admin/audit-log?actor_id=user_admin1
   THEN: response only contains entries by user_admin1
 ```
@@ -695,33 +742,61 @@ TEST: PlatformStats - handles DO restart
 
 ```
 TEST: Admin workflow - view stats, acknowledge alert, export data
-  1. Admin logs in with Clerk
-  2. Admin views /api/admin/stats
-  3. Verify stats returned successfully
-  4. Admin views /api/admin/alerts
-  5. Admin acknowledges a warning alert
-  6. Verify alert is now acknowledged
-  7. Admin exports transactions for the month
-  8. Verify CSV file is valid
-  9. Check audit log contains all actions
+  1. Admin sends request with X-Admin-Token header
+  2. GET /api/admin/stats - verify stats returned (200)
+  3. GET /api/admin/alerts - verify alerts list returned
+  4. POST /api/admin/alerts/:id/acknowledge - acknowledge warning alert
+  5. GET /api/admin/alerts/:id - verify alert is now acknowledged
+  6. GET /api/admin/export?type=transactions - download CSV
+  7. Verify CSV file is valid and contains expected columns
+  8. GET /api/admin/audit-log - verify all actions logged
 
 TEST: Alert lifecycle - creation to resolution
-  1. System detects degraded health (R2 slow)
-  2. Alert created automatically
-  3. Admin receives alert (via /api/admin/alerts)
-  4. Admin acknowledges alert
-  5. System health returns to normal
-  6. Alert auto-resolved
-  7. Alert moves to history
+  1. Simulate degraded R2 response time
+  2. Wait for scheduled health check to run
+  3. Verify alert created with type = "health_degraded"
+  4. GET /api/admin/alerts - verify alert visible
+  5. POST /api/admin/alerts/:id/acknowledge - admin acknowledges
+  6. Restore R2 to healthy state
+  7. Wait for next health check
+  8. Verify alert.resolved_at is now set
+  9. Alert remains in history but marked resolved
 
-TEST: Non-admin cannot access admin endpoints
-  1. Regular user logs in
-  2. Attempts GET /api/admin/stats
-  3. Receives 403 Forbidden
-  4. Attempts GET /api/admin/alerts
-  5. Receives 403 Forbidden
-  6. Regular endpoints still work normally
+TEST: Unauthorized access rejected
+  1. Request with no X-Admin-Token:
+     - GET /api/admin/stats → 401
+     - GET /api/admin/alerts → 401
+     - GET /api/admin/export → 401
+  2. Request with wrong X-Admin-Token:
+     - GET /api/admin/stats → 401
+  3. Request with Clerk session (not admin token):
+     - GET /api/admin/stats → 401
+  4. Regular user endpoints still work:
+     - GET /health → 200
+     - GET /api/balance (with Clerk) → 200
+
+TEST: Export rate limiting enforced
+  1. GET /api/admin/export?type=transactions → 200 (CSV returned)
+  2. Immediately GET /api/admin/export?type=users → 429 (rate limited)
+  3. Wait 60 seconds
+  4. GET /api/admin/export?type=users → 200 (allowed again)
 ```
+
+---
+
+## Resolved Decisions
+
+| # | Question | Decision | Rationale |
+|---|----------|----------|-----------|
+| 1 | How should admin users be identified? | **Separate admin authentication system** | Single admin with dedicated secret token, independent of Clerk |
+| 2 | Where should alerts be stored? | **Dedicated AlertStore Durable Object** | Provides durability and query capabilities |
+| 3 | Should alerts be sent externally? | **Only in-app alerts** | Simplifies implementation; admin polls API |
+| 5 | How should platform statistics be aggregated? | **Hybrid approach** | Counters real-time, aggregates periodic |
+| 6 | What is the audit log retention period? | **1 year** | Balance between compliance and storage costs |
+| 7 | Should export rate be limited? | **1 export per minute** | Prevents system overload |
+| 8 | What format should large exports use? | **CSV only** | Simple, universal format |
+| 9 | Should there be an admin UI? | **API only** | Admin uses external tools (curl, Postman, scripts) |
+| 10 | How should the system handle admin account deletion? | **Not allowed** | Single admin; token rotated manually if needed |
 
 ---
 
@@ -729,99 +804,136 @@ TEST: Non-admin cannot access admin endpoints
 
 The following questions need to be resolved before implementation:
 
-| # | Question | Options | Impact |
-|---|----------|---------|--------|
-| 1 | How should admin users be identified? | A) Clerk user IDs in environment variable<br>B) Admin role in Clerk metadata<br>C) Separate admin authentication system | Affects security model and maintainability |
-| 2 | Where should alerts be stored? | A) Dedicated AlertStore Durable Object<br>B) KV with TTL<br>C) External service (PagerDuty, etc.) | Affects durability and query capabilities |
-| 3 | Should alerts be sent externally? | A) Email notifications<br>B) Webhook to external service<br>C) Only in-app alerts | Affects response time to critical issues |
-| 4 | What anomaly thresholds should trigger alerts? | Specific thresholds for each anomaly type need definition | Affects false positive rate |
-| 5 | How should platform statistics be aggregated? | A) Real-time from all DOs (expensive)<br>B) Periodic snapshots (stale)<br>C) Hybrid (counters real-time, aggregates periodic) | Affects cost and freshness |
-| 6 | What is the audit log retention period? | A) 30 days<br>B) 90 days<br>C) 1 year<br>D) Indefinite | Affects storage costs and compliance |
-| 7 | Should export rate be limited? | A) No limit<br>B) 5 exports per minute<br>C) 1 export per minute | Affects system load |
-| 8 | What format should large exports use? | A) JSON only<br>B) CSV only<br>C) Both<br>D) NDJSON for streaming | Affects usability and performance |
-| 9 | Should there be an admin UI? | A) API only (use external tools)<br>B) Simple admin dashboard<br>C) Full admin panel | Affects development scope |
-| 10 | How should the system handle admin account deletion? | A) Prevent deletion<br>B) Require another admin to remove<br>C) Allow self-deletion with audit | Affects admin management |
+| # | Question | Proposed Answer | Notes |
+|---|----------|-----------------|-------|
+| 4 | What anomaly thresholds should trigger alerts? | See proposed thresholds below | Need confirmation |
+| 11 | What format should the admin secret token use? | 64-character hex string (256 bits) | Need confirmation |
+| 12 | How should the admin authenticate? | `X-Admin-Token` header | Need confirmation |
+
+### Proposed Anomaly Thresholds (Q4)
+
+| Alert Type | Threshold | Window | Cooldown |
+|------------|-----------|--------|----------|
+| `high_error_rate` | Error rate > 5% | 5 minutes | 1 hour |
+| `authentication_failures` | > 50 failures from same IP | 5 minutes | 1 hour |
+| `unusual_deposit_velocity` | > 5x normal hourly rate OR > 20 deposits/hour | 1 hour | 2 hours |
+| `unusual_upload_velocity` | > 5x normal hourly rate OR > 100 uploads/hour | 1 hour | 2 hours |
+| `storage_threshold` | R2 usage > 80% of quota | Daily check | 24 hours |
+| `health_degraded` | Any component returns degraded | Health check interval | Until resolved |
+| `health_unhealthy` | Any component returns unhealthy | Health check interval | Until resolved |
+| `dispute_created` | Any Stripe dispute | Immediate | None (always alert) |
+
+**Notes on thresholds:**
+- "Normal rate" is calculated as rolling 7-day average
+- Cooldown prevents alert spam for ongoing issues
+- `dispute_created` always triggers immediately (no cooldown) since disputes are critical
+- Health alerts auto-resolve when condition clears
 
 ---
 
-## Architecture Decisions (Pending)
+## Architecture Decisions
 
-Decisions to be made based on open questions:
-
-| Decision | Status | Notes |
-|----------|--------|-------|
-| Admin identification method | PENDING | Q1 |
-| Alert storage mechanism | PENDING | Q2 |
-| External notification integration | PENDING | Q3 |
-| Statistics aggregation strategy | PENDING | Q5 |
-| Audit log retention | PENDING | Q6 |
+| Decision | Status | Choice |
+|----------|--------|--------|
+| Admin identification method | ✅ RESOLVED | Separate auth with `ADMIN_SECRET_TOKEN` |
+| Alert storage mechanism | ✅ RESOLVED | AlertStore Durable Object |
+| External notification integration | ✅ RESOLVED | None (in-app only) |
+| Statistics aggregation strategy | ✅ RESOLVED | Hybrid (counters real-time, aggregates periodic) |
+| Audit log retention | ✅ RESOLVED | 1 year |
+| Export format | ✅ RESOLVED | CSV only |
+| Export rate limit | ✅ RESOLVED | 1 per minute |
+| Admin UI | ✅ RESOLVED | API only |
+| Admin deletion | ✅ RESOLVED | Not allowed (single admin) |
+| Anomaly thresholds | ⏳ PROPOSED | Awaiting confirmation |
+| Admin token format | ⏳ PROPOSED | 64-char hex, `X-Admin-Token` header |
 
 ---
 
-## Implementation Tasks (Pending Open Questions)
+## Implementation Tasks
 
-### Phase 1: Admin Authentication
-1. Implement admin identification mechanism
-2. Create admin middleware for endpoint protection
-3. Add admin check to all /api/admin/* routes
-4. Write tests for admin authorization
+### Phase 1: Admin Authentication ✅ READY
+1. Generate `ADMIN_SECRET_TOKEN` (64-char hex) and add to Cloudflare secrets
+2. Create `validateAdminToken(token, env)` function with constant-time comparison
+3. Create admin middleware that checks `X-Admin-Token` header
+4. Add admin middleware to all `/api/admin/*` routes
+5. Write tests for admin token validation
 
-### Phase 2: Platform Statistics
-1. Create PlatformStats Durable Object
-2. Integrate counters into content/user/payment flows
-3. Implement periodic snapshot mechanism
-4. Create /api/admin/stats endpoints
-5. Write tests for statistics accuracy
+### Phase 2: Platform Statistics ✅ READY
+1. Create `PlatformStats` Durable Object class
+2. Add counter increment methods (uploads, downloads, users, deposits)
+3. Integrate counter calls into content upload, download, user creation, payment flows
+4. Implement scheduled job for periodic snapshot aggregation
+5. Create `/api/admin/stats` endpoint (returns all stats)
+6. Create `/api/admin/stats/financial` endpoint (detailed financial breakdown)
+7. Create `/api/admin/stats/content` endpoint (content details)
+8. Create `/api/admin/stats/users` endpoint (user details)
+9. Write tests for statistics accuracy
 
-### Phase 3: Alerting System
-1. Create AlertStore Durable Object (or KV)
-2. Implement alert creation for each trigger type
-3. Implement alert acknowledgment endpoint
-4. Implement auto-resolution logic
-5. (Optional) Add external notification integration
-6. Write tests for alert lifecycle
+### Phase 3: Alerting System ✅ READY
+1. Create `AlertStore` Durable Object class
+2. Implement alert creation method with deduplication
+3. Integrate alert creation into:
+   - Stripe webhook handler (dispute_created)
+   - Health check (health_degraded, health_unhealthy)
+4. Create `GET /api/admin/alerts` endpoint with filtering
+5. Create `POST /api/admin/alerts/:id/acknowledge` endpoint
+6. Implement auto-resolution logic for health alerts
+7. Write tests for alert lifecycle
 
-### Phase 4: Anomaly Detection
-1. Define thresholds for each anomaly type
-2. Implement anomaly detection logic
-3. Integrate with alerting system
-4. Add cooldown mechanism
+### Phase 4: Anomaly Detection ⏳ AWAITING THRESHOLD CONFIRMATION
+1. Implement anomaly detection scheduled job
+2. Add detection logic for each anomaly type:
+   - high_error_rate (> 5% in 5 min)
+   - authentication_failures (> 50 from same IP in 5 min)
+   - unusual_deposit_velocity (> 5x normal or > 20/hour)
+   - unusual_upload_velocity (> 5x normal or > 100/hour)
+   - storage_threshold (> 80% R2 quota)
+3. Implement cooldown mechanism to prevent alert spam
+4. Integrate with AlertStore DO
 5. Write tests for anomaly detection
 
-### Phase 5: Data Export
-1. Implement export endpoints for each data type
-2. Add pagination support
-3. Add date range filtering
-4. Add format support (JSON, CSV)
-5. Implement export rate limiting
-6. Write tests for export functionality
+### Phase 5: Data Export ✅ READY
+1. Create `GET /api/admin/export` endpoint
+2. Implement CSV generation for each data type:
+   - transactions (from PaymentRecord DOs)
+   - users (from UserProfile DOs, no PII)
+   - content (from ContentMetadata DOs)
+   - audit (from AuditLog DO)
+3. Add pagination support (limit/offset query params)
+4. Add date range filtering (start_date/end_date)
+5. Implement rate limiting (1 export per minute)
+6. Ensure proper CSV escaping per RFC 4180
+7. Write tests for export functionality
 
-### Phase 6: Audit Log
-1. Create AuditLog Durable Object
-2. Integrate audit logging into admin endpoints
-3. Implement audit log query endpoint
-4. Add retention/cleanup mechanism
-5. Write tests for audit logging
+### Phase 6: Audit Log ✅ READY
+1. Create `AuditLog` Durable Object class
+2. Implement audit entry creation with timestamp, actor, action, resource
+3. Integrate audit logging into all admin endpoints
+4. Create `GET /api/admin/audit-log` endpoint with filtering
+5. Implement 1-year retention with scheduled cleanup job
+6. Write tests for audit logging
 
-### Phase 7: Admin UI (if approved)
-1. Design admin dashboard layout
-2. Implement stats display
-3. Implement alert management UI
-4. Implement export UI
-5. Implement audit log viewer
+### Phase 7: Extended Health Endpoint ✅ READY
+1. Create `GET /api/admin/health` endpoint (extends public `/health`)
+2. Add response time measurements for each component
+3. Add memory/resource usage metrics
+4. Write tests for extended health information
 
 ---
 
 ## Security Considerations
 
-1. **Admin identification**: Admin IDs stored as Cloudflare secret, not in code
-2. **Session only**: Admin endpoints require Clerk session, not API keys
-3. **Audit trail**: All admin actions logged
-4. **No PII in exports**: User exports exclude email addresses and names
-5. **Rate limiting**: Export endpoints rate-limited to prevent abuse
-6. **Principle of least privilege**: Admin access is read-only for most operations
-7. **Alert acknowledgment**: Only marks as seen, does not dismiss
-8. **Audit log immutability**: Audit entries cannot be deleted or modified
+1. **Admin token storage**: `ADMIN_SECRET_TOKEN` stored as Cloudflare secret, never in code or logs
+2. **Token-based auth**: Admin endpoints require `X-Admin-Token` header (not Clerk session or API key)
+3. **Constant-time comparison**: Token validation uses constant-time comparison to prevent timing attacks
+4. **Single admin**: No multi-admin complexity; token rotation handled manually via Cloudflare dashboard
+5. **Audit trail**: All admin actions logged with timestamp, action, and metadata
+6. **No PII in exports**: User exports exclude email addresses and names
+7. **Rate limiting**: Export endpoints limited to 1/minute to prevent abuse
+8. **Principle of least privilege**: Admin access is read-only for most operations
+9. **Alert acknowledgment**: Only marks as seen, does not dismiss or delete
+10. **Audit log immutability**: Audit entries cannot be deleted or modified
+11. **Token in header only**: Token must be in `X-Admin-Token` header, not query params (prevents logging)
 
 ---
 
@@ -839,6 +951,7 @@ Decisions to be made based on open questions:
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Created:** 2026-01-17
-**Status:** Draft - Open Questions Require Resolution
+**Last Updated:** 2026-01-17
+**Status:** Nearly Ready - Awaiting confirmation on anomaly thresholds and admin token format
