@@ -25,7 +25,7 @@ The following questions have been resolved:
 | 1 | Shared components approach | **Option B**: JavaScript templating/injection |
 | 2 | Dashboard URL structure | **Keep current**: `/api-keys.html`, `/api-keys-create.html`, `/api-keys-detail.html` |
 | 3 | Deposit page location | **Option A**: Keep at `/deposit.html` |
-| 4 | Active indicator style | **PENDING** - see analysis below |
+| 4 | Active indicator style | **Option E**: Left border for sidebar, bottom border for header |
 | 5 | Sidebar collapse on mobile | **Option C**: Convert to horizontal tabs below header |
 | 6 | Planned features indication | **Option B**: Normal styling with "(Coming Soon)" text suffix |
 | 7 | Deep link to planned page | **Option C**: Placeholder page with link to GitHub issue |
@@ -402,120 +402,29 @@ Add consistent footer links across all pages.
 
 ---
 
-## Open Questions
+## Active Indicator Specification
 
-### Question 4: Active Indicator Style (PENDING)
+The active indicator style uses different treatments for header (horizontal) and sidebar (vertical) navigation to provide clear "you are here" signals appropriate to each context.
 
-**Definition of "Active Navigation Items":**
+### Definition
 
-An "active navigation item" is a link in the navigation UI that represents the user's current location within the site hierarchy. There are two distinct contexts:
+An **active navigation item** is a link in the navigation UI that represents the user's current location within the site hierarchy:
 
-1. **Header Navigation (horizontal)**: The top-level nav links (Dashboard, Upload, Retrieve, Docs). The active item indicates which major section the user is in.
+1. **Header Navigation**: The top-level nav links (Dashboard, Upload, Retrieve, Docs). Indicates which major section the user is in.
 
-2. **Sidebar Navigation (vertical)**: The dashboard sub-navigation (Overview, API Keys, My Uploads, etc.). The active item indicates which dashboard feature the user is viewing.
+2. **Sidebar Navigation**: The dashboard sub-navigation (Overview, API Keys, My Uploads, etc.). Indicates which dashboard feature the user is viewing.
 
-**Analysis of Each Option:**
+### CSS Implementation
 
-#### Option A: Bold Text Only
 ```css
-.nav-active { font-weight: 700; }
-```
-
-| Pros | Cons |
-|------|------|
-| Minimal visual change | Subtle - may be missed by users |
-| Works in any color scheme | Causes text reflow (width changes) |
-| Accessible (doesn't rely on color) | Less effective for single-word items |
-| Simple to implement | No clear "you are here" signal |
-
-**Best for**: Text-heavy navigation where subtlety is preferred.
-
-#### Option B: Underline
-```css
-.nav-active { text-decoration: underline; text-underline-offset: 4px; }
-```
-
-| Pros | Cons |
-|------|------|
-| Strong visual affordance | May conflict with link styling |
-| Familiar pattern (web convention) | Can look dated |
-| No width change | Doesn't work well in sidebar |
-| Accessible | Limited styling options |
-
-**Best for**: Horizontal header navigation; mimics traditional web link states.
-
-#### Option C: Background Highlight
-```css
-.nav-active { background-color: var(--primary-light); border-radius: 4px; }
-```
-
-| Pros | Cons |
-|------|------|
-| High visibility | Requires careful color selection |
-| Clear "selected" state | May clash with hover states |
-| Works for both header and sidebar | Adds visual weight |
-| Familiar (tab/pill pattern) | Color-dependent (accessibility concern) |
-
-**Best for**: Tab-style navigation, pill buttons, where items are clearly separate.
-
-#### Option D: Left Border Accent (Sidebar Only)
-```css
-.sidebar .nav-active { border-left: 3px solid var(--primary); background: var(--bg-subtle); }
-```
-
-| Pros | Cons |
-|------|------|
-| Strong visual hierarchy | Only works for vertical nav |
-| Indicates position clearly | Requires sidebar-specific CSS |
-| Industry standard (VS Code, Slack, etc.) | Doesn't apply to header |
-| Works with any text styling | Need different solution for header |
-
-**Best for**: Vertical sidebar navigation; professional/developer tools.
-
-#### Option E: Combination (Bold + Underline or Bold + Border)
-```css
-/* Header */
-.nav-header .nav-active { font-weight: 600; border-bottom: 2px solid var(--primary); }
-/* Sidebar */
-.sidebar .nav-active { font-weight: 600; border-left: 3px solid var(--primary); background: var(--bg-subtle); }
-```
-
-| Pros | Cons |
-|------|------|
-| Maximum clarity | More complex CSS |
-| Redundant signals (accessibility) | Risk of over-styling |
-| Can differentiate header vs sidebar | Requires coordination |
-| Robust across contexts | More visual noise |
-
-**Best for**: Applications needing high discoverability and accessibility compliance.
-
----
-
-**Recommendation for HashBin:**
-
-Given that HashBin has:
-- A horizontal header nav (4 items when logged in)
-- A vertical sidebar nav (5 items)
-- A developer/technical audience
-- Existing primary color (#4f46e5 indigo)
-
-**Suggested approach**: Different treatments for header vs sidebar:
-
-| Context | Recommended Style |
-|---------|-------------------|
-| Header | **Bottom border** (2-3px solid primary color) - clear tab indicator |
-| Sidebar | **Left border + subtle background** - industry standard for vertical nav |
-
-This would be a **hybrid of Options B, C, and D**:
-```css
-/* Header active state */
+/* Header active state - bottom border indicator */
 .nav-header .nav-active {
   color: var(--primary);
   border-bottom: 2px solid var(--primary);
   padding-bottom: 2px;
 }
 
-/* Sidebar active state */
+/* Sidebar active state - left border + subtle background */
 .sidebar .nav-active {
   font-weight: 500;
   color: var(--primary);
@@ -524,13 +433,12 @@ This would be a **hybrid of Options B, C, and D**:
 }
 ```
 
-**Follow-up Question**: Which approach do you prefer?
-- **Option A**: Bold only (both contexts)
-- **Option B**: Underline only (both contexts)
-- **Option C**: Background highlight (both contexts)
-- **Option D**: Left border for sidebar, underline for header
-- **Option E**: Left border for sidebar, bottom border for header (recommended)
-- **Option F**: Other (please specify)
+### Visual Summary
+
+| Context | Treatment | Rationale |
+|---------|-----------|-----------|
+| Header | Bottom border (2px primary) | Tab-style indicator, clear horizontal position |
+| Sidebar | Left border (3px primary) + subtle background | Industry standard for vertical nav (VS Code, Slack) |
 
 ---
 
@@ -569,3 +477,4 @@ The navigation implementation is complete when:
 |---------|------|---------|
 | 1.0 | 2026-01-17 | Initial plan with 101 tests and 10 open questions |
 | 1.1 | 2026-01-17 | Resolved 9 of 10 questions. Added detailed analysis for Question 4 (active indicator style) with CSS examples and recommendation. |
+| 2.0 | 2026-01-17 | **ALL QUESTIONS RESOLVED** - Q4 decided as Option E (left border for sidebar, bottom border for header). Plan complete and ready for implementation. |
