@@ -96,8 +96,11 @@ assert_http_status "$HTTP_STATUS" "401" "AUTH-012" "Malformed Auth Header"
 
 # AUTH-013: Expired Token Handling
 log_info "Testing with expired JWT..."
-# Use a known expired JWT (expired in 2020)
-EXPIRED_JWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjE1MTYyMzkwMjJ9.4Adcj0u6gFlxH8zP6JqPYdTSqSKqhPqY5P8l-6Q-vVc"
+# Generate a test JWT with expired timestamp
+# Using a public test token that's clearly invalid/expired
+# This is a test-only token with exp set to 1516239022 (Jan 2018)
+# Structure: header.payload.signature where payload contains {"exp":1516239022}
+EXPIRED_JWT="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE1MTYyMzkwMjJ9.invalid-signature-for-testing"
 http_get "$TARGET_URL/api/auth/session" \
   "Authorization: Bearer $EXPIRED_JWT"
 assert_http_status "$HTTP_STATUS" "401" "AUTH-013" "Expired Token Handling"

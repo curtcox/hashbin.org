@@ -28,7 +28,7 @@ http_get() {
   local end_time=$(date +%s%3N)
   HTTP_TIME_MS=$((end_time - start_time))
   
-  HTTP_STATUS=$(cat "$status_file" | tail -c 4)
+  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
   HTTP_BODY=$(cat "$temp_file")
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -64,7 +64,7 @@ http_post() {
   local end_time=$(date +%s%3N)
   HTTP_TIME_MS=$((end_time - start_time))
   
-  HTTP_STATUS=$(cat "$status_file" | tail -c 4)
+  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
   HTTP_BODY=$(cat "$temp_file")
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -98,7 +98,7 @@ http_head() {
   local end_time=$(date +%s%3N)
   HTTP_TIME_MS=$((end_time - start_time))
   
-  HTTP_STATUS=$(cat "$status_file" | tail -c 4)
+  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
   HTTP_BODY=""
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -131,7 +131,7 @@ http_delete() {
   local end_time=$(date +%s%3N)
   HTTP_TIME_MS=$((end_time - start_time))
   
-  HTTP_STATUS=$(cat "$status_file" | tail -c 4)
+  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
   HTTP_BODY=$(cat "$temp_file")
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -167,7 +167,7 @@ http_put() {
   local end_time=$(date +%s%3N)
   HTTP_TIME_MS=$((end_time - start_time))
   
-  HTTP_STATUS=$(cat "$status_file" | tail -c 4)
+  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
   HTTP_BODY=$(cat "$temp_file")
   HTTP_HEADERS=$(cat "$header_file")
   

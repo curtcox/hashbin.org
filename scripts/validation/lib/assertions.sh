@@ -97,9 +97,22 @@ assert_response_time() {
   local test_id="$3"
   local description="$4"
   
-  # Convert to integer comparison (remove decimals)
-  local time_int=${time_ms%.*}
-  local threshold_int=${threshold_ms%.*}
+  # Convert to integer comparison (remove decimals if present)
+  # If no decimal point, the value remains unchanged
+  local time_int
+  local threshold_int
+  
+  if echo "$time_ms" | grep -q '\.'; then
+    time_int=${time_ms%.*}
+  else
+    time_int=$time_ms
+  fi
+  
+  if echo "$threshold_ms" | grep -q '\.'; then
+    threshold_int=${threshold_ms%.*}
+  else
+    threshold_int=$threshold_ms
+  fi
   
   if [ "$time_int" -le "$threshold_int" ]; then
     log_pass "$test_id" "$description" "${time_ms}ms < ${threshold_ms}ms"

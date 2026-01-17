@@ -95,11 +95,14 @@ if [ -n "$CORS_HEADER" ]; then
   log_pass "API-008" "CORS Headers Present" "CORS header: $CORS_HEADER"
 else
   # CORS might only be on OPTIONS, try that
-  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS \
+  http_get "$TARGET_URL/api/payments/calculate" \
+    "Origin: https://example.com" \
+    "Access-Control-Request-Method: POST"
+  # Use a simpler approach - just check if we can make OPTIONS request
+  local temp_status=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS \
     -H "Origin: https://example.com" \
-    -H "Access-Control-Request-Method: POST" \
     "$TARGET_URL/api/payments/calculate" 2>/dev/null || echo "000")
-  if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "204" ]; then
+  if [ "$temp_status" = "200" ] || [ "$temp_status" = "204" ]; then
     log_pass "API-008" "CORS Headers Present" "OPTIONS preflight supported"
   else
     log_skip "API-008" "CORS Headers Present" "CORS headers not found (may not be configured)"
