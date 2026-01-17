@@ -108,7 +108,9 @@ This document outlines a comprehensive GitHub Actions workflow for validating th
 | RATE-001 | Rate Limit Headers Present | Any request returns rate limit headers | X-RateLimit-Limit, X-RateLimit-Remaining present |
 | RATE-002 | Anonymous Rate Limit Info | Unauthenticated request shows anonymous limits | Limit reflects 100/minute |
 | RATE-003 | Rate Limit Status Endpoint | `GET /api/rate-limit` accessible | HTTP 200 with rate limit info |
-| RATE-004 | Retry-After Header on Limit | When rate limited, Retry-After provided | HTTP 429 with Retry-After header |
+| RATE-004 | API Key Reveal Rate Limit | Test 3/hour reveal limit enforcement | After 3 reveals, HTTP 429 with Retry-After |
+
+*Note: Only test restrictive rate limits (like reveal 3/hour). Do not exhaust general rate limits (100/min) as this could affect production.*
 
 ### 7. Error Handling Tests
 
@@ -132,20 +134,17 @@ This document outlines a comprehensive GitHub Actions workflow for validating th
 | INT-004 | Robots.txt Present | `GET /robots.txt` | HTTP 200 or 404 (documented) |
 | INT-005 | No Debug Endpoints Exposed | Common debug paths return 404 | /debug, /admin, /test return 404 |
 
-### 9. Security Tests
+### 9. Security Tests (Minimal - Header Checks Only)
 
 | Test ID | Test Name | Description | Expected Result |
 |---------|-----------|-------------|-----------------|
 | SEC-001 | Security Headers Present | Check for security headers | X-Content-Type-Options, X-Frame-Options present |
 | SEC-002 | No Server Header Leak | Server header doesn't expose details | No version info in Server header |
 | SEC-003 | HTTPS Only | All resources served over HTTPS | No mixed content |
-| SEC-004 | Cookie Security | Session cookies have secure flags | Secure, HttpOnly, SameSite attributes |
-| SEC-005 | CSP Header Present | Content-Security-Policy header set | Valid CSP header present |
-| SEC-006 | XSS Protection | Reflected XSS attempt blocked | No script execution, proper encoding |
-| SEC-007 | SQL Injection Protection | SQL injection in parameters | Proper error handling, no SQL errors |
-| SEC-008 | Path Traversal Protection | `/../` in paths blocked | HTTP 400 or normalized path |
-| SEC-009 | HSTS Header | Strict-Transport-Security present | Valid HSTS header with max-age |
-| SEC-010 | No Sensitive Data in URLs | API doesn't require secrets in URL | Secrets in headers/body only |
+| SEC-004 | HSTS Header | Strict-Transport-Security present | Valid HSTS header with max-age |
+| SEC-005 | No Sensitive Data in URLs | API doesn't require secrets in URL | Secrets in headers/body only |
+
+*Note: Full security testing (injection attacks, XSS, etc.) is out of scope for this workflow.*
 
 ### 10. Performance Tests
 
@@ -200,8 +199,8 @@ Tests should be executed in the following order to fail fast on critical issues:
 5. **Phase 5 - Authentication Boundaries**
    - AUTH-001 through AUTH-013
 
-6. **Phase 6 - Security Checks**
-   - SEC-001 through SEC-010
+6. **Phase 6 - Security Checks** (header validation only)
+   - SEC-001 through SEC-005
 
 7. **Phase 7 - Error Handling**
    - ERR-001 through ERR-007
@@ -264,7 +263,7 @@ scripts/
 
 - **Summary**: Pass/fail count, test duration
 - **Artifacts**: Full test log, failed test details
-- **Notifications**: Slack/email on failure (optional)
+- **Annotations**: GitHub Actions annotations for failures
 - **Badge**: Workflow status badge for README
 
 ### Exit Codes
@@ -276,60 +275,29 @@ scripts/
 
 ---
 
+## Resolved Decisions
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Test API Key Management | Pre-created key stored as GitHub secret (`VALIDATION_API_KEY`) |
+| 2 | Rate Limiting Tests | Test only restrictive limits (once per minute max), verify headers otherwise |
+| 3 | Performance Thresholds | Use proposed values: 1000ms pages, 500ms API, 2000ms health |
+| 4 | Security Tests Scope | Minimal - header checks only. Full security tests are separate. |
+| 5 | Webhook Testing | Test rejection of invalid requests only (no valid signature testing) |
+| 6 | Geographic Testing | Single region (GitHub Actions runner location) |
+| 7 | Notification Strategy | GitHub Actions annotations only |
+| 8 | Test Data Cleanup | All tests are read-only, no cleanup needed |
+| 9 | Existing Smoke Tests | Keep smoke-test.yml for quick checks, this workflow for comprehensive validation |
+| 10 | Session/Token Testing | Use API key for authenticated endpoint tests |
+| 11 | Expected Git SHA | Use SHA from triggering workflow (workflow_run) |
+
+---
+
 ## Open Questions
 
-1. **Test API Key Management**: How should the test API key be provisioned?
-   - Option A: Pre-created key stored as GitHub secret
-   - Option B: Create/delete key for each test run (requires auth)
-   - Option C: Skip API key tests in automated runs
-
-2. **Rate Limiting Tests**: Should we actually hit rate limits to test enforcement?
-   - Risk: Could affect production users if limits are global
-   - Alternative: Only verify headers, don't exhaust limits
-
-3. **Performance Thresholds**: What are acceptable latency thresholds?
-   - Current proposal: 1000ms for pages, 500ms for API, 2000ms for health
-   - Should these be configurable?
-
-4. **Security Tests Scope**: How deep should security testing go?
-   - Basic header checks vs. actual injection attempts
-   - Should we test for specific OWASP Top 10 items?
-
-5. **Webhook Testing**: Can we safely test webhook handling?
-   - Without valid Stripe signature, we can only test rejection
-   - Should we have a test-mode webhook secret?
-
-6. **Geographic Testing**: Should we test from multiple regions?
-   - Current plan: Single region (GitHub Actions runner location)
-   - Option: Use multiple runners or external service
-
-7. **Notification Strategy**: Where should failures be reported?
-   - GitHub Actions annotations only?
-   - Slack integration?
-   - Email alerts?
-
-8. **Test Data Cleanup**: If any tests create data, how is it cleaned up?
-   - Current assumption: All tests are read-only
-   - If writes needed, cleanup strategy required
-
-9. **Existing Smoke Tests**: Should this replace or supplement `.github/workflows/smoke-test.yml`?
-   - Option A: Replace smoke-test.yml entirely
-   - Option B: Keep smoke-test.yml for quick checks, this for comprehensive
-   - Option C: Merge both into single configurable workflow
-
-10. **Session/Token Testing**: How do we test with a valid session?
-    - Option A: Use API key for authenticated endpoint tests
-    - Option B: Skip authenticated endpoint success tests
-    - Option C: Create test user with Clerk test mode
-
-11. **Expected Git SHA**: How is the expected SHA determined?
-    - For `workflow_run`: Use SHA from triggering workflow
-    - For `schedule`: Fetch latest main branch SHA?
-    - For `workflow_dispatch`: Accept as parameter?
-
-12. **Failure Tolerance**: Should any test failures be non-blocking?
-    - Performance tests as warnings only?
-    - Security tests that are informational?
+1. **Failure Severity**: Should some test failures be treated as warnings (workflow passes) vs. hard failures (workflow fails)?
+   - Example: Performance test slightly over threshold = warning, security header missing = hard fail?
+   - Or should ALL test failures cause the workflow to fail?
 
 ---
 
@@ -342,7 +310,7 @@ The deployment is considered valid when:
 3. All frontend pages load successfully (FE-*)
 4. All authentication boundaries are enforced (AUTH-*)
 5. All public APIs respond correctly (API-*)
-6. No critical security issues detected (SEC-*)
+6. Security headers are present (SEC-*)
 7. Performance is within acceptable thresholds (PERF-*)
 8. Git SHA consistency is verified (INT-001, INT-002)
 
@@ -366,3 +334,4 @@ The deployment is considered valid when:
 | Version | Date | Changes |
 |---------|------|---------|
 | 0.1 | 2026-01-17 | Initial draft |
+| 0.2 | 2026-01-17 | Resolved 11 of 12 questions; simplified security tests to header-only; clarified rate limit testing approach |
