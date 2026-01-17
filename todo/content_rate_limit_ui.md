@@ -29,6 +29,9 @@ The following decisions have been made (resolved 2026-01-17):
 | 6 | Purchase Success Behavior | Redirect to info.html with success message |
 | 7 | Handling Content Near Expiration | Allow any duration up to remaining retention (no warnings, consistent with no-refunds policy) |
 | 8 | Default MTBR Presets | [100ms, 1s, 10s, 1min, 1hr, 1day] |
+| 9 | Who Can Purchase Rate Limits | Any authenticated user can purchase for any content |
+| 10 | Slider Behavior Between Presets | Slider allows smooth values between presets |
+| 11 | User Upload History API Scope | Full API returning complete metadata (size, expiration, rate limits, download count) |
 
 ## Design Principles
 
@@ -65,15 +68,19 @@ The following decisions have been made (resolved 2026-01-17):
 
 **Location**: `/dashboard/uploads/{hash}/` page (per Decision #1)
 
-**Purpose**: Allow authenticated users to purchase bandwidth for their content
+**Purpose**: Allow any authenticated user to purchase bandwidth for any content (per Decision #9)
+
+**Note**: While the URL is under `/dashboard/uploads/`, any authenticated user can access and purchase rate limits for any CID, not just their own uploads. The dashboard location provides a consistent management interface.
 
 **Form Elements**:
 - **Content ID (CID)**: Display only (from URL parameter)
 - **Content Size**: Display only (fetched from API)
-- **MTBR Selector** (per Decision #2 - Hybrid):
-  - Slider with preset stops: 100ms, 1s, 10s, 1min, 1hr, 1day
-  - "Custom" toggle that reveals freeform millisecond input
+- **MTBR Selector** (per Decisions #2 and #10 - Hybrid with smooth sliding):
+  - Slider with tick marks at presets: 100ms, 1s, 10s, 1min, 1hr, 1day
+  - Slider allows smooth continuous values between presets (e.g., 47 seconds is valid)
+  - "Custom" toggle that reveals freeform millisecond input for precise values
   - Minimum enforced: 100ms
+  - Display shows human-readable current value (e.g., "47 seconds")
 - **Duration Selector** (per Decision #3 - Slider bound to retention):
   - Slider ranging from minimum (MTBR value) to maximum (remaining retention)
   - Display shows days/hours remaining
@@ -130,10 +137,11 @@ The following decisions have been made (resolved 2026-01-17):
 5. Full pricing calculator visible to anonymous users (Decision #5)
 ```
 
-### Flow 2: Purchase Bandwidth (Authenticated Content Publisher)
+### Flow 2: Purchase Bandwidth (Any Authenticated User - Decision #9)
 
 ```
 1. User navigates to /dashboard/uploads/{hash}/ (from info.html link or dashboard)
+   - Note: Any authenticated user can access this page for any CID
 2. If not authenticated:
    a. Redirect to sign in
    b. After sign in, return to /dashboard/uploads/{hash}/
@@ -141,11 +149,12 @@ The following decisions have been made (resolved 2026-01-17):
    a. Content metadata (size, retention expiration)
    b. Current rate limit status
    c. User balance
-4. User configures purchase using hybrid controls (Decision #2):
-   a. Use MTBR slider with presets [100ms, 1s, 10s, 1min, 1hr, 1day]
-   b. Or toggle "Custom" to enter exact milliseconds (min 100ms)
-   c. Adjust duration slider (Decision #3) from MTBR to remaining retention
-   d. View live cost calculation updating in real-time
+4. User configures purchase using hybrid controls (Decisions #2 and #10):
+   a. Use MTBR slider with tick marks at [100ms, 1s, 10s, 1min, 1hr, 1day]
+   b. Slide smoothly between presets to any value (e.g., 47 seconds)
+   c. Or toggle "Custom" to enter exact milliseconds (min 100ms)
+   d. Adjust duration slider (Decision #3) from MTBR to remaining retention
+   e. View live cost calculation updating in real-time
 5. User clicks "Purchase"
 6. If insufficient balance:
    a. Show error with "Add Funds" link
@@ -303,6 +312,25 @@ TEST-UI-FORM-010: Purchase button disabled when form invalid
 TEST-UI-FORM-011: Purchase button disabled when insufficient balance
 TEST-UI-FORM-012: Form should show loading state while fetching content info
 TEST-UI-FORM-013: Form should handle missing CID parameter gracefully
+TEST-UI-FORM-014: Any authenticated user can access purchase form for any CID (Decision #9)
+TEST-UI-FORM-015: Page should load correctly for CID user did not upload (Decision #9)
+```
+
+### Unit Tests - MTBR Slider Behavior (Decision #10)
+
+```
+TEST-UI-SLIDER-001: Slider should have tick marks at preset positions [100ms, 1s, 10s, 1min, 1hr, 1day]
+TEST-UI-SLIDER-002: Slider should allow smooth continuous values between presets
+TEST-UI-SLIDER-003: Sliding to position between 1s and 10s should yield intermediate value (e.g., 5s)
+TEST-UI-SLIDER-004: Sliding to position between 10s and 1min should yield intermediate value (e.g., 35s)
+TEST-UI-SLIDER-005: Current value should be displayed in human-readable format during slide
+TEST-UI-SLIDER-006: Awkward values like 47000ms should display as "47 seconds"
+TEST-UI-SLIDER-007: "Custom" toggle should reveal freeform millisecond input
+TEST-UI-SLIDER-008: Custom input should accept any integer >= 100
+TEST-UI-SLIDER-009: Custom input should update slider position to match
+TEST-UI-SLIDER-010: Slider should update custom input when sliding
+TEST-UI-SLIDER-011: Slider scale should be logarithmic (equal visual distance between presets)
+TEST-UI-SLIDER-012: Touch/drag on mobile should work smoothly
 ```
 
 ### Unit Tests - Live Pricing Calculator
@@ -413,6 +441,23 @@ TEST-UI-API-008: Bearer token is included in authenticated requests
 TEST-UI-API-009: Balance API response is parsed correctly
 ```
 
+### Integration Tests - User Upload History API (Decision #11)
+
+```
+TEST-UI-UPLOADS-001: GET /api/user/uploads returns list of user's uploads
+TEST-UI-UPLOADS-002: Response includes complete metadata (size, expiration, rate limits)
+TEST-UI-UPLOADS-003: Pagination works with cursor parameter
+TEST-UI-UPLOADS-004: Sort by uploaded_at_desc returns newest first (default)
+TEST-UI-UPLOADS-005: Sort by expires_at_asc returns expiring soonest first
+TEST-UI-UPLOADS-006: Limit parameter restricts number of results
+TEST-UI-UPLOADS-007: Inline content has rate_limit_status: null
+TEST-UI-UPLOADS-008: Rate limit status includes effective_mtbr_ms and active count
+TEST-UI-UPLOADS-009: Download count is included in response
+TEST-UI-UPLOADS-010: Empty upload history returns empty array
+TEST-UI-UPLOADS-011: Unauthenticated request returns 401
+TEST-UI-UPLOADS-012: Response handles large upload history efficiently
+```
+
 ### Edge Case Tests
 
 ```
@@ -518,55 +563,58 @@ TEST-UI-A11Y-008: Slider inputs have accessible alternatives (number input)
 - Deposit flow: ✅ Complete (`deposit.html`)
 
 ### Required Prerequisites
-- **User upload history API**: Need endpoint to list user's uploads with metadata
-  - Suggested: `GET /api/user/uploads` returning list of CIDs with metadata
+- **User upload history API** (per Decision #11 - Full metadata API):
+  - Endpoint: `GET /api/user/uploads`
   - Currently: User profile DO stores `upload_history` but no API endpoint exposed
+  - Requires backend implementation before Phase 1
 
 ---
 
-## Open Questions
+## User Upload History API Specification (Decision #11)
 
-### Question 9: Who Can Purchase Rate Limits?
+### Endpoint: `GET /api/user/uploads`
 
-The backend API (`POST /api/content/rate-limit/purchase`) allows any authenticated user to purchase rate limits for any CID. However, Decision #1 places the purchase form at `/dashboard/uploads/{hash}/` which implies it's for content the user uploaded.
+**Authentication**: Required (Bearer token)
 
-**Options**:
-a) Only the original uploader can purchase rate limits for their content
-b) Any authenticated user can purchase rate limits for any content (current API behavior)
-c) Both: uploader via dashboard, others via a separate public purchase page
+**Response**:
+```json
+{
+  "uploads": [
+    {
+      "cid": "256t1-abc123...",
+      "size_bytes": 1048576,
+      "uploaded_at": "2026-01-15T10:30:00Z",
+      "expires_at": "2026-02-14T10:30:00Z",
+      "is_inline": false,
+      "rate_limit_status": {
+        "effective_mtbr_ms": 60000,
+        "is_rate_limited": false,
+        "next_available_at": "2026-01-17T12:00:00Z",
+        "active_rate_limits_count": 2,
+        "default_rate_limit_expires_at": "2026-02-14T10:30:00Z"
+      },
+      "download_count": 1523
+    }
+  ],
+  "total_count": 42,
+  "has_more": true,
+  "cursor": "abc123..."
+}
+```
 
-**Implications**:
-- Option (a) requires ownership verification in UI and possibly API changes
-- Option (b) means `/dashboard/uploads/{hash}/` URL is misleading for non-uploaders
-- Option (c) adds complexity but provides most flexibility
+**Query Parameters**:
+- `limit` (optional, default 50, max 100): Number of uploads to return
+- `cursor` (optional): Pagination cursor from previous response
+- `sort` (optional, default "uploaded_at_desc"): Sort order
+  - `uploaded_at_desc`: Newest first
+  - `uploaded_at_asc`: Oldest first
+  - `expires_at_asc`: Expiring soonest first
+  - `size_desc`: Largest first
 
-### Question 10: Slider Behavior Between Presets
-
-Decision #2 specifies a hybrid slider with presets [100ms, 1s, 10s, 1min, 1hr, 1day].
-
-**Options**:
-a) Slider snaps to preset values only (6 discrete positions)
-b) Slider allows smooth values between presets
-c) Slider snaps to presets, "Custom" mode allows any value
-
-**Implications**:
-- Option (a) is simplest, may limit flexibility
-- Option (b) could result in awkward values like "47 seconds"
-- Option (c) provides best UX but requires clear mode switching
-
-### Question 11: User Upload History API Scope
-
-To implement Phase 1 (Dashboard Upload List), we need an API to fetch user's uploads.
-
-**Options**:
-a) Create minimal API returning just CIDs + rate limit status
-b) Create full API returning complete metadata (size, expiration, rate limits, download count)
-c) Use existing API calls (one per CID) from client-side stored upload history
-
-**Implications**:
-- Option (a) is fastest to implement but may require multiple follow-up calls
-- Option (b) is most complete but more backend work
-- Option (c) may have stale data and causes N+1 API calls
+**Notes**:
+- Rate limit status is fetched in bulk for efficiency (avoids N+1 queries)
+- Download count may be approximate for high-traffic content
+- Inline content has `rate_limit_status: null`
 
 ---
 
@@ -576,4 +624,5 @@ c) Use existing API calls (one per CID) from client-side stored upload history
 |---------|------|---------|
 | 1.0 | 2026-01-17 | Initial plan with test list and 8 open questions |
 | 1.1 | 2026-01-17 | Resolved Questions 1-8, updated implementation phases, added 3 follow-up questions (9-11) |
+| 1.2 | 2026-01-17 | Resolved Questions 9-11: any user can purchase (9), smooth slider (10), full metadata API (11). Added API specification for GET /api/user/uploads. Added 29 new tests for slider behavior, form validation, and upload history API. All questions resolved - plan complete. |
 
