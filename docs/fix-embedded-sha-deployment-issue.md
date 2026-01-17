@@ -1,110 +1,150 @@
-# Fix: Embedded SHA Deployment Issue
+# Fix: Embedded SHA Deployment Issue (Final Solution)
 
 ## Problem Statement
 
-The deployed site's health endpoint was returning a response without the `gitSha` field, even though:
+The deployed site's health endpoint was returning a response without the `gitSha` field, causing deployment verification to fail:
+
+```
+Deployed git SHA: 
+❌ Git SHA mismatch: expected 577224be973a3d6b225317d120361824a4c07211, got 
+Error: Process completed with exit code 1.
+```
+
+Even though:
 - The source code (`src/index.js`) includes `gitSha: env.GIT_SHA || 'unknown'` in the health response
 - The deployment workflow updates `wrangler.toml` with the correct GIT_SHA value
 - The wrangler deployment logs show GIT_SHA in the environment variables
 
+## Failed Previous Attempts
+
+### PR #128: Update wrangler.toml with sed
+- Updated GIT_SHA in wrangler.toml before deployment
+- Result: Still no gitSha field in deployed response
+
+### PR #130: Add final deployment after secrets
+- Added `wrangler deploy` after all secret configuration
+- Theory: Secret updates trigger redeployments with cached bundles
+- Result: Still no gitSha field in deployed response
+
 ## Root Cause Analysis
 
-### Issue
-When `wrangler secret put` commands are executed after the initial `wrangler deploy`, each secret update triggers a redeployment of the worker. These triggered redeployments may:
-1. Use cached or previous versions of the code
-2. Not include the modifications made to `wrangler.toml` before the initial deployment
-3. Result in the deployed worker running code that differs from the git repository
+The root cause is that environment variables from wrangler.toml `[vars]` section are not reliably available in deployed Cloudflare Workers, especially when multiple redeployments are triggered by secret updates. The deployed response had NO `gitSha` field at all (not even 'unknown'), indicating the deployed code was running with environment variables that didn't match expectations.
 
-### Evidence from CI Logs (Run 21097526577)
-```
-1. Git SHA successfully injected into HTML files ✓
-2. wrangler.toml successfully updated with GIT_SHA ✓
-3. npx wrangler deploy completed ✓
-4. env.GIT_SHA shown in deployment bindings ✓
-5. npx wrangler secret put CLERK_SECRET_KEY (triggers redeploy)
-6. npx wrangler secret put CLERK_PUBLISHABLE_KEY (triggers redeploy)
-7. npx wrangler secret put STRIPE_SECRET_KEY (triggers redeploy)
-8. npx wrangler secret put STRIPE_WEBHOOK_SECRET (triggers redeploy)
-9. npx wrangler secret put API_KEY_ENCRYPTION_KEY (triggers redeploy)
-10. Health check shows NO gitSha field ✗
-```
+**Key insight**: Even after "final deployment", the gitSha field was missing. This suggests the issue is fundamental to how environment variables are passed to deployed workers, not just a timing/caching issue.
 
-After 5 secret updates (each triggering a redeployment), the final deployed code was not the version from step 3.
+## Solution: Direct Code Injection
 
-## Solution
-
-Add a final `wrangler deploy` step after all secret configuration is complete. This ensures:
-- All secrets are configured in the worker
-- The final deployed code matches the git repository exactly
-- The `wrangler.toml` modifications (including GIT_SHA) are preserved
+**Instead of relying on runtime environment variables, inject the GIT_SHA directly into the source code before deployment.**
 
 ### Implementation
 
-In `.github/workflows/deploy.yml`, added after the "Configure API key encryption secret" step:
+**New script**: `scripts/inject-git-sha-code.sh`
+```bash
+# Replaces this pattern in src/index.js:
+gitSha: env.GIT_SHA || 'unknown',
 
-```yaml
-- name: Final deployment to restore correct code and configuration
-  run: |
-    echo "Re-deploying to ensure correct code and GIT_SHA after secret updates..."
-    npx wrangler deploy
-    echo "✅ Final deployment complete"
-  env:
-    CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-    CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+# With hardcoded value:
+gitSha: '577224be973a3d6b225317d120361824a4c07211',
 ```
+
+Features:
+- Handles flexible whitespace patterns
+- Can update existing hardcoded SHAs
+- Validates the injection succeeded
+- Provides clear error messages
+
+**Updated workflow**: `.github/workflows/deploy.yml`
+```yaml
+- name: Inject git SHA into frontend, source code, and wrangler config
+  run: |
+    GIT_SHA=$(git rev-parse HEAD)
+    echo "Git SHA: $GIT_SHA"
+    
+    # Inject SHA into HTML files (existing)
+    bash scripts/inject-git-sha.sh "$GIT_SHA"
+    
+    # Inject SHA directly into source code (NEW)
+    bash scripts/inject-git-sha-code.sh "$GIT_SHA"
+    
+    # Update GIT_SHA in wrangler.toml (for consistency)
+    sed -i "s/^\([[:space:]]*\)GIT_SHA = .*/\1GIT_SHA = \"$GIT_SHA\"/" wrangler.toml
+```
+
+**New test**: `scripts/test-git-sha-code-injection.sh`
+- Validates the injection script works correctly
+- Tests both initial injection and updates
+- Added to CI test runner
+
+### How It Works
+
+1. During CI deployment, the script modifies src/index.js in the temporary checkout
+2. The modified code (with hardcoded SHA) is bundled by wrangler
+3. The bundle is deployed with the SHA already embedded
+4. No runtime dependency on environment variables
+5. Original repository code remains unchanged (still uses env.GIT_SHA for local dev)
 
 ## Deployment Flow (After Fix)
 
-1. **Inject Git SHA**: Updates HTML files and `wrangler.toml` with current commit SHA
-2. **Create R2 Buckets**: Ensures storage buckets exist
-3. **Initial Deployment**: Deploys worker with correct code and GIT_SHA ✓
-4. **Configure Secrets**: Updates all required secrets (5 separate operations, each triggers redeploy)
-5. **Final Deployment**: Re-deploys worker with correct code and GIT_SHA ✓ (NEW STEP)
-6. **Wait**: 10 seconds for propagation
-7. **Verify**: Check health endpoint has correct gitSha field
+1. **Checkout Code**: At specific commit SHA
+2. **Inject Git SHA into HTML**: Updates frontend files with SHA comments
+3. **Inject Git SHA into Code**: Updates src/index.js with hardcoded SHA (NEW)
+4. **Update wrangler.toml**: For consistency
+5. **Create R2 Buckets**: Ensures storage buckets exist
+6. **Deploy to Cloudflare**: Deploys worker with hardcoded SHA in bundle
+7. **Configure Secrets**: Updates all required secrets (triggers redeployments)
+8. **Final Deployment**: Ensures latest configuration
+9. **Wait**: 10 seconds for propagation
+10. **Verify**: Health endpoint should now show the gitSha field
 
-## Verification
+## Benefits
 
-After the fix is deployed, the verification step will confirm:
-- ✅ Health endpoint returns HTTP 200
-- ✅ Health response includes `gitSha` field  
-- ✅ gitSha value matches the deployed commit SHA (from `git rev-parse HEAD`)
-- ✅ HTML files contain correct `<!-- git-sha: <SHA> -->` comment
-
-## Alternative Solutions Considered
-
-### Option 1: Configure Secrets Before Initial Deployment
-**Rejected**: Cannot configure secrets for a worker that doesn't exist yet.
-
-### Option 2: Use Environment Variables Instead of Vars
-**Rejected**: Would require secrets for a build-time value (git SHA), which is not appropriate.
-
-### Option 3: Pass GIT_SHA as --var Flag
-**Previously Attempted**: This was tried in PR #127 but didn't persist through secret updates.
-
-### Option 4: Don't Use Secret Put, Use Wrangler.toml Secrets
-**Rejected**: Wrangler.toml cannot contain secret values (they must be configured separately).
-
-## Impact
-
-- **Low Risk**: The final deployment step is identical to the initial deployment
-- **No Breaking Changes**: Secrets remain configured throughout the process
-- **Minimal Added Time**: ~5-10 seconds for the additional deployment
-- **High Confidence**: Ensures deployed code always matches the git repository
-
-## Related Issues
-
-- Original Issue: #129 - Bug: Deployed site does not contain embedded SHA
-- Previous Fix Attempt: PR #128 - Fix: Write GIT_SHA to wrangler.toml instead of using --var flag
-- Earlier Attempt: PR #127 - Feature: Embed git SHA in health check and HTML pages
-- Related: PR #125 - Feature: Add embedded SHA support to health endpoint
+1. **Reliable**: SHA is baked into the JavaScript bundle, no runtime environment variable dependency
+2. **Verifiable**: Can confirm SHA is in bundle before deployment
+3. **No Side Effects**: Only affects CI environment temporary files, not repository
+4. **Backward Compatible**: Still updates wrangler.toml; local dev still uses env.GIT_SHA
+5. **Proven Approach**: Similar to how the HTML files are handled
 
 ## Testing
 
-To test this fix:
-1. Trigger a deployment to main branch
-2. Monitor CI logs for "Final deployment to restore correct code and configuration"
-3. Check health endpoint: `curl https://hashbin.org/health | jq .gitSha`
-4. Verify HTML files: `curl https://hashbin.org/ | grep "git-sha:"`
+All tests pass:
+- ✅ Grep patterns test  
+- ✅ Git SHA HTML injection test
+- ✅ Git SHA code injection test (NEW)
+- ✅ User balance test
+- ✅ Auth gate test
+- ✅ Security scan (CodeQL: 0 alerts)
 
-Both should show the commit SHA from the deployment.
+To verify after deployment:
+```bash
+# Check health endpoint
+curl https://hashbin.org/health | jq .gitSha
+
+# Check HTML files  
+curl https://hashbin.org/ | grep "git-sha:"
+
+# Both should show the same commit SHA
+```
+
+## Files Changed
+
+- `.github/workflows/deploy.yml` - Added code injection step (9 lines modified)
+- `scripts/inject-git-sha-code.sh` - New injection script (66 lines)
+- `scripts/test-git-sha-code-injection.sh` - New test (79 lines)
+- `scripts/test-reporter.sh` - Added new tests to CI (2 lines)
+
+**Total**: 154 lines added, 2 lines modified
+
+## Impact
+
+- **Low Risk**: Similar approach already used for HTML files
+- **No Breaking Changes**: Original code remains unchanged in repository
+- **Minimal Added Time**: ~1 second for code injection
+- **High Confidence**: Eliminates environment variable reliability issues
+
+## Related Issues
+
+- Current Issue: #131 - Bug: Deployed site does not contain embedded SHA
+- Previous Attempt: PR #130 - Fix: Redeploy after secret updates
+- Previous Attempt: PR #128 - Fix: Write GIT_SHA to wrangler.toml
+- Previous Attempt: PR #127 - Feature: Embed git SHA
+- Original Feature: PR #125 - Add embedded SHA support
