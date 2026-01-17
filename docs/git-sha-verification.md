@@ -65,7 +65,7 @@ The deployment workflow has been enhanced with:
        
        # Update GIT_SHA in wrangler.toml
        echo "Updating wrangler.toml with GIT_SHA..."
-       sed -i "s/^GIT_SHA = .*/GIT_SHA = \"$GIT_SHA\"/" wrangler.toml
+       sed -i "s/^\([[:space:]]*\)GIT_SHA = .*/\1GIT_SHA = \"$GIT_SHA\"/" wrangler.toml
        
        # Verify the update
        echo "Updated wrangler.toml [vars] section:"
