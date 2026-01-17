@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Site Map - HashBin.org">
+  <title>Site Map - HashBin.org</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .sitemap-section {
+      margin-bottom: 3rem;
+    }
+    
+    .sitemap-section h2 {
+      margin-bottom: 1.5rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--color-border);
+      color: var(--color-primary);
+    }
+    
+    .sitemap-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    
+    .sitemap-list li {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+      position: relative;
+    }
+    
+    .sitemap-list li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--color-primary);
+      font-weight: bold;
+    }
+    
+    .sitemap-list a {
+      color: var(--color-primary);
+      text-decoration: none;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    
+    .sitemap-list a:hover {
+      color: var(--color-primary-hover);
+      text-decoration: underline;
+    }
+    
+    .sitemap-list .coming-soon {
+      color: var(--color-text-light);
+      font-size: 0.875rem;
+      font-style: italic;
+      margin-left: 0.5rem;
+    }
+    
+    .sitemap-description {
+      color: var(--color-text-light);
+      font-size: 0.875rem;
+      margin-top: 0.25rem;
+    }
+    
+    .page-count {
+      background-color: var(--color-surface);
+      padding: 1.5rem;
+      border-radius: var(--radius-md);
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    
+    .page-count strong {
+      font-size: 1.5rem;
+      color: var(--color-primary);
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header">
+    <a href="/" class="logo">HashBin</a>
+    <nav>
+      <a href="/dashboard.html" class="auth-only">Dashboard</a>
+      <a href="/upload.html">Upload</a>
+      <a href="/retrieve.html">Retrieve</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+    <div id="auth-section">
+      <!-- Auth UI will be rendered here by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <h1>Site Map</h1>
+      <p style="color: var(--color-text-light); margin-bottom: 2rem;">
+        Complete overview of all pages and features available on HashBin.org
+      </p>
+      
+      <!-- Page Count -->
+      <div class="page-count">
+        <strong>11</strong> pages implemented, <strong>3</strong> planned features
+      </div>
+      
+      <!-- Public Pages -->
+      <section class="sitemap-section">
+        <h2>Public Pages</h2>
+        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+          Pages accessible to all visitors (no authentication required)
+        </p>
+        <ul class="sitemap-list">
+          <li>
+            <a href="/">Home</a>
+            <div class="sitemap-description">Landing page with platform overview and pricing</div>
+          </li>
+          <li>
+            <a href="/retrieve.html">Retrieve Content</a>
+            <div class="sitemap-description">Download content using a hash address</div>
+          </li>
+          <li>
+            <a href="/info.html">Content Info</a>
+            <div class="sitemap-description">View metadata and details about stored content</div>
+          </li>
+          <li>
+            <a href="/docs/">Documentation</a>
+            <div class="sitemap-description">API documentation and platform guides</div>
+          </li>
+          <li>
+            <a href="/sitemap.html">Site Map</a>
+            <div class="sitemap-description">This page - complete site navigation overview</div>
+          </li>
+        </ul>
+      </section>
+      
+      <!-- User Pages -->
+      <section class="sitemap-section">
+        <h2>User Pages</h2>
+        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+          Pages that require authentication (sign in with Google, Apple, or Microsoft)
+        </p>
+        <ul class="sitemap-list">
+          <li>
+            <a href="/upload.html">Upload Content</a>
+            <div class="sitemap-description">Upload files with hash-based addressing</div>
+          </li>
+          <li>
+            <a href="/dashboard.html">Dashboard</a>
+            <div class="sitemap-description">Account overview, balance, and quick actions</div>
+          </li>
+          <li>
+            <a href="/api-keys.html">API Keys</a>
+            <div class="sitemap-description">Manage API credentials (up to 25 keys)</div>
+          </li>
+          <li>
+            <a href="/api-keys-create.html">Create API Key</a>
+            <div class="sitemap-description">Generate a new API key with custom settings</div>
+          </li>
+          <li>
+            <a href="/dashboard/uploads/">My Uploads</a>
+            <div class="sitemap-description">View and manage uploaded content</div>
+          </li>
+          <li>
+            <a href="/deposit.html">Add Funds</a>
+            <div class="sitemap-description">Deposit money to your account via Stripe</div>
+          </li>
+          <li>
+            <span style="color: var(--color-text-light);">Transactions</span>
+            <span class="coming-soon">(Coming Soon)</span>
+            <div class="sitemap-description">View transaction history and payment records</div>
+          </li>
+          <li>
+            <span style="color: var(--color-text-light);">Account Settings</span>
+            <span class="coming-soon">(Coming Soon)</span>
+            <div class="sitemap-description">Manage account preferences and profile</div>
+          </li>
+        </ul>
+      </section>
+      
+      <!-- Admin Pages -->
+      <section class="sitemap-section">
+        <h2>Admin Pages</h2>
+        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+          Administrative features (planned for future release)
+        </p>
+        <ul class="sitemap-list">
+          <li>
+            <span style="color: var(--color-text-light);">Admin Dashboard</span>
+            <span class="coming-soon">(Planned)</span>
+            <div class="sitemap-description">Platform administration and monitoring</div>
+          </li>
+        </ul>
+      </section>
+      
+      <!-- API Endpoints -->
+      <section class="sitemap-section">
+        <h2>API Endpoints</h2>
+        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+          Programmatic access to HashBin services
+        </p>
+        <ul class="sitemap-list">
+          <li>
+            <a href="/docs/" target="_blank">API Documentation</a>
+            <div class="sitemap-description">Complete API reference with examples and authentication details</div>
+          </li>
+        </ul>
+      </section>
+      
+      <!-- Help Section -->
+      <section class="sitemap-section">
+        <h2>Need Help?</h2>
+        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+          If you can't find what you're looking for, check out these resources:
+        </p>
+        <ul class="sitemap-list">
+          <li>
+            <a href="/docs/">Documentation</a>
+            <div class="sitemap-description">Guides, tutorials, and API reference</div>
+          </li>
+          <li>
+            <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub Repository</a>
+            <div class="sitemap-description">Source code, issues, and contribution guidelines</div>
+          </li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source | 
+      <a href="/docs/">Documentation</a> | 
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a> |
+      <a href="/sitemap.html">Site Map</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
