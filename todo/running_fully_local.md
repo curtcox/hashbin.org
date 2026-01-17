@@ -84,9 +84,9 @@ Update `src/auth/middleware.js`:
 
 Create `frontend/js/local-auth.js`:
 - Provide same interface as `auth.js` (getAuthState, signIn, signOut, etc.)
-- Store "session" in localStorage
+- Reuse the same session storage mechanism as production (no reimplementation)
 - Show simple login prompt (just enter a username)
-- No external script dependencies
+- No external script dependencies (no Clerk SDK)
 
 #### 2.4 Frontend: Auth Module Switcher
 
@@ -237,54 +237,36 @@ Add "Local Development" section to main README.
 ## Open Questions
 
 1. **User ID Format**: What format should local user IDs follow?
-   - Option A: Free-form string (e.g., "alice", "bob")
-   - Option B: Structured format (e.g., "local_user_xxx")
-   - Option C: UUID format for consistency with Clerk
+   - ✅ **DECISION: Option A - Free-form string (e.g., "alice", "bob")**
 
 2. **Session Persistence**: How should local sessions be stored?
-   - Option A: localStorage only (simplest, browser-specific)
-   - Option B: Cookie-based (works across tabs, more realistic)
-   - Option C: Memory only (no persistence, clean slate on refresh)
+   - ✅ **DECISION: Same as production - use the same code and mechanism**
 
 3. **Balance Initialization**: Should new local users get starting balance?
-   - Option A: Start with $0 (realistic, forces dev deposit)
-   - Option B: Start with $10 (convenient for testing)
-   - Option C: Configurable via environment variable
+   - ✅ **DECISION: Option B - Start with $10 (convenient for testing)**
 
 4. **API Key Encryption**: How to handle `API_KEY_ENCRYPTION_KEY` locally?
-   - Option A: Generate random key on first run
-   - Option B: Use fixed development key
-   - Option C: Skip encryption in local mode
+   - ✅ **DECISION: Option C - Skip encryption in local mode**
 
 5. **Rate Limiting**: Should rate limiting be active in local mode?
-   - Option A: Disable completely (easier testing)
-   - Option B: Keep enabled but with higher limits
-   - Option C: Keep same limits (realistic testing)
+   - ✅ **DECISION: Option C - Keep same limits (realistic testing)**
 
 6. **Durable Object Persistence**: What about data between `npm run dev:local` sessions?
-   - Option A: Persist in `.wrangler/state` (current behavior)
-   - Option B: Add `npm run dev:local:fresh` to clear state
-   - Option C: Both options available
+   - ✅ **DECISION: Option A - Persist in `.wrangler/state` (current behavior)**
 
 7. **CORS Configuration**: Should local mode be more permissive?
-   - Option A: Allow all origins in local mode
-   - Option B: Keep same CORS policy
-   - Option C: Allow localhost:* only
+   - ✅ **DECISION: Option B - Keep same CORS policy**
 
 8. **Local Auth Header Name**: What header format for local auth?
-   - Option A: `Authorization: LocalDev <user_id>`
-   - Option B: `X-Local-User: <user_id>`
-   - Option C: `Authorization: Bearer local_<user_id>`
+   - ✅ **DECISION: Option A - `Authorization: LocalDev <user_id>`**
+   - Rationale: Explicit about local development, reuses existing Authorization header, clearly distinguishable from production
 
 9. **Frontend Detection Method**: How should frontend detect local mode?
-   - Option A: Check `/api/config` response
-   - Option B: Check window.location.hostname
-   - Option C: Embedded build-time variable
+   - ✅ **DECISION: Option A - Check `/api/config` response**
+   - Rationale: Server-driven single source of truth, already planned in Phase 4, most reliable approach
 
 10. **Multi-tab Behavior**: How should local auth work across browser tabs?
-    - Option A: Share session via localStorage (same user in all tabs)
-    - Option B: Independent sessions per tab (different users possible)
-    - Option C: Configurable behavior
+    - ✅ **DECISION: Same as production - use the same code and mechanism**
 
 ---
 
