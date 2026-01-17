@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Content Management - HashBin.org">
+  <title>Content Management - HashBin.org</title>
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .content-header {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+    
+    .content-cid {
+      font-family: 'Courier New', monospace;
+      font-size: 1.1rem;
+      word-break: break-all;
+      margin: 0.5rem 0;
+    }
+    
+    .info-card {
+      background: var(--color-bg-secondary);
+      padding: 2rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+    
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    
+    .info-label {
+      font-weight: 500;
+      color: var(--color-text-light);
+    }
+    
+    .info-value {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    
+    .form-help {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.875rem;
+      color: var(--color-text-light);
+    }
+    
+    .slider-container {
+      margin: 1rem 0;
+    }
+    
+    .slider {
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--color-border);
+      outline: none;
+      -webkit-appearance: none;
+    }
+    
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      cursor: pointer;
+    }
+    
+    .slider::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--color-primary);
+      cursor: pointer;
+      border: none;
+    }
+    
+    .slider-value {
+      text-align: center;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin: 1rem 0;
+      min-height: 2rem;
+    }
+    
+    .slider-presets {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--color-text-light);
+      margin-top: 0.5rem;
+    }
+    
+    .custom-input-toggle {
+      margin-top: 1rem;
+    }
+    
+    .custom-input-toggle label {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      color: var(--color-text-light);
+      font-size: 0.875rem;
+    }
+    
+    .custom-input-toggle input[type="checkbox"] {
+      margin-right: 0.5rem;
+    }
+    
+    .custom-input-field {
+      margin-top: 1rem;
+      display: none;
+    }
+    
+    .custom-input-field.active {
+      display: block;
+    }
+    
+    .custom-input-field input {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+    
+    .pricing-card {
+      background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+      padding: 2rem;
+      border-radius: 8px;
+      margin: 2rem 0;
+    }
+    
+    .pricing-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      font-size: 1rem;
+    }
+    
+    .pricing-row.total {
+      border-top: 2px solid var(--color-primary);
+      margin-top: 1rem;
+      padding-top: 1rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+    
+    .balance-display {
+      margin: 1.5rem 0;
+      padding: 1rem;
+      background: var(--color-bg-secondary);
+      border-radius: 4px;
+      text-align: center;
+    }
+    
+    .balance-amount {
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+    
+    .balance-status {
+      margin-top: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .balance-status.sufficient {
+      color: #10b981;
+    }
+    
+    .balance-status.insufficient {
+      color: #ef4444;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    
+    .badge-success {
+      background: #10b981;
+      color: white;
+    }
+    
+    .badge-warning {
+      background: #f59e0b;
+      color: white;
+    }
+    
+    .badge-error {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .btn-purchase {
+      width: 100%;
+      padding: 1rem;
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-top: 1rem;
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header">
+    <a href="/" class="logo">HashBin</a>
+    <nav>
+      <a href="/upload.html">Upload</a>
+      <a href="/retrieve.html">Retrieve</a>
+      <a href="/docs/">Docs</a>
+    </nav>
+    <div id="auth-section">
+      <!-- Auth UI will be rendered here by app.js -->
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <div id="loading" style="text-align: center; padding: 2rem;">
+        <div class="spinner"></div>
+        <p>Loading content information...</p>
+      </div>
+      
+      <div id="content-management" style="display: none;">
+        <div class="content-header">
+          <h1 style="margin: 0;">📦 Content Management</h1>
+          <div class="content-cid" id="header-cid"></div>
+        </div>
+        
+        <!-- Content Info Card -->
+        <div class="info-card">
+          <h3 style="margin-bottom: 1rem;">Content Information</h3>
+          <div class="info-row">
+            <span class="info-label">Size</span>
+            <span class="info-value" id="content-size"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Expires At</span>
+            <span class="info-value" id="content-expires"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Downloads</span>
+            <span class="info-value" id="content-downloads"></span>
+          </div>
+          <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+            <a id="view-link" href="#" class="btn btn-secondary" target="_blank">View Content</a>
+            <a id="download-link" href="#" class="btn btn-secondary" download>Download</a>
+          </div>
+        </div>
+        
+        <!-- Current Rate Limit Status -->
+        <div class="info-card">
+          <h3 style="margin-bottom: 1rem;">Current Rate Limit Status</h3>
+          <div id="current-rate-limit-status">
+            <p style="color: var(--color-text-light);">Loading rate limit status...</p>
+          </div>
+        </div>
+        
+        <!-- Rate Limit Purchase Form -->
+        <div class="info-card" id="purchase-form-card">
+          <h3 style="margin-bottom: 1rem;">🚀 Purchase Bandwidth</h3>
+          <p style="color: var(--color-text-light); margin-bottom: 2rem;">
+            Configure and purchase rate limit bandwidth for this content. Lower MTBR (Minimum Time Between Requests) allows more frequent access.
+          </p>
+          
+          <form id="purchase-form">
+            <!-- MTBR Selector -->
+            <div class="form-group">
+              <label class="form-label">Request Frequency (MTBR)</label>
+              <span class="form-help">How often can this content be requested?</span>
+              
+              <div class="slider-container">
+                <div class="slider-value" id="mtbr-display">1 request/second</div>
+                <input type="range" min="0" max="100" value="50" class="slider" id="mtbr-slider">
+                <div class="slider-presets">
+                  <span>100ms</span>
+                  <span>1s</span>
+                  <span>10s</span>
+                  <span>1min</span>
+                  <span>1hr</span>
+                  <span>1day</span>
+                </div>
+              </div>
+              
+              <div class="custom-input-toggle">
+                <label>
+                  <input type="checkbox" id="custom-mtbr-toggle">
+                  Use custom value (milliseconds)
+                </label>
+              </div>
+              
+              <div class="custom-input-field" id="custom-mtbr-field">
+                <input type="number" id="custom-mtbr-input" min="100" step="1" placeholder="Enter milliseconds (min 100)">
+              </div>
+            </div>
+            
+            <!-- Duration Selector -->
+            <div class="form-group">
+              <label class="form-label">Duration</label>
+              <span class="form-help" id="duration-help">How long should this rate limit last?</span>
+              
+              <div class="slider-container">
+                <div class="slider-value" id="duration-display">15 days</div>
+                <input type="range" min="0" max="100" value="50" class="slider" id="duration-slider">
+                <div class="slider-presets">
+                  <span id="duration-min-label">1 sec</span>
+                  <span id="duration-max-label">30 days</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Pricing Calculator -->
+            <div class="pricing-card">
+              <h4 style="margin: 0 0 1rem 0; color: var(--color-primary);">💰 Price Calculation</h4>
+              <div class="pricing-row">
+                <span>Content Size:</span>
+                <span id="calc-size">-</span>
+              </div>
+              <div class="pricing-row">
+                <span>Max Requests:</span>
+                <span id="calc-requests">-</span>
+              </div>
+              <div class="pricing-row">
+                <span>Max Bandwidth:</span>
+                <span id="calc-bandwidth">-</span>
+              </div>
+              <div class="pricing-row total">
+                <span>Total Price:</span>
+                <span id="calc-price">$0.00</span>
+              </div>
+            </div>
+            
+            <!-- Balance Display -->
+            <div class="balance-display" id="balance-display" style="display: none;">
+              <div>Your Balance:</div>
+              <div class="balance-amount" id="balance-amount">$0.00</div>
+              <div class="balance-status" id="balance-status"></div>
+            </div>
+            
+            <!-- Purchase Button -->
+            <button type="submit" class="btn btn-primary btn-purchase" id="purchase-btn" disabled>
+              Purchase Bandwidth
+            </button>
+            
+            <div style="text-align: center; margin-top: 1rem;">
+              <a href="/deposit.html" class="btn btn-secondary">Add Funds</a>
+            </div>
+          </form>
+        </div>
+        
+        <!-- Inline Content Notice -->
+        <div class="info-card" id="inline-notice" style="display: none;">
+          <h3 style="margin-bottom: 1rem;">ℹ️ No Rate Limits</h3>
+          <p>This content is small enough (≤64 bytes) to be served inline with unlimited access. No rate limiting applies, and you cannot purchase rate limits for inline content.</p>
+          <div style="margin-top: 1rem;">
+            <a href="/dashboard/uploads/" class="btn btn-secondary">Back to Uploads</a>
+          </div>
+        </div>
+      </div>
+      
+      <div id="error" style="display: none;">
+        <div class="alert alert-error">
+          <strong>Error</strong>
+          <p id="error-message"></p>
+        </div>
+        <div style="margin-top: 2rem;">
+          <a href="/dashboard/uploads/" class="btn btn-secondary">Back to Uploads</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source | 
+      <a href="/docs/">Documentation</a> | 
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/rate-limit-purchase.js"></script>
+</body>
+</html>

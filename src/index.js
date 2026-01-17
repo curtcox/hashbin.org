@@ -47,6 +47,8 @@ import {
   handleGetRateLimit 
 } from './api/rate-limit.js';
 
+import { handleGetUserUploads } from './api/user.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -62,11 +64,13 @@ const STATIC_PATHS = [
   'upload.html',
   'retrieve.html',
   'dashboard.html',
+  'dashboard/',
   'deposit.html',
   'info.html',
   'css/',
   'js/',
-  'docs/'
+  'docs/',
+  'api-keys'
 ];
 
 /**
@@ -118,6 +122,15 @@ export default {
     // Try to serve static assets for non-API paths
     if (env.ASSETS) {
       try {
+        // Special handling for /dashboard/uploads/{cid}/ -> serve detail.html
+        if (url.pathname.match(/^\/dashboard\/uploads\/[^\/]+\/?$/)) {
+          const detailRequest = new Request(new URL('/dashboard/uploads/detail.html', url), request);
+          const detailAsset = await env.ASSETS.fetch(detailRequest);
+          if (detailAsset.status !== 404) {
+            return detailAsset;
+          }
+        }
+        
         // Serve static files
         const asset = await env.ASSETS.fetch(request);
         
@@ -282,6 +295,11 @@ function handleApiRoutes(url, request, env) {
   if (url.pathname.startsWith('/api/donate/cid/') && request.method === 'POST') {
     const cid = url.pathname.split('/')[4];
     return handleCreateDonation(request, env, cid);
+  }
+
+  // User API routes
+  if (url.pathname === '/api/user/uploads' && request.method === 'GET') {
+    return handleGetUserUploads(request, env);
   }
 
   // TODO: Add API routes for:
