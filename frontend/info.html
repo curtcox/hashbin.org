@@ -82,6 +82,50 @@
     .download-link:hover {
       background: var(--color-bg-secondary);
     }
+    
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    
+    .badge-success {
+      background: #10b981;
+      color: white;
+    }
+    
+    .badge-warning {
+      background: #f59e0b;
+      color: white;
+    }
+    
+    .badge-error {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .badge-secondary {
+      background: var(--color-bg-secondary);
+      color: var(--color-text);
+    }
+    
+    .rate-limit-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      align-items: center;
+    }
+    
+    .rate-limit-label {
+      color: var(--color-text-light);
+    }
+    
+    .rate-limit-value {
+      font-weight: 600;
+      color: var(--color-text);
+    }
   </style>
 </head>
 <body>
@@ -138,6 +182,14 @@
           </div>
         </div>
         
+        <!-- Rate Limit Status Card -->
+        <div class="info-card" id="rate-limit-card">
+          <h3 style="margin-bottom: 1rem;">Rate Limit Status</h3>
+          <div id="rate-limit-content">
+            <p style="color: var(--color-text-light);">Loading rate limit status...</p>
+          </div>
+        </div>
+        
         <div style="text-align: center; margin-top: 2rem;">
           <a id="download-link" href="#" class="btn btn-primary" style="margin-right: 1rem;">
             Download Content
@@ -172,15 +224,28 @@
   <script type="module" src="/js/app.js"></script>
   <script type="module">
     import { getContentSize, formatFileSize } from './js/hash256t.js';
+    import { 
+      formatMTBR, 
+      getRateLimitBadge, 
+      formatTimeUntil 
+    } from './js/rate-limit-utils.js';
     
     // Get CID from URL parameter
     const params = new URLSearchParams(window.location.search);
     const cid = params.get('cid');
+    const purchaseSuccess = params.get('purchase_success');
+    const purchaseId = params.get('purchase_id');
     
     if (!cid) {
       showError('No content ID provided');
     } else {
       loadContentInfo(cid);
+      loadRateLimitStatus(cid);
+      
+      // Show purchase success banner if redirected from purchase
+      if (purchaseSuccess === '1' && purchaseId) {
+        showPurchaseSuccess(purchaseId);
+      }
     }
     
     async function loadContentInfo(cid) {
@@ -209,6 +274,103 @@
       } catch (error) {
         showError(error.message);
       }
+    }
+    
+    async function loadRateLimitStatus(cid) {
+      const rateLimitContent = document.getElementById('rate-limit-content');
+      
+      try {
+        const response = await fetch(`/api/content/${cid}/rate-limit`);
+        
+        if (!response.ok) {
+          rateLimitContent.innerHTML = `
+            <p style="color: var(--color-text-light);">Unable to load rate limit status</p>
+          `;
+          return;
+        }
+        
+        const data = await response.json();
+        displayRateLimitStatus(data);
+        
+      } catch (error) {
+        console.error('Failed to load rate limit status:', error);
+        rateLimitContent.innerHTML = `
+          <p style="color: var(--color-text-light);">Unable to load rate limit status</p>
+        `;
+      }
+    }
+    
+    function displayRateLimitStatus(status) {
+      const rateLimitContent = document.getElementById('rate-limit-content');
+      const badge = getRateLimitBadge(status);
+      
+      let html = `
+        <div class="rate-limit-row">
+          <span class="rate-limit-label">Status</span>
+          <span class="rate-limit-value">
+            <span class="badge ${badge.class}">${badge.icon} ${badge.text}</span>
+          </span>
+        </div>
+      `;
+      
+      // Show MTBR if available and not inline
+      if (!status.is_inline && status.effective_mtbr_ms !== null) {
+        html += `
+          <div class="rate-limit-row">
+            <span class="rate-limit-label">Request Frequency</span>
+            <span class="rate-limit-value">${formatMTBR(status.effective_mtbr_ms)}</span>
+          </div>
+        `;
+      }
+      
+      // Show next available time if rate limited
+      if (status.next_available_at) {
+        const nextAvailable = new Date(status.next_available_at);
+        if (nextAvailable > new Date()) {
+          html += `
+            <div class="rate-limit-row">
+              <span class="rate-limit-label">Next Available In</span>
+              <span class="rate-limit-value">${formatTimeUntil(status.next_available_at)}</span>
+            </div>
+          `;
+        }
+      }
+      
+      // Show active rate limits count
+      if (status.active_rate_limits && status.active_rate_limits.length > 0) {
+        html += `
+          <div class="rate-limit-row">
+            <span class="rate-limit-label">Active Rate Limits</span>
+            <span class="rate-limit-value">${status.active_rate_limits.length}</span>
+          </div>
+        `;
+      }
+      
+      // Show purchase link for non-inline content
+      if (!status.is_inline) {
+        html += `
+          <div style="margin-top: 1rem; text-align: center;">
+            <a href="/dashboard/uploads/${cid}/" class="btn btn-secondary">
+              ${status.is_rate_limited ? '🚀 Purchase Bandwidth' : '⚙️ Manage Rate Limits'}
+            </a>
+          </div>
+        `;
+      } else {
+        html += `
+          <p style="color: var(--color-text-light); margin-top: 1rem; text-align: center;">
+            This content is small enough (≤64 bytes) to be served unlimited with no rate limits.
+          </p>
+        `;
+      }
+      
+      rateLimitContent.innerHTML = html;
+    }
+    
+    function showPurchaseSuccess(purchaseId) {
+      // Add success message at the top
+      const successBanner = document.querySelector('.success-banner');
+      successBanner.querySelector('h2').textContent = '✓ Rate Limit Purchase Successful!';
+      successBanner.querySelector('p').textContent = `Your bandwidth purchase has been completed. The content now has updated rate limits.`;
     }
     
     function formatRelativeTime(dateString) {
