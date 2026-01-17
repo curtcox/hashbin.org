@@ -84,7 +84,7 @@ export function calculateRateLimitPrice(sizeBytes, mtbrMs, durationSeconds) {
   const maxRequests = Math.floor(durationSeconds / mtbrSeconds);
   const maxBytes = sizeBytes * maxRequests;
   
-  // Pricing formula: $0.01 per GB-request
+  // Pricing formula: $1 per GB-request
   // Price = (size_bytes * max_requests) / (1024^3) * 100 cents
   const pricePerGBRequest = 1.0; // $1 per GB-request
   const bytesPerGB = 1024 * 1024 * 1024;
