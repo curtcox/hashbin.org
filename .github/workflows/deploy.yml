@@ -166,6 +166,23 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
 
+      - name: Verify wrangler.toml for binding conflicts
+        run: |
+          echo "Checking wrangler.toml for potential binding conflicts..."
+          
+          # Check if GIT_SHA is defined in [vars] section
+          # sed pattern: /^\[vars\]/,/^\[/ matches from [vars] to next section
+          # {/^\[vars\]/p; /^\[/!p;} prints [vars] line and all lines not starting with [
+          # This extracts only [vars] section content, excluding next section header
+          if sed -n '/^\[vars\]/,/^\[/{/^\[vars\]/p; /^\[/!p;}' wrangler.toml | grep -q 'GIT_SHA'; then
+            echo "❌ ERROR: GIT_SHA is defined in wrangler.toml [vars] section"
+            echo "This will conflict with the GIT_SHA secret configuration."
+            echo "Please remove GIT_SHA from the [vars] section in wrangler.toml"
+            exit 1
+          fi
+          
+          echo "✅ No binding conflicts detected"
+
       - name: Configure GIT_SHA as secret
         run: |
           GIT_SHA=$(git rev-parse HEAD)
