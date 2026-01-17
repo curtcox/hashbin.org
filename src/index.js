@@ -55,6 +55,7 @@ import { applyRateLimit, authenticate } from './auth/middleware.js';
 const VALID_ENVIRONMENTS = ['development', 'production'];
 const VALID_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
 const HEALTH_CHECK_ID = 'health-check';
+const GIT_SHA_PLACEHOLDER = 'unknown';
 
 // Static paths that should not be matched as CIDs
 // These paths are served by the ASSETS binding (frontend files)
@@ -127,7 +128,7 @@ export default {
           const detailRequest = new Request(new URL('/dashboard/uploads/detail.html', url), request);
           const detailAsset = await env.ASSETS.fetch(detailRequest);
           if (detailAsset.status !== 404) {
-            return detailAsset;
+            return withGitShaComment(detailAsset, env);
           }
         }
         
@@ -136,7 +137,7 @@ export default {
         
         // If asset found, return it
         if (asset.status !== 404) {
-          return asset;
+          return withGitShaComment(asset, env);
         }
         
         // If requesting a path without extension, try index.html
@@ -144,7 +145,7 @@ export default {
           const indexRequest = new Request(new URL('/index.html', url), request);
           const indexAsset = await env.ASSETS.fetch(indexRequest);
           if (indexAsset.status !== 404) {
-            return indexAsset;
+            return withGitShaComment(indexAsset, env);
           }
         }
       } catch (error) {
@@ -309,6 +310,43 @@ function handleApiRoutes(url, request, env) {
   return new Response('Not Found', { status: 404 });
 }
 
+function injectGitShaIntoHtml(html, gitSha) {
+  const comment = `<!-- git-sha: ${gitSha} -->`;
+  const commentRegex = /<!--\s*git-sha:[^>]*-->/i;
+
+  if (commentRegex.test(html)) {
+    return html.replace(commentRegex, comment);
+  }
+
+  const doctypeMatch = html.match(/<!doctype[^>]*>/i);
+  if (doctypeMatch) {
+    return html.replace(doctypeMatch[0], `${doctypeMatch[0]}\n${comment}`);
+  }
+
+  return `${comment}\n${html}`;
+}
+
+async function withGitShaComment(response, env) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('text/html')) {
+    return response;
+  }
+
+  const gitSha = env.GIT_SHA || GIT_SHA_PLACEHOLDER;
+  const html = await response.text();
+  const updatedHtml = injectGitShaIntoHtml(html, gitSha);
+  const headers = new Headers(response.headers);
+  headers.delete('content-length');
+  headers.set('x-git-sha', gitSha);
+  headers.set('x-git-sha-present', String(Boolean(env.GIT_SHA)));
+
+  return new Response(updatedHtml, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
 /**
  * Root endpoint - Basic info
  */
@@ -376,11 +414,16 @@ async function handleHealth(env) {
     overallStatus = 'degraded';
   }
 
+  if (!env.GIT_SHA) {
+    console.warn('Health check: GIT_SHA secret is not configured.');
+  }
+
   const health = {
     status: overallStatus,
     timestamp: new Date().toISOString(),
     environment: env.ENVIRONMENT || 'unknown',
-    gitSha: env.GIT_SHA || 'unknown',
+    gitSha: env.GIT_SHA || GIT_SHA_PLACEHOLDER,
+    gitShaPresent: Boolean(env.GIT_SHA),
     checks: checks,
     summary: {
       total: Object.keys(checks).length,
@@ -396,7 +439,9 @@ async function handleHealth(env) {
     status: statusCode,
     headers: {
       'content-type': 'application/json',
-      'access-control-allow-origin': '*'
+      'access-control-allow-origin': '*',
+      'x-git-sha': env.GIT_SHA || GIT_SHA_PLACEHOLDER,
+      'x-git-sha-present': String(Boolean(env.GIT_SHA))
     }
   });
 }
