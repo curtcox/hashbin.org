@@ -171,7 +171,8 @@ jobs:
           echo "Checking wrangler.toml for potential binding conflicts..."
           
           # Check if GIT_SHA is defined in [vars] section
-          if grep -A 10 '^\[vars\]' wrangler.toml | grep -q 'GIT_SHA'; then
+          # Extract entire [vars] section (from [vars] to next section starting with [)
+          if sed -n '/^\[vars\]/,/^\[/p' wrangler.toml | grep -q 'GIT_SHA'; then
             echo "❌ ERROR: GIT_SHA is defined in wrangler.toml [vars] section"
             echo "This will conflict with the GIT_SHA secret configuration."
             echo "Please remove GIT_SHA from the [vars] section in wrangler.toml"
