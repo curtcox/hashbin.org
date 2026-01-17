@@ -15,11 +15,26 @@ From `todo/user_stories.md`:
 - [UI: ✅ | API: ✅] **As an anonymous user**, I would like to check content rate limit status so that I know if I can download the content.
   - _Paths: UI: `/info.html` | API: `GET /api/content/{cid}/rate-limit`_
 
+## Design Decisions
+
+The following decisions have been made (resolved 2026-01-17):
+
+| # | Decision | Choice |
+|---|----------|--------|
+| 1 | Page Structure | Add to `/dashboard/uploads/{hash}/` page |
+| 2 | MTBR Input Method | Hybrid: slider with presets + "Custom" option for freeform |
+| 3 | Duration Input Method | Slider bound to remaining retention |
+| 4 | When to Show Rate Limit Info | Always show rate limit section on info.html |
+| 5 | Anonymous vs Authenticated View | Show full pricing calculator to anonymous users, require auth only at purchase |
+| 6 | Purchase Success Behavior | Redirect to info.html with success message |
+| 7 | Handling Content Near Expiration | Allow any duration up to remaining retention (no warnings, consistent with no-refunds policy) |
+| 8 | Default MTBR Presets | [100ms, 1s, 10s, 1min, 1hr, 1day] |
+
 ## Design Principles
 
 1. **Consistency**: Follow existing UI patterns from `upload.html`, `deposit.html`, and `dashboard.html`
 2. **Clarity**: Make pricing calculations transparent before purchase
-3. **Progressive disclosure**: Show rate limit info when relevant, not overwhelming for inline content
+3. **Always visible**: Rate limit section shown on info.html for all content types
 4. **No external frameworks**: Use vanilla HTML/CSS/JavaScript matching existing codebase
 
 ---
@@ -30,7 +45,7 @@ From `todo/user_stories.md`:
 
 **Location**: Add new `.info-card` section to `/frontend/info.html`
 
-**Purpose**: Show current rate limit status for any CID
+**Purpose**: Show current rate limit status for any CID (always visible per Decision #4)
 
 **Display Elements**:
 - Current status: "Available", "Rate Limited", or "Unlimited" (for inline)
@@ -38,57 +53,63 @@ From `todo/user_stories.md`:
 - Time until next available request (if rate limited)
 - Active rate limits count
 - Default rate limit expiration (if applicable)
+- Link to purchase page (for non-inline content)
 
 **Conditional Rendering**:
-- **Inline content (≤64 bytes)**: Show "Unlimited - No Rate Limiting" badge, hide purchase option
+- **Inline content (≤64 bytes)**: Show "Unlimited - No Rate Limiting" badge, hide purchase link
 - **Available content**: Show "Available" with effective MTBR and next reset time
 - **Rate limited content**: Show "Rate Limited" with countdown to next available time
-- **Blocked content (Infinity MTBR)**: Show "Blocked - Purchase Required" with call to action
+- **Blocked content (Infinity MTBR)**: Show "Blocked - Purchase Required" with prominent purchase link
 
 ### 2. Rate Limit Purchase Form
 
-**Location**: `/frontend/rate-limit.html` (new page) or modal on `/info.html`
+**Location**: `/dashboard/uploads/{hash}/` page (per Decision #1)
 
-**Purpose**: Allow authenticated users to purchase bandwidth for any CID
+**Purpose**: Allow authenticated users to purchase bandwidth for their content
 
 **Form Elements**:
 - **Content ID (CID)**: Display only (from URL parameter)
 - **Content Size**: Display only (fetched from API)
-- **MTBR Selector**: Range slider or dropdown with presets
-  - Presets: 1 second, 10 seconds, 1 minute, 1 hour, 1 day
-  - Custom input option (minimum 100ms)
-- **Duration Selector**: Range slider or dropdown with presets
-  - Presets: 7 days, 30 days, 90 days, matching remaining retention
-  - Custom input option
-  - Maximum: remaining content retention period
-- **Live Cost Calculator**: Shows price as inputs change
+- **MTBR Selector** (per Decision #2 - Hybrid):
+  - Slider with preset stops: 100ms, 1s, 10s, 1min, 1hr, 1day
+  - "Custom" toggle that reveals freeform millisecond input
+  - Minimum enforced: 100ms
+- **Duration Selector** (per Decision #3 - Slider bound to retention):
+  - Slider ranging from minimum (MTBR value) to maximum (remaining retention)
+  - Display shows days/hours remaining
+  - Clear label showing "X days remaining until content expires"
+- **Live Cost Calculator** (per Decision #5 - visible to anonymous):
   - Max requests calculation
   - Max bytes calculation
   - Total price in dollars
-- **Balance Display**: Current balance with warning if insufficient
+  - Visible to all users, purchase button requires auth
+- **Balance Display**: Current balance with warning if insufficient (authenticated only)
 - **Purchase Button**: Disabled until authenticated and sufficient balance
 
 ### 3. Purchase Confirmation
 
-**Purpose**: Show success after purchase
+**Behavior**: Redirect to info.html with success message (per Decision #6)
 
-**Display Elements**:
+**Display Elements** (shown via URL parameter on info.html):
+- Success banner with purchase details
 - Purchase ID
 - New effective MTBR
 - Rate limit expiration date
 - Amount charged
-- Remaining balance
-- Link to content
+- Updated balance
 
-### 4. Dashboard Rate Limit Section (optional enhancement)
+### 4. Dashboard Upload Management Page
 
-**Location**: Add to `/frontend/dashboard.html` in upload history
+**Location**: `/dashboard/uploads/{hash}/`
 
-**Purpose**: Quick overview of rate limit status for user's content
+**Purpose**: Manage a specific upload including rate limits
 
 **Display Elements**:
-- List of user's uploads with rate limit status indicators
-- Link to rate limit purchase for each
+- Content metadata (size, expiration, CID)
+- Current rate limit status
+- Active rate limits list with expiration dates
+- Rate limit purchase form (embedded)
+- Download/share links
 
 ---
 
@@ -100,39 +121,42 @@ From `todo/user_stories.md`:
 1. User visits /info.html?cid=ABC123
 2. Page loads content metadata
 3. Page fetches rate limit status from GET /api/content/{cid}/rate-limit
-4. Display rate limit card with:
+4. Display rate limit card (always shown per Decision #4) with:
    - Current availability status
    - Effective MTBR (humanized, e.g., "1 request per minute")
    - Next available time (if rate limited)
-   - "Purchase Bandwidth" button (links to rate-limit.html or prompts login)
+   - For inline content: "Unlimited - No Rate Limiting" (no purchase link)
+   - For non-inline: "Purchase Bandwidth" link to /dashboard/uploads/{hash}/
+5. Full pricing calculator visible to anonymous users (Decision #5)
 ```
 
-### Flow 2: Purchase Bandwidth (Authenticated)
+### Flow 2: Purchase Bandwidth (Authenticated Content Publisher)
 
 ```
-1. User clicks "Purchase Bandwidth" on info.html (or navigates to rate-limit.html?cid=ABC123)
+1. User navigates to /dashboard/uploads/{hash}/ (from info.html link or dashboard)
 2. If not authenticated:
-   a. Show "Sign in required" message
-   b. After sign in, return to purchase page
+   a. Redirect to sign in
+   b. After sign in, return to /dashboard/uploads/{hash}/
 3. Page loads:
    a. Content metadata (size, retention expiration)
    b. Current rate limit status
    c. User balance
-4. User configures purchase:
-   a. Select/enter MTBR (minimum 100ms)
-   b. Select/enter duration (max = remaining retention)
-   c. View live cost calculation
+4. User configures purchase using hybrid controls (Decision #2):
+   a. Use MTBR slider with presets [100ms, 1s, 10s, 1min, 1hr, 1day]
+   b. Or toggle "Custom" to enter exact milliseconds (min 100ms)
+   c. Adjust duration slider (Decision #3) from MTBR to remaining retention
+   d. View live cost calculation updating in real-time
 5. User clicks "Purchase"
 6. If insufficient balance:
    a. Show error with "Add Funds" link
    b. Return after deposit
-7. On success:
-   a. Show confirmation with purchase details
-   b. Update balance display
-   c. Refresh rate limit status
+7. On success (Decision #6):
+   a. Redirect to /info.html?cid={hash}&purchase_success=1&purchase_id={id}
+   b. info.html displays success banner with purchase details
+   c. Rate limit status section shows updated MTBR
 8. On error:
    a. Show appropriate error message
-   b. Allow retry
+   b. Form remains editable for retry
 ```
 
 ### Flow 3: Content Download Rate Limited
@@ -142,10 +166,19 @@ From `todo/user_stories.md`:
 2. If rate limited (429 response):
    a. Show rate limit error message
    b. Display next available time
-   c. Offer link to purchase faster access
+   c. Offer link to /dashboard/uploads/{hash}/ to purchase faster access
 3. If successful:
    a. Content downloads
    b. Response headers include rate limit info
+```
+
+### Flow 4: Dashboard Upload List to Rate Limit Purchase
+
+```
+1. User visits /dashboard/uploads/ (upload history list)
+2. Each upload shows rate limit status indicator (Available/Limited/Blocked)
+3. User clicks on specific upload
+4. Navigates to /dashboard/uploads/{hash}/ with full management including rate limits
 ```
 
 ---
@@ -420,129 +453,38 @@ TEST-UI-A11Y-008: Slider inputs have accessible alternatives (number input)
 
 ---
 
-## Open Questions
-
-### Question 1: Page Structure
-
-**Options**:
-a) Add purchase form as a modal/expandable section on `/info.html`
-b) Create a separate `/rate-limit.html` page for purchases
-c) Add to `/dashboard/uploads/{hash}/` page (requires dashboard content management implementation first)
-
-**Trade-offs**:
-- (a) Simpler, keeps everything on one page, but may clutter the info page
-- (b) Cleaner separation, follows REST-like URL structure, but requires navigation
-- (c) Best UX for content publishers, but depends on unimplemented dashboard features
-
-### Question 2: MTBR Input Method
-
-**Options**:
-a) Range slider with predefined presets only
-b) Freeform input with validation (minimum 100ms)
-c) Hybrid: slider with presets + "Custom" option for freeform
-
-**Trade-offs**:
-- (a) Simpler UX, prevents invalid values, but limits flexibility
-- (b) Maximum flexibility, but users may enter invalid values or make mistakes
-- (c) Best of both, but more complex to implement
-
-### Question 3: Duration Input Method
-
-**Options**:
-a) Presets only (7d, 30d, 90d, max)
-b) Calendar date picker
-c) Freeform days/hours input
-d) Slider bound to remaining retention
-
-**Trade-offs**:
-- (a) Simple but limiting
-- (b) Familiar UX but may confuse with absolute dates
-- (c) Flexible but error-prone
-- (d) Clear limits, intuitive, but needs clear labeling
-
-### Question 4: When to Show Rate Limit Info
-
-**Options**:
-a) Always show rate limit section on info.html
-b) Only show when content is rate limited or blocked
-c) Show minimal status by default, expandable for details
-
-**Trade-offs**:
-- (a) Consistent but may overwhelm for inline content
-- (b) Cleaner but users may not discover the feature
-- (c) Balance of both but more complex UX
-
-### Question 5: Anonymous vs Authenticated Purchase View
-
-**Options**:
-a) Show full pricing calculator to anonymous users, require auth only at purchase
-b) Require authentication before showing pricing
-c) Show simplified pricing info to anonymous, full details after auth
-
-**Trade-offs**:
-- (a) More transparent, users see cost before committing to sign in
-- (b) Simpler implementation, but may feel like a bait-and-switch
-- (c) Middle ground but duplicates some UI work
-
-### Question 6: Purchase Success Behavior
-
-**Options**:
-a) Show inline confirmation, stay on same page
-b) Redirect to dedicated confirmation page
-c) Redirect to info.html with success message
-
-**Trade-offs**:
-- (a) Fewer page loads, but may not feel like a significant action
-- (b) Clear completion signal, printable receipt, but more navigation
-- (c) Natural flow, shows updated status, simple to implement
-
-### Question 7: Handling Content Near Expiration
-
-**Options**:
-a) Allow any duration up to remaining retention, let user take the risk
-b) Warn when duration is close to retention expiration
-c) Require minimum "buffer" (e.g., 1 day before expiration)
-
-**Trade-offs**:
-- (a) Maximum flexibility, consistent with "no refunds" policy
-- (b) Helpful UX, prevents accidental waste
-- (c) More restrictive, may frustrate users who want short bursts
-
-### Question 8: Default MTBR Presets
-
-**Options**:
-a) [100ms, 1s, 10s, 1min, 1hr, 1day]
-b) [1s, 1min, 10min, 1hr]
-c) [1s, 10s, 30s, 1min]
-
-**Trade-offs**:
-- Different use cases have different needs (CDN-like vs. occasional access)
-- Wider range gives more flexibility but may overwhelm
-- Narrower range is simpler but may not cover edge cases
-
----
-
 ## Implementation Phases
 
-### Phase 1: Rate Limit Status Display (info.html)
-- Add rate limit status card to info.html
+### Phase 1: Dashboard Upload List Page (Prerequisite)
+- Create `/dashboard/uploads/` page listing user's uploads
+- Display basic metadata: CID, size, expiration date
+- Show rate limit status indicator for each (Available/Limited/Blocked/Unlimited)
+- Link each item to `/dashboard/uploads/{hash}/`
+
+### Phase 2: Rate Limit Status Display (info.html)
+- Add rate limit status card to info.html (always visible per Decision #4)
 - Display availability, effective MTBR, countdown
-- Show "Purchase Bandwidth" link (non-functional initially)
-- Handle inline content display
+- Show "Purchase Bandwidth" link to `/dashboard/uploads/{hash}/` for non-inline content
+- Handle inline content display ("Unlimited - No Rate Limiting")
+- Handle purchase success URL parameters for confirmation banner
 
-### Phase 2: Purchase Form UI
-- Create rate-limit.html page structure
-- Implement MTBR selector UI
-- Implement duration selector UI
-- Implement live pricing calculator (client-side)
+### Phase 3: Dashboard Upload Detail Page with Purchase Form
+- Create `/dashboard/uploads/{hash}/` page structure
+- Display content metadata and current rate limit status
+- Implement MTBR selector UI (hybrid slider + custom per Decision #2):
+  - Slider with stops at [100ms, 1s, 10s, 1min, 1hr, 1day]
+  - "Custom" toggle revealing freeform input
+- Implement duration selector (slider bound to retention per Decision #3)
+- Implement live pricing calculator (client-side, visible to all per Decision #5)
 
-### Phase 3: Purchase Integration
-- Integrate Clerk authentication
-- Integrate balance API
+### Phase 4: Purchase Integration
+- Integrate Clerk authentication (required for purchase)
+- Integrate balance API for display
 - Connect purchase form to backend API
-- Implement success/error handling
+- Implement redirect to info.html with success message (Decision #6)
+- Implement error handling
 
-### Phase 4: Polish & Edge Cases
+### Phase 5: Polish & Edge Cases
 - Cross-browser testing
 - Mobile responsiveness
 - Accessibility audit
@@ -553,22 +495,78 @@ c) [1s, 10s, 30s, 1min]
 ## File Changes Required
 
 ### New Files
-- `/frontend/rate-limit.html` - Purchase page (if Option 1b chosen)
-- `/frontend/css/rate-limit.css` - Rate limit specific styles (optional)
-- `/frontend/js/rate-limit.js` - Rate limit purchase logic
+- `/frontend/dashboard/uploads/index.html` - Upload list page
+- `/frontend/dashboard/uploads/[hash].html` - Upload detail page (or dynamic routing)
+- `/frontend/css/uploads.css` - Upload management styles
+- `/frontend/js/uploads.js` - Upload list logic
+- `/frontend/js/rate-limit-purchase.js` - Rate limit purchase form logic
+- `/frontend/js/rate-limit-pricing.js` - Client-side pricing calculator (mirroring backend)
 
 ### Modified Files
-- `/frontend/info.html` - Add rate limit status section
-- `/frontend/js/hash256t.js` - May need price calculation utilities
+- `/frontend/info.html` - Add rate limit status section, handle purchase success params
+- `/frontend/dashboard.html` - Add link to uploads list in navigation/quick actions
+- `/frontend/js/app.js` - May need shared utilities
 
 ---
 
 ## Dependencies
 
+### Complete (Ready to Use)
 - Backend API: ✅ Complete (`POST /api/content/rate-limit/purchase`, `GET /api/content/{cid}/rate-limit`)
 - Authentication: ✅ Complete (Clerk integration)
 - Balance API: ✅ Complete (`GET /api/balance`)
 - Deposit flow: ✅ Complete (`deposit.html`)
+
+### Required Prerequisites
+- **User upload history API**: Need endpoint to list user's uploads with metadata
+  - Suggested: `GET /api/user/uploads` returning list of CIDs with metadata
+  - Currently: User profile DO stores `upload_history` but no API endpoint exposed
+
+---
+
+## Open Questions
+
+### Question 9: Who Can Purchase Rate Limits?
+
+The backend API (`POST /api/content/rate-limit/purchase`) allows any authenticated user to purchase rate limits for any CID. However, Decision #1 places the purchase form at `/dashboard/uploads/{hash}/` which implies it's for content the user uploaded.
+
+**Options**:
+a) Only the original uploader can purchase rate limits for their content
+b) Any authenticated user can purchase rate limits for any content (current API behavior)
+c) Both: uploader via dashboard, others via a separate public purchase page
+
+**Implications**:
+- Option (a) requires ownership verification in UI and possibly API changes
+- Option (b) means `/dashboard/uploads/{hash}/` URL is misleading for non-uploaders
+- Option (c) adds complexity but provides most flexibility
+
+### Question 10: Slider Behavior Between Presets
+
+Decision #2 specifies a hybrid slider with presets [100ms, 1s, 10s, 1min, 1hr, 1day].
+
+**Options**:
+a) Slider snaps to preset values only (6 discrete positions)
+b) Slider allows smooth values between presets
+c) Slider snaps to presets, "Custom" mode allows any value
+
+**Implications**:
+- Option (a) is simplest, may limit flexibility
+- Option (b) could result in awkward values like "47 seconds"
+- Option (c) provides best UX but requires clear mode switching
+
+### Question 11: User Upload History API Scope
+
+To implement Phase 1 (Dashboard Upload List), we need an API to fetch user's uploads.
+
+**Options**:
+a) Create minimal API returning just CIDs + rate limit status
+b) Create full API returning complete metadata (size, expiration, rate limits, download count)
+c) Use existing API calls (one per CID) from client-side stored upload history
+
+**Implications**:
+- Option (a) is fastest to implement but may require multiple follow-up calls
+- Option (b) is most complete but more backend work
+- Option (c) may have stale data and causes N+1 API calls
 
 ---
 
@@ -576,5 +574,6 @@ c) [1s, 10s, 30s, 1min]
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2026-01-17 | Initial plan with test list and open questions |
+| 1.0 | 2026-01-17 | Initial plan with test list and 8 open questions |
+| 1.1 | 2026-01-17 | Resolved Questions 1-8, updated implementation phases, added 3 follow-up questions (9-11) |
 
