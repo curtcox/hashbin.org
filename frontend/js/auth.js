@@ -241,13 +241,8 @@ function notifyAuthStateChange(session) {
  * @returns {string} Provider icon data URI or empty string
  */
 export function getProviderIcon(provider) {
-  // Normalize the provider name and handle null/undefined
+  // Normalize provider name and handle null/undefined
   const p = (provider == null) ? '' : String(provider).trim().toLowerCase();
-  
-  // Return empty string if provider is empty after normalization
-  if (!p) {
-    return '';
-  }
 
   // Helper to construct valid SVG data URLs
   const svgDataUrl = (svg) => `data:image/svg+xml,${encodeURIComponent(svg)}`;
