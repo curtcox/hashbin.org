@@ -58,6 +58,14 @@ jobs:
           
           # Update GIT_SHA in wrangler.toml
           echo "Updating wrangler.toml with GIT_SHA..."
+          
+          # Verify GIT_SHA line exists
+          if ! grep -q "GIT_SHA = " wrangler.toml; then
+            echo "❌ ERROR: GIT_SHA line not found in wrangler.toml"
+            exit 1
+          fi
+          
+          # Update the value
           sed -i "s/^\([[:space:]]*\)GIT_SHA = .*/\1GIT_SHA = \"$GIT_SHA\"/" wrangler.toml
           
           # Verify the update
@@ -85,10 +93,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy to Cloudflare Workers
-        run: |
-          GIT_SHA=$(git rev-parse HEAD)
-          echo "Deploying with git SHA: $GIT_SHA"
-          npx wrangler deploy
+        run: npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

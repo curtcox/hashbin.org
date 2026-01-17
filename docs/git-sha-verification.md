@@ -65,20 +65,27 @@ The deployment workflow has been enhanced with:
        
        # Update GIT_SHA in wrangler.toml
        echo "Updating wrangler.toml with GIT_SHA..."
+       
+       # Verify GIT_SHA line exists
+       if ! grep -q "GIT_SHA = " wrangler.toml; then
+         echo "❌ ERROR: GIT_SHA line not found in wrangler.toml"
+         exit 1
+       fi
+       
+       # Update the value
        sed -i "s/^\([[:space:]]*\)GIT_SHA = .*/\1GIT_SHA = \"$GIT_SHA\"/" wrangler.toml
        
        # Verify the update
        echo "Updated wrangler.toml [vars] section:"
        grep -A 3 "\[vars\]" wrangler.toml
    ```
+   
+   **Prerequisites**: The `wrangler.toml` file must contain a `GIT_SHA` variable in the `[vars]` section. The default value is `"local-dev"`.
 
 2. **Deployment with SHA Variable**:
    ```yaml
    - name: Deploy to Cloudflare Workers
-     run: |
-       GIT_SHA=$(git rev-parse HEAD)
-       echo "Deploying with git SHA: $GIT_SHA"
-       npx wrangler deploy
+     run: npx wrangler deploy
    ```
    
    Note: The GIT_SHA is set in wrangler.toml before deployment rather than passed as a command-line argument. This ensures the variable is properly persisted in the Worker configuration.
