@@ -123,7 +123,9 @@ if echo "$TARGET_URL" | grep -q "^https://"; then
   HTTP_URL=$(echo "$TARGET_URL" | sed 's/^https:/http:/')
   FINAL_URL=$(http_follow_redirect "$HTTP_URL")
   
-  if echo "$FINAL_URL" | grep -q "^https://"; then
+  if [ -z "$FINAL_URL" ]; then
+    log_fail "INF-010" "HTTP to HTTPS Redirect" "Failed to follow redirect (connection error)"
+  elif echo "$FINAL_URL" | grep -q "^https://"; then
     log_pass "INF-010" "HTTP to HTTPS Redirect" "Redirects to HTTPS"
   else
     log_warn "HTTP does not redirect to HTTPS (Final URL: $FINAL_URL)"

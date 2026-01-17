@@ -94,13 +94,12 @@ CORS_HEADER=$(get_header "Access-Control-Allow-Origin")
 if [ -n "$CORS_HEADER" ]; then
   log_pass "API-008" "CORS Headers Present" "CORS header: $CORS_HEADER"
 else
-  # CORS might only be on OPTIONS, try that
-  http_get "$TARGET_URL/api/payments/calculate" \
-    "Origin: https://example.com" \
-    "Access-Control-Request-Method: POST"
-  # Use a simpler approach - just check if we can make OPTIONS request
+  # CORS might only be on OPTIONS preflight, check that
+  # Note: Using direct curl here because OPTIONS method is not in http_client library
+  # and is only needed for this specific CORS preflight test
   local temp_status=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS \
     -H "Origin: https://example.com" \
+    -H "Access-Control-Request-Method: POST" \
     "$TARGET_URL/api/payments/calculate" 2>/dev/null || echo "000")
   if [ "$temp_status" = "200" ] || [ "$temp_status" = "204" ]; then
     log_pass "API-008" "CORS Headers Present" "OPTIONS preflight supported"
