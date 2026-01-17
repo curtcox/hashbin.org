@@ -84,9 +84,9 @@ Update `src/auth/middleware.js`:
 
 Create `frontend/js/local-auth.js`:
 - Provide same interface as `auth.js` (getAuthState, signIn, signOut, etc.)
-- Store "session" in localStorage
+- Reuse the same session storage mechanism as production (no reimplementation)
 - Show simple login prompt (just enter a username)
-- No external script dependencies
+- No external script dependencies (no Clerk SDK)
 
 #### 2.4 Frontend: Auth Module Switcher
 
@@ -240,7 +240,7 @@ Add "Local Development" section to main README.
    - ✅ **DECISION: Option A - Free-form string (e.g., "alice", "bob")**
 
 2. **Session Persistence**: How should local sessions be stored?
-   - ✅ **DECISION: Same as production (Cookie-based)**
+   - ✅ **DECISION: Same as production - use the same code and mechanism**
 
 3. **Balance Initialization**: Should new local users get starting balance?
    - ✅ **DECISION: Option B - Start with $10 (convenient for testing)**
@@ -266,7 +266,7 @@ Add "Local Development" section to main README.
    - Rationale: Server-driven single source of truth, already planned in Phase 4, most reliable approach
 
 10. **Multi-tab Behavior**: How should local auth work across browser tabs?
-    - ✅ **DECISION: Same as production (Share session via localStorage)**
+    - ✅ **DECISION: Same as production - use the same code and mechanism**
 
 ---
 
