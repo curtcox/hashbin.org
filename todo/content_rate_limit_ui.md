@@ -1,6 +1,6 @@
 # Content Rate Limit UI Plan
 
-## Overview
+## Implementation Status: ✅ COMPLETE (2026-01-17)
 
 This document describes the UI for allowing users to view rate limit status and purchase bandwidth (MTBR rate limiting) for specific content. The backend API is already complete (see `todo/content_rate_limit.md`), and this plan focuses on the frontend implementation.
 
@@ -8,10 +8,10 @@ This document describes the UI for allowing users to view rate limit status and 
 
 From `todo/user_stories.md`:
 
-- [UI: 📋 | API: ✅] **As a content publisher**, I would like to purchase bandwidth (MTBR rate limiting) for my content so that I can control access frequency.
-  - _Paths: UI: `/dashboard/uploads/{hash}/rate-limit` (planned) | API: `POST /api/content/rate-limit/purchase`_
-- [UI: 📋 | API: ✅] **As a content publisher**, I would like to see rate limit pricing based on file size and request frequency so that I can budget appropriately.
-  - _Paths: UI: `/dashboard/uploads/{hash}/rate-limit` (planned) | API: Pricing calculator in rate-limit handler_
+- [UI: ✅ | API: ✅] **As a content publisher**, I would like to purchase bandwidth (MTBR rate limiting) for my content so that I can control access frequency.
+  - _Paths: UI: `/dashboard/uploads/{hash}/` (implemented) | API: `POST /api/content/rate-limit/purchase`_
+- [UI: ✅ | API: ✅] **As a content publisher**, I would like to see rate limit pricing based on file size and request frequency so that I can budget appropriately.
+  - _Paths: UI: `/dashboard/uploads/{hash}/` (implemented) | API: Pricing calculator in rate-limit handler_
 - [UI: ✅ | API: ✅] **As an anonymous user**, I would like to check content rate limit status so that I know if I can download the content.
   - _Paths: UI: `/info.html` | API: `GET /api/content/{cid}/rate-limit`_
 
@@ -618,6 +618,97 @@ TEST-UI-A11Y-008: Slider inputs have accessible alternatives (number input)
 
 ---
 
+## Implementation Summary
+
+### Completed (2026-01-17)
+
+All UI components have been successfully implemented:
+
+1. **Backend API** (`src/api/user.js`)
+   - `GET /api/user/uploads` - Retrieves user's upload history with full metadata including rate limit status
+   - Supports sorting (newest, oldest, expiring soon, largest)
+   - Includes pagination with cursor-based navigation
+
+2. **Rate Limit Status Display** (`frontend/info.html`)
+   - Always-visible rate limit card showing current status
+   - Badge indicators (Available, Rate Limited, Blocked, Unlimited)
+   - Human-readable MTBR formatting (e.g., "1 request/minute")
+   - Next available time countdown
+   - Purchase link for non-inline content
+   - Success banner for post-purchase redirects
+
+3. **Dashboard Upload List** (`frontend/dashboard/uploads/index.html`)
+   - Card-based layout showing all user uploads
+   - Sortable by upload date, expiration, or size
+   - Rate limit status badges on each card
+   - Quick stats: size, expiration, downloads, current MTBR
+   - Click-through to detail page
+
+4. **Rate Limit Purchase Form** (`frontend/dashboard/uploads/detail.html`)
+   - Content information display
+   - Current rate limit status
+   - Hybrid MTBR selector with logarithmic slider + custom input
+   - Duration selector bounded by content retention
+   - Live pricing calculator showing max requests, bandwidth, and cost
+   - Balance display with sufficiency indicator
+   - Form validation and error handling
+   - Redirect to info.html on success
+
+5. **Utility Functions** (`frontend/js/rate-limit-utils.js`)
+   - MTBR formatting (milliseconds to human-readable)
+   - Pricing calculation (matches backend formula)
+   - Slider position conversion (logarithmic scale)
+   - Time and duration formatting
+   - Badge generation based on status
+
+6. **Routing Updates** (`src/index.js`)
+   - Added `/dashboard/` and `api-keys` to static paths
+   - Dynamic routing for `/dashboard/uploads/{cid}/` → `detail.html`
+   - Proper handling of upload management pages
+
+### Files Created/Modified
+
+**New Files:**
+- `src/api/user.js` - User uploads API handler
+- `frontend/js/rate-limit-utils.js` - Rate limit utility functions
+- `frontend/js/rate-limit-purchase.js` - Purchase form logic
+- `frontend/dashboard/uploads/index.html` - Upload list page
+- `frontend/dashboard/uploads/detail.html` - Upload detail & purchase page
+
+**Modified Files:**
+- `src/index.js` - Added user uploads route, static paths, dynamic routing
+- `frontend/info.html` - Added rate limit status card
+- `frontend/dashboard.html` - Added "Manage Uploads" quick action
+
+### Design Decisions Implemented
+
+All 11 design decisions from the plan have been implemented:
+
+1. ✅ Purchase form integrated into `/dashboard/uploads/{hash}/` page
+2. ✅ Hybrid MTBR input: slider with presets + custom millisecond input
+3. ✅ Duration slider bound to remaining content retention
+4. ✅ Rate limit section always shown on info.html
+5. ✅ Pricing calculator visible to anonymous users, purchase requires auth
+6. ✅ Redirect to info.html with success message after purchase
+7. ✅ Duration allowed up to full remaining retention
+8. ✅ MTBR presets: [100ms, 1s, 10s, 1min, 1hr, 1day]
+9. ✅ Any authenticated user can purchase for any content
+10. ✅ Smooth logarithmic slider between presets
+11. ✅ Full metadata API (size, expiration, rate limits, downloads)
+
+### Testing Notes
+
+The implementation follows all design principles and user story requirements. Manual testing should verify:
+- Upload list loads and displays correctly
+- Rate limit status shows on info.html
+- Purchase form calculates pricing accurately
+- Purchase flow completes successfully
+- Success redirect displays confirmation
+- Inline content shows "Unlimited" correctly
+- Balance checking prevents insufficient fund purchases
+
+---
+
 ## Document History
 
 | Version | Date | Changes |
@@ -625,4 +716,5 @@ TEST-UI-A11Y-008: Slider inputs have accessible alternatives (number input)
 | 1.0 | 2026-01-17 | Initial plan with test list and 8 open questions |
 | 1.1 | 2026-01-17 | Resolved Questions 1-8, updated implementation phases, added 3 follow-up questions (9-11) |
 | 1.2 | 2026-01-17 | Resolved Questions 9-11: any user can purchase (9), smooth slider (10), full metadata API (11). Added API specification for GET /api/user/uploads. Added 29 new tests for slider behavior, form validation, and upload history API. All questions resolved - plan complete. |
+| 2.0 | 2026-01-17 | **IMPLEMENTATION COMPLETE** - All UI components implemented and committed. Added implementation summary with files created/modified and completion status. |
 
