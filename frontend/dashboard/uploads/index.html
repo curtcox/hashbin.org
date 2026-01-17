@@ -132,6 +132,7 @@
   <header class="nav-header">
     <a href="/" class="logo">HashBin</a>
     <nav>
+      <a href="/dashboard.html" class="auth-only">Dashboard</a>
       <a href="/upload.html">Upload</a>
       <a href="/retrieve.html">Retrieve</a>
       <a href="/docs/">Docs</a>
@@ -144,45 +145,88 @@
   <!-- Main Content -->
   <main>
     <div class="container">
-      <h1>📦 Upload Management</h1>
-      <p style="color: var(--color-text-light); margin-bottom: 2rem;">
-        View and manage your uploaded content, including rate limits and retention.
-      </p>
-      
-      <div class="sort-controls">
-        <label for="sort-select">Sort by:</label>
-        <select id="sort-select">
-          <option value="uploaded_at_desc">Newest First</option>
-          <option value="uploaded_at_asc">Oldest First</option>
-          <option value="expires_at_asc">Expiring Soon</option>
-          <option value="size_desc">Largest First</option>
-        </select>
-      </div>
-      
-      <div id="loading" style="text-align: center; padding: 2rem;">
-        <div class="spinner"></div>
-        <p>Loading your uploads...</p>
-      </div>
-      
-      <div id="uploads-list" style="display: none;">
-        <!-- Upload cards will be rendered here -->
-      </div>
-      
-      <div id="empty-state" style="display: none;">
-        <div class="empty-state">
-          <div class="empty-state-icon">📦</div>
-          <h2>No Uploads Yet</h2>
-          <p style="margin: 1rem 0 2rem 0;">
-            You haven't uploaded any content yet. Start by uploading your first file!
+      <div class="dashboard-layout">
+        <!-- Dashboard Sidebar -->
+        <aside class="dashboard-sidebar">
+          <nav>
+            <a href="/dashboard.html">
+              <span class="nav-icon">📊</span>
+              <span>Overview</span>
+            </a>
+            <a href="/api-keys.html">
+              <span class="nav-icon">🔑</span>
+              <span>API Keys</span>
+            </a>
+            <a href="/dashboard/uploads/" class="nav-active">
+              <span class="nav-icon">📦</span>
+              <span>My Uploads</span>
+            </a>
+            <a href="/deposit.html">
+              <span class="nav-icon">💰</span>
+              <span>Add Funds</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">💳</span>
+              <span>Transactions</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">⚙️</span>
+              <span>Account Settings</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+          </nav>
+        </aside>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard-content">
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a href="/dashboard.html">Dashboard</a>
+            <span class="separator">›</span>
+            <span class="current">My Uploads</span>
+          </nav>
+
+          <h1>📦 Upload Management</h1>
+          <p style="color: var(--color-text-light); margin-bottom: 2rem;">
+            View and manage your uploaded content, including rate limits and retention.
           </p>
-          <a href="/upload.html" class="btn btn-primary">Upload Content</a>
-        </div>
-      </div>
-      
-      <div id="error" style="display: none;">
-        <div class="alert alert-error">
-          <strong>Error</strong>
-          <p id="error-message"></p>
+          
+          <div class="sort-controls">
+            <label for="sort-select">Sort by:</label>
+            <select id="sort-select">
+              <option value="uploaded_at_desc">Newest First</option>
+              <option value="uploaded_at_asc">Oldest First</option>
+              <option value="expires_at_asc">Expiring Soon</option>
+              <option value="size_desc">Largest First</option>
+            </select>
+          </div>
+          
+          <div id="loading" style="text-align: center; padding: 2rem;">
+            <div class="spinner"></div>
+            <p>Loading your uploads...</p>
+          </div>
+          
+          <div id="uploads-list" style="display: none;">
+            <!-- Upload cards will be rendered here -->
+          </div>
+          
+          <div id="empty-state" style="display: none;">
+            <div class="empty-state">
+              <div class="empty-state-icon">📦</div>
+              <h2>No Uploads Yet</h2>
+              <p style="margin: 1rem 0 2rem 0;">
+                You haven't uploaded any content yet. Start by uploading your first file!
+              </p>
+              <a href="/upload.html" class="btn btn-primary">Upload Content</a>
+            </div>
+          </div>
+          
+          <div id="error" style="display: none;">
+            <div class="alert alert-error">
+              <strong>Error</strong>
+              <p id="error-message"></p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -192,7 +236,8 @@
   <footer>
     <p>&copy; 2026 HashBin.org | Open Source | 
       <a href="/docs/">Documentation</a> | 
-      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a> |
+      <a href="/sitemap.html">Site Map</a>
     </p>
   </footer>
 

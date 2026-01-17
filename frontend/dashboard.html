@@ -19,6 +19,7 @@
   <header class="nav-header">
     <a href="/" class="logo">HashBin</a>
     <nav>
+      <a href="/dashboard.html" class="auth-only">Dashboard</a>
       <a href="/upload.html">Upload</a>
       <a href="/retrieve.html">Retrieve</a>
       <a href="/docs/">Docs</a>
@@ -31,50 +32,87 @@
   <!-- Main Content -->
   <main>
     <div class="container">
-      <h1>Dashboard</h1>
-      
-      <!-- Balance Card -->
-      <div class="card">
-        <h2 class="card-title">Account Balance</h2>
-        <div id="dashboard-balance">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <div class="spinner"></div>
-            <span>Loading balance...</span>
+      <div class="dashboard-layout">
+        <!-- Dashboard Sidebar -->
+        <aside class="dashboard-sidebar">
+          <nav>
+            <a href="/dashboard.html" class="nav-active">
+              <span class="nav-icon">📊</span>
+              <span>Overview</span>
+            </a>
+            <a href="/api-keys.html">
+              <span class="nav-icon">🔑</span>
+              <span>API Keys</span>
+            </a>
+            <a href="/dashboard/uploads/">
+              <span class="nav-icon">📦</span>
+              <span>My Uploads</span>
+            </a>
+            <a href="/deposit.html">
+              <span class="nav-icon">💰</span>
+              <span>Add Funds</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">💳</span>
+              <span>Transactions</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">⚙️</span>
+              <span>Account Settings</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+          </nav>
+        </aside>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard-content">
+          <h1>Dashboard</h1>
+          
+          <!-- Balance Card -->
+          <div class="card">
+            <h2 class="card-title">Account Balance</h2>
+            <div id="dashboard-balance">
+              <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="spinner"></div>
+                <span>Loading balance...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Actions -->
+          <div class="card" style="margin-top: 2rem;">
+            <h2 class="card-title">Quick Actions</h2>
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+              <a href="/upload.html" class="btn btn-primary">Upload Content</a>
+              <a href="/retrieve.html" class="btn btn-secondary">Retrieve Content</a>
+              <a href="/deposit.html" class="btn btn-secondary">Add Funds</a>
+              <a href="/dashboard/uploads/" class="btn btn-secondary">📦 Manage Uploads</a>
+            </div>
+          </div>
+
+          <!-- API Keys Card -->
+          <div class="card" style="margin-top: 2rem;">
+            <h2 class="card-title">🔑 API Keys</h2>
+            <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+              Manage your API credentials for programmatic access
+            </p>
+            <div id="api-keys-summary">
+              <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="spinner"></div>
+                <span>Loading API keys...</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Placeholder for future features -->
+          <div class="card" style="margin-top: 2rem;">
+            <h2 class="card-title">Recent Uploads</h2>
+            <p style="color: var(--color-text-light);">
+              Your uploaded content will appear here. Upload functionality coming soon.
+            </p>
           </div>
         </div>
-      </div>
-
-      <!-- Quick Actions -->
-      <div class="card" style="margin-top: 2rem;">
-        <h2 class="card-title">Quick Actions</h2>
-        <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-          <a href="/upload.html" class="btn btn-primary">Upload Content</a>
-          <a href="/retrieve.html" class="btn btn-secondary">Retrieve Content</a>
-          <a href="/deposit.html" class="btn btn-secondary">Add Funds</a>
-          <a href="/dashboard/uploads/" class="btn btn-secondary">📦 Manage Uploads</a>
-        </div>
-      </div>
-
-      <!-- API Keys Card -->
-      <div class="card" style="margin-top: 2rem;">
-        <h2 class="card-title">🔑 API Keys</h2>
-        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
-          Manage your API credentials for programmatic access
-        </p>
-        <div id="api-keys-summary">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <div class="spinner"></div>
-            <span>Loading API keys...</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Placeholder for future features -->
-      <div class="card" style="margin-top: 2rem;">
-        <h2 class="card-title">Recent Uploads</h2>
-        <p style="color: var(--color-text-light);">
-          Your uploaded content will appear here. Upload functionality coming soon.
-        </p>
       </div>
     </div>
   </main>
@@ -83,7 +121,8 @@
   <footer>
     <p>&copy; 2026 HashBin.org | Open Source | 
       <a href="/docs/">Documentation</a> | 
-      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a> |
+      <a href="/sitemap.html">Site Map</a>
     </p>
   </footer>
 

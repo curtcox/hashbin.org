@@ -208,6 +208,7 @@
   <header class="nav-header">
     <a href="/" class="logo">HashBin</a>
     <nav>
+      <a href="/dashboard.html" class="auth-only">Dashboard</a>
       <a href="/upload.html">Upload</a>
       <a href="/retrieve.html">Retrieve</a>
       <a href="/docs/">Docs</a>
@@ -220,64 +221,108 @@
   <!-- Main Content -->
   <main>
     <div class="container">
-      <div class="api-keys-header">
-        <div>
-          <h1>
-            API Keys
-            <span id="key-count" class="key-count"></span>
-          </h1>
-          <p style="color: var(--color-text-light); margin-top: var(--spacing-sm);">
-            Manage your API credentials for programmatic access
-          </p>
-        </div>
-        <a href="/api-keys-create.html" id="create-key-btn" class="btn btn-primary">
-          Create New Key
-        </a>
-      </div>
-      
-      <!-- Warning when approaching limit -->
-      <div id="limit-warning" class="alert alert-warning hidden" style="margin-bottom: var(--spacing-lg);">
-        <!-- Will be populated by JS -->
-      </div>
-      
-      <!-- Loading State -->
-      <div id="loading-state" class="card">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <div class="spinner"></div>
-          <span>Loading API keys...</span>
-        </div>
-      </div>
-      
-      <!-- Empty State -->
-      <div id="empty-state" class="card hidden">
-        <div class="empty-state">
-          <div class="empty-state-icon">🔑</div>
-          <h2>No API Keys Yet</h2>
-          <p>
-            Create your first API key to start using the HashBin API programmatically.
-          </p>
-          <a href="/api-keys-create.html" class="btn btn-primary">Create API Key</a>
-        </div>
-      </div>
-      
-      <!-- Keys Table -->
-      <div id="keys-table-container" class="card hidden">
-        <table class="api-keys-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Key Prefix</th>
-              <th>Status</th>
-              <th>Usage</th>
-              <th>Last Used</th>
-              <th>Expires</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="keys-table-body">
+      <div class="dashboard-layout">
+        <!-- Dashboard Sidebar -->
+        <aside class="dashboard-sidebar">
+          <nav>
+            <a href="/dashboard.html">
+              <span class="nav-icon">📊</span>
+              <span>Overview</span>
+            </a>
+            <a href="/api-keys.html" class="nav-active">
+              <span class="nav-icon">🔑</span>
+              <span>API Keys</span>
+            </a>
+            <a href="/dashboard/uploads/">
+              <span class="nav-icon">📦</span>
+              <span>My Uploads</span>
+            </a>
+            <a href="/deposit.html">
+              <span class="nav-icon">💰</span>
+              <span>Add Funds</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">💳</span>
+              <span>Transactions</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">⚙️</span>
+              <span>Account Settings</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+          </nav>
+        </aside>
+
+        <!-- Dashboard Content -->
+        <div class="dashboard-content">
+          <!-- Breadcrumbs -->
+          <nav class="breadcrumbs" aria-label="Breadcrumb">
+            <a href="/dashboard.html">Dashboard</a>
+            <span class="separator">›</span>
+            <span class="current">API Keys</span>
+          </nav>
+
+          <div class="api-keys-header">
+            <div>
+              <h1>
+                API Keys
+                <span id="key-count" class="key-count"></span>
+              </h1>
+              <p style="color: var(--color-text-light); margin-top: var(--spacing-sm);">
+                Manage your API credentials for programmatic access
+              </p>
+            </div>
+            <a href="/api-keys-create.html" id="create-key-btn" class="btn btn-primary">
+              Create New Key
+            </a>
+          </div>
+          
+          <!-- Warning when approaching limit -->
+          <div id="limit-warning" class="alert alert-warning hidden" style="margin-bottom: var(--spacing-lg);">
             <!-- Will be populated by JS -->
-          </tbody>
+          </div>
+          
+          <!-- Loading State -->
+          <div id="loading-state" class="card">
+            <div style="display: flex; align-items: center; gap: 1rem;">
+              <div class="spinner"></div>
+              <span>Loading API keys...</span>
+            </div>
+          </div>
+          
+          <!-- Empty State -->
+          <div id="empty-state" class="card hidden">
+            <div class="empty-state">
+              <div class="empty-state-icon">🔑</div>
+              <h2>No API Keys Yet</h2>
+              <p>
+                Create your first API key to start using the HashBin API programmatically.
+              </p>
+              <a href="/api-keys-create.html" class="btn btn-primary">Create API Key</a>
+            </div>
+          </div>
+          
+          <!-- Keys Table -->
+          <div id="keys-table-container" class="card hidden">
+            <table class="api-keys-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Key Prefix</th>
+                  <th>Status</th>
+                  <th>Usage</th>
+                  <th>Last Used</th>
+                  <th>Expires</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="keys-table-body">
+                <!-- Will be populated by JS -->
+              </tbody>
         </table>
+      </div>
+    </div>
       </div>
     </div>
   </main>
@@ -286,7 +331,8 @@
   <footer>
     <p>&copy; 2026 HashBin.org | Open Source | 
       <a href="/docs/">Documentation</a> | 
-      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a>
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a> |
+      <a href="/sitemap.html">Site Map</a>
     </p>
   </footer>
 
