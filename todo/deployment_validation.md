@@ -290,14 +290,7 @@ scripts/
 | 9 | Existing Smoke Tests | Keep smoke-test.yml for quick checks, this workflow for comprehensive validation |
 | 10 | Session/Token Testing | Use API key for authenticated endpoint tests |
 | 11 | Expected Git SHA | Use SHA from triggering workflow (workflow_run) |
-
----
-
-## Open Questions
-
-1. **Failure Severity**: Should some test failures be treated as warnings (workflow passes) vs. hard failures (workflow fails)?
-   - Example: Performance test slightly over threshold = warning, security header missing = hard fail?
-   - Or should ALL test failures cause the workflow to fail?
+| 12 | Failure Severity | All failures are hard failures - any test failure causes workflow to fail |
 
 ---
 
@@ -335,3 +328,4 @@ The deployment is considered valid when:
 |---------|------|---------|
 | 0.1 | 2026-01-17 | Initial draft |
 | 0.2 | 2026-01-17 | Resolved 11 of 12 questions; simplified security tests to header-only; clarified rate limit testing approach |
+| 1.0 | 2026-01-17 | All questions resolved; all failures are hard failures; plan ready for implementation |
