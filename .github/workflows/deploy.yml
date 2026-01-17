@@ -50,6 +50,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Inject git SHA into frontend
+        run: |
+          GIT_SHA=$(git rev-parse HEAD)
+          echo "Git SHA: $GIT_SHA"
+          bash scripts/inject-git-sha.sh "$GIT_SHA"
+          
       - name: Create R2 buckets
         run: |
           create_bucket() {
@@ -71,7 +77,10 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy to Cloudflare Workers
-        run: npx wrangler deploy
+        run: |
+          GIT_SHA=$(git rev-parse HEAD)
+          echo "Deploying with git SHA: $GIT_SHA"
+          npx wrangler deploy --var GIT_SHA:"$GIT_SHA"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -162,6 +171,8 @@ jobs:
 
       - name: Verify deployment - Custom domain
         run: |
+          GIT_SHA=$(git rev-parse HEAD)
+          echo "Expected git SHA: $GIT_SHA"
           echo "Testing custom domain hashbin.org..."
           RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin.org/health)
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
@@ -180,11 +191,38 @@ jobs:
             exit 1
           fi
 
+          # Verify git SHA
+          DEPLOYED_SHA=$(echo "$BODY" | grep -o '"gitSha"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"\([^"]*\)".*/\1/')
+          echo "Deployed git SHA: $DEPLOYED_SHA"
+          
+          if [ "$DEPLOYED_SHA" != "$GIT_SHA" ]; then
+            echo "❌ Git SHA mismatch: expected $GIT_SHA, got $DEPLOYED_SHA"
+            exit 1
+          fi
+          
+          echo "✅ Git SHA verified: $GIT_SHA"
+
           if ! echo "$BODY" | grep -q '"environment"[[:space:]]*:[[:space:]]*"production"'; then
             echo "⚠️  Environment field shows unexpected value (non-critical)"
           fi
 
           echo "✅ Custom domain verified"
+
+      - name: Verify git SHA in HTML files
+        run: |
+          GIT_SHA=$(git rev-parse HEAD)
+          echo "Verifying git SHA in HTML files..."
+          
+          # Test the index page
+          HTML_RESPONSE=$(curl -s https://hashbin.org/)
+          
+          if echo "$HTML_RESPONSE" | grep -q "<!-- git-sha: $GIT_SHA -->"; then
+            echo "✅ Git SHA found in HTML: $GIT_SHA"
+          else
+            echo "❌ Git SHA not found in HTML files"
+            echo "Expected: <!-- git-sha: $GIT_SHA -->"
+            exit 1
+          fi
 
       - name: Verify deployment - Workers.dev URL
         continue-on-error: true

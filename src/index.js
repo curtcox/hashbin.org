@@ -380,6 +380,7 @@ async function handleHealth(env) {
     status: overallStatus,
     timestamp: new Date().toISOString(),
     environment: env.ENVIRONMENT || 'unknown',
+    gitSha: env.GIT_SHA || 'unknown',
     checks: checks,
     summary: {
       total: Object.keys(checks).length,

@@ -215,6 +215,49 @@ jobs:
           echo "::notice::Durable Objects operational"
 
       # ============================================
+      # Deployment Verification Tests
+      # ============================================
+      - name: Test - Git SHA in Health Endpoint
+        run: |
+          BODY='${{ steps.health.outputs.body }}'
+          
+          # Check git SHA is present in health response
+          if ! echo "$BODY" | jq -e '.gitSha' > /dev/null 2>&1; then
+            echo "::error::gitSha field not found in health response"
+            exit 1
+          fi
+          
+          GIT_SHA=$(echo "$BODY" | jq -r '.gitSha')
+          echo "Deployed git SHA: $GIT_SHA"
+          
+          if [ "$GIT_SHA" == "unknown" ] || [ -z "$GIT_SHA" ]; then
+            echo "::error::gitSha is not set properly"
+            exit 1
+          fi
+          
+          echo "::notice::Git SHA present in health endpoint: $GIT_SHA"
+
+      - name: Test - Git SHA in HTML Comments
+        run: |
+          BODY='${{ steps.health.outputs.body }}'
+          GIT_SHA=$(echo "$BODY" | jq -r '.gitSha')
+          
+          # Fetch the index page and check for git SHA comment
+          HTML_RESPONSE=$(curl -sf "${{ steps.url.outputs.base_url }}/" || printf 'ERROR')
+          
+          if [ "$HTML_RESPONSE" == "ERROR" ]; then
+            echo "::error::Failed to fetch HTML page"
+            exit 1
+          fi
+          
+          if echo "$HTML_RESPONSE" | grep -q "<!-- git-sha: $GIT_SHA -->"; then
+            echo "::notice::Git SHA found in HTML comments: $GIT_SHA"
+          else
+            echo "::error::Git SHA not found in HTML comments (expected: $GIT_SHA)"
+            exit 1
+          fi
+
+      # ============================================
       # API Endpoint Tests
       # ============================================
       - name: Test - Root Endpoint
