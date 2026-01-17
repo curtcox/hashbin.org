@@ -16,6 +16,25 @@ This plan addresses the 7 Navigation & Discoverability user stories from `todo/u
 | 6 | Clear visual indicators of which section I'm currently viewing | UI: Planned |
 | 7 | Breadcrumb navigation on nested pages | UI: Planned |
 
+## Design Decisions
+
+The following questions have been resolved:
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Shared components approach | **Option B**: JavaScript templating/injection |
+| 2 | Dashboard URL structure | **Keep current**: `/api-keys.html`, `/api-keys-create.html`, `/api-keys-detail.html` |
+| 3 | Deposit page location | **Option A**: Keep at `/deposit.html` |
+| 4 | Active indicator style | **PENDING** - see analysis below |
+| 5 | Sidebar collapse on mobile | **Option C**: Convert to horizontal tabs below header |
+| 6 | Planned features indication | **Option B**: Normal styling with "(Coming Soon)" text suffix |
+| 7 | Deep link to planned page | **Option C**: Placeholder page with link to GitHub issue |
+| 8 | Breadcrumb hash truncation | **Option B**: First 4 + last 4 (e.g., "6G2k...XiT8") |
+| 9 | Site map access point | **Option D**: Footer + 404 page suggestion |
+| 10 | Header navigation order | **Option B**: Dashboard, Upload, Retrieve, Docs (when logged in) |
+
+---
+
 ## Current State Analysis
 
 ### Existing Navigation Elements
@@ -236,7 +255,7 @@ Add consistent footer links across all pages.
 | NAV-B-011 | "My Uploads" breadcrumb link works | Clicking navigates to `/dashboard/uploads/` |
 | NAV-B-012 | Current page is not a link | Final breadcrumb segment is text, not link |
 | NAV-B-013 | Breadcrumb separator visible | ">" or "/" visible between segments |
-| NAV-B-014 | Breadcrumbs truncate long hash | Hash shows first 8 chars + "..." |
+| NAV-B-014 | Breadcrumbs truncate long hash | Hash shows first 4 + "..." + last 4 (e.g., "6G2k...XiT8") |
 | NAV-B-015 | Breadcrumbs truncate long key name | Names > 20 chars are truncated |
 | NAV-B-016 | Breadcrumbs accessible | Proper ARIA attributes on breadcrumb nav |
 
@@ -275,8 +294,8 @@ Add consistent footer links across all pages.
 | NAV-R-006 | Menu close on outside click | Clicking outside menu closes it |
 | NAV-R-007 | Mobile menu includes all links | Same links as desktop visible |
 | NAV-R-008 | Mobile menu shows auth state | Sign in/user info visible |
-| NAV-R-009 | Sidebar collapses on mobile | Sidebar hidden or transformed |
-| NAV-R-010 | Sidebar toggle visible on mobile | Way to show sidebar on narrow screens |
+| NAV-R-009 | Sidebar converts to horizontal tabs on mobile | Sidebar items appear as tab bar below header |
+| NAV-R-010 | Horizontal tabs scrollable if needed | Tab bar scrolls horizontally on narrow screens |
 | NAV-R-011 | Breadcrumbs wrap on mobile | Long breadcrumbs don't overflow |
 | NAV-R-012 | Touch targets >= 44x44px | All clickable elements adequately sized |
 | NAV-R-013 | No horizontal scroll | Pages don't require horizontal scrolling |
@@ -330,6 +349,41 @@ Add consistent footer links across all pages.
 | NAV-AC-014 | Focus trap in mobile menu | Tab cycles within open menu |
 | NAV-AC-015 | Escape closes mobile menu | Keyboard dismissal works |
 
+### JavaScript Component Injection Tests
+
+| Test ID | Test Description | Expected Result |
+|---------|------------------|-----------------|
+| NAV-J-001 | Header injected on page load | Header appears via JS, not in static HTML |
+| NAV-J-002 | Sidebar injected on dashboard pages | Sidebar appears via JS injection |
+| NAV-J-003 | Navigation works without page reload | Injected nav responds to clicks |
+| NAV-J-004 | Auth state reflected in injected header | Dashboard link visibility matches auth |
+| NAV-J-005 | Active state correct after injection | Current page highlighted correctly |
+| NAV-J-006 | Breadcrumbs injected with correct data | Page-specific breadcrumbs render |
+| NAV-J-007 | Footer injected consistently | Same footer on all pages |
+| NAV-J-008 | No duplicate injection on SPA navigation | Components not duplicated |
+
+### Placeholder Page Tests (Planned Features)
+
+| Test ID | Test Description | Expected Result |
+|---------|------------------|-----------------|
+| NAV-P-001 | Transactions page shows placeholder | "Coming Soon" message displayed |
+| NAV-P-002 | Account Settings page shows placeholder | "Coming Soon" message displayed |
+| NAV-P-003 | Placeholder includes GitHub issue link | Link to relevant issue present |
+| NAV-P-004 | Placeholder has standard navigation | Header/sidebar/footer present |
+| NAV-P-005 | Placeholder sidebar shows current item | "Transactions (Coming Soon)" active |
+| NAV-P-006 | Placeholder breadcrumbs correct | Shows full path to planned page |
+
+### 404 Page Navigation Tests
+
+| Test ID | Test Description | Expected Result |
+|---------|------------------|-----------------|
+| NAV-404-001 | 404 page has standard header | Same header as other pages |
+| NAV-404-002 | 404 page has standard footer | Same footer as other pages |
+| NAV-404-003 | 404 page suggests site map | "View our site map" link present |
+| NAV-404-004 | Site map link on 404 works | Navigates to `/sitemap.html` |
+| NAV-404-005 | 404 suggests home page | Link to `/` present |
+| NAV-404-006 | 404 shows searched URL | Displays what user tried to access |
+
 ### Edge Case Tests
 
 | Test ID | Test Description | Expected Result |
@@ -350,70 +404,133 @@ Add consistent footer links across all pages.
 
 ## Open Questions
 
-### Architecture Questions
+### Question 4: Active Indicator Style (PENDING)
 
-1. **Shared components approach**: Should we implement a JavaScript-based component system to inject header/sidebar, or continue with duplicated HTML?
-   - Option A: Keep HTML duplication (simpler, but maintenance burden)
-   - Option B: Use JavaScript templating/injection (DRY, but JS dependency)
-   - Option C: Build step with HTML includes (requires tooling change)
+**Definition of "Active Navigation Items":**
 
-2. **Dashboard URL structure**: Should API Keys remain at `/api-keys.html` or move to `/dashboard/api-keys/`?
-   - Current: `/api-keys.html`, `/api-keys-create.html`, `/api-keys-detail.html`
-   - Proposed: `/dashboard/api-keys/`, `/dashboard/api-keys/create.html`, `/dashboard/api-keys/detail.html`
-   - Affects: Breadcrumb logic, link consistency, redirects needed
+An "active navigation item" is a link in the navigation UI that represents the user's current location within the site hierarchy. There are two distinct contexts:
 
-3. **Deposit page location**: Should `/deposit.html` be part of dashboard structure?
-   - Current: `/deposit.html` at root
-   - Option A: Keep at `/deposit.html`
-   - Option B: Move to `/dashboard/deposit.html`
-   - Option C: Move to `/dashboard/balance/` with deposit as action
-   - Affects: Sidebar navigation, breadcrumbs
+1. **Header Navigation (horizontal)**: The top-level nav links (Dashboard, Upload, Retrieve, Docs). The active item indicates which major section the user is in.
 
-### Design Questions
+2. **Sidebar Navigation (vertical)**: The dashboard sub-navigation (Overview, API Keys, My Uploads, etc.). The active item indicates which dashboard feature the user is viewing.
 
-4. **Active indicator style**: What visual treatment for active navigation items?
-   - Option A: Bold text only
-   - Option B: Underline
-   - Option C: Background highlight
-   - Option D: Left border accent (for sidebar)
-   - Option E: Combination (bold + underline)
+**Analysis of Each Option:**
 
-5. **Sidebar collapse behavior on mobile**: How should sidebar behave on narrow screens?
-   - Option A: Hide entirely (rely on header nav only)
-   - Option B: Collapse to icon-only rail
-   - Option C: Convert to horizontal tabs below header
-   - Option D: Off-canvas slide-out drawer
+#### Option A: Bold Text Only
+```css
+.nav-active { font-weight: 700; }
+```
 
-6. **Planned features indication in navigation**: How to show "coming soon" features?
-   - Option A: Grayed out with tooltip
-   - Option B: Normal styling with "(Coming Soon)" text suffix
-   - Option C: Don't show planned features at all in nav
-   - Option D: Show with lock/clock icon
+| Pros | Cons |
+|------|------|
+| Minimal visual change | Subtle - may be missed by users |
+| Works in any color scheme | Causes text reflow (width changes) |
+| Accessible (doesn't rely on color) | Less effective for single-word items |
+| Simple to implement | No clear "you are here" signal |
 
-### Functional Questions
+**Best for**: Text-heavy navigation where subtlety is preferred.
 
-7. **Deep link to planned page behavior**: What happens when user navigates to a planned page URL?
-   - Option A: 404 error page
-   - Option B: Redirect to parent with toast message
-   - Option C: Placeholder page with "Coming Soon" message and timeline
+#### Option B: Underline
+```css
+.nav-active { text-decoration: underline; text-underline-offset: 4px; }
+```
 
-8. **Breadcrumb hash truncation**: How to display long content hashes?
-   - Option A: First 8 characters (e.g., "6G2ksXiT...")
-   - Option B: First 4 + last 4 (e.g., "6G2k...XiT8")
-   - Option C: Full hash with horizontal scroll
-   - Option D: Custom name if available, fallback to truncated hash
+| Pros | Cons |
+|------|------|
+| Strong visual affordance | May conflict with link styling |
+| Familiar pattern (web convention) | Can look dated |
+| No width change | Doesn't work well in sidebar |
+| Accessible | Limited styling options |
 
-9. **Site map primary access point**: Where should the site map be most prominently linked?
-   - Option A: Footer only (standard convention)
-   - Option B: Footer + help dropdown in header
-   - Option C: Footer + dedicated link in dashboard sidebar
-   - Option D: Footer + 404 page suggestion
+**Best for**: Horizontal header navigation; mimics traditional web link states.
 
-10. **Header navigation order**: What order should nav items appear?
-    - Current: Upload, Retrieve, Docs
-    - Option A: Keep current + add Dashboard at end
-    - Option B: Dashboard, Upload, Retrieve, Docs (dashboard first for logged-in users)
-    - Option C: Retrieve, Upload, Dashboard, Docs (read-first flow)
+#### Option C: Background Highlight
+```css
+.nav-active { background-color: var(--primary-light); border-radius: 4px; }
+```
+
+| Pros | Cons |
+|------|------|
+| High visibility | Requires careful color selection |
+| Clear "selected" state | May clash with hover states |
+| Works for both header and sidebar | Adds visual weight |
+| Familiar (tab/pill pattern) | Color-dependent (accessibility concern) |
+
+**Best for**: Tab-style navigation, pill buttons, where items are clearly separate.
+
+#### Option D: Left Border Accent (Sidebar Only)
+```css
+.sidebar .nav-active { border-left: 3px solid var(--primary); background: var(--bg-subtle); }
+```
+
+| Pros | Cons |
+|------|------|
+| Strong visual hierarchy | Only works for vertical nav |
+| Indicates position clearly | Requires sidebar-specific CSS |
+| Industry standard (VS Code, Slack, etc.) | Doesn't apply to header |
+| Works with any text styling | Need different solution for header |
+
+**Best for**: Vertical sidebar navigation; professional/developer tools.
+
+#### Option E: Combination (Bold + Underline or Bold + Border)
+```css
+/* Header */
+.nav-header .nav-active { font-weight: 600; border-bottom: 2px solid var(--primary); }
+/* Sidebar */
+.sidebar .nav-active { font-weight: 600; border-left: 3px solid var(--primary); background: var(--bg-subtle); }
+```
+
+| Pros | Cons |
+|------|------|
+| Maximum clarity | More complex CSS |
+| Redundant signals (accessibility) | Risk of over-styling |
+| Can differentiate header vs sidebar | Requires coordination |
+| Robust across contexts | More visual noise |
+
+**Best for**: Applications needing high discoverability and accessibility compliance.
+
+---
+
+**Recommendation for HashBin:**
+
+Given that HashBin has:
+- A horizontal header nav (4 items when logged in)
+- A vertical sidebar nav (5 items)
+- A developer/technical audience
+- Existing primary color (#4f46e5 indigo)
+
+**Suggested approach**: Different treatments for header vs sidebar:
+
+| Context | Recommended Style |
+|---------|-------------------|
+| Header | **Bottom border** (2-3px solid primary color) - clear tab indicator |
+| Sidebar | **Left border + subtle background** - industry standard for vertical nav |
+
+This would be a **hybrid of Options B, C, and D**:
+```css
+/* Header active state */
+.nav-header .nav-active {
+  color: var(--primary);
+  border-bottom: 2px solid var(--primary);
+  padding-bottom: 2px;
+}
+
+/* Sidebar active state */
+.sidebar .nav-active {
+  font-weight: 500;
+  color: var(--primary);
+  background-color: var(--primary-bg);
+  border-left: 3px solid var(--primary);
+}
+```
+
+**Follow-up Question**: Which approach do you prefer?
+- **Option A**: Bold only (both contexts)
+- **Option B**: Underline only (both contexts)
+- **Option C**: Background highlight (both contexts)
+- **Option D**: Left border for sidebar, underline for header
+- **Option E**: Left border for sidebar, bottom border for header (recommended)
+- **Option F**: Other (please specify)
 
 ---
 
@@ -422,7 +539,7 @@ Add consistent footer links across all pages.
 The navigation implementation is complete when:
 
 1. [ ] All 7 user stories have passing tests
-2. [ ] All 101 test cases in the test plan pass
+2. [ ] All 121 test cases in the test plan pass
 3. [ ] No open questions remain (all decisions documented)
 4. [ ] Dashboard link appears in header for authenticated users
 5. [ ] Active page indicators work on all pages
@@ -451,3 +568,4 @@ The navigation implementation is complete when:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-17 | Initial plan with 101 tests and 10 open questions |
+| 1.1 | 2026-01-17 | Resolved 9 of 10 questions. Added detailed analysis for Question 4 (active indicator style) with CSS examples and recommendation. |
