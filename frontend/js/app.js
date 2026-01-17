@@ -77,10 +77,17 @@ async function updateAuthUI() {
     setupAuthenticatedHandlers();
     // Fetch and display balance
     await updateBalance();
+    // Show auth-only nav links
+    showAuthOnlyNavigation();
   } else {
     authSection.innerHTML = createUnauthenticatedHTML();
     setupUnauthenticatedHandlers();
+    // Hide auth-only nav links
+    hideAuthOnlyNavigation();
   }
+  
+  // Update active page indicator
+  updateActiveNavigation();
 }
 
 /**
@@ -233,11 +240,97 @@ export function getCachedBalance() {
   return balanceCache;
 }
 
+/**
+ * Show navigation items that require authentication
+ */
+function showAuthOnlyNavigation() {
+  const authOnlyLinks = document.querySelectorAll('.nav-header nav a.auth-only');
+  authOnlyLinks.forEach(link => {
+    link.style.display = '';
+  });
+}
+
+/**
+ * Hide navigation items that require authentication
+ */
+function hideAuthOnlyNavigation() {
+  const authOnlyLinks = document.querySelectorAll('.nav-header nav a.auth-only');
+  authOnlyLinks.forEach(link => {
+    link.style.display = 'none';
+  });
+}
+
+/**
+ * Update active navigation indicator based on current page
+ */
+function updateActiveNavigation() {
+  const currentPath = window.location.pathname;
+  const navLinks = document.querySelectorAll('.nav-header nav a');
+  
+  // Remove existing active states
+  navLinks.forEach(link => {
+    link.classList.remove('nav-active');
+  });
+  
+  // Determine which nav item should be active
+  let activeLink = null;
+  
+  // Dashboard pages (including sub-pages)
+  if (currentPath === '/dashboard.html' || 
+      currentPath === '/api-keys.html' || 
+      currentPath === '/api-keys-create.html' || 
+      currentPath === '/api-keys-detail.html' ||
+      currentPath === '/deposit.html' ||
+      currentPath.startsWith('/dashboard/')) {
+    activeLink = document.querySelector('.nav-header nav a[href="/dashboard.html"]');
+  }
+  // Upload page
+  else if (currentPath === '/upload.html') {
+    activeLink = document.querySelector('.nav-header nav a[href="/upload.html"]');
+  }
+  // Retrieve and Info pages
+  else if (currentPath === '/retrieve.html' || currentPath === '/info.html') {
+    activeLink = document.querySelector('.nav-header nav a[href="/retrieve.html"]');
+  }
+  // Docs pages
+  else if (currentPath.startsWith('/docs/')) {
+    activeLink = document.querySelector('.nav-header nav a[href="/docs/"]');
+  }
+  
+  // Apply active class
+  if (activeLink) {
+    activeLink.classList.add('nav-active');
+  }
+}
+
+/**
+ * Update sidebar active navigation indicator based on current page
+ */
+function updateSidebarActiveNavigation() {
+  const currentPath = window.location.pathname;
+  const sidebarLinks = document.querySelectorAll('.dashboard-sidebar nav a');
+  
+  // Remove existing active states
+  sidebarLinks.forEach(link => {
+    link.classList.remove('nav-active');
+  });
+  
+  // Find and activate the matching sidebar link
+  sidebarLinks.forEach(link => {
+    const href = link.getAttribute('href');
+    if (href && (currentPath === href || currentPath.startsWith(href.replace('.html', '')))) {
+      link.classList.add('nav-active');
+    }
+  });
+}
+
 // Export functions for global access
 window.app = {
   updateBalance,
   getCurrentAuthState,
-  getCachedBalance
+  getCachedBalance,
+  updateActiveNavigation,
+  updateSidebarActiveNavigation
 };
 
 // Initialize when DOM is ready
