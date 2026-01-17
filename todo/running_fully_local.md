@@ -61,8 +61,9 @@ Add to `package.json`:
 Create `src/auth/local-auth.js`:
 - Detect when running in local mode via `env.ENVIRONMENT === 'local'`
 - Skip Clerk JWT verification
-- Accept a simple local auth header format
-- Auto-create user profiles on first request
+- Accept a simple local auth header format: `Authorization: LocalDev <user_id>`
+- Auto-create user profiles on first request with $10 starting balance (hardcoded)
+- Store API keys as plain text (no encryption in local mode)
 
 **Local Auth Flow:**
 ```
@@ -243,10 +244,10 @@ Add "Local Development" section to main README.
    - ✅ **DECISION: Same as production - use the same code and mechanism**
 
 3. **Balance Initialization**: Should new local users get starting balance?
-   - ✅ **DECISION: Option B - Start with $10 (convenient for testing)**
+   - ✅ **DECISION: Option B - Start with $10 (hardcoded, convenient for testing)**
 
 4. **API Key Encryption**: How to handle `API_KEY_ENCRYPTION_KEY` locally?
-   - ✅ **DECISION: Option C - Skip encryption in local mode**
+   - ✅ **DECISION: Option C - Skip encryption in local mode (store as plain text)**
 
 5. **Rate Limiting**: Should rate limiting be active in local mode?
    - ✅ **DECISION: Option C - Keep same limits (realistic testing)**
@@ -321,6 +322,8 @@ The implementation is complete when:
 ---
 
 ## Status
+
+**All open questions resolved. Ready for implementation.**
 
 - [ ] Phase 1: Local Development Configuration
 - [ ] Phase 2: Mock Authentication System
