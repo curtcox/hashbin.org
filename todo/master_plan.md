@@ -154,25 +154,27 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 
 **No search/discovery features** - Hash-only access as per architectural decision #12
 
-### Phase 3: Authentication & Authorization
+### Phase 3: Authentication & Authorization ✅ COMPLETE
 **Goal:** Implement secure user authentication with multiple providers
+**Status:** Complete - January 2026
 
 **Deliverables:**
-- **Clerk integration** for unified OAuth (see Decision #17)
+- ✅ **Clerk integration** for unified OAuth (see Decision #17)
   - Google
   - Apple
   - Microsoft
   - GitHub
-- Clerk JavaScript SDK in frontend
-- Clerk API integration in Cloudflare Workers
-- Session management (handled by Clerk)
-- JWT token generation and validation (handled by Clerk)
-- API key generation for programmatic access
-- User profile storage in Durable Objects (sync from Clerk)
-- R2-based rate limiting (no custom implementation needed)
+- ✅ Clerk JavaScript SDK in frontend
+- ✅ Clerk API integration in Cloudflare Workers
+- ✅ Session management (handled by Clerk)
+- ✅ JWT token generation and validation (handled by Clerk)
+- ✅ API key generation for programmatic access
+- ✅ User profile storage in Durable Objects (sync from Clerk)
+- ✅ Rate limiting (100/min anonymous, 1000/min user, 500/min per-key)
 
 **Sub-Plans:**
-- `todo/user_authorization.md` - Multi-provider authentication system
+- `done/user_authorization.md` - Multi-provider authentication system (COMPLETE)
+- `done/api_keys.md` - API key management system (COMPLETE)
 
 **Technologies:**
 - Clerk (authentication provider)
@@ -181,28 +183,29 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 
 **Note:** No email/password auth - OAuth only for security and simplicity
 
-### Phase 4: Payment System
+### Phase 4: Payment System ✅ COMPLETE
 **Goal:** Integrate payment processing for uploads and retention
+**Status:** Complete - January 2026
 
 **Deliverables:**
-- **Stripe integration** (see Decisions #16, #18)
+- ✅ **Stripe integration** (see Decisions #16, #18)
   - Credit/debit cards
   - Apple Pay, Google Pay
   - ACH transfers
   - Cryptocurrency support (via Stripe Crypto partners)
-- **Pricing implementation:** `Cost = Size (GB) × Duration (months) × $0.03`
+- ✅ **Pricing implementation:** `Cost = Size (GB) × Duration (months) × $0.03`
   - $1.00 minimum payment
   - Display payment processing fees separately when possible
   - Show breakdown: Storage cost + Processing fee = Total
-- Stripe Checkout for payment flow
-- Stripe Webhooks for payment confirmation
-- Receipt generation and email delivery
-- Payment history storage and accounting in Durable Objects
-- Financial analytics (revenue, costs, profit/loss)
-- **No refunds** - All payments final (see Decision #13)
+- ✅ Stripe Checkout for payment flow
+- ✅ Stripe Webhooks for payment confirmation
+- ✅ Receipt generation and email delivery
+- ✅ Payment history storage and accounting in Durable Objects
+- ✅ Financial analytics (revenue, costs, profit/loss)
+- ✅ **No refunds** - All payments final (see Decision #13)
 
 **Sub-Plans:**
-- `todo/payments.md` - Stripe payment integration
+- `done/payments.md` - Stripe payment integration (COMPLETE)
 - `todo/pricing_model.md` - Storage pricing and calculations
 
 **Technologies:**
@@ -928,14 +931,14 @@ No blocking questions remain for beginning implementation.
 
 ## Next Steps
 
-**Phase 1 infrastructure is complete.** The project is ready to begin Phase 2 implementation.
+**Phases 1, 3, and 4 are complete.** The project is ready to continue Phase 2 implementation and begin Phase 5.
 
 ### Immediate Actions
 
-1. **Begin Phase 2 implementation** - Core content operations (256t hash, upload/download)
-2. **Create detailed sub-plans** - `todo/content_operations.md`, `todo/256t_integration.md`
-3. **Implement backup functionality** - Event sourcing and snapshots (deferred from Phase 1)
-4. **Continue development** - Build on existing infrastructure
+1. **Continue Phase 2 implementation** - Core content operations (256t hash, upload/download)
+2. **Begin Phase 5 implementation** - Retention and expiration management
+3. **Deploy to production** - Configure Clerk and Stripe production credentials
+4. **Continue frontend development** - Integration with authentication and payments
 
 ### Sub-Plans Status
 
@@ -956,15 +959,26 @@ No blocking questions remain for beginning implementation.
    - Content download API endpoint
    - R2 storage integration
 
-4. **`todo/user_authorization.md`** - Authentication system (Phase 3) - TO CREATE
+4. **`done/user_authorization.md`** - Authentication system (Phase 3) ✅ COMPLETE
    - Clerk integration
    - OAuth flow setup
    - API key generation
+   - Rate limiting
 
-5. **`todo/payments.md`** - Payment processing (Phase 4) - TO CREATE
+5. **`done/api_keys.md`** - API key management (Phase 3) ✅ COMPLETE
+   - API key generation and validation
+   - Key revocation and expiration
+   - KeyRegistry Durable Object
+
+6. **`done/payments.md`** - Payment processing (Phase 4) ✅ COMPLETE
    - Stripe integration
    - Pricing calculator
    - Webhook handlers
+
+7. **`done/deployment_validation.md`** - Deployment validation (Phase 1) ✅ COMPLETE
+   - Smoke tests
+   - Health checks
+   - CI/CD validation
 
 ### Development Environment Setup
 
@@ -974,30 +988,36 @@ Before creating sub-plans, set up local development tools:
 - Configure GitHub repository for Actions
 - Install Node.js and npm for JavaScript development
 
-## Sub-Plans to Create
+## Sub-Plans Index
 
-The following detailed implementation plans should be created as we answer the open questions:
+### Completed Plans (done/)
 
-1. `todo/site_creation.md` - Cloudflare setup, domain, R2, deployment
-2. `todo/user_authorization.md` - Multi-provider authentication
-3. `todo/payments.md` - Payment integration and processing
-4. `todo/content_operations.md` - Upload and download implementation
-5. `todo/256t_integration.md` - Hash generation and validation library
-6. `todo/pricing_model.md` - Storage pricing and calculations
-7. `todo/retention_system.md` - Content lifecycle and expiration
-8. `todo/contestation_system.md` - Dispute resolution workflow
-9. `todo/content_moderation.md` - Review and moderation tools
-10. `todo/public_records.md` - Transparency and reporting
-11. `todo/frontend_ui.md` - Web interface implementation
-12. `todo/api_documentation.md` - Public API documentation
-13. `todo/testing_strategy.md` - Comprehensive testing plan
-14. `todo/security_audit.md` - Security review and hardening
-15. `todo/legal_compliance.md` - Terms of Service, Privacy Policy, DMCA
-16. `todo/operations.md` - Production operations and monitoring
-17. `todo/monitoring.md` - System monitoring and alerting
+1. `done/site_creation.md` - Cloudflare setup, domain, R2, deployment ✅
+2. `done/user_authorization.md` - Multi-provider authentication ✅
+3. `done/api_keys.md` - API key management ✅
+4. `done/payments.md` - Payment integration and processing ✅
+5. `done/stripe.md` - Stripe integration details ✅
+6. `done/deployment_validation.md` - Deployment smoke tests ✅
+
+### Pending Plans (todo/)
+
+1. `todo/content_operations.md` - Upload and download implementation
+2. `todo/256t_integration.md` - Hash generation and validation library
+3. `todo/pricing_model.md` - Storage pricing and calculations
+4. `todo/retention_system.md` - Content lifecycle and expiration
+5. `todo/contestation_system.md` - Dispute resolution workflow
+6. `todo/content_moderation.md` - Review and moderation tools
+7. `todo/public_records.md` - Transparency and reporting
+8. `todo/frontend_ui.md` - Web interface implementation
+9. `todo/api_documentation.md` - Public API documentation
+10. `todo/testing_strategy.md` - Comprehensive testing plan
+11. `todo/security_audit.md` - Security review and hardening
+12. `todo/legal_compliance.md` - Terms of Service, Privacy Policy, DMCA
+13. `todo/operations.md` - Production operations and monitoring
+14. `todo/monitoring.md` - System monitoring and alerting
 
 ---
 
-**Document Version:** 3.1
-**Last Updated:** 2026-01-13
-**Status:** Phase 1 Complete - Infrastructure operational, ready for Phase 2
+**Document Version:** 3.2
+**Last Updated:** 2026-01-18
+**Status:** Phases 1, 3, 4 Complete - Infrastructure, authentication, and payments operational
