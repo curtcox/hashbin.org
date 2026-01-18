@@ -34,9 +34,11 @@ This document describes how to configure GitHub secrets and Cloudflare for autom
      - Account → Workers KV Storage → Edit
      - Account → Workers R2 Storage → Edit
      - Account → Account Settings → Read
+     - Zone → Workers Routes → Edit *(for custom domain routing)*
+     - Zone → Cache Purge → Purge *(for cache invalidation on deploy)*
    - **Account Resources:**
      - Include → Your Account
-   - **Zone Resources:** (if deploying with custom domain)
+   - **Zone Resources:** (required for custom domain and cache purge)
      - Include → hashbin.org
 5. Click "Continue to summary"
 6. Click "Create Token"
@@ -56,6 +58,7 @@ This document describes how to configure GitHub secrets and Cloudflare for autom
 |-------------|-------|---------------|
 | `CLOUDFLARE_API_TOKEN` | Your API token from Step 2 | Cloudflare Profile → API Tokens |
 | `CLOUDFLARE_ACCOUNT_ID` | Your account ID from Step 1 | Cloudflare Dashboard → Workers |
+| `CLOUDFLARE_ZONE_ID` | Your zone ID for hashbin.org | Cloudflare Dashboard → Domain → API section (right sidebar) |
 
 ### Adding Each Secret
 

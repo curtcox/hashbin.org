@@ -199,6 +199,7 @@ Update your domain's nameservers at your domain registrar:
 - Account → Workers R2 Storage → Edit
 - Account → Account Settings → Read
 - Zone → Workers Routes → Edit *(if using custom domain)*
+- Zone → Cache Purge → Purge *(required for cache invalidation on deploy)*
 
 **Account Resources**:
 - Include → *Your Account*
@@ -237,6 +238,21 @@ Add these two secrets:
 
 - **Name**: `CLOUDFLARE_API_TOKEN`
 - **Secret**: Paste your API Token from Step 3.5
+- Click **Add secret**
+
+### Secret 3: CLOUDFLARE_ZONE_ID
+
+The Zone ID is required for cache purging after deployments.
+
+1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. Select your domain (e.g., `yourdomain.com`)
+3. On the domain overview page, look at the **right sidebar**
+4. Under the **API** section, copy the **Zone ID**
+   - Format: `1234567890abcdef1234567890abcdef` (32 characters)
+
+Add the secret:
+- **Name**: `CLOUDFLARE_ZONE_ID`
+- **Secret**: Paste your Zone ID
 - Click **Add secret**
 
 **Security Note**: Never commit these values to your repository or share them publicly.
