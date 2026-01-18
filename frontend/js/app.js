@@ -4,13 +4,13 @@
  */
 
 import { 
-  initializeClerk, 
+  initializeAuth, 
   getAuthState, 
   signIn, 
   signOut, 
   onAuthStateChange,
   getProviderIcon
-} from './auth.js';
+} from './auth-loader.js';
 
 import { 
   authenticatedFetch, 
@@ -34,15 +34,15 @@ async function init() {
   console.log('Initializing HashBin.org application...');
   
   // Initialize Clerk
-  const clerkInitialized = await initializeClerk();
+  const authInitialized = await initializeAuth();
   
-  if (!clerkInitialized) {
+  if (!authInitialized) {
     showAuthError('Authentication service unavailable');
     return;
   }
 
   // Set up auth state listener
-  onAuthStateChange(handleAuthChange);
+  await onAuthStateChange(handleAuthChange);
 
   // Update UI with initial auth state
   await updateAuthUI();
@@ -73,7 +73,8 @@ async function updateAuthUI() {
 
   // Update UI based on auth state
   if (authState.authenticated) {
-    authSection.innerHTML = createAuthenticatedHTML(authState.user);
+    const providerIcon = await getProviderIcon(authState.user.provider);
+    authSection.innerHTML = createAuthenticatedHTML(authState.user, providerIcon);
     setupAuthenticatedHandlers();
     // Fetch and display balance
     await updateBalance();
@@ -119,8 +120,7 @@ function createUnauthenticatedHTML() {
 /**
  * Create HTML for authenticated state
  */
-function createAuthenticatedHTML(user) {
-  const providerIcon = getProviderIcon(user.provider);
+function createAuthenticatedHTML(user, providerIcon) {
   // Only render provider icon if we have a non-empty src
   const providerIconHTML = providerIcon
     ? `<img class="provider-icon" src="${providerIcon}" alt="${user.provider || ''}" title="Signed in with ${user.provider}">` 

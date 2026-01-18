@@ -103,9 +103,30 @@ See [todo/master_plan.md](todo/master_plan.md) for the complete roadmap.
 
 The development server runs at `http://localhost:8787`
 
+### Local-Only Development (No External Services)
+
+Use the fully local mode to run without Clerk or Stripe:
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+2. **Start local mode**
+   ```bash
+   npm run dev:local
+   ```
+
+3. **Sign in locally**
+   - Click **Sign In** in the UI and enter a username, or
+   - Send requests with `Authorization: LocalDev <user_id>`.
+
+For full details, see [docs/local-development.md](docs/local-development.md).
+
 ### Available Scripts
 
 - `npm run dev` - Start local development server
+- `npm run dev:local` - Start local development with local auth/payments
 - `npm run deploy` - Deploy to production
 - `npm run verify` - Verify production deployment
 - `npm test` - Run test suite

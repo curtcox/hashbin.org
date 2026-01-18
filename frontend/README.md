@@ -7,6 +7,7 @@ This directory contains the frontend web interface for HashBin.org.
 The frontend is built using vanilla HTML, CSS, and JavaScript (ES6+ modules) with no build step required. It integrates with:
 
 - **Clerk JavaScript SDK** for OAuth authentication (Google, Apple, Microsoft, GitHub)
+- **Local auth module** for offline/local development
 - **HashBin.org API** (Cloudflare Workers backend) for balance, content operations, and user management
 
 ## Structure
@@ -25,7 +26,9 @@ frontend/
 │   └── auth.css           # Authentication UI components
 └── js/
     ├── app.js             # Main application entry point
+    ├── auth-loader.js     # Auth mode switcher (Clerk vs local)
     ├── auth.js            # Clerk SDK integration
+    ├── local-auth.js      # Local auth implementation
     ├── auth-gate.js       # Protected page middleware
     └── utils.js           # Utility functions
 ```
@@ -34,15 +37,8 @@ frontend/
 
 ### Clerk Publishable Key
 
-The Clerk publishable key must be configured in each HTML file. Replace the placeholder:
-
-```javascript
-window.CLERK_PUBLISHABLE_KEY = 'YOUR_CLERK_PUBLISHABLE_KEY';
-```
-
-With your actual Clerk publishable key:
-- Development: `pk_test_...`
-- Production: `pk_live_...`
+The backend supplies the Clerk publishable key via `/api/config` when running in non-local mode.
+Set `CLERK_PUBLISHABLE_KEY` in your Worker environment (Wrangler or secrets) to enable Clerk.
 
 ### Backend API
 
@@ -125,7 +121,7 @@ const formatted = formatBalance(data.balance_cents);
 To check current auth state:
 
 ```javascript
-import { getAuthState } from './js/auth.js';
+import { getAuthState } from './js/auth-loader.js';
 
 const authState = await getAuthState();
 if (authState.authenticated) {

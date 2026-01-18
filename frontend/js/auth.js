@@ -13,7 +13,7 @@ const authStateListeners = new Set();
  * Initialize Clerk SDK
  * @returns {Promise<boolean>} True if initialization succeeded
  */
-export async function initializeClerk() {
+export async function initializeAuth() {
   try {
     // Get Clerk publishable key from API config endpoint
     let publishableKey = null;
@@ -61,6 +61,9 @@ export async function initializeClerk() {
     return false;
   }
 }
+
+// Legacy alias for compatibility
+export const initializeClerk = initializeAuth;
 
 /**
  * Load Clerk script from CDN
@@ -205,6 +208,21 @@ export async function getSessionToken() {
     console.error('Failed to get session token:', error);
     return null;
   }
+}
+
+/**
+ * Get authentication headers for API requests
+ * @returns {Promise<Object|null>} Headers object or null if unauthenticated
+ */
+export async function getAuthHeaders() {
+  const token = await getSessionToken();
+  if (!token) {
+    return null;
+  }
+
+  return {
+    Authorization: `Bearer ${token}`
+  };
 }
 
 /**

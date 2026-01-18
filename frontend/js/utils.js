@@ -22,16 +22,16 @@ export function formatBalance(cents) {
  */
 export async function authenticatedFetch(url, options = {}) {
   // Import dynamically to avoid circular dependency
-  const { getSessionToken } = await import('./auth.js');
-  const token = await getSessionToken();
+  const { getAuthHeaders } = await import('./auth-loader.js');
+  const authHeaders = await getAuthHeaders();
   
-  if (!token) {
+  if (!authHeaders) {
     throw new Error('Not authenticated');
   }
 
   const headers = {
     ...options.headers,
-    'Authorization': `Bearer ${token}`
+    ...authHeaders
   };
 
   return fetch(url, { ...options, headers });

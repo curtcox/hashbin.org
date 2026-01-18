@@ -33,6 +33,7 @@ import {
   handleCalculateRetention,
   handleCreateDonation
 } from './api/payments.js';
+import { handleLocalDevDeposit } from './api/local-payments.js';
 
 import {
   handleUploadContent,
@@ -52,7 +53,7 @@ import { handleGetUserUploads } from './api/user.js';
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
-const VALID_ENVIRONMENTS = ['development', 'production'];
+const VALID_ENVIRONMENTS = ['development', 'production', 'local'];
 const VALID_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
 const HEALTH_CHECK_ID = 'health-check';
 const GIT_SHA_PLACEHOLDER = 'unknown';
@@ -255,6 +256,10 @@ function handleApiRoutes(url, request, env) {
     return handleCreateDeposit(request, env);
   }
 
+  if (url.pathname === '/api/balance/dev-deposit' && request.method === 'POST') {
+    return handleLocalDevDeposit(request, env);
+  }
+
   // Payment calculation endpoint (public)
   if (url.pathname === '/api/payments/calculate' && request.method === 'POST') {
     return handleCalculateRetention(request, env);
@@ -376,8 +381,11 @@ function handleRoot(env) {
  * Returns non-secret configuration needed by the frontend
  */
 function handleConfig(env) {
+  const isLocalMode = env.ENVIRONMENT === 'local';
   const config = {
-    clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY || null
+    clerkPublishableKey: isLocalMode ? null : (env.CLERK_PUBLISHABLE_KEY || null),
+    isLocalMode,
+    authMode: isLocalMode ? 'local' : 'clerk'
   };
 
   return new Response(JSON.stringify(config), {
@@ -607,6 +615,17 @@ async function checkR2Buckets(env) {
  * Check Clerk integration health
  */
 async function checkClerk(env) {
+  if (env.ENVIRONMENT === 'local') {
+    return {
+      status: 'operational',
+      message: 'Clerk disabled in local mode',
+      details: {
+        secretKeyConfigured: false,
+        publishableKeyConfigured: false
+      }
+    };
+  }
+
   const checks = {
     secretKeyConfigured: false,
     publishableKeyConfigured: false
@@ -642,6 +661,17 @@ async function checkClerk(env) {
  * Check Stripe integration health
  */
 async function checkStripe(env) {
+  if (env.ENVIRONMENT === 'local') {
+    return {
+      status: 'operational',
+      message: 'Stripe disabled in local mode',
+      details: {
+        secretKeyConfigured: false,
+        webhookSecretConfigured: false
+      }
+    };
+  }
+
   const checks = {
     secretKeyConfigured: false,
     webhookSecretConfigured: false

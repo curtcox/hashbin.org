@@ -99,6 +99,7 @@ export async function handleSessionInfo(request, env) {
  */
 export async function handleLogout(request, env) {
   const authResult = await authenticate(request, env);
+  const isLocalMode = env.ENVIRONMENT === 'local';
 
   // Require authentication
   const authError = requireAuth(authResult);
@@ -106,6 +107,19 @@ export async function handleLogout(request, env) {
 
   // Only Clerk sessions can be logged out
   if (authResult.user.authMethod !== 'clerk') {
+    if (isLocalMode && authResult.user.authMethod === 'local') {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Local session cleared'
+        }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
     return new Response(
       JSON.stringify({
         error: 'Invalid authentication method',
@@ -243,16 +257,17 @@ export async function handleLinkProvider(request, env) {
  */
 export async function handleCreateApiKey(request, env) {
   const authResult = await authenticate(request, env);
+  const isLocalMode = env.ENVIRONMENT === 'local';
 
   // Require Clerk session (API keys can't create other API keys)
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk') {
+  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
     return new Response(
       JSON.stringify({
         error: 'Invalid authentication method',
-        message: 'API keys cannot be used to create new API keys. Use Clerk session.'
+        message: 'API keys cannot be used to create new API keys. Use Clerk session (or local auth in local mode).'
       }),
       {
         status: 403,
@@ -354,19 +369,22 @@ export async function handleCreateApiKey(request, env) {
   const keyId = generateKeyId();
 
   // Encrypt the API key for reveal functionality
-  if (!env.API_KEY_ENCRYPTION_KEY) {
-    return new Response(
-      JSON.stringify({
-        error: 'Encryption key not configured',
-        message: 'API_KEY_ENCRYPTION_KEY secret must be set'
-      }),
-      {
-        status: 500,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
+  let keyEncrypted = apiKey;
+  if (!isLocalMode) {
+    if (!env.API_KEY_ENCRYPTION_KEY) {
+      return new Response(
+        JSON.stringify({
+          error: 'Encryption key not configured',
+          message: 'API_KEY_ENCRYPTION_KEY secret must be set'
+        }),
+        {
+          status: 500,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+    keyEncrypted = await encryptApiKey(apiKey, env.API_KEY_ENCRYPTION_KEY);
   }
-  const keyEncrypted = await encryptApiKey(apiKey, env.API_KEY_ENCRYPTION_KEY);
 
   // Store in UserProfile DO
   const response = await userProfileStub.fetch(
@@ -432,16 +450,17 @@ export async function handleCreateApiKey(request, env) {
  */
 export async function handleListApiKeys(request, env) {
   const authResult = await authenticate(request, env);
+  const isLocalMode = env.ENVIRONMENT === 'local';
 
   // Require Clerk session
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk') {
+  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
     return new Response(
       JSON.stringify({
         error: 'Invalid authentication method',
-        message: 'Use Clerk session to list API keys'
+        message: 'Use Clerk session (or local auth in local mode) to list API keys'
       }),
       {
         status: 403,
@@ -474,16 +493,17 @@ export async function handleListApiKeys(request, env) {
  */
 export async function handleRevokeApiKey(request, env, keyId) {
   const authResult = await authenticate(request, env);
+  const isLocalMode = env.ENVIRONMENT === 'local';
 
   // Require Clerk session
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk') {
+  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
     return new Response(
       JSON.stringify({
         error: 'Invalid authentication method',
-        message: 'Use Clerk session to revoke API keys'
+        message: 'Use Clerk session (or local auth in local mode) to revoke API keys'
       }),
       {
         status: 403,
@@ -531,16 +551,17 @@ export async function handleRevokeApiKey(request, env, keyId) {
  */
 export async function handleRevealApiKey(request, env, keyId) {
   const authResult = await authenticate(request, env);
+  const isLocalMode = env.ENVIRONMENT === 'local';
 
   // Require Clerk session (API keys cannot reveal other keys)
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk') {
+  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
     return new Response(
       JSON.stringify({
         error: 'Invalid authentication method',
-        message: 'API keys cannot reveal other API keys. Use Clerk session.'
+        message: 'API keys cannot reveal other API keys. Use Clerk session (or local auth in local mode).'
       }),
       {
         status: 403,
@@ -550,42 +571,44 @@ export async function handleRevealApiKey(request, env, keyId) {
   }
 
   // Verify session is fresh (authenticated within last 5 minutes)
-  try {
-    if (!env.CLERK_SECRET_KEY) {
-      throw new Error('CLERK_SECRET_KEY not configured');
-    }
+  if (!isLocalMode) {
+    try {
+      if (!env.CLERK_SECRET_KEY) {
+        throw new Error('CLERK_SECRET_KEY not configured');
+      }
 
-    const clerkClient = createClerkClient({
-      secretKey: env.CLERK_SECRET_KEY
-    });
+      const clerkClient = createClerkClient({
+        secretKey: env.CLERK_SECRET_KEY
+      });
 
-    const sessionId = authResult.user.sessionId;
-    const session = await clerkClient.sessions.getSession(sessionId);
+      const sessionId = authResult.user.sessionId;
+      const session = await clerkClient.sessions.getSession(sessionId);
 
-    // Check if session is fresh
-    if (!isSessionFresh(session, 5)) {
+      // Check if session is fresh
+      if (!isSessionFresh(session, 5)) {
+        return new Response(
+          JSON.stringify({
+            error: 'FRESH_AUTH_REQUIRED',
+            message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
+          }),
+          {
+            status: 403,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+    } catch (error) {
       return new Response(
         JSON.stringify({
-          error: 'FRESH_AUTH_REQUIRED',
-          message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
+          error: 'Session verification failed',
+          message: error.message
         }),
         {
-          status: 403,
+          status: 500,
           headers: { 'content-type': 'application/json' }
         }
       );
     }
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: 'Session verification failed',
-        message: error.message
-      }),
-      {
-        status: 500,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
   }
 
   // Get encrypted key from UserProfile DO (includes rate limiting)
@@ -612,7 +635,7 @@ export async function handleRevealApiKey(request, env, keyId) {
   const keyData = await response.json();
 
   // Decrypt the API key
-  if (!env.API_KEY_ENCRYPTION_KEY) {
+  if (!isLocalMode && !env.API_KEY_ENCRYPTION_KEY) {
     return new Response(
       JSON.stringify({
         error: 'Encryption key not configured',
@@ -626,7 +649,9 @@ export async function handleRevealApiKey(request, env, keyId) {
   }
 
   try {
-    const apiKey = await decryptApiKey(keyData.key_encrypted, env.API_KEY_ENCRYPTION_KEY);
+    const apiKey = isLocalMode
+      ? keyData.key_encrypted
+      : await decryptApiKey(keyData.key_encrypted, env.API_KEY_ENCRYPTION_KEY);
 
     return new Response(
       JSON.stringify({
@@ -668,16 +693,17 @@ export async function handleRevealApiKey(request, env, keyId) {
  */
 export async function handleUpdateApiKey(request, env, keyId) {
   const authResult = await authenticate(request, env);
+  const isLocalMode = env.ENVIRONMENT === 'local';
 
   // Require Clerk session (API keys cannot update themselves)
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk') {
+  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
     return new Response(
       JSON.stringify({
         error: 'Invalid authentication method',
-        message: 'API keys cannot update other API keys. Use Clerk session.'
+        message: 'API keys cannot update other API keys. Use Clerk session (or local auth in local mode).'
       }),
       {
         status: 403,
@@ -687,42 +713,44 @@ export async function handleUpdateApiKey(request, env, keyId) {
   }
 
   // Verify session is fresh (authenticated within last 5 minutes)
-  try {
-    if (!env.CLERK_SECRET_KEY) {
-      throw new Error('CLERK_SECRET_KEY not configured');
-    }
+  if (!isLocalMode) {
+    try {
+      if (!env.CLERK_SECRET_KEY) {
+        throw new Error('CLERK_SECRET_KEY not configured');
+      }
 
-    const clerkClient = createClerkClient({
-      secretKey: env.CLERK_SECRET_KEY
-    });
+      const clerkClient = createClerkClient({
+        secretKey: env.CLERK_SECRET_KEY
+      });
 
-    const sessionId = authResult.user.sessionId;
-    const session = await clerkClient.sessions.getSession(sessionId);
+      const sessionId = authResult.user.sessionId;
+      const session = await clerkClient.sessions.getSession(sessionId);
 
-    // Check if session is fresh (5 minutes)
-    if (!isSessionFresh(session, 5)) {
+      // Check if session is fresh (5 minutes)
+      if (!isSessionFresh(session, 5)) {
+        return new Response(
+          JSON.stringify({
+            error: 'FRESH_AUTH_REQUIRED',
+            message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
+          }),
+          {
+            status: 403,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+    } catch (error) {
       return new Response(
         JSON.stringify({
-          error: 'FRESH_AUTH_REQUIRED',
-          message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
+          error: 'Session verification failed',
+          message: error.message
         }),
         {
-          status: 403,
+          status: 500,
           headers: { 'content-type': 'application/json' }
         }
       );
     }
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: 'Session verification failed',
-        message: error.message
-      }),
-      {
-        status: 500,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
   }
 
   // Parse request body

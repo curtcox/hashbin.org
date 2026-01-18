@@ -3,10 +3,11 @@
  * Handles deposit form, fee calculation, and Stripe checkout
  */
 
-import { authenticatedFetch, formatBalance, showToast, handleApiError } from './utils.js';
+import { authenticatedFetch, showToast, handleApiError } from './utils.js';
 
 // Constants
 const MINIMUM_DEPOSIT_DOLLARS = 1.00;
+const LOCAL_MINIMUM_DEPOSIT_DOLLARS = 0.01;
 const STRIPE_FEE_PERCENTAGE = 0.029;
 const STRIPE_FEE_FIXED_CENTS = 30;
 
@@ -21,11 +22,12 @@ let depositForm;
 let successMessage;
 let cancelMessage;
 let errorMessage;
+let isLocalMode = false;
 
 /**
  * Initialize deposit page
  */
-function init() {
+async function init() {
   // Get DOM elements
   amountInput = document.getElementById('amount');
   submitBtn = document.getElementById('submit-btn');
@@ -43,6 +45,9 @@ function init() {
     return;
   }
 
+  await detectLocalMode();
+  updateModeUI();
+
   // Check for status in URL (success/cancel redirects)
   handleUrlStatus();
 
@@ -51,6 +56,49 @@ function init() {
   depositForm.addEventListener('submit', handleFormSubmit);
 
   console.log('Deposit page initialized');
+}
+
+async function detectLocalMode() {
+  try {
+    const response = await fetch('/api/config');
+    if (!response.ok) {
+      return;
+    }
+    const config = await response.json();
+    isLocalMode = Boolean(config.isLocalMode || config.authMode === 'local');
+  } catch (error) {
+    console.warn('Unable to detect local mode:', error);
+  }
+}
+
+function updateModeUI() {
+  if (!isLocalMode) {
+    return;
+  }
+
+  const heading = document.querySelector('.card-title');
+  const description = document.querySelector('.card p');
+
+  if (heading) {
+    heading.textContent = 'Add Funds (Local Mode)';
+  }
+
+  if (description) {
+    description.textContent = 'Add test funds directly to your local account balance.';
+  }
+
+  const successParagraph = successMessage?.querySelector('p');
+  if (successParagraph) {
+    successParagraph.textContent = 'Your balance has been updated.';
+  }
+
+  const helperText = document.querySelector('.form-text');
+  if (helperText) {
+    helperText.textContent = `Minimum: $${LOCAL_MINIMUM_DEPOSIT_DOLLARS.toFixed(2)}`;
+  }
+
+  submitBtn.textContent = 'Add Funds';
+  feeBreakdown.classList.add('hidden');
 }
 
 /**
@@ -95,29 +143,32 @@ function handleAmountChange() {
   }
 
   const amountDollars = parseFloat(value);
+  const minimumDeposit = isLocalMode ? LOCAL_MINIMUM_DEPOSIT_DOLLARS : MINIMUM_DEPOSIT_DOLLARS;
   
   // Validate amount
-  if (isNaN(amountDollars) || amountDollars < MINIMUM_DEPOSIT_DOLLARS) {
+  if (isNaN(amountDollars) || amountDollars < minimumDeposit) {
     feeBreakdown.classList.add('hidden');
     submitBtn.disabled = true;
     
     if (amountDollars > 0) {
-      showError(`Minimum deposit is $${MINIMUM_DEPOSIT_DOLLARS.toFixed(2)}`);
+      showError(`Minimum deposit is $${minimumDeposit.toFixed(2)}`);
     }
     return;
   }
 
-  // Calculate fees
-  const amountCents = Math.round(amountDollars * 100);
-  const fees = calculateFees(amountCents);
-  
-  // Update breakdown display
-  creditAmountSpan.textContent = formatDollars(fees.creditCents);
-  feeAmountSpan.textContent = formatDollars(fees.feeCents);
-  totalAmountSpan.textContent = formatDollars(fees.totalChargeCents);
-  
-  // Show breakdown
-  feeBreakdown.classList.remove('hidden');
+  if (!isLocalMode) {
+    // Calculate fees
+    const amountCents = Math.round(amountDollars * 100);
+    const fees = calculateFees(amountCents);
+    
+    // Update breakdown display
+    creditAmountSpan.textContent = formatDollars(fees.creditCents);
+    feeAmountSpan.textContent = formatDollars(fees.feeCents);
+    totalAmountSpan.textContent = formatDollars(fees.totalChargeCents);
+    
+    // Show breakdown
+    feeBreakdown.classList.remove('hidden');
+  }
   
   // Enable submit button
   submitBtn.disabled = false;
@@ -162,19 +213,20 @@ async function handleFormSubmit(event) {
   const amountCents = Math.round(amountDollars * 100);
   
   // Validate
-  if (isNaN(amountCents) || amountCents < 100) {
-    showError('Please enter a valid amount (minimum $1.00)');
+  const minimumCents = Math.round((isLocalMode ? LOCAL_MINIMUM_DEPOSIT_DOLLARS : MINIMUM_DEPOSIT_DOLLARS) * 100);
+  if (isNaN(amountCents) || amountCents < minimumCents) {
+    showError(`Please enter a valid amount (minimum $${(minimumCents / 100).toFixed(2)})`);
     return;
   }
 
   // Disable form
   submitBtn.disabled = true;
-  submitBtn.textContent = 'Creating checkout session...';
+  submitBtn.textContent = isLocalMode ? 'Adding funds...' : 'Creating checkout session...';
   submitBtn.classList.add('loading');
 
   try {
-    // Call API to create checkout session
-    const response = await authenticatedFetch('/api/balance/deposit', {
+    const endpoint = isLocalMode ? '/api/balance/dev-deposit' : '/api/balance/deposit';
+    const response = await authenticatedFetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -187,6 +239,15 @@ async function handleFormSubmit(event) {
     await handleApiError(response);
     const data = await response.json();
 
+    if (isLocalMode) {
+      successMessage.classList.remove('hidden');
+      showToast(`Added ${formatDollars(data.amount_cents)} to your balance.`, 'success');
+      submitBtn.textContent = 'Add Funds';
+      submitBtn.disabled = false;
+      submitBtn.classList.remove('loading');
+      return;
+    }
+
     // Redirect to Stripe checkout
     window.location.href = data.checkout_url;
   } catch (error) {
@@ -195,7 +256,7 @@ async function handleFormSubmit(event) {
     
     // Re-enable form
     submitBtn.disabled = false;
-    submitBtn.textContent = 'Add Funds via Stripe';
+    submitBtn.textContent = isLocalMode ? 'Add Funds' : 'Add Funds via Stripe';
     submitBtn.classList.remove('loading');
   }
 }
