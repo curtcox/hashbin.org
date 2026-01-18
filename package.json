@@ -23,7 +23,19 @@
     "test:apikeys": "bash scripts/test-api-keys.sh",
     "test:upload": "bash scripts/test-upload-balance.sh",
     "test:ratelimit": "bash scripts/test-rate-limiting.sh",
-    "test:gitsha": "bash scripts/test-git-sha-injection.sh"
+    "test:gitsha": "bash scripts/test-git-sha-injection.sh",
+    "test:api": "bash scripts/run-all-api-tests.sh",
+    "test:api:health": "bash scripts/api-tests/test-local-health.sh",
+    "test:api:auth": "bash scripts/api-tests/test-local-auth.sh",
+    "test:api:balance": "bash scripts/api-tests/test-local-balance.sh",
+    "test:api:upload": "bash scripts/api-tests/test-local-upload.sh",
+    "test:api:download": "bash scripts/api-tests/test-local-download.sh",
+    "test:api:ratelimit": "bash scripts/api-tests/test-local-ratelimit-purchase.sh",
+    "test:api:extension": "bash scripts/api-tests/test-local-extension.sh",
+    "test:api:user": "bash scripts/api-tests/test-local-user.sh",
+    "test:api:donation": "bash scripts/api-tests/test-local-donation.sh",
+    "test:api:errors": "bash scripts/api-tests/test-local-errors.sh",
+    "test:api:concurrent": "bash scripts/api-tests/test-local-concurrent.sh"
   },
   "keywords": [
     "256t",
