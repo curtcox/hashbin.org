@@ -1,0 +1,51 @@
+name: Local API Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  api-tests:
+    name: Run Local API Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start local server
+        run: |
+          npm run dev:local &
+          echo $! > /tmp/server.pid
+
+      - name: Wait for server ready
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:8787/health > /dev/null; then
+              echo "Server is ready"
+              exit 0
+            fi
+            echo "Waiting for server... ($i/30)"
+            sleep 2
+          done
+          echo "Server failed to start"
+          exit 1
+
+      - name: Run API Tests
+        run: bash scripts/run-all-api-tests.sh
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill $(cat /tmp/server.pid) 2>/dev/null || true
+          fi
