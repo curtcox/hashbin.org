@@ -57,6 +57,7 @@ export class PaymentRecord {
    */
   async createTransaction(data) {
     const transaction = {
+      id: data.transaction_id,
       transaction_id: data.transaction_id,
       type: data.type, // deposit | upload_payment | cid_extension | donation_received
       user_id: data.user_id,
@@ -103,6 +104,9 @@ export class PaymentRecord {
     for (const txId of requestedIds) {
       const tx = await this.state.storage.get(`tx:${txId}`);
       if (tx) {
+        if (!tx.id) {
+          tx.id = tx.transaction_id;
+        }
         // Apply type filter if specified
         if (!typeFilter || tx.type === typeFilter) {
           transactions.push(tx);
@@ -140,6 +144,10 @@ export class PaymentRecord {
           headers: { 'content-type': 'application/json' }
         }
       );
+    }
+
+    if (!transaction.id) {
+      transaction.id = transaction.transaction_id;
     }
 
     return new Response(JSON.stringify(transaction), {

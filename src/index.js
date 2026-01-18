@@ -121,6 +121,20 @@ export default {
       }
     }
 
+    // If path contains invalid characters and isn't a static asset or CID, return 404
+    if (pathWithoutLeadingSlash && /[^A-Za-z0-9._\/-]/.test(pathWithoutLeadingSlash)) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid path',
+          message: 'The requested path is invalid'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
     // Try to serve static assets for non-API paths
     if (env.ASSETS) {
       try {
@@ -312,7 +326,16 @@ function handleApiRoutes(url, request, env) {
   // - Contests
   // - Public records
 
-  return new Response('Not Found', { status: 404 });
+  return new Response(
+    JSON.stringify({
+      error: 'Not Found',
+      message: 'API endpoint not found'
+    }),
+    {
+      status: 404,
+      headers: { 'content-type': 'application/json' }
+    }
+  );
 }
 
 function injectGitShaIntoHtml(html, gitSha) {

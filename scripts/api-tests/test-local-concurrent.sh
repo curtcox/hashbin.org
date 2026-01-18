@@ -43,7 +43,7 @@ balance_before=$(http_get "/api/balance" "$AUTH_HEADER" | get_body | json_get "b
 # Launch 3 concurrent uploads
 pids=()
 for i in {1..3}; do
-  content="Concurrent test content $i $(random_string 32)"
+  content="Concurrent test content $i $(random_string 64)"
   temp_file=$(create_temp_file "$content")
   (http_post_file "/api/content" "$temp_file" "$AUTH_HEADER" "text/plain" > /dev/null) &
   pids+=($!)
@@ -99,7 +99,7 @@ download_pid=$!
 
 # Start upload in background
 upload_status=""
-new_content="Upload during download test"
+new_content="Upload during download test $(random_string 32) $(random_string 32)"
 new_file=$(create_temp_file "$new_content")
 (
   response=$(http_post_file "/api/content" "$new_file" "$AUTH_HEADER" "text/plain")

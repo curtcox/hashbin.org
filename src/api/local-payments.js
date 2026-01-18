@@ -28,7 +28,7 @@ export async function handleLocalDonationUnavailable() {
       error: 'Stripe disabled in local mode',
       message: 'Donations are disabled in local mode.'
     },
-    400
+    501
   );
 }
 
@@ -139,6 +139,7 @@ export async function handleLocalDevDeposit(request, env) {
     transaction_id: transactionId,
     amount_cents: amount_cents,
     balance_before_cents: balance_before,
-    balance_after_cents: depositData.balance_after_cents
+    balance_after_cents: depositData.balance_after_cents,
+    balance_cents: depositData.balance_after_cents
   });
 }

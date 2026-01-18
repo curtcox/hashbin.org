@@ -153,22 +153,40 @@ http_put() {
 # Extract HTTP status code from response
 get_status() {
   local response="$1"
-  echo "$response" | tail -n1
+  echo "$response" | tail -n1 | tr -d '\r' | xargs
 }
 
 # Extract body from response (all lines except last)
 get_body() {
-  local response="$1"
+  local response="${1:-}"
+  if [ -z "$response" ]; then
+    response=$(cat)
+  fi
   echo "$response" | head -n-1
 }
 
 # JSON parsing helpers (using jq if available, fallback to grep/sed)
 json_get() {
-  local json="$1"
-  local key="$2"
+  local json
+  local key
+
+  if [ $# -eq 1 ]; then
+    key="$1"
+    json=$(cat)
+  else
+    json="${1:-}"
+    key="${2:-}"
+    if [ -z "$json" ]; then
+      json=$(cat)
+    fi
+  fi
+
+  if [ -z "$key" ]; then
+    return 0
+  fi
   
   if command -v jq > /dev/null 2>&1; then
-    echo "$json" | jq -r ".$key // empty" 2>/dev/null || echo ""
+    echo "$json" | jq -r "if has(\"$key\") then .[\"$key\"] else empty end" 2>/dev/null || echo ""
   else
     # Fallback to grep/sed for simple values
     echo "$json" | grep -o "\"$key\"[[:space:]]*:[[:space:]]*[^,}]*" | sed 's/.*:[[:space:]]*//' | tr -d '"'
@@ -298,7 +316,7 @@ wait_for_server() {
 # Generate random test data
 random_string() {
   local length="${1:-16}"
-  LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c "$length"
+  LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c "$length" || true
 }
 
 # Create temp file with content

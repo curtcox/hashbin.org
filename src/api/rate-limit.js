@@ -32,7 +32,9 @@ export async function handlePurchaseRateLimit(request, env) {
 
   try {
     const data = await request.json();
-    const { cid, min_time_between_requests_ms, duration_seconds } = data;
+    const cid = data.cid;
+    const minTimeBetweenRequestsMs = data.min_time_between_requests_ms ?? data.mtbr_ms;
+    const durationSeconds = data.duration_seconds ?? (data.duration_months ? data.duration_months * 30 * 24 * 60 * 60 : undefined);
 
     if (!cid) {
       return new Response(
@@ -47,7 +49,7 @@ export async function handlePurchaseRateLimit(request, env) {
       );
     }
 
-    if (!min_time_between_requests_ms) {
+    if (!minTimeBetweenRequestsMs) {
       return new Response(
         JSON.stringify({
           error: 'Missing parameter',
@@ -60,7 +62,7 @@ export async function handlePurchaseRateLimit(request, env) {
       );
     }
 
-    if (!duration_seconds) {
+    if (!durationSeconds) {
       return new Response(
         JSON.stringify({
           error: 'Missing parameter',
@@ -117,8 +119,8 @@ export async function handlePurchaseRateLimit(request, env) {
 
     // Validate purchase parameters
     const validation = validateRateLimitPurchase(
-      min_time_between_requests_ms,
-      duration_seconds,
+      minTimeBetweenRequestsMs,
+      durationSeconds,
       content.expires_at
     );
 
@@ -159,8 +161,8 @@ export async function handlePurchaseRateLimit(request, env) {
     // Calculate price
     const pricing = calculateRateLimitPrice(
       content.size_bytes,
-      min_time_between_requests_ms,
-      duration_seconds
+      minTimeBetweenRequestsMs,
+      durationSeconds
     );
 
     // Check user balance
@@ -216,8 +218,8 @@ export async function handlePurchaseRateLimit(request, env) {
         body: JSON.stringify({
           record_id: recordId,
           payer_id: userId,
-          min_time_between_requests_ms: min_time_between_requests_ms,
-          duration_seconds: duration_seconds,
+          min_time_between_requests_ms: minTimeBetweenRequestsMs,
+          duration_seconds: durationSeconds,
           max_requests: pricing.maxRequests,
           max_bytes: pricing.maxBytes,
           price_cents: pricing.priceCents
@@ -256,8 +258,8 @@ export async function handlePurchaseRateLimit(request, env) {
           balance_before_cents: debitData.balance_before_cents,
           balance_after_cents: debitData.balance_after_cents,
           cid: cid,
-          min_time_between_requests_ms: min_time_between_requests_ms,
-          duration_seconds: duration_seconds,
+          min_time_between_requests_ms: minTimeBetweenRequestsMs,
+          duration_seconds: durationSeconds,
           max_requests: pricing.maxRequests,
           max_bytes: pricing.maxBytes
         })
@@ -269,8 +271,10 @@ export async function handlePurchaseRateLimit(request, env) {
         purchase_id: recordId,
         cid: cid,
         size_bytes: content.size_bytes,
-        min_time_between_requests_ms: min_time_between_requests_ms,
-        duration_seconds: duration_seconds,
+        min_time_between_requests_ms: minTimeBetweenRequestsMs,
+        duration_seconds: durationSeconds,
+        mtbr_ms: minTimeBetweenRequestsMs,
+        duration_months: data.duration_months || null,
         max_requests: pricing.maxRequests,
         max_bytes: pricing.maxBytes,
         price_cents: pricing.priceCents,
@@ -278,7 +282,7 @@ export async function handlePurchaseRateLimit(request, env) {
         expires_at: purchaseData.expires_at
       }),
       {
-        status: 201,
+        status: 200,
         headers: { 'content-type': 'application/json' }
       }
     );

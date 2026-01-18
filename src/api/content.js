@@ -41,11 +41,40 @@ export async function handleUploadContent(request, env) {
   }
 
   try {
-    const formData = await request.formData();
-    const file = formData.get('content');
-    const retention_months = parseInt(formData.get('retention_months') || '1');
+    const url = new URL(request.url);
+    const requestContentType = request.headers.get('content-type') || '';
+    let retention_months = parseInt(url.searchParams.get('retention_months') || '1');
+    let contentData;
+    let size_bytes;
+    let contentType = requestContentType.split(';')[0] || 'application/octet-stream';
 
-    if (!file) {
+    if (requestContentType.includes('multipart/form-data')) {
+      const formData = await request.formData();
+      const file = formData.get('content');
+      retention_months = parseInt(formData.get('retention_months') || retention_months.toString());
+
+      if (!file) {
+        return new Response(
+          JSON.stringify({
+            error: 'Missing content',
+            message: 'Content file is required'
+          }),
+          {
+            status: 400,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+
+      size_bytes = file.size;
+      contentData = await file.arrayBuffer();
+      contentType = file.type || contentType;
+    } else {
+      contentData = await request.arrayBuffer();
+      size_bytes = contentData.byteLength;
+    }
+
+    if (!contentData || size_bytes === 0) {
       return new Response(
         JSON.stringify({
           error: 'Missing content',
@@ -58,7 +87,7 @@ export async function handleUploadContent(request, env) {
       );
     }
 
-    if (retention_months < 1) {
+    if (!Number.isInteger(retention_months) || retention_months < 1) {
       return new Response(
         JSON.stringify({
           error: 'Invalid retention',
@@ -71,12 +100,8 @@ export async function handleUploadContent(request, env) {
       );
     }
 
-    const size_bytes = file.size;
     const userId = authResult.user.userId;
 
-    // Read file content for hashing
-    const contentData = await file.arrayBuffer();
-    
     // Calculate actual 256t hash
     const hash_256t = await generate256tHash(contentData);
     
@@ -214,6 +239,19 @@ export async function handleUploadContent(request, env) {
         );
       }
 
+      // Add to user's upload history
+      await userProfileStub.fetch(
+        new Request('http://internal/uploads', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            content_hash: hash_256t,
+            size_bytes: size_bytes,
+            payment_id: transactionId
+          })
+        })
+      );
+
       return new Response(
         JSON.stringify({
           cid: hash_256t,
@@ -257,7 +295,7 @@ export async function handleUploadContent(request, env) {
     if (!isInline) {
       await env.CONTENT_BUCKET.put(hash_256t, contentData, {
         httpMetadata: {
-          contentType: file.type || 'application/octet-stream'
+          contentType: contentType || 'application/octet-stream'
         }
       });
     }
@@ -275,7 +313,8 @@ export async function handleUploadContent(request, env) {
           uploader_id: userId,
           retention_months: retention_months,
           amount_cents: cost_cents,
-          payment_id: transactionId
+          payment_id: transactionId,
+          content_type: contentType || 'application/octet-stream'
         })
       })
     );
@@ -423,7 +462,22 @@ export async function handleExtendContent(request, env, cid) {
 
   try {
     const data = await request.json();
-    const months_to_add = parseInt(data.months_to_add || '1');
+    const rawMonths = data.months_to_add ?? data.additional_months;
+
+    if (rawMonths === undefined || rawMonths === null) {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid retention',
+          message: 'Extension requires additional_months'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const months_to_add = parseInt(rawMonths);
 
     if (months_to_add < 1) {
       return new Response(
@@ -488,24 +542,28 @@ export async function handleExtendContent(request, env, cid) {
       );
     }
 
-    // Debit balance
-    const debitResponse = await userProfileStub.fetch(
-      new Request('http://internal/balance/debit', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ amount_cents: cost_cents })
-      })
-    );
+    // Debit balance if needed
+    let debitData = { balance_after_cents: balance_cents, balance_before_cents: balance_cents };
 
-    if (!debitResponse.ok) {
-      const error = await debitResponse.json();
-      return new Response(JSON.stringify(error), {
-        status: debitResponse.status,
-        headers: { 'content-type': 'application/json' }
-      });
+    if (cost_cents > 0) {
+      const debitResponse = await userProfileStub.fetch(
+        new Request('http://internal/balance/debit', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ amount_cents: cost_cents })
+        })
+      );
+
+      if (!debitResponse.ok) {
+        const error = await debitResponse.json();
+        return new Response(JSON.stringify(error), {
+          status: debitResponse.status,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+
+      debitData = await debitResponse.json();
     }
-
-    const debitData = await debitResponse.json();
 
     // Extend retention
     const transactionId = crypto.randomUUID();
@@ -589,14 +647,56 @@ export async function handleDownloadContent(request, env, cid, extension = null)
           message: 'The provided CID is not a valid 256t identifier'
         }),
         {
-          status: 400,
+          status: 404,
           headers: { 'content-type': 'application/json' }
         }
       );
     }
 
-    // Determine MIME type from extension
-    const mimeType = extension ? getMimeType(extension) : 'application/octet-stream';
+    const isInline = isInlineContent(cid);
+
+    // Fetch metadata to validate existence/expiration and capture content type
+    const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);
+    const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);
+    const metadataResponse = await contentMetadataStub.fetch(
+      new Request('http://internal/content')
+    );
+
+    if (!metadataResponse.ok) {
+      if (metadataResponse.status === 404) {
+        return new Response(
+          JSON.stringify({
+            error: 'not_found',
+            message: 'Content not found'
+          }),
+          {
+            status: 404,
+            headers: { 'content-type': 'application/json' }
+          }
+        );
+      }
+      return metadataResponse;
+    }
+
+    const metadata = await metadataResponse.json();
+
+    // Check if content is expired
+    const expiresAt = new Date(metadata.expires_at);
+    if (expiresAt < new Date()) {
+      return new Response(
+        JSON.stringify({
+          error: 'not_found',
+          message: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Determine MIME type from extension or stored metadata
+    const mimeType = extension ? getMimeType(extension) : (metadata.content_type || 'application/octet-stream');
 
     // Build base headers
     const headers = {
@@ -626,7 +726,7 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     }
 
     // Check if this is inline content
-    if (isInlineContent(cid)) {
+    if (isInline) {
       // Inline content has no rate limit - serve immediately
       // Extract content from CID itself
       const contentBytes = extractInlineContent(cid);
@@ -653,49 +753,6 @@ export async function handleDownloadContent(request, env, cid, extension = null)
         status: 200,
         headers: headers
       });
-    }
-
-    // For non-inline content, check metadata first
-    const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);
-    const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);
-    
-    const metadataResponse = await contentMetadataStub.fetch(
-      new Request('http://internal/content')
-    );
-
-    if (!metadataResponse.ok) {
-      if (metadataResponse.status === 404) {
-        return new Response(
-          JSON.stringify({
-            error: 'not_found',
-            message: 'Content not found'
-          }),
-          {
-            status: 404,
-            headers: { 'content-type': 'application/json' }
-          }
-        );
-      }
-      
-      // Other metadata errors
-      return metadataResponse;
-    }
-
-    const metadata = await metadataResponse.json();
-
-    // Check if content is expired
-    const expiresAt = new Date(metadata.expires_at);
-    if (expiresAt < new Date()) {
-      return new Response(
-        JSON.stringify({
-          error: 'not_found',
-          message: 'Content not found'
-        }),
-        {
-          status: 404,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
     }
 
     // Check rate limit before serving content
@@ -813,7 +870,7 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     // For HEAD requests, return headers only
     if (method === 'HEAD') {
       return new Response(null, {
-        status: r2Object.range ? 206 : 200,
+        status: rangeHeader ? 206 : 200,
         headers: headers
       });
     }
@@ -829,7 +886,7 @@ export async function handleDownloadContent(request, env, cid, extension = null)
 
     // Stream content
     return new Response(r2Object.body, {
-      status: r2Object.range ? 206 : 200,
+      status: rangeHeader ? 206 : 200,
       headers: headers
     });
   } catch (error) {
