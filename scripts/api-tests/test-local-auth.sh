@@ -180,7 +180,7 @@ assert_status "$status" "201" "A-027: API key creation with name"
 assert_json_value "$body" "name" "my_custom_key" "A-027: Custom name is set"
 
 # A-028: API key with expiration
-future_date="2025-12-31T23:59:59Z"
+future_date=$(date -u -d "+30 days" +"%Y-%m-%dT%H:%M:%SZ")
 response=$(http_post "/api/auth/apikeys" "{\"name\":\"expiring_key\",\"expires_at\":\"$future_date\"}" "$API_AUTH")
 status=$(get_status "$response")
 body=$(get_body "$response")
@@ -227,8 +227,10 @@ status=$(get_status "$response")
 assert_status "$status" "404" "A-030: Invalid key ID returns 404"
 
 # A-031: X-API-Key header works
-# Create a new key for this test
-response=$(http_post "/api/auth/apikeys" '{"name":"x_header_test"}' "$API_AUTH")
+# Create a new user to avoid API key limits
+X_API_USER="x_api_user_$$"
+X_API_AUTH="Authorization: LocalDev $X_API_USER"
+response=$(http_post "/api/auth/apikeys" '{"name":"x_header_test"}' "$X_API_AUTH")
 body=$(get_body "$response")
 x_api_key=$(json_get "$body" "api_key")
 response=$(http_get "/api/auth/session" "X-API-Key: $x_api_key")

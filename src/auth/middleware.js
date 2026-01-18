@@ -12,7 +12,7 @@ export const AUTH_ERROR_CODES = {
   AUTH_MISSING: 'AUTH_MISSING',
   AUTH_INVALID_FORMAT: 'AUTH_INVALID_FORMAT',
   AUTH_EXPIRED: 'AUTH_EXPIRED',
-  AUTH_REVOKED: 'AUTH_REVOKED',
+  AUTH_KEY_REVOKED: 'AUTH_KEY_REVOKED',
   AUTH_USER_DELETED: 'AUTH_USER_DELETED',
   AUTH_RATE_LIMITED: 'AUTH_RATE_LIMITED',
   AUTH_KEY_LIMIT: 'AUTH_KEY_LIMIT'
@@ -175,7 +175,7 @@ async function validateApiKey(apiKey, env) {
     if (apiKeyData.revoked_at) {
       return {
         valid: false,
-        error: AUTH_ERROR_CODES.AUTH_REVOKED,
+        error: AUTH_ERROR_CODES.AUTH_KEY_REVOKED,
         message: 'API key has been revoked'
       };
     }
@@ -546,7 +546,7 @@ function getErrorMessage(errorCode) {
     [AUTH_ERROR_CODES.AUTH_MISSING]: 'Authentication required',
     [AUTH_ERROR_CODES.AUTH_INVALID_FORMAT]: 'Invalid authentication format',
     [AUTH_ERROR_CODES.AUTH_EXPIRED]: 'Authentication token expired',
-    [AUTH_ERROR_CODES.AUTH_REVOKED]: 'API key has been revoked',
+    [AUTH_ERROR_CODES.AUTH_KEY_REVOKED]: 'API key has been revoked',
     [AUTH_ERROR_CODES.AUTH_USER_DELETED]: 'User account has been deleted',
     [AUTH_ERROR_CODES.AUTH_RATE_LIMITED]: 'Rate limit exceeded',
     [AUTH_ERROR_CODES.AUTH_KEY_LIMIT]: 'Maximum API keys limit reached'

@@ -114,9 +114,11 @@ export class ContentMetadata {
     const content = {
       hash_256t: data.hash_256t,
       size_bytes: data.size_bytes,
+      content_type: data.content_type || 'application/octet-stream',
       uploader_id: data.uploader_id,
       created_at: created_at.toISOString(),
       expires_at: expires_at.toISOString(),
+      retention_months: data.retention_months,
       retention_payments: [
         {
           payment_id: data.payment_id || null,
@@ -237,6 +239,7 @@ export class ContentMetadata {
     };
 
     content.expires_at = new_expires_at.toISOString();
+    content.retention_months = (content.retention_months || 0) + data.months_to_add;
     content.retention_payments.push(payment);
 
     await this.state.storage.put('content', content);

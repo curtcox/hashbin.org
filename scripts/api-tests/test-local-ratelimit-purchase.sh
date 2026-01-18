@@ -18,7 +18,7 @@ AUTH_HEADER="Authorization: LocalDev $RL_PURCHASE_USER"
 http_post "/api/balance/dev-deposit" '{"amount_cents":100000}' "$AUTH_HEADER" > /dev/null
 
 # Upload test content (must be >64 bytes to have rate limit)
-test_content=$(printf 'Rate limit purchase test content %.0s' {1..10})
+test_content="Rate limit purchase test content $(random_string 32) $(random_string 32)"
 temp_file=$(create_temp_file "$test_content")
 response=$(http_post_file "/api/content" "$temp_file" "$AUTH_HEADER" "text/plain")
 body=$(get_body "$response")
@@ -54,7 +54,7 @@ fi
 # R-004: Purchase deducts balance
 balance_before=$(http_get "/api/balance" "$AUTH_HEADER" | get_body | json_get "balance_cents")
 # Upload new content
-new_content=$(printf 'New content for balance test %.0s' {1..10})
+new_content="New content for balance test $(random_string 32) $(random_string 32)"
 new_file=$(create_temp_file "$new_content")
 response=$(http_post_file "/api/content" "$new_file" "$AUTH_HEADER" "text/plain")
 new_cid=$(get_body "$response" | json_get "cid")
@@ -83,7 +83,7 @@ assert_status "$status" "400" "R-006: Cannot purchase rate limit for inline cont
 
 # R-007: Cannot exceed retention
 # Upload content with 1 month retention
-one_month_content=$(printf 'One month content %.0s' {1..10})
+one_month_content="One month content $(random_string 32) $(random_string 32)"
 one_month_file=$(create_temp_file "$one_month_content")
 response=$(http_post_file "/api/content?retention_months=1" "$one_month_file" "$AUTH_HEADER" "text/plain")
 one_month_cid=$(get_body "$response" | json_get "cid")
@@ -101,7 +101,7 @@ fi
 poor_user="poor_rl_user_$$"
 poor_auth="Authorization: LocalDev $poor_user"
 # Upload content
-poor_content=$(printf 'Poor user content %.0s' {1..10})
+poor_content=$(printf 'Poor user content %.0s' {1..2500})
 poor_file=$(create_temp_file "$poor_content")
 response=$(http_post_file "/api/content" "$poor_file" "$poor_auth" "text/plain")
 poor_cid=$(get_body "$response" | json_get "cid")

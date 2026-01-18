@@ -47,7 +47,7 @@ else
 fi
 
 # D-003: Download non-existent CID
-status=$(curl -sf -w "%{http_code}" -o /dev/null "$BASE_URL/nonexistent_cid_12345" || echo "404")
+status=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/nonexistent_cid_12345")
 if [ "$status" = "404" ]; then
   pass "D-003: Download non-existent CID returns 404"
 else
@@ -70,25 +70,25 @@ else
 fi
 
 # D-006: Download expired content (non-existent)
-status=$(curl -sf -w "%{http_code}" -o /dev/null "$BASE_URL/never_uploaded_cid_xyz" || echo "404")
+status=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/never_uploaded_cid_xyz")
 assert_status "$status" "404" "D-006: Download expired/non-existent content returns 404"
 
 echo ""
 echo "=== Rate Limiting ==="
 
 # Upload new content for rate limit tests
-rl_content="Rate limit test content"
+rl_content="Rate limit test content $(random_string 16) $(random_string 16) $(random_string 16)"
 rl_file=$(create_temp_file "$rl_content")
 response=$(http_post_file "/api/content" "$rl_file" "$AUTH_HEADER" "text/plain")
 body=$(get_body "$response")
 rl_cid=$(json_get "$body" "cid")
 
 # D-010: First download succeeds
-status=$(curl -sf -w "%{http_code}" -o /dev/null "$BASE_URL/$rl_cid")
+status=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/$rl_cid")
 assert_status "$status" "200" "D-010: First download succeeds"
 
 # D-011: Immediate re-download blocked
-status=$(curl -sf -w "%{http_code}" -o /dev/null "$BASE_URL/$rl_cid" || echo "429")
+status=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/$rl_cid")
 if [ "$status" = "429" ]; then
   pass "D-011: Immediate re-download blocked with 429"
 else
@@ -98,7 +98,7 @@ fi
 # D-012: 429 includes next_available_at
 temp_429=$(mktemp)
 TEMP_FILES+=("$temp_429")
-curl -sf "$BASE_URL/$rl_cid" > "$temp_429" 2>&1 || true
+curl -s "$BASE_URL/$rl_cid" > "$temp_429" 2>&1 || true
 body_429=$(cat "$temp_429")
 if echo "$body_429" | grep -q "next_available_at\|retry_after"; then
   pass "D-012: 429 response includes next_available_at"
@@ -142,7 +142,7 @@ fi
 # D-016: Download after MTBR expires
 info "D-016: Testing download after MTBR expires (waiting 2 seconds)..."
 sleep 2
-status=$(curl -sf -w "%{http_code}" -o /dev/null "$BASE_URL/$rl_cid")
+status=$(curl -s -w "%{http_code}" -o /dev/null "$BASE_URL/$rl_cid")
 if [ "$status" = "200" ] || [ "$status" = "429" ]; then
   # After 2 seconds with default MTBR, should succeed
   # But if still rate limited, that's also valid behavior

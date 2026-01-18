@@ -15,6 +15,8 @@ const MINIMUM_DEPOSIT_CENTS = 100;
 
 // Minimum retention: 30 days (1 month)
 const MINIMUM_RETENTION_MONTHS = 1;
+const INLINE_CONTENT_THRESHOLD = 64;
+const MINIMUM_RETENTION_COST_CENTS = 200;
 
 /**
  * Calculate retention cost for content
@@ -31,6 +33,10 @@ export function calculateRetentionCost(sizeBytes, retentionMonths) {
     throw new Error(`Minimum retention is ${MINIMUM_RETENTION_MONTHS} month(s)`);
   }
 
+  if (sizeBytes <= INLINE_CONTENT_THRESHOLD) {
+    return 0;
+  }
+
   // Convert bytes to GB
   const sizeGB = sizeBytes / (1024 * 1024 * 1024);
 
@@ -40,7 +46,7 @@ export function calculateRetentionCost(sizeBytes, retentionMonths) {
   // Convert to cents and round
   const costCents = Math.round(costDollars * 100);
 
-  return costCents;
+  return Math.max(costCents, MINIMUM_RETENTION_COST_CENTS);
 }
 
 /**

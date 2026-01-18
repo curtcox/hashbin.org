@@ -18,7 +18,7 @@ AUTH_HEADER="Authorization: LocalDev $EXTENSION_TEST_USER"
 http_post "/api/balance/dev-deposit" '{"amount_cents":100000}' "$AUTH_HEADER" > /dev/null
 
 # Upload test content
-test_content="Content extension test"
+test_content=$(printf 'Content extension test %.0s' {1..10})
 temp_file=$(create_temp_file "$test_content")
 response=$(http_post_file "/api/content?retention_months=1" "$temp_file" "$AUTH_HEADER" "text/plain")
 body=$(get_body "$response")
@@ -34,7 +34,7 @@ assert_json_field "$body" "expires_at" "E-001: Response contains new expires_at"
 # E-002: Extension deducts balance
 balance_before=$(http_get "/api/balance" "$AUTH_HEADER" | get_body | json_get "balance_cents")
 # Upload new content
-new_content="Another content for extension"
+new_content=$(printf 'Another content for extension %.0s' {1..10})
 new_file=$(create_temp_file "$new_content")
 response=$(http_post_file "/api/content?retention_months=1" "$new_file" "$AUTH_HEADER" "text/plain")
 new_cid=$(get_body "$response" | json_get "cid")
@@ -62,7 +62,7 @@ assert_status "$status" "404" "E-004: Cannot extend non-existent content"
 poor_user="poor_ext_user_$$"
 poor_auth="Authorization: LocalDev $poor_user"
 # Upload content
-poor_content="Poor user content"
+poor_content=$(printf 'Poor user content %.0s' {1..10})
 poor_file=$(create_temp_file "$poor_content")
 response=$(http_post_file "/api/content?retention_months=1" "$poor_file" "$poor_auth" "text/plain")
 poor_cid=$(get_body "$response" | json_get "cid")
