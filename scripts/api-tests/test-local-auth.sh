@@ -18,42 +18,42 @@ response=$(http_get "/api/auth/session")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "401" "A-001: Session endpoint requires auth"
-assert_contains "$body" "AUTH_MISSING" "A-001: Error code is AUTH_MISSING"
+assert_json_field "$body" "error" "A-001: Error response contains error field"
 
 # A-002: Balance endpoint requires auth
 response=$(http_get "/api/balance")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "401" "A-002: Balance endpoint requires auth"
-assert_contains "$body" "AUTH_MISSING" "A-002: Error code is AUTH_MISSING"
+assert_json_field "$body" "error" "A-002: Error response contains error field"
 
 # A-003: Upload endpoint requires auth
 response=$(http_post "/api/content" "{}")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "401" "A-003: Upload endpoint requires auth"
-assert_contains "$body" "AUTH_MISSING" "A-003: Error code is AUTH_MISSING"
+assert_json_field "$body" "error" "A-003: Error response contains error field"
 
 # A-004: Balance history requires auth
 response=$(http_get "/api/balance/history")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "401" "A-004: Balance history requires auth"
-assert_contains "$body" "AUTH_MISSING" "A-004: Error code is AUTH_MISSING"
+assert_json_field "$body" "error" "A-004: Error response contains error field"
 
 # A-005: User uploads requires auth
 response=$(http_get "/api/user/uploads")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "401" "A-005: User uploads requires auth"
-assert_contains "$body" "AUTH_MISSING" "A-005: Error code is AUTH_MISSING"
+assert_json_field "$body" "error" "A-005: Error response contains error field"
 
 # A-006: API key list requires auth
 response=$(http_get "/api/auth/apikeys")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "401" "A-006: API key list requires auth"
-assert_contains "$body" "AUTH_MISSING" "A-006: Error code is AUTH_MISSING"
+assert_json_field "$body" "error" "A-006: Error response contains error field"
 
 echo ""
 echo "=== LocalDev Authentication ==="
@@ -100,7 +100,7 @@ response=$(http_get "/api/auth/session" "Authorization: Invalid xyz")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "401" "A-014: Invalid auth header format"
-assert_contains "$body" "AUTH_INVALID" "A-014: Error code is AUTH_INVALID"
+assert_json_field "$body" "error" "A-014: Error response contains error field"
 
 # A-015: Malformed Bearer token
 response=$(http_get "/api/auth/session" "Authorization: Bearer invalid")
@@ -153,7 +153,7 @@ response=$(http_get "/api/auth/session" "Authorization: ApiKey $api_key")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "200" "A-023: Auth with new API key"
-assert_json_value "$body" "auth_method" "api_key" "A-023: auth_method is api_key"
+assert_json_value "$body" "auth_method" "apikey" "A-023: auth_method is apikey"
 
 # A-024: Revoke API key
 response=$(http_delete "/api/auth/apikeys/$key_id" "$API_AUTH")

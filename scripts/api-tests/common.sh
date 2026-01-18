@@ -70,9 +70,9 @@ http_get() {
   TEMP_FILES+=("$temp_file")
   
   if [ -n "$auth" ]; then
-    curl -sf -w "\n%{http_code}" -H "$auth" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -H "$auth" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   else
-    curl -sf -w "\n%{http_code}" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   fi
   
   cat "$temp_file"
@@ -88,9 +88,9 @@ http_post() {
   TEMP_FILES+=("$temp_file")
   
   if [ -n "$auth" ]; then
-    curl -sf -w "\n%{http_code}" -X POST -H "$auth" -H "Content-Type: application/json" -d "$data" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -X POST -H "$auth" -H "Content-Type: application/json" -d "$data" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   else
-    curl -sf -w "\n%{http_code}" -X POST -H "Content-Type: application/json" -d "$data" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -X POST -H "Content-Type: application/json" -d "$data" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   fi
   
   cat "$temp_file"
@@ -107,9 +107,9 @@ http_post_file() {
   TEMP_FILES+=("$temp_file")
   
   if [ -n "$auth" ]; then
-    curl -sf -w "\n%{http_code}" -X POST -H "$auth" -H "Content-Type: $content_type" --data-binary "@$file" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -X POST -H "$auth" -H "Content-Type: $content_type" --data-binary "@$file" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   else
-    curl -sf -w "\n%{http_code}" -X POST -H "Content-Type: $content_type" --data-binary "@$file" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -X POST -H "Content-Type: $content_type" --data-binary "@$file" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   fi
   
   cat "$temp_file"
@@ -124,9 +124,9 @@ http_delete() {
   TEMP_FILES+=("$temp_file")
   
   if [ -n "$auth" ]; then
-    curl -sf -w "\n%{http_code}" -X DELETE -H "$auth" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -X DELETE -H "$auth" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   else
-    curl -sf -w "\n%{http_code}" -X DELETE "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -X DELETE "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   fi
   
   cat "$temp_file"
@@ -142,9 +142,9 @@ http_put() {
   TEMP_FILES+=("$temp_file")
   
   if [ -n "$auth" ]; then
-    curl -sf -w "\n%{http_code}" -X PUT -H "$auth" -H "Content-Type: application/json" -d "$data" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -X PUT -H "$auth" -H "Content-Type: application/json" -d "$data" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   else
-    curl -sf -w "\n%{http_code}" -X PUT -H "Content-Type: application/json" -d "$data" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
+    curl -s -w "\n%{http_code}" -X PUT -H "Content-Type: application/json" -d "$data" "$BASE_URL$url" > "$temp_file" 2>&1 || echo -e "\n000" > "$temp_file"
   fi
   
   cat "$temp_file"
