@@ -6,15 +6,28 @@ This document outlines the plan for automated API integration tests that run aga
 
 **Goals:**
 - Create automated tests that can run locally via command line
-- Add tests to GitHub Actions to run before PR approval
+- Add tests to GitHub Actions to run before PR approval (required to pass)
 - Achieve comprehensive coverage of all API endpoints and edge cases
 
-**Testing Approach:**
-- Use bash scripts with `curl` for consistency with existing test infrastructure
-- Use `LocalDev` authentication for authenticated endpoints
-- Use `dev-deposit` endpoint to set up test balances
-- Each test suite should be independently runnable
-- Tests should be idempotent where possible (can run multiple times)
+---
+
+## Design Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Test ordering | Sequential with shared state | Faster execution, tests build on each other |
+| Cleanup strategy | Fresh user IDs per run | No cleanup needed, isolation via unique IDs |
+| Flaky test handling | Fail fast | Investigate and fix rather than mask issues |
+| API key reveal testing | Skip | Requires Clerk session freshness, not available in LocalDev |
+| Logout endpoint testing | Skip | Clerk-specific, returns 501 for LocalDev |
+| Stripe webhook testing | Skip in local mode | Requires valid Stripe signatures; test in production smoke tests |
+| Rate limit testing | Purchase 100ms MTBR | Minimum allowed MTBR enables quick re-download tests |
+| CI trigger | PRs to main/develop only | Save CI minutes |
+| PR blocking | Required to pass | Ensure quality before merge |
+| CI timeout | 5 minutes | Sufficient for all tests |
+| Large file testing | Skip | Slow and resource-intensive |
+| Content expiration testing | Use non-existent CID | Non-existent content returns same 404 as expired |
+| 2FA endpoint testing | Skip | Not available in LocalDev |
 
 ---
 
@@ -23,6 +36,7 @@ This document outlines the plan for automated API integration tests that run aga
 - Local server running: `npm run dev:local`
 - Base URL: `http://localhost:8787`
 - Tests use `LocalDev` auth: `Authorization: LocalDev <test_user_id>`
+- Each test run generates a unique user ID: `api_test_user_$(date +%s)`
 
 ---
 
@@ -147,6 +161,7 @@ This document outlines the plan for automated API integration tests that run aga
 | D-003 | Download non-existent CID | GET | `/{invalid_cid}` | 404 |
 | D-004 | Download sets content type | GET | `/{cid}` | Correct `Content-Type` header |
 | D-005 | Download sets content length | GET | `/{cid}` | Correct `Content-Length` header |
+| D-006 | Download expired content (non-existent) | GET | `/{never_uploaded_cid}` | 404 (same as expired) |
 
 #### 5.2 Rate Limiting
 
@@ -158,19 +173,24 @@ This document outlines the plan for automated API integration tests that run aga
 | D-013 | Rate limit headers present | GET | `/{cid}` | `X-RateLimit-Content-Reset` header |
 | D-014 | Get rate limit status | GET | `/api/content/{cid}/rate-limit` | 200 with current status |
 | D-015 | Inline content no rate limit | GET | `/{inline_cid}` | Never returns 429 |
+| D-016 | Download after MTBR expires | GET | `/{cid}` | 200 after waiting 100ms+ |
 
 ### 6. Rate Limit Purchase Tests (`test-local-ratelimit-purchase.sh`)
+
+**Note:** Tests purchase 100ms MTBR (minimum allowed) to enable rapid re-download testing.
 
 | Test ID | Test Name | Method | Endpoint | Expected Result |
 |---------|-----------|--------|----------|-----------------|
 | R-001 | Purchase rate limit reduction | POST | `/api/content/rate-limit/purchase` | 200 with new MTBR |
-| R-002 | Purchase deducts balance | POST | `/api/content/rate-limit/purchase` | Balance reduced |
-| R-003 | Purchase creates transaction | GET | `/api/balance/history` | Shows `rate_limit_purchase` |
-| R-004 | Cannot purchase for inline | POST | `/api/content/rate-limit/purchase` | 400 for inline content |
-| R-005 | Cannot exceed retention | POST | `/api/content/rate-limit/purchase` | 400 if duration > retention |
-| R-006 | Insufficient balance rejected | POST | `/api/content/rate-limit/purchase` | 400 with `insufficient_balance` |
-| R-007 | Invalid CID rejected | POST | `/api/content/rate-limit/purchase` | 404 for non-existent CID |
-| R-008 | Purchase validates MTBR minimum | POST | `/api/content/rate-limit/purchase` | 400 if MTBR < 100ms |
+| R-002 | Purchase 100ms MTBR | POST | `/api/content/rate-limit/purchase` | MTBR set to 100ms |
+| R-003 | Download succeeds after 100ms wait | GET | `/{cid}` | 200 after short wait |
+| R-004 | Purchase deducts balance | POST | `/api/content/rate-limit/purchase` | Balance reduced |
+| R-005 | Purchase creates transaction | GET | `/api/balance/history` | Shows `rate_limit_purchase` |
+| R-006 | Cannot purchase for inline | POST | `/api/content/rate-limit/purchase` | 400 for inline content |
+| R-007 | Cannot exceed retention | POST | `/api/content/rate-limit/purchase` | 400 if duration > retention |
+| R-008 | Insufficient balance rejected | POST | `/api/content/rate-limit/purchase` | 400 with `insufficient_balance` |
+| R-009 | Invalid CID rejected | POST | `/api/content/rate-limit/purchase` | 404 for non-existent CID |
+| R-010 | Purchase validates MTBR minimum | POST | `/api/content/rate-limit/purchase` | 400 if MTBR < 100ms |
 
 ### 7. Content Extension Tests (`test-local-extension.sh`)
 
@@ -224,6 +244,22 @@ This document outlines the plan for automated API integration tests that run aga
 
 ---
 
+## Skipped Tests (By Design)
+
+The following are explicitly **not tested** in this suite:
+
+| Feature | Reason |
+|---------|--------|
+| API key reveal | Requires Clerk session freshness (<5 min) |
+| Logout endpoint | Clerk-specific, returns 501 for LocalDev |
+| Stripe webhooks | Requires valid Stripe signatures |
+| Large file uploads | Slow and resource-intensive |
+| Content expiration | Time-based; use non-existent CID as proxy |
+| 2FA-protected endpoints | Not available in LocalDev auth |
+| Account deletion | Requires 2FA verification |
+
+---
+
 ## GitHub Actions Integration
 
 ### Workflow: `local-api-tests.yml`
@@ -234,13 +270,12 @@ name: Local API Tests
 on:
   pull_request:
     branches: [main, develop]
-  push:
-    branches: [main, develop]
 
 jobs:
   api-tests:
     name: Run Local API Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - uses: actions/checkout@v4
@@ -256,7 +291,7 @@ jobs:
       - name: Start local server
         run: |
           npm run dev:local &
-          sleep 10  # Wait for server to start
+          echo $! > /tmp/server.pid
 
       - name: Wait for server ready
         run: |
@@ -271,163 +306,122 @@ jobs:
           echo "Server failed to start"
           exit 1
 
-      - name: Run Health Tests
-        run: bash scripts/api-tests/test-local-health.sh
+      - name: Run API Tests
+        run: bash scripts/run-all-api-tests.sh
 
-      - name: Run Auth Tests
-        run: bash scripts/api-tests/test-local-auth.sh
-
-      - name: Run Balance Tests
-        run: bash scripts/api-tests/test-local-balance.sh
-
-      - name: Run Upload Tests
-        run: bash scripts/api-tests/test-local-upload.sh
-
-      - name: Run Download Tests
-        run: bash scripts/api-tests/test-local-download.sh
-
-      - name: Run Rate Limit Tests
-        run: bash scripts/api-tests/test-local-ratelimit-purchase.sh
-
-      - name: Run Extension Tests
-        run: bash scripts/api-tests/test-local-extension.sh
-
-      - name: Run User Tests
-        run: bash scripts/api-tests/test-local-user.sh
-
-      - name: Run Error Tests
-        run: bash scripts/api-tests/test-local-errors.sh
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/server.pid ]; then
+            kill $(cat /tmp/server.pid) 2>/dev/null || true
+          fi
 ```
 
-### Test Script Structure
-
-Each test script will follow this pattern:
+### Master Test Runner: `scripts/run-all-api-tests.sh`
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+echo "============================================"
+echo "Running All Local API Tests"
+echo "============================================"
+
+# Run tests in priority order (P0 first, then P1, etc.)
+# Tests are sequential and may share state
+
+bash "$SCRIPT_DIR/api-tests/test-local-health.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-auth.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-balance.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-upload.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-download.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-ratelimit-purchase.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-extension.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-user.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-donation.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-errors.sh"
+bash "$SCRIPT_DIR/api-tests/test-local-concurrent.sh"
+
+echo ""
+echo "============================================"
+echo "All API Tests Completed Successfully"
+echo "============================================"
+```
+
+### Test Script Template
+
+Each test script follows this pattern:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Configuration
 BASE_URL="${BASE_URL:-http://localhost:8787}"
-TEST_USER="api_test_user_$(date +%s)"
+TEST_USER="api_test_user_$(date +%s)_$$"
+AUTH_HEADER="Authorization: LocalDev $TEST_USER"
 
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Counters
 TOTAL=0
 PASSED=0
 FAILED=0
 
-pass() { echo -e "${GREEN}✅ PASS${NC}: $1"; ((PASSED++)); ((TOTAL++)); }
-fail() { echo -e "${RED}❌ FAIL${NC}: $1"; ((FAILED++)); ((TOTAL++)); }
+# Helper functions
+pass() {
+  echo -e "${GREEN}✅ PASS${NC}: $1"
+  ((PASSED++))
+  ((TOTAL++))
+}
 
-# Test implementations...
+fail() {
+  echo -e "${RED}❌ FAIL${NC}: $1"
+  ((FAILED++))
+  ((TOTAL++))
+}
+
+info() {
+  echo -e "${YELLOW}ℹ️  INFO${NC}: $1"
+}
+
+# Test implementations here...
 
 # Summary
-echo "Total: $TOTAL | Passed: $PASSED | Failed: $FAILED"
+echo ""
+echo "=========================================="
+echo "Test Summary: $TOTAL total, $PASSED passed, $FAILED failed"
+echo "=========================================="
 [ $FAILED -eq 0 ] && exit 0 || exit 1
 ```
 
 ---
 
-## Open Questions
-
-### Test Infrastructure
-
-1. **Q1: Should tests be ordered or independent?**
-   - Option A: Each test is fully independent (slower, more setup per test)
-   - Option B: Tests run in sequence with shared state (faster, but order-dependent)
-   - *Recommendation: Option B for speed, with clear test ordering*
-
-2. **Q2: Should tests clean up after themselves?**
-   - Option A: Tests clean up created resources (API keys, content)
-   - Option B: Tests don't clean up, rely on fresh user IDs each run
-   - *Recommendation: Option B, use unique user IDs per test run*
-
-3. **Q3: How should we handle flaky network/timing issues?**
-   - Option A: Retry failed tests automatically
-   - Option B: Fail fast, investigate flakiness
-   - *Recommendation: Option B for CI, with clear error messages*
-
-### Test Coverage
-
-4. **Q4: Should we test API key reveal functionality?**
-   - Note: Reveal requires "fresh session" (<5 min) which is Clerk-specific
-   - LocalDev auth may not support session freshness checks
-   - *Need to verify if reveal works with LocalDev*
-
-5. **Q5: Should we test logout endpoint?**
-   - Note: Logout is Clerk-specific and returns 501 for non-Clerk sessions
-   - *Probably skip or test that it returns appropriate error for LocalDev*
-
-6. **Q6: Should we test Stripe webhook endpoint?**
-   - Note: Requires valid Stripe signature
-   - Option A: Mock Stripe signatures locally
-   - Option B: Skip webhook tests in local mode
-   - *Recommendation: Option B, test webhook in production smoke tests only*
-
-7. **Q7: What timeout should we use for rate limit tests?**
-   - Default MTBR is 30 days - too long for tests
-   - Need a way to test rate limiting without waiting 30 days
-   - Option A: Purchase very low MTBR for test content
-   - Option B: Add test-only endpoint to set rate limits
-   - *Need to determine feasible approach*
-
-### GitHub Actions
-
-8. **Q8: Should API tests run on every commit or only PRs?**
-   - Option A: Every push to any branch
-   - Option B: Only on PRs to main/develop
-   - Option C: Both, but with different test subsets
-   - *Recommendation: Option B to save CI minutes*
-
-9. **Q9: Should API tests be blocking for PR merge?**
-   - Option A: Required to pass before merge
-   - Option B: Advisory only (warning on failure)
-   - *Recommendation: Option A*
-
-10. **Q10: How long should we allow for the full test suite?**
-    - Estimate: 2-5 minutes for all tests
-    - Should we set a timeout?
-    - *Need to measure actual runtime*
-
-### Edge Cases
-
-11. **Q11: Should we test large file uploads?**
-    - Risk: Slow tests, resource usage
-    - Option A: Test with files up to 10MB
-    - Option B: Skip large file tests in CI
-    - *Need to determine max size worth testing*
-
-12. **Q12: Should we test content expiration?**
-    - Note: Content expiration is time-based
-    - Cannot easily test in short-running CI
-    - *Probably skip, test logic via unit tests instead*
-
-13. **Q13: How should we test 2FA requirements?**
-    - Note: Account deletion requires 2FA
-    - LocalDev auth doesn't support 2FA
-    - *Skip 2FA-protected endpoints or mock 2FA*
-
----
-
 ## Test Priority Matrix
 
-| Priority | Test Suite | Reason |
-|----------|------------|--------|
-| P0 (Critical) | Health & Config | Basic availability |
-| P0 (Critical) | Auth - Unauthenticated | Security boundary |
-| P0 (Critical) | Auth - LocalDev | Required for all other tests |
-| P1 (High) | Upload | Core functionality |
-| P1 (High) | Download | Core functionality |
-| P1 (High) | Balance | Money handling |
-| P2 (Medium) | API Keys | Important feature |
-| P2 (Medium) | Rate Limiting | Important feature |
-| P2 (Medium) | Error Handling | User experience |
-| P3 (Low) | Content Extension | Less common flow |
-| P3 (Low) | Donations | Less common flow |
-| P3 (Low) | Concurrent Tests | Edge cases |
+| Priority | Test Suite | Tests | Reason |
+|----------|------------|-------|--------|
+| P0 (Critical) | Health & Config | 10 | Basic availability |
+| P0 (Critical) | Auth - Unauthenticated | 6 | Security boundary |
+| P0 (Critical) | Auth - LocalDev | 7 | Required for all other tests |
+| P0 (Critical) | Auth - API Keys | 12 | Important auth flow |
+| P1 (High) | Upload | 18 | Core functionality |
+| P1 (High) | Download | 17 | Core functionality |
+| P1 (High) | Balance | 10 | Money handling |
+| P2 (Medium) | Rate Limiting | 10 | Important feature |
+| P2 (Medium) | Error Handling | 6 | User experience |
+| P3 (Low) | Content Extension | 6 | Less common flow |
+| P3 (Low) | User Data | 5 | Less common flow |
+| P3 (Low) | Donations | 4 | Less common flow |
+| P3 (Low) | Concurrent Tests | 4 | Edge cases |
+
+**Total: 115 tests**
 
 ---
 
@@ -436,31 +430,54 @@ echo "Total: $TOTAL | Passed: $PASSED | Failed: $FAILED"
 ```
 scripts/
 ├── api-tests/
-│   ├── common.sh              # Shared utilities
-│   ├── test-local-health.sh
-│   ├── test-local-auth.sh
-│   ├── test-local-balance.sh
-│   ├── test-local-upload.sh
-│   ├── test-local-download.sh
-│   ├── test-local-ratelimit-purchase.sh
-│   ├── test-local-extension.sh
-│   ├── test-local-user.sh
-│   ├── test-local-donation.sh
-│   ├── test-local-errors.sh
-│   └── test-local-concurrent.sh
-└── run-all-api-tests.sh       # Master runner
+│   ├── common.sh                        # Shared utilities and helpers
+│   ├── test-local-health.sh             # H-001 to H-010
+│   ├── test-local-auth.sh               # A-001 to A-031
+│   ├── test-local-balance.sh            # B-001 to B-010
+│   ├── test-local-upload.sh             # U-001 to U-035
+│   ├── test-local-download.sh           # D-001 to D-016
+│   ├── test-local-ratelimit-purchase.sh # R-001 to R-010
+│   ├── test-local-extension.sh          # E-001 to E-006
+│   ├── test-local-user.sh               # UD-001 to UD-005
+│   ├── test-local-donation.sh           # DN-001 to DN-004
+│   ├── test-local-errors.sh             # ERR-001 to ERR-006
+│   └── test-local-concurrent.sh         # C-001 to C-004
+└── run-all-api-tests.sh                 # Master runner
 
 .github/workflows/
-└── local-api-tests.yml
+└── local-api-tests.yml                  # CI workflow
+```
+
+---
+
+## npm Scripts (to be added to package.json)
+
+```json
+{
+  "scripts": {
+    "test:api": "bash scripts/run-all-api-tests.sh",
+    "test:api:health": "bash scripts/api-tests/test-local-health.sh",
+    "test:api:auth": "bash scripts/api-tests/test-local-auth.sh",
+    "test:api:balance": "bash scripts/api-tests/test-local-balance.sh",
+    "test:api:upload": "bash scripts/api-tests/test-local-upload.sh",
+    "test:api:download": "bash scripts/api-tests/test-local-download.sh",
+    "test:api:ratelimit": "bash scripts/api-tests/test-local-ratelimit-purchase.sh",
+    "test:api:extension": "bash scripts/api-tests/test-local-extension.sh",
+    "test:api:user": "bash scripts/api-tests/test-local-user.sh",
+    "test:api:donation": "bash scripts/api-tests/test-local-donation.sh",
+    "test:api:errors": "bash scripts/api-tests/test-local-errors.sh",
+    "test:api:concurrent": "bash scripts/api-tests/test-local-concurrent.sh"
+  }
+}
 ```
 
 ---
 
 ## Next Steps
 
-1. Resolve open questions above
-2. Implement `common.sh` with shared utilities
-3. Implement test scripts in priority order (P0 first)
-4. Create GitHub Actions workflow
-5. Add to PR requirements
-6. Document test maintenance procedures
+1. Implement `common.sh` with shared utilities (curl helpers, assertions, setup)
+2. Implement test scripts in priority order (P0 → P1 → P2 → P3)
+3. Add npm scripts to `package.json`
+4. Create GitHub Actions workflow file
+5. Configure branch protection to require API tests
+6. Run full suite and measure actual execution time
