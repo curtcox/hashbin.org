@@ -1,0 +1,86 @@
+name: Purge Cloudflare Cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      purge_type:
+        description: 'Type of cache purge'
+        required: true
+        default: 'everything'
+        type: choice
+        options:
+          - everything
+          - frontend-only
+          - custom-urls
+      custom_urls:
+        description: 'Custom URLs to purge (comma-separated, only used if purge_type is custom-urls)'
+        required: false
+        type: string
+
+jobs:
+  purge-cache:
+    name: Purge Cloudflare Cache
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine URLs to purge
+        id: urls
+        run: |
+          PURGE_TYPE="${{ github.event.inputs.purge_type }}"
+
+          case "$PURGE_TYPE" in
+            "everything")
+              echo "purge_everything=true" >> $GITHUB_OUTPUT
+              echo "urls=" >> $GITHUB_OUTPUT
+              echo "Purging entire cache..."
+              ;;
+            "frontend-only")
+              URLS="https://hashbin.org/,https://hashbin.org/index.html,https://hashbin.org/upload.html,https://hashbin.org/dashboard.html,https://hashbin.org/api-keys.html,https://hashbin.org/info.html,https://hashbin.org/styles.css,https://hashbin.org/app.js,https://www.hashbin.org/,https://www.hashbin.org/index.html"
+              echo "purge_everything=false" >> $GITHUB_OUTPUT
+              echo "urls=$URLS" >> $GITHUB_OUTPUT
+              echo "Purging frontend assets: $URLS"
+              ;;
+            "custom-urls")
+              URLS="${{ github.event.inputs.custom_urls }}"
+              if [ -z "$URLS" ]; then
+                echo "ERROR: custom_urls input is required when purge_type is custom-urls"
+                exit 1
+              fi
+              echo "purge_everything=false" >> $GITHUB_OUTPUT
+              echo "urls=$URLS" >> $GITHUB_OUTPUT
+              echo "Purging custom URLs: $URLS"
+              ;;
+          esac
+
+      - name: Purge entire cache
+        if: steps.urls.outputs.purge_everything == 'true'
+        run: bash scripts/purge-cloudflare-cache.sh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+
+      - name: Purge specific URLs
+        if: steps.urls.outputs.purge_everything == 'false'
+        run: bash scripts/purge-cloudflare-cache.sh --urls "${{ steps.urls.outputs.urls }}"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+
+      - name: Verify cache purge
+        run: |
+          echo "Waiting for cache purge to propagate..."
+          sleep 5
+
+          echo "Fetching fresh content from hashbin.org..."
+          RESPONSE=$(curl -s -I https://hashbin.org/ 2>&1 | head -20)
+          echo "$RESPONSE"
+
+          echo ""
+          echo "=========================================="
+          echo "Cache purge completed successfully"
+          echo "=========================================="
+          echo ""
+          echo "The cache has been purged. Fresh content should now be served."
+          echo "Note: It may take a few seconds for all edge locations to update."

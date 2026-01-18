@@ -199,6 +199,14 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Purge Cloudflare cache
+        run: |
+          echo "Purging Cloudflare cache to ensure fresh content is served..."
+          bash scripts/purge-cloudflare-cache.sh
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+
       - name: Wait for deployment propagation
         run: sleep 10
 
