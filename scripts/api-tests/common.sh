@@ -37,8 +37,8 @@ trap cleanup EXIT INT TERM
 # Helper functions
 pass() {
   echo -e "${GREEN}✅ PASS${NC}: $1"
-  ((PASSED++))
-  ((TOTAL++))
+  PASSED=$((PASSED + 1))
+  TOTAL=$((TOTAL + 1))
 }
 
 fail() {
@@ -46,8 +46,8 @@ fail() {
   if [ -n "${2:-}" ]; then
     echo -e "  ${RED}Details${NC}: $2"
   fi
-  ((FAILED++))
-  ((TOTAL++))
+  FAILED=$((FAILED + 1))
+  TOTAL=$((TOTAL + 1))
 }
 
 info() {
@@ -162,11 +162,17 @@ get_body() {
   echo "$response" | head -n-1
 }
 
-# JSON parsing helpers (using grep/sed for portability)
+# JSON parsing helpers (using jq if available, fallback to grep/sed)
 json_get() {
   local json="$1"
   local key="$2"
-  echo "$json" | grep -o "\"$key\"[[:space:]]*:[[:space:]]*[^,}]*" | sed 's/.*:[[:space:]]*//' | tr -d '"'
+  
+  if command -v jq > /dev/null 2>&1; then
+    echo "$json" | jq -r ".$key // empty" 2>/dev/null || echo ""
+  else
+    # Fallback to grep/sed for simple values
+    echo "$json" | grep -o "\"$key\"[[:space:]]*:[[:space:]]*[^,}]*" | sed 's/.*:[[:space:]]*//' | tr -d '"'
+  fi
 }
 
 # Assertion helpers
