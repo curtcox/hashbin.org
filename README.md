@@ -1,5 +1,9 @@
 # HashBin.org
 
+<p align="center">
+  <img src="frontend/img/hashbin-logo.png" alt="HashBin logo" width="256">
+</p>
+
 **Content distribution platform using 256t hash-based addressing**
 
 [![Deploy Status](https://github.com/curtcox/hashbin.org/actions/workflows/deploy.yml/badge.svg)](https://github.com/curtcox/hashbin.org/actions/workflows/deploy.yml)

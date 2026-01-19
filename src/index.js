@@ -75,6 +75,7 @@ const STATIC_PATHS = [
   'info.html',
   'css/',
   'js/',
+  'img/',
   'docs/',
   'api-keys'
 ];
