@@ -162,7 +162,8 @@ get_body() {
   if [ -z "$response" ]; then
     response=$(cat)
   fi
-  echo "$response" | head -n-1
+  # macOS `head` does not support `-n -1` / `-n-1`; use sed to drop the last line.
+  echo "$response" | sed '$d'
 }
 
 # JSON parsing helpers (using jq if available, fallback to grep/sed)
@@ -328,4 +329,17 @@ create_temp_file() {
   TEMP_FILES+=("$temp_file")
   echo -n "$content" > "$temp_file"
   echo "$temp_file"
+}
+
+# Get a UTC timestamp N days in the future in RFC3339 format (portable across macOS/Linux)
+utc_rfc3339_days_from_now() {
+  local days="${1:-0}"
+
+  if date -u -v+1d "+%Y-%m-%dT%H:%M:%SZ" >/dev/null 2>&1; then
+    # BSD date (macOS)
+    date -u -v+"${days}"d "+%Y-%m-%dT%H:%M:%SZ"
+  else
+    # GNU date (Linux)
+    date -u -d "+${days} days" "+%Y-%m-%dT%H:%M:%SZ"
+  fi
 }

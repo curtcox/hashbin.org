@@ -180,7 +180,7 @@ assert_status "$status" "201" "A-027: API key creation with name"
 assert_json_value "$body" "name" "my_custom_key" "A-027: Custom name is set"
 
 # A-028: API key with expiration
-future_date=$(date -u -d "+30 days" +"%Y-%m-%dT%H:%M:%SZ")
+future_date=$(utc_rfc3339_days_from_now 30)
 response=$(http_post "/api/auth/apikeys" "{\"name\":\"expiring_key\",\"expires_at\":\"$future_date\"}" "$API_AUTH")
 status=$(get_status "$response")
 body=$(get_body "$response")
