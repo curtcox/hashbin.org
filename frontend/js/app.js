@@ -12,6 +12,8 @@ import {
   getProviderIcon
 } from './auth-loader.js';
 
+import { renderNavHeader } from './nav-header.js';
+
 import { 
   authenticatedFetch, 
   formatBalance, 
@@ -32,6 +34,8 @@ let balanceCache = null;
  */
 async function init() {
   console.log('Initializing HashBin.org application...');
+
+  renderNavHeader();
   
   // Initialize Clerk
   const authInitialized = await initializeAuth();
@@ -135,7 +139,14 @@ function createAuthenticatedHTML(user, providerIcon) {
     <div class="balance" id="balance-display">
       <span class="balance-loading">Loading balance...</span>
     </div>
-    <button class="btn-sign-out" id="sign-out-btn">Sign Out</button>
+    <button class="btn-sign-out" id="sign-out-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+      <span>Sign Out</span>
+    </button>
   `;
 }
 
