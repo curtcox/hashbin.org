@@ -387,6 +387,7 @@ jobs:
         run: |
           GIT_SHA=$(git rev-parse HEAD)
           echo "Verifying git SHA in HTML files..."
+          echo "Expected SHA: $GIT_SHA"
 
           PAGES=(
             "/"
@@ -396,18 +397,42 @@ jobs:
             "/info.html"
           )
 
-          for PAGE in "${PAGES[@]}"; do
-            echo "Checking $PAGE..."
-            HTML_RESPONSE=$(curl -s "https://hashbin.org$PAGE")
+          MAX_RETRIES=3
+          RETRY_DELAY=5
 
-            if echo "$HTML_RESPONSE" | grep -q "<!-- git-sha: $GIT_SHA -->"; then
-              echo "✅ Git SHA found in HTML: $GIT_SHA ($PAGE)"
-            else
-              echo "❌ Git SHA not found in HTML for $PAGE"
+          for PAGE in "${PAGES[@]}"; do
+            echo ""
+            echo "Checking $PAGE..."
+            SUCCESS=false
+
+            for ((i=1; i<=MAX_RETRIES; i++)); do
+              # Use cache-busting headers
+              HTML_RESPONSE=$(curl -s -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://hashbin.org$PAGE?_=$(date +%s)")
+
+              if echo "$HTML_RESPONSE" | grep -q "<!-- git-sha: $GIT_SHA -->"; then
+                echo "✅ Git SHA found in HTML: $GIT_SHA ($PAGE)"
+                SUCCESS=true
+                break
+              else
+                echo "Attempt $i/$MAX_RETRIES: SHA not found, waiting ${RETRY_DELAY}s..."
+                if [ $i -lt $MAX_RETRIES ]; then
+                  sleep $RETRY_DELAY
+                fi
+              fi
+            done
+
+            if [ "$SUCCESS" = false ]; then
+              echo "❌ Git SHA not found in HTML for $PAGE after $MAX_RETRIES attempts"
               echo "Expected: <!-- git-sha: $GIT_SHA -->"
+              # Show what SHA is actually in the file
+              FOUND_SHA=$(echo "$HTML_RESPONSE" | grep -o '<!-- git-sha: [^>]*-->' | head -1)
+              echo "Found: $FOUND_SHA"
               exit 1
             fi
           done
+
+          echo ""
+          echo "✅ All HTML files verified"
 
       - name: Verify deployment - Workers.dev URL
         continue-on-error: true
