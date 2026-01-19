@@ -309,6 +309,30 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
+      - name: Verify routes are configured
+        run: |
+          echo "=== Checking worker routes for hashbin.org zone ==="
+
+          # Get routes from Cloudflare API
+          ROUTES_RESPONSE=$(curl -s -X GET \
+            "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/workers/routes" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json")
+
+          echo "Routes configured for zone:"
+          echo "$ROUTES_RESPONSE" | jq '.' 2>/dev/null || echo "$ROUTES_RESPONSE"
+
+          # Check if our worker is in the routes
+          if echo "$ROUTES_RESPONSE" | grep -q "hashbin-worker"; then
+            echo "✅ hashbin-worker found in routes"
+          else
+            echo "❌ WARNING: hashbin-worker NOT found in routes!"
+            echo "The custom domain may be pointing to a different worker"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+
       - name: Purge Cloudflare cache
         run: |
           echo "Purging Cloudflare cache to ensure fresh content is served..."
