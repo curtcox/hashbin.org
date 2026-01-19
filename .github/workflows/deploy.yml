@@ -54,11 +54,21 @@ jobs:
         run: |
           GIT_SHA=$(git rev-parse HEAD)
           echo "Git SHA: $GIT_SHA"
-          
+
           # Inject SHA into HTML files
           bash scripts/inject-git-sha.sh "$GIT_SHA"
           echo "✅ Git SHA injected into HTML files"
-          
+
+      - name: Inject git SHA into worker source code
+        run: |
+          GIT_SHA=$(git rev-parse HEAD)
+          echo "Git SHA: $GIT_SHA"
+
+          # Inject SHA into worker source code
+          # This ensures code changes with each commit, forcing wrangler to redeploy
+          bash scripts/inject-git-sha-code.sh "$GIT_SHA"
+          echo "✅ Git SHA injected into source code"
+
       - name: Create R2 buckets
         run: |
           create_bucket() {

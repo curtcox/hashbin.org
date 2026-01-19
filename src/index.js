@@ -58,6 +58,10 @@ const VALID_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
 const HEALTH_CHECK_ID = 'health-check';
 const GIT_SHA_PLACEHOLDER = 'unknown';
 
+// Git SHA embedded at build time - replaced during deployment
+// This constant forces code changes on each deploy, ensuring wrangler uploads new code
+const BUNDLED_GIT_SHA = '__DEPLOY_GIT_SHA__';
+
 // Static paths that should not be matched as CIDs
 // These paths are served by the ASSETS binding (frontend files)
 // Note: In a larger application, consider moving this to a configuration file
@@ -360,13 +364,15 @@ async function withGitShaComment(response, env) {
     return response;
   }
 
-  const gitSha = env.GIT_SHA || GIT_SHA_PLACEHOLDER;
+  // Prefer bundled SHA (embedded at build time), fall back to secret, then placeholder
+  const bundledShaIsValid = BUNDLED_GIT_SHA && BUNDLED_GIT_SHA !== '__DEPLOY_GIT_SHA__';
+  const gitSha = bundledShaIsValid ? BUNDLED_GIT_SHA : (env.GIT_SHA || GIT_SHA_PLACEHOLDER);
   const html = await response.text();
   const updatedHtml = injectGitShaIntoHtml(html, gitSha);
   const headers = new Headers(response.headers);
   headers.delete('content-length');
   headers.set('x-git-sha', gitSha);
-  headers.set('x-git-sha-present', String(Boolean(env.GIT_SHA)));
+  headers.set('x-git-sha-present', String(bundledShaIsValid || Boolean(env.GIT_SHA)));
 
   return new Response(updatedHtml, {
     status: response.status,
@@ -445,16 +451,20 @@ async function handleHealth(env) {
     overallStatus = 'degraded';
   }
 
-  if (!env.GIT_SHA) {
-    console.warn('Health check: GIT_SHA secret is not configured.');
+  // Determine git SHA: prefer bundled value (embedded at build time), fall back to secret, then placeholder
+  const bundledShaIsValid = BUNDLED_GIT_SHA && BUNDLED_GIT_SHA !== '__DEPLOY_GIT_SHA__';
+  const effectiveGitSha = bundledShaIsValid ? BUNDLED_GIT_SHA : (env.GIT_SHA || GIT_SHA_PLACEHOLDER);
+
+  if (!bundledShaIsValid && !env.GIT_SHA) {
+    console.warn('Health check: Neither BUNDLED_GIT_SHA nor GIT_SHA secret is configured.');
   }
 
   const health = {
     status: overallStatus,
     timestamp: new Date().toISOString(),
     environment: env.ENVIRONMENT || 'unknown',
-    gitSha: env.GIT_SHA || GIT_SHA_PLACEHOLDER,
-    gitShaPresent: Boolean(env.GIT_SHA),
+    gitSha: effectiveGitSha,
+    gitShaPresent: bundledShaIsValid || Boolean(env.GIT_SHA),
     checks: checks,
     summary: {
       total: Object.keys(checks).length,
@@ -471,8 +481,8 @@ async function handleHealth(env) {
     headers: {
       'content-type': 'application/json',
       'access-control-allow-origin': '*',
-      'x-git-sha': env.GIT_SHA || GIT_SHA_PLACEHOLDER,
-      'x-git-sha-present': String(Boolean(env.GIT_SHA))
+      'x-git-sha': effectiveGitSha,
+      'x-git-sha-present': String(bundledShaIsValid || Boolean(env.GIT_SHA))
     }
   });
 }
