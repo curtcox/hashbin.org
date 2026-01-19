@@ -227,14 +227,34 @@ jobs:
 
           echo ""
           echo "=== Running wrangler deploy ==="
-          npx wrangler deploy --outdir=.wrangler-output 2>&1
+          # Capture output to extract workers.dev URL
+          DEPLOY_OUTPUT=$(npx wrangler deploy --outdir=.wrangler-output 2>&1)
+          echo "$DEPLOY_OUTPUT"
+
+          # Extract workers.dev URL from deploy output
+          WORKERS_DEV_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*workers.dev' | head -1)
+          echo ""
+          echo "Extracted workers.dev URL: $WORKERS_DEV_URL"
+          echo "WORKERS_DEV_URL=$WORKERS_DEV_URL" >> $GITHUB_ENV
+
+          echo ""
+          echo "=== Verifying bundled output contains git SHA ==="
+          GIT_SHA=$(git rev-parse HEAD)
+          if grep -q "$GIT_SHA" .wrangler-output/index.js; then
+            echo "✅ Git SHA found in bundled output: $GIT_SHA"
+          else
+            echo "❌ ERROR: Git SHA NOT found in bundled output!"
+            echo "Searching for any SHA-like strings in bundle:"
+            grep -o "BUNDLED_GIT_SHA[^,]*" .wrangler-output/index.js | head -3 || echo "BUNDLED_GIT_SHA not found"
+            echo ""
+            echo "First 500 chars of bundle:"
+            head -c 500 .wrangler-output/index.js
+            exit 1
+          fi
 
           echo ""
           echo "=== Deployment complete ==="
-          if [ -d ".wrangler-output" ]; then
-            echo "Output files:"
-            ls -la .wrangler-output/ 2>/dev/null || true
-          fi
+          ls -la .wrangler-output/ 2>/dev/null || true
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -244,21 +264,47 @@ jobs:
           GIT_SHA=$(git rev-parse HEAD)
           echo "Checking workers.dev URL immediately after deploy..."
           echo "Expected SHA: $GIT_SHA"
+          echo "Workers.dev URL: $WORKERS_DEV_URL"
 
-          # Get the workers.dev URL from wrangler
-          WORKERS_URL="https://hashbin-worker.${CLOUDFLARE_ACCOUNT_ID}.workers.dev"
-          echo "Workers.dev URL pattern: hashbin-worker.<account>.workers.dev"
+          if [ -z "$WORKERS_DEV_URL" ]; then
+            echo "❌ ERROR: Could not determine workers.dev URL from deployment"
+            exit 1
+          fi
 
-          # Try the health endpoint
+          # Try the health endpoint on workers.dev
           echo ""
-          echo "Fetching /health from workers.dev..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" "https://hashbin-worker.${CLOUDFLARE_WORKERS_SUBDOMAIN:-curtcox}.workers.dev/health" 2>/dev/null || echo "CURL_FAILED")
-          echo "Response: $RESPONSE"
+          echo "Fetching /health from $WORKERS_DEV_URL..."
+          RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" "${WORKERS_DEV_URL}/health")
+          HTTP_CODE=$(echo "$RESPONSE" | grep -o 'HTTP_CODE:[0-9]*' | cut -d: -f2)
+          BODY=$(echo "$RESPONSE" | sed 's/HTTP_CODE:[0-9]*$//')
 
-          # Also try to check via wrangler
+          echo "HTTP Code: $HTTP_CODE"
+          echo "Response Body: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Workers.dev health check failed with HTTP $HTTP_CODE"
+            echo "This may indicate the worker failed to start!"
+            # Don't exit - continue to check custom domain
+          else
+            # Check if gitSha is in the response
+            if echo "$BODY" | grep -q "gitSha"; then
+              DEPLOYED_SHA=$(echo "$BODY" | grep -o '"gitSha"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"\([^"]*\)".*/\1/')
+              echo "Workers.dev deployed SHA: $DEPLOYED_SHA"
+              if [ "$DEPLOYED_SHA" = "$GIT_SHA" ]; then
+                echo "✅ Workers.dev shows correct SHA!"
+              else
+                echo "⚠️ Workers.dev SHA mismatch: expected $GIT_SHA, got $DEPLOYED_SHA"
+              fi
+            else
+              echo "❌ Workers.dev response missing gitSha field!"
+              echo "The NEW code is not running on workers.dev"
+            fi
+          fi
+
+          # Show recent deployments
           echo ""
-          echo "Worker info via wrangler:"
-          npx wrangler deployments list --limit 3 2>&1 || echo "Could not list deployments"
+          echo "Recent deployments:"
+          npx wrangler deployments list 2>&1 || echo "Could not list deployments"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
