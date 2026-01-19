@@ -67,7 +67,20 @@ jobs:
           # Inject SHA into worker source code
           # This ensures code changes with each commit, forcing wrangler to redeploy
           bash scripts/inject-git-sha-code.sh "$GIT_SHA"
-          echo "✅ Git SHA injected into source code"
+
+          # Verify the injection worked
+          echo ""
+          echo "=== Verifying source code modification ==="
+          echo "Looking for BUNDLED_GIT_SHA in src/index.js:"
+          grep "BUNDLED_GIT_SHA" src/index.js
+
+          if grep -q "BUNDLED_GIT_SHA = '$GIT_SHA'" src/index.js; then
+            echo "✅ Git SHA correctly injected into source code"
+          else
+            echo "❌ ERROR: Git SHA injection failed!"
+            echo "Expected to find: BUNDLED_GIT_SHA = '$GIT_SHA'"
+            exit 1
+          fi
 
       - name: Create R2 buckets
         run: |
@@ -204,7 +217,48 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy to Cloudflare Workers
-        run: npx wrangler deploy
+        run: |
+          echo "=== Wrangler version ==="
+          npx wrangler --version
+
+          echo ""
+          echo "=== Source code before deployment ==="
+          grep "BUNDLED_GIT_SHA" src/index.js
+
+          echo ""
+          echo "=== Running wrangler deploy ==="
+          npx wrangler deploy --outdir=.wrangler-output 2>&1
+
+          echo ""
+          echo "=== Deployment complete ==="
+          if [ -d ".wrangler-output" ]; then
+            echo "Output files:"
+            ls -la .wrangler-output/ 2>/dev/null || true
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify deployment via workers.dev (immediate check)
+        run: |
+          GIT_SHA=$(git rev-parse HEAD)
+          echo "Checking workers.dev URL immediately after deploy..."
+          echo "Expected SHA: $GIT_SHA"
+
+          # Get the workers.dev URL from wrangler
+          WORKERS_URL="https://hashbin-worker.${CLOUDFLARE_ACCOUNT_ID}.workers.dev"
+          echo "Workers.dev URL pattern: hashbin-worker.<account>.workers.dev"
+
+          # Try the health endpoint
+          echo ""
+          echo "Fetching /health from workers.dev..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://hashbin-worker.${CLOUDFLARE_WORKERS_SUBDOMAIN:-curtcox}.workers.dev/health" 2>/dev/null || echo "CURL_FAILED")
+          echo "Response: $RESPONSE"
+
+          # Also try to check via wrangler
+          echo ""
+          echo "Worker info via wrangler:"
+          npx wrangler deployments list --limit 3 2>&1 || echo "Could not list deployments"
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

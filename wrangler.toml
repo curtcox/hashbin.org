@@ -1,6 +1,6 @@
 name = "hashbin-worker"
 main = "src/index.js"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-12-01"
 
 # Static assets (frontend files)
 [assets]
