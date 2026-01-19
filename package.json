@@ -45,7 +45,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "4.47.0"
   },
   "dependencies": {
     "@clerk/backend": "^2.29.2",
