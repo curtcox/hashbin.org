@@ -1,4 +1,4 @@
-name = "hashbin-worker"
+name = "hashbin-worker-prod"
 main = "src/index.js"
 compatibility_date = "2024-12-01"
 
@@ -30,32 +30,32 @@ workers_dev = true
 [[durable_objects.bindings]]
 name = "CONTENT_METADATA"
 class_name = "ContentMetadata"
-script_name = "hashbin-worker"
+script_name = "hashbin-worker-prod"
 
 [[durable_objects.bindings]]
 name = "USER_PROFILES"
 class_name = "UserProfile"
-script_name = "hashbin-worker"
+script_name = "hashbin-worker-prod"
 
 [[durable_objects.bindings]]
 name = "PAYMENT_RECORDS"
 class_name = "PaymentRecord"
-script_name = "hashbin-worker"
+script_name = "hashbin-worker-prod"
 
 [[durable_objects.bindings]]
 name = "CONTEST_RECORDS"
 class_name = "ContestRecord"
-script_name = "hashbin-worker"
+script_name = "hashbin-worker-prod"
 
 [[durable_objects.bindings]]
 name = "MESSAGE_THREADS"
 class_name = "MessageThread"
-script_name = "hashbin-worker"
+script_name = "hashbin-worker-prod"
 
 [[durable_objects.bindings]]
 name = "KEY_REGISTRY"
 class_name = "KeyRegistry"
-script_name = "hashbin-worker"
+script_name = "hashbin-worker-prod"
 
 # R2 bucket bindings
 [[r2_buckets]]
