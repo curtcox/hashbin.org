@@ -8,6 +8,40 @@ import { getAuthState, initializeAuth } from './auth-loader.js';
 import { redirectWithReturn, getReturnUrl } from './utils.js';
 
 /**
+ * Wait for Clerk to be fully initialized
+ * Handles the async nature of Clerk SDK loading
+ * @param {number} timeout - Maximum time to wait in ms (default: 10000)
+ * @returns {Promise<boolean>} True if Clerk initialized, false if timeout
+ */
+export async function waitForClerkInit(timeout = 10000) {
+  const startTime = Date.now();
+
+  // Wait for window.Clerk to exist
+  while (!window.Clerk && Date.now() - startTime < timeout) {
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  if (!window.Clerk) {
+    console.warn('Clerk SDK not loaded within timeout');
+    return false;
+  }
+
+  // Check if Clerk is already loaded, or wait for it to load
+  if (window.Clerk.loaded) {
+    return true;
+  }
+
+  // Wait for Clerk to finish loading
+  try {
+    await window.Clerk.load();
+    return true;
+  } catch (error) {
+    console.error('Failed to load Clerk:', error);
+    return false;
+  }
+}
+
+/**
  * Check if user is authenticated and redirect if not
  * @param {Object} options Configuration options
  * @returns {Promise<boolean>} True if authenticated, false otherwise

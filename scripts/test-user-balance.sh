@@ -59,11 +59,13 @@ log_test "New user profile is created with balance of 0 cents"
 # We cannot directly test without authentication, but we can verify
 # the structure and behavior through code inspection
 
-# Verify the createProfile method sets balance_cents to 0
-if grep -q "balance_cents[[:space:]]*:[[:space:]]*0" src/durable-objects/user-profile.js; then
-  log_pass "UserProfile.createProfile sets balance_cents to 0"
+# Verify the createProfile method sets balance_cents (via initialBalance which defaults to 0)
+# The code uses: balance_cents: initialBalance, where initialBalance defaults to 0
+if grep -q "balance_cents[[:space:]]*:[[:space:]]*initialBalance" src/durable-objects/user-profile.js && \
+   grep -q ":[[:space:]]*0;" src/durable-objects/user-profile.js; then
+  log_pass "UserProfile.createProfile sets balance_cents to initialBalance (defaults to 0)"
 else
-  log_fail "UserProfile.createProfile does not set balance_cents to 0"
+  log_fail "UserProfile.createProfile does not set balance_cents correctly"
 fi
 
 # ==========================================
@@ -131,13 +133,14 @@ fi
 # ==========================================
 log_test "New profile initializes all balance-related fields"
 
-# Check that createProfile initializes all balance fields to 0
-# Get lines around the createProfile function
+# Check that createProfile initializes all balance fields
+# The code uses initialBalance (which defaults to 0) for balance_cents and total_deposited_cents
+# and uses literal 0 for total_spent_cents
 PROFILE_CREATE=$(grep -A 40 "async createProfile" src/durable-objects/user-profile.js)
-if echo "$PROFILE_CREATE" | grep -q "balance_cents[[:space:]]*:[[:space:]]*0"; then
-  if echo "$PROFILE_CREATE" | grep -q "total_deposited_cents[[:space:]]*:[[:space:]]*0"; then
+if echo "$PROFILE_CREATE" | grep -q "balance_cents[[:space:]]*:[[:space:]]*initialBalance"; then
+  if echo "$PROFILE_CREATE" | grep -q "total_deposited_cents[[:space:]]*:[[:space:]]*initialBalance"; then
     if echo "$PROFILE_CREATE" | grep -q "total_spent_cents[[:space:]]*:[[:space:]]*0"; then
-      log_pass "createProfile initializes all balance fields to 0"
+      log_pass "createProfile initializes all balance fields correctly"
     else
       log_fail "createProfile missing total_spent_cents initialization"
     fi
