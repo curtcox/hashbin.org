@@ -198,6 +198,49 @@
   box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
+/* Retention Slider */
+.retention-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+  gap: 1rem;
+}
+
+.retention-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.retention-subtext {
+  font-size: 0.9rem;
+  color: var(--color-text-light);
+}
+
+.retention-slider {
+  width: 100%;
+  margin-bottom: 0.75rem;
+}
+
+.retention-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.btn-small {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+}
+
+.retention-hint {
+  font-size: 0.85rem;
+  color: var(--color-text-light);
+  margin: 0;
+}
+
 /* Alerts */
 .alert {
   padding: 1rem;

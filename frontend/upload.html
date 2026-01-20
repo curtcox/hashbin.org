@@ -100,19 +100,32 @@
           
           <!-- Retention Picker -->
           <div class="form-group">
-            <label for="retention-preset">Retention Period</label>
-            <select id="retention-preset" class="form-control">
-              <option value="1">1 month</option>
-              <option value="12">1 year (12 months)</option>
-              <option value="120">1 decade (120 months)</option>
-              <option value="1200">1 century (1200 months)</option>
-              <option value="custom">Custom...</option>
-            </select>
-          </div>
-          
-          <div id="custom-retention-group" class="form-group" style="display: none;">
-            <label for="custom-retention">Custom Months</label>
-            <input type="number" id="custom-retention" class="form-control" min="1" value="1">
+            <label for="retention-slider">Retention Period</label>
+            <div class="retention-summary">
+              <div class="retention-value" id="retention-value">1 month</div>
+              <div class="retention-subtext" id="retention-subtext">30 days</div>
+            </div>
+            <input
+              type="range"
+              id="retention-slider"
+              class="retention-slider"
+              min="1"
+              max="120"
+              step="1"
+              value="1"
+              list="retention-stops"
+            >
+            <datalist id="retention-stops">
+              <option value="12" label="1 year"></option>
+              <option value="60" label="5 years"></option>
+              <option value="120" label="10 years"></option>
+            </datalist>
+            <div class="retention-actions">
+              <button type="button" class="btn btn-secondary btn-small" data-retention="12">1 year</button>
+              <button type="button" class="btn btn-secondary btn-small" data-retention="60">5 years</button>
+              <button type="button" class="btn btn-secondary btn-small" data-retention="120">10 years</button>
+            </div>
+            <p class="retention-hint">Choose any multiple of 30 days or jump to full-year milestones.</p>
           </div>
           
           <!-- Cost Display -->
@@ -166,18 +179,5 @@
   <script type="module" src="/js/app.js"></script>
   <script type="module" src="/js/upload.js"></script>
   
-  <script>
-    // Show custom retention input when "Custom" is selected
-    document.addEventListener('DOMContentLoaded', () => {
-      const retentionSelect = document.getElementById('retention-preset');
-      const customGroup = document.getElementById('custom-retention-group');
-      
-      if (retentionSelect) {
-        retentionSelect.addEventListener('change', (e) => {
-          customGroup.style.display = e.target.value === 'custom' ? 'block' : 'none';
-        });
-      }
-    });
-  </script>
 </body>
 </html>
