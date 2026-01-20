@@ -26,6 +26,8 @@ async function init() {
   const dropZone = document.getElementById('drop-zone');
   const uploadForm = document.getElementById('upload-form');
   const cancelButton = document.getElementById('cancel-upload');
+  const retentionSlider = document.getElementById('retention-slider');
+  const retentionButtons = document.querySelectorAll('[data-retention]');
   
   // Set up file input
   fileInput.addEventListener('change', handleFileSelect);
@@ -43,11 +45,14 @@ async function init() {
   cancelButton.addEventListener('click', handleCancel);
   
   // Set up retention picker
-  const retentionSelect = document.getElementById('retention-preset');
-  const customRetentionInput = document.getElementById('custom-retention');
-  
-  retentionSelect.addEventListener('change', handleRetentionChange);
-  customRetentionInput.addEventListener('input', handleRetentionChange);
+  retentionSlider.addEventListener('input', handleRetentionChange);
+  retentionButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      retentionSlider.value = button.dataset.retention;
+      handleRetentionChange();
+    });
+  });
+  updateRetentionDisplay();
   
   // Load user balance
   await loadBalance();
@@ -237,6 +242,7 @@ async function checkDuplicate(cid) {
  * Handle retention change
  */
 function handleRetentionChange() {
+  updateRetentionDisplay();
   updateCostDisplay();
 }
 
@@ -244,14 +250,25 @@ function handleRetentionChange() {
  * Get selected retention months
  */
 function getRetentionMonths() {
-  const preset = document.getElementById('retention-preset').value;
-  
-  if (preset === 'custom') {
-    const custom = parseInt(document.getElementById('custom-retention').value);
-    return custom > 0 ? custom : 1;
+  const sliderValue = parseInt(document.getElementById('retention-slider').value, 10);
+  return Number.isNaN(sliderValue) || sliderValue < 1 ? 1 : sliderValue;
+}
+
+/**
+ * Update retention display
+ */
+function updateRetentionDisplay() {
+  const months = getRetentionMonths();
+  const valueElement = document.getElementById('retention-value');
+  const subtextElement = document.getElementById('retention-subtext');
+
+  if (valueElement) {
+    valueElement.textContent = formatRetentionLabel(months);
   }
-  
-  return parseInt(preset);
+
+  if (subtextElement) {
+    subtextElement.textContent = `${months * 30} days`;
+  }
 }
 
 /**
@@ -265,8 +282,9 @@ function updateCostDisplay() {
   
   // Update cost display
   document.getElementById('cost-amount').textContent = formatCents(costCents);
+  const retentionLabel = formatRetentionLabel(months);
   document.getElementById('cost-breakdown').textContent = 
-    `${formatFileSize(selectedFile.size)} × ${months} month(s) @ $${BASE_RATE_PER_GB_PER_MONTH}/GB/month`;
+    `${formatFileSize(selectedFile.size)} × ${retentionLabel} @ $${BASE_RATE_PER_GB_PER_MONTH}/GB/month`;
   
   // Check if inline content (free)
   if (calculatedCID && isInlineContent(calculatedCID)) {
@@ -306,6 +324,22 @@ function calculateCost(sizeBytes, months) {
  */
 function formatCents(cents) {
   return '$' + (cents / 100).toFixed(2);
+}
+
+/**
+ * Format retention label
+ */
+function formatRetentionLabel(months) {
+  if (months === 1) {
+    return '1 month';
+  }
+
+  if (months % 12 === 0) {
+    const years = months / 12;
+    return `${years} year${years === 1 ? '' : 's'} (${months} months)`;
+  }
+
+  return `${months} months`;
 }
 
 /**
