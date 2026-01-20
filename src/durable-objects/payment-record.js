@@ -59,7 +59,7 @@ export class PaymentRecord {
     const transaction = {
       id: data.transaction_id,
       transaction_id: data.transaction_id,
-      type: data.type, // deposit | upload_payment | cid_extension | donation_received
+      type: data.type, // deposit | upload_payment | cid_extension | donation_received | rate_limit_purchase
       user_id: data.user_id,
       amount_cents: data.amount_cents,
       balance_before_cents: data.balance_before_cents,
@@ -68,6 +68,14 @@ export class PaymentRecord {
       stripe_payment_intent: data.stripe_payment_intent || null,
       cid: data.cid || null,
       retention_months: data.retention_months || null,
+      // Rate limit purchase fields
+      min_time_between_requests_ms: data.min_time_between_requests_ms || null,
+      duration_seconds: data.duration_seconds || null,
+      max_requests: data.max_requests || null,
+      max_bytes: data.max_bytes || null,
+      // Failed transaction tracking
+      status: data.status || 'success',  // "success" | "failed"
+      failure_reason: data.failure_reason || null,
       created_at: new Date().toISOString()
     };
 
