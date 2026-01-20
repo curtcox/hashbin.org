@@ -31,6 +31,10 @@ The `PaymentRecord.createTransaction()` method only persists a fixed set of fiel
 
 These fields ARE passed to `createTransaction()` from `rate-limit.js:249-265` but are NOT being saved.
 
+**Missing fields for failed transaction tracking (Q10):**
+- `status` ("success" | "failed") - defaults to "success" for backward compatibility
+- `failure_reason` (string, null for successful transactions)
+
 ### Not Yet Implemented
 - Frontend transaction history UI
 - Persisting rate limit purchase details in transactions
@@ -82,6 +86,9 @@ async createTransaction(data) {
     duration_seconds: data.duration_seconds || null,
     max_requests: data.max_requests || null,
     max_bytes: data.max_bytes || null,
+    // NEW: Failed transaction tracking (Q10)
+    status: data.status || 'success',  // "success" | "failed"
+    failure_reason: data.failure_reason || null,
     created_at: new Date().toISOString()
   };
   // ... rest unchanged
@@ -149,102 +156,119 @@ Add "Transaction History" to authenticated user navigation
 
 ---
 
-## Open Questions
+## Resolved Questions
 
-### Q1: Transaction History Retention
+### Q1: Transaction History Retention ✅
 **Question:** Should transaction history be retained indefinitely, or should there be a retention period?
-**Options:**
-- A) Indefinite retention (current implementation)
-- B) Configurable retention (e.g., 7 years for compliance)
-- C) Allow users to delete old transactions
+**Decision:** A) Indefinite retention
+**Rationale:** Can always delete later if needed. Simpler implementation.
 
-**Impact:** Affects storage costs and legal compliance (financial records)
-
-### Q2: Date Display Format
+### Q2: Date Display Format ✅
 **Question:** How should dates be displayed?
-**Options:**
-- A) Relative time (e.g., "2 hours ago", "3 days ago")
-- B) Absolute date (e.g., "Jan 20, 2026 3:45 PM")
-- C) Both - relative for recent, absolute for older
-- D) User-configurable
+**Decision:** B) Absolute UTC date (e.g., "2026-01-20 15:45:00 UTC")
+**Rationale:** Unambiguous, consistent across users, good for record-keeping.
 
-**Impact:** Affects frontend implementation complexity
-
-### Q3: Amount Sign Convention
+### Q3: Amount Sign Convention ✅
 **Question:** How should amounts be displayed for debits vs credits?
-**Options:**
-- A) Signed amounts: +$10.00 for deposits, -$0.30 for purchases
-- B) Unsigned with direction indicator: $10.00 IN, $0.30 OUT
-- C) Color-coded: green for deposits, red for purchases
+**Decision:** B + C) Unsigned with direction indicator AND color-coded
+- Display: "$10.00 IN" (green) for deposits
+- Display: "$0.30 OUT" (red) for purchases
+**Rationale:** Combines clarity of direction with visual scanning via color.
 
-**Impact:** Affects UI design and accessibility
-
-### Q4: CID Display Format
+### Q4: CID Display Format ✅
 **Question:** How should CIDs be displayed in transaction history?
-**Options:**
-- A) Full CID (may be long)
-- B) Truncated CID with "..." (e.g., "abc123...xyz789")
-- C) Truncated with hover/click to see full
-- D) Link to content (if still exists)
+**Decision:** A + D) Full CID displayed as a link to content
+**Rationale:** Full hash for record-keeping, link for easy access to content.
 
-**Impact:** Affects UI density and usability
-
-### Q5: Bandwidth Transaction Display
+### Q5: Bandwidth Transaction Display ✅
 **Question:** How should MTBR be displayed to users?
-**Options:**
-- A) Raw milliseconds: "100ms"
-- B) Requests per second: "10 req/s"
-- C) Human-readable: "10 times per second"
-- D) Both technical and human-readable
+**Decision:** D) Both technical and human-readable
+- Display: "100ms (10 req/s)" or "60000ms (1 req/min)"
+**Rationale:** Technical users see exact value, others understand the rate.
 
-**Impact:** Affects user understanding, especially non-technical users
-
-### Q6: Duration Display Format
+### Q6: Duration Display Format ✅
 **Question:** How should duration be displayed for bandwidth purchases?
-**Options:**
-- A) Raw seconds: "86400 seconds"
-- B) Human-readable: "1 day"
-- C) As date range: "Jan 20 - Jan 21, 2026"
-- D) Remaining time if still active: "23 hours remaining"
+**Decision:** C) As date range (e.g., "Jan 20 - Jan 21, 2026 UTC")
+**Rationale:** Clear start/end times for the purchased period.
+**Implementation Note:** Need to store `rate_limit_started_at` timestamp to calculate end date.
 
-**Impact:** Affects user clarity about active rate limits
-
-### Q7: Transaction Export
+### Q7: Transaction Export ✅
 **Question:** Should users be able to export transaction history?
-**Options:**
-- A) No export functionality (v1)
-- B) CSV export
-- C) PDF export (formatted receipt-style)
-- D) Both CSV and PDF
+**Decision:** Provide link to API endpoint with transaction data
+- Display clickable link: `GET /api/balance/history?limit=1000`
+- User can open in browser or use programmatically
+**Rationale:** No additional development needed, API already returns JSON, power users can process as needed.
 
-**Impact:** Affects development scope and user needs for record-keeping
-
-### Q8: Inline Content Transactions
+### Q8: Inline Content Transactions ✅
 **Question:** Inline content (<=64 bytes) is free. Should these still appear in transaction history?
-**Options:**
-- A) Yes, show as $0.00 transactions
-- B) No, don't create transaction records for free content
-- C) User preference to show/hide
+**Decision:** B) No record for free inline content
+**Rationale:** Reduces noise, transaction history is for financial records.
 
-**Impact:** Affects transaction volume and user clarity
-
-### Q9: Balance Running Total
+### Q9: Balance Running Total ✅
 **Question:** Should each transaction show the running balance?
-**Options:**
-- A) Yes, show balance_after_cents for each row
-- B) No, only show transaction amounts
-- C) Show on hover/expand only
+**Decision:** A) Yes, show balance_after_cents for each row
+**Rationale:** Already captured in data, provides audit trail.
 
-**Impact:** Already captured in data, just display decision
-
-### Q10: Failed Transaction Visibility
+### Q10: Failed Transaction Visibility ✅
 **Question:** Should failed/declined transactions be visible?
-**Options:**
-- A) Only show successful transactions (current behavior)
-- B) Show failed transactions with status indicator
-- C) Separate section for failed attempts
+**Decision:** B) Show failed transactions with status indicator
+**Rationale:** Users should see failed attempts for troubleshooting.
+**Implementation Note:** Currently failed transactions are NOT stored. Need to add:
+- `status` field: "success" | "failed"
+- `failure_reason` field for failed transactions
 
-**Impact:** Affects whether we need to track failed transactions (not currently stored)
+---
+
+## Open Questions (Follow-up)
+
+### Q11: CID Link for Expired/Deleted Content
+**Question:** When displaying CID as a link, what happens if the content has expired or been deleted?
+**Options:**
+- A) Dead link (404 when clicked)
+- B) Check content existence on page load, show "Expired" badge if gone
+- C) Always link, show user-friendly error page when content not found
+- D) Link to content metadata page (shows expiration info even if content gone)
+
+**Impact:** Affects UX when viewing historical transactions for expired content.
+
+### Q12: Failed Transaction Scenarios
+**Question:** Which failure scenarios should create transaction records?
+**Options (multi-select):**
+- A) Insufficient balance (attempted purchase with not enough funds)
+- B) Stripe payment declined (deposit attempt failed)
+- C) Content already exists (duplicate upload attempt)
+- D) Rate limit exceeded (API rate limiting, not content rate limiting)
+- E) Invalid CID format
+- F) Content not found (extension/donation for non-existent CID)
+
+**Impact:** Affects what failures users can see and troubleshoot.
+
+### Q13: Rate Limit Start Time Storage
+**Question:** For bandwidth purchases, we need to calculate the date range. How should we store the start time?
+**Options:**
+- A) Use `created_at` as start time (purchase time = activation time)
+- B) Add new field `rate_limit_started_at` (if activation can be delayed)
+- C) Add both `rate_limit_started_at` and `rate_limit_expires_at` for explicit range
+
+**Impact:** Affects data model and whether rate limits can be scheduled.
+
+### Q14: Transaction Status Field Location
+**Question:** Where should the transaction `status` field be stored?
+**Options:**
+- A) In PaymentRecord only (backend tracks success/failure)
+- B) In both PaymentRecord and UserProfile.uploads (for cross-reference)
+- C) Separate FailedTransactionRecord Durable Object
+
+**Impact:** Affects data model complexity and query patterns.
+
+### Q15: Export API Link Display
+**Question:** How should the export API link be displayed?
+**Options:**
+- A) Static link: `/api/balance/history?limit=1000`
+- B) Dynamic link with current filters applied
+- C) Both: "Export All" + "Export Current View"
+
+**Impact:** Affects frontend implementation and user flexibility.
 
 ---
 
@@ -267,46 +291,54 @@ TEST: Transactions with same timestamp maintain stable order
 ```
 TEST: Display deposit amount correctly
   INPUT: amount_cents = 1000, type = "deposit"
-  EXPECTED: Displayed as "$10.00" with positive indicator
+  EXPECTED: "$10.00 IN" displayed in green
 
 TEST: Display purchase amount correctly
-  INPUT: amount_cents = -30, type = "upload_payment"
-  EXPECTED: Displayed as "$0.30" with negative indicator
-
-TEST: Display zero amount correctly
-  INPUT: amount_cents = 0, type = "upload_payment" (inline content)
-  EXPECTED: Displayed as "$0.00"
+  INPUT: amount_cents = 30, type = "upload_payment"
+  EXPECTED: "$0.30 OUT" displayed in red
 
 TEST: Display large amount correctly
   INPUT: amount_cents = 100000, type = "deposit"
-  EXPECTED: Displayed as "$1,000.00" with thousands separator
+  EXPECTED: "$1,000.00 IN" with thousands separator, green
 
 TEST: Handle fractional cents (edge case)
   INPUT: amount_cents = 1 (one cent)
-  EXPECTED: Displayed as "$0.01"
+  EXPECTED: "$0.01 OUT" displayed in red
+
+TEST: Color contrast meets accessibility standards
+  INPUT: Green and red color values
+  EXPECTED: WCAG AA compliant contrast ratios
 ```
 
 #### CID Transaction Tests
 ```
-TEST: upload_payment includes CID
-  INPUT: Transaction with type "upload_payment", cid = "abc123"
-  EXPECTED: CID "abc123" displayed in transaction details
+TEST: upload_payment displays CID as clickable link
+  INPUT: Transaction with type "upload_payment", cid = "abc123def456"
+  EXPECTED: Full CID "abc123def456" displayed as link to /content/abc123def456
 
 TEST: upload_payment includes retention period
   INPUT: Transaction with type "upload_payment", retention_months = 3
   EXPECTED: "3 months" displayed in retention column
 
-TEST: cid_extension includes CID
-  INPUT: Transaction with type "cid_extension", cid = "xyz789"
-  EXPECTED: CID "xyz789" displayed in transaction details
+TEST: cid_extension displays CID as clickable link
+  INPUT: Transaction with type "cid_extension", cid = "xyz789abc123"
+  EXPECTED: Full CID "xyz789abc123" as link to /content/xyz789abc123
 
 TEST: cid_extension includes added months
   INPUT: Transaction with type "cid_extension", retention_months = 6
   EXPECTED: "6 months" displayed
 
-TEST: donation_received includes CID
-  INPUT: Transaction with type "donation_received", cid = "def456"
-  EXPECTED: CID "def456" displayed
+TEST: donation_received displays CID as clickable link
+  INPUT: Transaction with type "donation_received", cid = "def456ghi789"
+  EXPECTED: Full CID "def456ghi789" as link
+
+TEST: CID link opens in same tab
+  ACTION: Click CID link
+  EXPECTED: Navigates to content page (not new tab)
+
+TEST: Long CID (64 chars) displays fully without breaking layout
+  INPUT: CID = "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2"
+  EXPECTED: Full CID displayed, may wrap but no horizontal overflow
 ```
 
 #### Retention Time Display Tests
@@ -334,37 +366,53 @@ TEST: Handle null retention_months
 
 #### Bandwidth Transaction Tests
 ```
-TEST: rate_limit_purchase includes CID
-  INPUT: Transaction with type "rate_limit_purchase", cid = "bw123"
-  EXPECTED: CID "bw123" displayed
+TEST: rate_limit_purchase displays CID as link
+  INPUT: Transaction with type "rate_limit_purchase", cid = "bw123abc"
+  EXPECTED: Full CID "bw123abc" as clickable link
 
-TEST: rate_limit_purchase includes MTBR (frequency)
-  INPUT: Transaction with min_time_between_requests_ms = 100
-  EXPECTED: Frequency displayed (format depends on Q5 answer)
+TEST: MTBR displays both technical and human-readable (100ms)
+  INPUT: min_time_between_requests_ms = 100
+  EXPECTED: "100ms (10 req/s)"
 
-TEST: rate_limit_purchase includes duration
-  INPUT: Transaction with duration_seconds = 86400
-  EXPECTED: Duration displayed (format depends on Q6 answer)
+TEST: MTBR displays both technical and human-readable (1 second)
+  INPUT: min_time_between_requests_ms = 1000
+  EXPECTED: "1000ms (1 req/s)"
 
-TEST: Handle MTBR minimum value
-  INPUT: min_time_between_requests_ms = 100 (minimum allowed)
-  EXPECTED: "10 requests/second" or "100ms" displayed correctly
+TEST: MTBR displays both technical and human-readable (1 minute)
+  INPUT: min_time_between_requests_ms = 60000
+  EXPECTED: "60000ms (1 req/min)"
 
-TEST: Handle large MTBR value
-  INPUT: min_time_between_requests_ms = 60000 (1 minute)
-  EXPECTED: "1 request/minute" or "60000ms" or "60 seconds"
+TEST: MTBR displays both technical and human-readable (500ms)
+  INPUT: min_time_between_requests_ms = 500
+  EXPECTED: "500ms (2 req/s)"
 
-TEST: Handle short duration
-  INPUT: duration_seconds = 3600 (1 hour)
-  EXPECTED: "1 hour" displayed
+TEST: Duration displays as date range (1 day)
+  INPUT: created_at = "2026-01-20T10:00:00Z", duration_seconds = 86400
+  EXPECTED: "2026-01-20 10:00:00 UTC - 2026-01-21 10:00:00 UTC"
 
-TEST: Handle long duration
-  INPUT: duration_seconds = 2592000 (30 days)
-  EXPECTED: "30 days" or "1 month" displayed
+TEST: Duration displays as date range (1 hour)
+  INPUT: created_at = "2026-01-20T10:00:00Z", duration_seconds = 3600
+  EXPECTED: "2026-01-20 10:00:00 UTC - 2026-01-20 11:00:00 UTC"
+
+TEST: Duration displays as date range (30 days)
+  INPUT: created_at = "2026-01-20T10:00:00Z", duration_seconds = 2592000
+  EXPECTED: "2026-01-20 10:00:00 UTC - 2026-02-19 10:00:00 UTC"
+
+TEST: Duration date range handles month boundary
+  INPUT: created_at = "2026-01-31T10:00:00Z", duration_seconds = 86400
+  EXPECTED: "2026-01-31 10:00:00 UTC - 2026-02-01 10:00:00 UTC"
+
+TEST: Duration date range handles year boundary
+  INPUT: created_at = "2025-12-31T10:00:00Z", duration_seconds = 86400
+  EXPECTED: "2025-12-31 10:00:00 UTC - 2026-01-01 10:00:00 UTC"
 
 TEST: Handle max_bytes display
   INPUT: max_bytes = 1073741824 (1 GB)
   EXPECTED: "1 GB" displayed
+
+TEST: Handle max_bytes display (fractional GB)
+  INPUT: max_bytes = 536870912 (0.5 GB)
+  EXPECTED: "512 MB" or "0.5 GB" displayed
 
 TEST: Handle max_requests display
   INPUT: max_requests = 10000
@@ -525,17 +573,21 @@ TEST: Error state shown on API failure
 
 #### Date Display Tests
 ```
-TEST: Recent transaction shows relative time
-  INPUT: Transaction from 2 hours ago
-  EXPECTED: "2 hours ago" displayed (if using relative time)
+TEST: Transaction date shows absolute UTC format
+  INPUT: created_at = "2026-01-20T15:45:30.000Z"
+  EXPECTED: "2026-01-20 15:45:30 UTC" displayed
 
-TEST: Old transaction shows absolute date
-  INPUT: Transaction from 3 months ago
-  EXPECTED: "Oct 20, 2025" displayed
+TEST: Date format is consistent regardless of user locale
+  SETUP: User's browser locale = "en-GB" or "en-US"
+  EXPECTED: Always "YYYY-MM-DD HH:MM:SS UTC" format
 
-TEST: Date formatted for user's locale
-  SETUP: User's browser locale = "en-GB"
-  EXPECTED: Date formatted as "20 Jan 2026" (DD MMM YYYY)
+TEST: Midnight UTC displays correctly
+  INPUT: created_at = "2026-01-20T00:00:00.000Z"
+  EXPECTED: "2026-01-20 00:00:00 UTC"
+
+TEST: Year boundary displays correctly
+  INPUT: created_at = "2025-12-31T23:59:59.000Z"
+  EXPECTED: "2025-12-31 23:59:59 UTC" (correct year shown)
 ```
 
 #### Filtering Tests
@@ -671,12 +723,102 @@ TEST: Deleted account handling (if accounts can be deleted)
 TEST: Existing rate_limit_purchase transactions without new fields
   SETUP: Old transaction missing min_time_between_requests_ms
   INPUT: GET /api/balance/history
-  EXPECTED: Field shown as null or "N/A" (graceful degradation)
+  EXPECTED: Field shown as "N/A" (graceful degradation)
 
 TEST: Mix of old and new format transactions
   SETUP: Some transactions with new fields, some without
   INPUT: GET /api/balance/history
   EXPECTED: All transactions displayed, missing fields handled gracefully
+
+TEST: Old transactions without status field
+  SETUP: Transaction created before status field added
+  INPUT: GET /api/balance/history
+  EXPECTED: Treated as status = "success" (backward compatible)
+```
+
+### Failed Transaction Tests
+```
+TEST: Failed transaction displays with failure indicator
+  INPUT: Transaction with status = "failed"
+  EXPECTED: Red "FAILED" badge displayed, row styled differently
+
+TEST: Failed transaction shows failure reason
+  INPUT: Transaction with status = "failed", failure_reason = "Insufficient balance"
+  EXPECTED: "Insufficient balance" displayed in details
+
+TEST: Failed deposit (Stripe declined) appears in history
+  SETUP: Stripe webhook reports payment_intent.payment_failed
+  INPUT: GET /api/balance/history
+  EXPECTED: Transaction with type "deposit", status "failed", appropriate reason
+
+TEST: Failed purchase (insufficient balance) appears in history
+  SETUP: User attempts purchase with $0.50 balance for $1.00 item
+  INPUT: GET /api/balance/history
+  EXPECTED: Transaction with status "failed", failure_reason "Insufficient balance"
+
+TEST: Failed transactions do not affect balance
+  SETUP: User has $10 balance, failed purchase attempt for $5
+  INPUT: Check balance_after_cents on failed transaction
+  EXPECTED: balance_after_cents equals balance_before_cents
+
+TEST: Filter by failed transactions only
+  SETUP: User has mix of successful and failed transactions
+  INPUT: GET /api/balance/history?status=failed
+  EXPECTED: Only failed transactions returned
+
+TEST: Filter excludes failed by default (optional)
+  INPUT: GET /api/balance/history (no status filter)
+  EXPECTED: All transactions shown (both success and failed)
+
+TEST: Failed transaction count displayed
+  SETUP: User has 5 failed transactions
+  INPUT: View transaction history
+  EXPECTED: Failed transaction count shown somewhere (header or filter badge)
+```
+
+### Running Balance Tests
+```
+TEST: Each transaction shows balance after
+  INPUT: Transaction list
+  EXPECTED: Each row shows balance_after_cents formatted as currency
+
+TEST: Balance column header is clear
+  INPUT: View transaction history
+  EXPECTED: Column header "Balance After" or similar
+
+TEST: First transaction shows initial balance context
+  SETUP: User's first transaction is a deposit
+  INPUT: View transaction history
+  EXPECTED: balance_before_cents = 0, balance_after_cents = deposit amount
+
+TEST: Running balance decreases for purchases
+  SETUP: Deposit $10, then purchase $3
+  INPUT: View both transactions
+  EXPECTED: Deposit shows $10.00 balance, purchase shows $7.00 balance
+```
+
+### Export Link Tests
+```
+TEST: Export link displayed on transaction history page
+  INPUT: View transaction history
+  EXPECTED: Link/button "Export via API" visible
+
+TEST: Export link includes correct endpoint
+  INPUT: Click export link
+  EXPECTED: Links to /api/balance/history?limit=1000
+
+TEST: Export link opens in new tab
+  ACTION: Click export link
+  EXPECTED: API response opens in new browser tab
+
+TEST: Export link with current filter applied
+  SETUP: Filter by type = "deposit"
+  INPUT: Click export link
+  EXPECTED: Links to /api/balance/history?limit=1000&type=deposit
+
+TEST: API endpoint returns valid JSON for export
+  INPUT: GET /api/balance/history?limit=1000
+  EXPECTED: Valid JSON response, Content-Type: application/json
 ```
 
 ---
@@ -771,3 +913,4 @@ TEST: Mix of old and new format transactions
 | Date | Version | Changes |
 |------|---------|---------|
 | 2026-01-20 | 1.0 | Initial plan created |
+| 2026-01-20 | 1.1 | Resolved Q1-Q10, added follow-up Q11-Q15, updated tests for resolved decisions |
