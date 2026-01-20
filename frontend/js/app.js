@@ -13,6 +13,7 @@ import {
 } from './auth-loader.js';
 
 import { renderNavHeader } from './nav-header.js';
+import { renderBanner } from './banner.js';
 
 import { 
   authenticatedFetch, 
@@ -33,6 +34,7 @@ let balanceCache = null;
  * Initialize the application
  */
 async function init() {
+  renderBanner();
   console.log('Initializing HashBin.org application...');
 
   renderNavHeader();

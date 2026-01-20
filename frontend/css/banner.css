@@ -1,0 +1,25 @@
+#site-banner {
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  animation: banner-slide-down 0.5s cubic-bezier(0.4,0,0.2,1);
+  position: fixed;
+  left: -30vw;
+  top: 2em;
+  width: 160vw;
+  z-index: 10000;
+  transform: rotate(-15deg);
+  text-align: center;
+  font-weight: bold;
+  font-size: 1.3rem;
+  padding: 0.85em 0;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.13);
+  pointer-events: none;
+  opacity: 0.97;
+  color: inherit;
+  background: inherit;
+}
+
+@keyframes banner-slide-down {
+  from { transform: translateY(-100%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
