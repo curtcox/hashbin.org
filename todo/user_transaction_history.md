@@ -221,54 +221,38 @@ Add "Transaction History" to authenticated user navigation
 
 ## Open Questions (Follow-up)
 
-### Q11: CID Link for Expired/Deleted Content
+### Q11: CID Link for Expired/Deleted Content ✅
 **Question:** When displaying CID as a link, what happens if the content has expired or been deleted?
-**Options:**
-- A) Dead link (404 when clicked)
-- B) Check content existence on page load, show "Expired" badge if gone
-- C) Always link, show user-friendly error page when content not found
-- D) Link to content metadata page (shows expiration info even if content gone)
+**Decision:** A) Dead link (404 when clicked)
+**Rationale:** Simple implementation. Users understand 404 errors. No need to check content existence on every page load.
 
-**Impact:** Affects UX when viewing historical transactions for expired content.
-
-### Q12: Failed Transaction Scenarios
+### Q12: Failed Transaction Scenarios ✅
 **Question:** Which failure scenarios should create transaction records?
-**Options (multi-select):**
+**Decision:** A + B only:
 - A) Insufficient balance (attempted purchase with not enough funds)
 - B) Stripe payment declined (deposit attempt failed)
-- C) Content already exists (duplicate upload attempt)
-- D) Rate limit exceeded (API rate limiting, not content rate limiting)
-- E) Invalid CID format
-- F) Content not found (extension/donation for non-existent CID)
+**Rationale:** These are the only scenarios involving the user and money changing hands. Other failures (duplicate content, invalid CID, etc.) are operational errors, not financial transactions.
 
-**Impact:** Affects what failures users can see and troubleshoot.
-
-### Q13: Rate Limit Start Time Storage
+### Q13: Rate Limit Start Time Storage ✅
 **Question:** For bandwidth purchases, we need to calculate the date range. How should we store the start time?
-**Options:**
-- A) Use `created_at` as start time (purchase time = activation time)
-- B) Add new field `rate_limit_started_at` (if activation can be delayed)
-- C) Add both `rate_limit_started_at` and `rate_limit_expires_at` for explicit range
+**Decision:** A) Use `created_at` as start time (purchase time = activation time)
+**Rationale:** Simpler data model. Rate limits activate immediately upon purchase.
 
-**Impact:** Affects data model and whether rate limits can be scheduled.
-
-### Q14: Transaction Status Field Location
+### Q14: Transaction Status Field Location ✅
 **Question:** Where should the transaction `status` field be stored?
-**Options:**
-- A) In PaymentRecord only (backend tracks success/failure)
-- B) In both PaymentRecord and UserProfile.uploads (for cross-reference)
-- C) Separate FailedTransactionRecord Durable Object
+**Decision:** A) In PaymentRecord only
+**Rationale:** Single source of truth. Simpler architecture. No cross-reference needed.
 
-**Impact:** Affects data model complexity and query patterns.
-
-### Q15: Export API Link Display
+### Q15: Export API Link Display ✅
 **Question:** How should the export API link be displayed?
-**Options:**
-- A) Static link: `/api/balance/history?limit=1000`
-- B) Dynamic link with current filters applied
-- C) Both: "Export All" + "Export Current View"
+**Decision:** A) Static link: `/api/balance/history?limit=1000`
+**Rationale:** Simple implementation. Users who want filtered exports can modify the URL manually.
 
-**Impact:** Affects frontend implementation and user flexibility.
+---
+
+## All Questions Resolved
+
+All 15 questions have been answered. The plan is ready for implementation.
 
 ---
 
@@ -749,7 +733,7 @@ TEST: Failed transaction shows failure reason
 TEST: Failed deposit (Stripe declined) appears in history
   SETUP: Stripe webhook reports payment_intent.payment_failed
   INPUT: GET /api/balance/history
-  EXPECTED: Transaction with type "deposit", status "failed", appropriate reason
+  EXPECTED: Transaction with type "deposit", status "failed", failure_reason "Payment declined"
 
 TEST: Failed purchase (insufficient balance) appears in history
   SETUP: User attempts purchase with $0.50 balance for $1.00 item
@@ -774,6 +758,17 @@ TEST: Failed transaction count displayed
   SETUP: User has 5 failed transactions
   INPUT: View transaction history
   EXPECTED: Failed transaction count shown somewhere (header or filter badge)
+
+TEST: Only insufficient balance and Stripe declined create failed records
+  SETUP: Various failure scenarios occur
+  INPUT: GET /api/balance/history?status=failed
+  EXPECTED: Only "Insufficient balance" and "Payment declined" failures appear
+           (no duplicate content, invalid CID, or other operational errors)
+
+TEST: Stripe declined includes Stripe error code
+  SETUP: Stripe webhook with decline_code = "insufficient_funds"
+  INPUT: GET /api/balance/history
+  EXPECTED: failure_reason includes Stripe decline code for debugging
 ```
 
 ### Running Balance Tests
@@ -803,22 +798,26 @@ TEST: Export link displayed on transaction history page
   INPUT: View transaction history
   EXPECTED: Link/button "Export via API" visible
 
-TEST: Export link includes correct endpoint
+TEST: Export link includes correct static endpoint
   INPUT: Click export link
-  EXPECTED: Links to /api/balance/history?limit=1000
+  EXPECTED: Links to /api/balance/history?limit=1000 (always static, ignores current filters)
 
 TEST: Export link opens in new tab
   ACTION: Click export link
   EXPECTED: API response opens in new browser tab
 
-TEST: Export link with current filter applied
-  SETUP: Filter by type = "deposit"
+TEST: Export link remains static regardless of filters
+  SETUP: Filter by type = "deposit" on UI
   INPUT: Click export link
-  EXPECTED: Links to /api/balance/history?limit=1000&type=deposit
+  EXPECTED: Still links to /api/balance/history?limit=1000 (not filtered)
 
 TEST: API endpoint returns valid JSON for export
   INPUT: GET /api/balance/history?limit=1000
   EXPECTED: Valid JSON response, Content-Type: application/json
+
+TEST: Export link is clearly labeled
+  INPUT: View transaction history
+  EXPECTED: Link text indicates it exports all transactions (e.g., "Export All (API)")
 ```
 
 ---
@@ -896,15 +895,21 @@ TEST: API endpoint returns valid JSON for export
 
 1. All transaction types display with correct type-specific details
 2. Transactions sorted by date descending (newest first)
-3. CID transactions show the content hash
-4. Retention transactions show the time period paid for
-5. Bandwidth transactions show MTBR frequency and duration
-6. Pagination works correctly for users with many transactions
-7. Type filtering works correctly
-8. Mobile-responsive design
-9. All tests pass
-10. No regression in existing transaction creation
-11. Graceful handling of old transactions missing new fields
+3. Dates displayed in absolute UTC format (YYYY-MM-DD HH:MM:SS UTC)
+4. Amounts displayed as unsigned with IN/OUT direction, color-coded (green/red)
+5. CID transactions show full content hash as clickable link
+6. Retention transactions show the time period paid for
+7. Bandwidth transactions show MTBR as "Xms (Y req/s)" and duration as date range
+8. Running balance (balance_after_cents) shown for each transaction
+9. Failed transactions (insufficient balance, Stripe declined) displayed with status indicator
+10. Static export link to `/api/balance/history?limit=1000` available
+11. Pagination works correctly for users with many transactions
+12. Type filtering works correctly
+13. Mobile-responsive design
+14. All tests pass
+15. No regression in existing transaction creation
+16. Graceful handling of old transactions missing new fields
+17. No records created for free inline content
 
 ---
 
@@ -914,3 +919,4 @@ TEST: API endpoint returns valid JSON for export
 |------|---------|---------|
 | 2026-01-20 | 1.0 | Initial plan created |
 | 2026-01-20 | 1.1 | Resolved Q1-Q10, added follow-up Q11-Q15, updated tests for resolved decisions |
+| 2026-01-20 | 1.2 | Resolved Q11-Q15, all questions answered, plan ready for implementation |
