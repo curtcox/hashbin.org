@@ -24,6 +24,22 @@ response=$(http_post_file "/api/content" "$temp_file" "$AUTH_HEADER" "text/plain
 body=$(get_body "$response")
 test_cid=$(json_get "$body" "cid")
 
+# R-000: Content detail endpoint exists and returns metadata
+response=$(http_get "/api/content/$test_cid")
+status=$(get_status "$response")
+body=$(get_body "$response")
+assert_status "$status" "200" "R-000: GET /api/content/:cid returns content metadata"
+
+# R-000b: Rate limit status endpoint exists and returns status
+response=$(http_get "/api/content/$test_cid/rate-limit")
+status=$(get_status "$response")
+assert_status "$status" "200" "R-000b: GET /api/content/:cid/rate-limit returns status"
+
+# R-000c: Non-CID path segment returns 404 (diagnostic for frontend CID parsing)
+response=$(http_get "/api/content/detail")
+status=$(get_status "$response")
+assert_status "$status" "404" "R-000c: GET /api/content/detail returns 404"
+
 # R-001: Purchase rate limit reduction
 response=$(http_post "/api/content/rate-limit/purchase" "{\"cid\":\"$test_cid\",\"mtbr_ms\":100,\"duration_months\":1}" "$AUTH_HEADER")
 status=$(get_status "$response")

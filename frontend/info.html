@@ -343,7 +343,7 @@
       if (!status.is_inline) {
         html += `
           <div style="margin-top: 1rem; text-align: center;">
-            <a href="/dashboard/uploads/${cid}/" class="btn btn-secondary">
+            <a href="/dashboard/uploads/detail?cid=${encodeURIComponent(cid)}" class="btn btn-secondary">
               ${status.is_rate_limited ? '🚀 Purchase Bandwidth' : '⚙️ Manage Rate Limits'}
             </a>
           </div>

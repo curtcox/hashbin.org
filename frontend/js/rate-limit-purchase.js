@@ -5,7 +5,7 @@
 
 import { requireAuth } from './auth-gate.js';
 import { authenticatedFetch, handleApiError, formatBalance } from './utils.js';
-import { formatFileSize } from './hash256t.js';
+import { formatFileSize, validate256tCID } from './hash256t.js';
 import {
   formatMTBR,
   getRateLimitBadge,
@@ -65,13 +65,19 @@ function extractCIDFromURL() {
   // Try query parameter first
   const params = new URLSearchParams(window.location.search);
   const cidParam = params.get('cid');
-  if (cidParam) return cidParam;
+  if (cidParam && validate256tCID(cidParam)) return cidParam;
   
   // Try path parameter
   const pathParts = window.location.pathname.split('/').filter(p => p);
   // Path should be: dashboard/uploads/CID or dashboard/uploads/CID/
   if (pathParts.length >= 3 && pathParts[0] === 'dashboard' && pathParts[1] === 'uploads') {
-    return pathParts[2];
+    const candidate = pathParts[2];
+    if (!candidate || candidate === 'detail' || candidate === 'detail.html' || candidate.endsWith('.html')) {
+      return null;
+    }
+    if (validate256tCID(candidate)) {
+      return candidate;
+    }
   }
   
   return null;
