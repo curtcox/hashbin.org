@@ -57,7 +57,30 @@ jobs:
 
           # Inject SHA into HTML files
           bash scripts/inject-git-sha.sh "$GIT_SHA"
-          echo "✅ Git SHA injected into HTML files"
+
+          # Verify ALL HTML files have the SHA
+          echo ""
+          echo "=== Verifying SHA injection in all HTML files ==="
+          FAILED=false
+          for file in $(find frontend -name "*.html" -type f); do
+            if grep -q "<!-- git-sha: $GIT_SHA -->" "$file"; then
+              echo "✅ $file"
+            else
+              echo "❌ MISSING SHA in: $file"
+              echo "   First 3 lines:"
+              head -3 "$file"
+              FAILED=true
+            fi
+          done
+
+          if [ "$FAILED" = true ]; then
+            echo ""
+            echo "❌ ERROR: Some HTML files are missing the git SHA!"
+            exit 1
+          fi
+
+          echo ""
+          echo "✅ Git SHA injected into all HTML files"
 
       - name: Inject git SHA into worker source code
         run: |
