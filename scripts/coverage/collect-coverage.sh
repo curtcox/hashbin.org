@@ -12,10 +12,10 @@ if ! find . -name "*.test.js" -o -name "*.spec.js" | grep -q .; then
   echo "   Current tests are integration tests that test the deployed service."
   echo "   Code coverage requires unit tests to analyze."
   
-  # Create a data file indicating no tests
+  # Create a data file indicating no tests (matching c8 format)
   cat > build-reports/coverage/data.json << 'EOF'
 {
-  "summary": {
+  "total": {
     "lines": { "total": 0, "covered": 0, "skipped": 0, "pct": 0 },
     "statements": { "total": 0, "covered": 0, "skipped": 0, "pct": 0 },
     "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 0 },
@@ -51,10 +51,10 @@ if [ -f build-reports/coverage/raw/coverage-summary.json ]; then
   echo "   JSON Data: build-reports/coverage/data.json"
 else
   echo "⚠️  Warning: c8 did not generate coverage-summary.json"
-  # Create empty coverage data
+  # Create empty coverage data matching c8 format
   cat > build-reports/coverage/data.json << 'EOF'
 {
-  "summary": {
+  "total": {
     "lines": { "total": 0, "covered": 0, "skipped": 0, "pct": 0 },
     "statements": { "total": 0, "covered": 0, "skipped": 0, "pct": 0 },
     "functions": { "total": 0, "covered": 0, "skipped": 0, "pct": 0 },

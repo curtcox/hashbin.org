@@ -22,14 +22,14 @@ if [ -n "$MESSAGE" ]; then
   
   # Create the no-tests message in a file to avoid escaping issues
   cat > /tmp/files_table.txt << 'TABLE_EOF'
-<tr><td colspan='5' style='text-align: center; padding: 40px;'><strong>No unit tests found</strong><br/><br/>The current test suite consists of integration tests that test the deployed service.<br/>Code coverage analysis requires JavaScript unit tests (*.test.js or *.spec.js).</td></tr>
+<tr><td colspan='4' style='text-align: center; padding: 40px;'><strong>No unit tests found</strong><br/><br/>The current test suite consists of integration tests that test the deployed service.<br/>Code coverage analysis requires JavaScript unit tests (*.test.js or *.spec.js).</td></tr>
 TABLE_EOF
   
   # Create a simple report indicating no tests
-  sed -e "s|{{LINES_PCT}}|N/A|g" \
-      -e "s|{{STATEMENTS_PCT}}|N/A|g" \
-      -e "s|{{FUNCTIONS_PCT}}|N/A|g" \
-      -e "s|{{BRANCHES_PCT}}|N/A|g" \
+  sed -e "s|{{TOTAL_LINES}}|N/A|g" \
+      -e "s|{{TOTAL_BRANCHES}}|N/A|g" \
+      -e "s|{{TOTAL_FUNCTIONS}}|N/A|g" \
+      -e "s|{{TOTAL_STATEMENTS}}|N/A|g" \
       -e "s|{{REPO_URL}}|${REPO_URL}|g" \
       -e "s|{{COMMIT_SHA}}|${COMMIT_SHA}|g" \
       "$TEMPLATE" > "$OUTPUT.tmp"
@@ -103,17 +103,17 @@ done
 
 # If no files, show a message
 if [ -z "$FILES_TABLE" ]; then
-  FILES_TABLE="<tr><td colspan='5' style='text-align: center; padding: 20px;'>No files analyzed</td></tr>"
+  FILES_TABLE="<tr><td colspan='4' style='text-align: center; padding: 20px;'>No files analyzed</td></tr>"
 fi
 
 # Write FILES_TABLE to a temp file to avoid escaping issues
 echo "$FILES_TABLE" > /tmp/files_table.txt
 
 # Substitute values into template
-sed -e "s|{{LINES_PCT}}|${LINES_PCT}|g" \
-    -e "s|{{STATEMENTS_PCT}}|${STATEMENTS_PCT}|g" \
-    -e "s|{{FUNCTIONS_PCT}}|${FUNCTIONS_PCT}|g" \
-    -e "s|{{BRANCHES_PCT}}|${BRANCHES_PCT}|g" \
+sed -e "s|{{TOTAL_LINES}}|${LINES_PCT}|g" \
+    -e "s|{{TOTAL_STATEMENTS}}|${STATEMENTS_PCT}|g" \
+    -e "s|{{TOTAL_FUNCTIONS}}|${FUNCTIONS_PCT}|g" \
+    -e "s|{{TOTAL_BRANCHES}}|${BRANCHES_PCT}|g" \
     -e "s|{{REPO_URL}}|${REPO_URL}|g" \
     -e "s|{{COMMIT_SHA}}|${COMMIT_SHA}|g" \
     "$TEMPLATE" > "$OUTPUT.tmp"
