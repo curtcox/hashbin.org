@@ -31,3 +31,4 @@ Thumbs.db
 build-reports/
 .nyc_output/
 coverage/
+!scripts/coverage/

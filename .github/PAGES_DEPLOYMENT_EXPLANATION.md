@@ -2,20 +2,24 @@
 
 ## Problem
 
-The build report was being generated and pushed to a `gh-pages` branch successfully, but it wasn't visible on GitHub Pages at `https://curtcox.github.io/hashbin.org/`.
+The build report workflow was failing with a 403 permission error when trying to push to the `gh-pages` branch:
+
+```
+remote: Permission to curtcox/hashbin.org.git denied to github-actions[bot].
+fatal: unable to access 'https://github.com/curtcox/hashbin.org.git/': The requested URL returned error: 403
+```
 
 ## Root Cause
 
 The workflow was using an older method of deploying to GitHub Pages:
 - Using `peaceiris/actions-gh-pages@v3` to push to a separate `gh-pages` branch
-- Requiring manual configuration in repository settings to use the `gh-pages` branch
-- Required `contents: write` permission
-
-This approach required the repository owner to manually configure GitHub Pages in the repository settings to deploy from the `gh-pages` branch, which apparently wasn't done or wasn't working correctly.
+- This method requires `contents: write` permission, but the workflow only had `contents: read`
+- GitHub Actions bot was denied permission to push to the repository
+- Required manual configuration in repository settings to use the `gh-pages` branch
 
 ## Solution
 
-Updated to use the modern GitHub Actions native deployment method:
+Updated to use the modern GitHub Actions native deployment method as of January 2026:
 
 ### Changes Made
 
