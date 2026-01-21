@@ -48,9 +48,19 @@
   "devDependencies": {
     "c8": "^9.1.0",
     "eslint": "^8.57.0",
+    "eslint-plugin-jsdoc": "^48.2.7",
     "eslint-plugin-no-unsanitized": "^4.0.2",
     "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-promise": "^6.2.0",
     "eslint-plugin-security": "^2.1.1",
+    "eslint-plugin-sonarjs": "^0.21.0",
+    "espree": "^9.6.1",
+    "estraverse": "^5.3.0",
+    "fast-glob": "^3.3.2",
+    "madge": "^6.1.0",
+    "pixelmatch": "^5.3.0",
+    "playwright": "^1.47.2",
+    "pngjs": "^7.0.0",
     "wrangler": "4.47.0"
   },
   "dependencies": {
