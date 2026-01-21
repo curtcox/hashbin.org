@@ -13,6 +13,7 @@ import {
   calculateRetentionCost,
   BASE_RATE_PER_GB_PER_MONTH
 } from '../utils/pricing.js';
+import { recordDeposit, recordPayment, recordDispute } from '../utils/platform-stats.js';
 
 /**
  * POST /api/balance/deposit
@@ -233,7 +234,10 @@ export async function handleStripeWebhook(request, env) {
       case 'charge.dispute.created':
         // Log dispute for admin review
         console.error('Dispute created:', event.data.object);
-        // TODO: Notify admin
+        // Record dispute in platform stats
+        await recordDispute(env);
+        // Create alert for admin
+        await createDisputeAlert(env, event.data.object);
         break;
       
       default:
@@ -336,6 +340,10 @@ async function handleCheckoutSessionCompleted(session, env) {
       );
 
       console.log(`Deposit completed: ${amount_cents} cents for user ${userId}`);
+      
+      // Record platform statistics
+      await recordDeposit(env, amount_cents);
+      
       // TODO: Send receipt email
     }
   } else if (type === 'donation') {
@@ -596,5 +604,37 @@ export async function handleCalculateRetention(request, env) {
         headers: { 'content-type': 'application/json' }
       }
     );
+  }
+}
+
+/**
+ * Create an alert for a Stripe dispute
+ */
+async function createDisputeAlert(env, dispute) {
+  try {
+    const alertId = env.ALERT_STORE.idFromName('global');
+    const alertStub = env.ALERT_STORE.get(alertId);
+    
+    await alertStub.fetch(
+      new Request('https://dummy/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'dispute_created',
+          severity: 'critical',
+          title: 'New Stripe Dispute Received',
+          message: `Dispute for payment ${dispute.payment_intent} - Amount: $${(dispute.amount / 100).toFixed(2)}`,
+          metadata: {
+            dispute_id: dispute.id,
+            payment_intent_id: dispute.payment_intent,
+            amount_cents: dispute.amount,
+            reason: dispute.reason,
+            status: dispute.status
+          }
+        })
+      })
+    );
+  } catch (error) {
+    console.error('Failed to create dispute alert:', error);
   }
 }

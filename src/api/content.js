@@ -19,6 +19,7 @@ import {
   extractInlineContent
 } from '../utils/hash256t.js';
 import { getMimeType } from '../utils/mime-types.js';
+import { recordContentUpload, recordContentDownload, recordPayment } from '../utils/platform-stats.js';
 
 /**
  * POST /api/content
@@ -356,6 +357,12 @@ export async function handleUploadContent(request, env) {
         })
       })
     );
+
+    // Record platform statistics
+    await recordContentUpload(env, size_bytes, isInline);
+    if (!isInline && cost_cents > 0) {
+      await recordPayment(env, 'upload_payment', cost_cents);
+    }
 
     return new Response(
       JSON.stringify({
@@ -882,6 +889,11 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     // Errors are logged but don't cause memory leaks - failed increments are ignored.
     incrementDownloadCount(env, cid).catch(err => {
       console.error('Failed to increment download count:', err);
+    });
+    
+    // Record platform statistics
+    recordContentDownload(env).catch(err => {
+      console.error('Failed to record platform download stat:', err);
     });
 
     // Stream content
