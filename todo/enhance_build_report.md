@@ -721,7 +721,7 @@ All initial open questions have been answered. Here are the key decisions:
 - **Report Size**: Main page is TOC, separate pages for each analysis type
 - **External Dependencies**: Approved to add npm packages as needed
 - **JSON Format**: Publish internal tool output formats (c8 format, npm audit format, etc.)
-- **Report Organization**: Subdirectory structure for organized report files
+- **Report Organization**: Report type subdirectories (coverage/, security/, performance/, etc.)
 - **Build Timing**: Use GitHub Actions logs, no custom build performance tracking
 - **Visual Regression Scope**: All 14 HTML frontend pages
 
@@ -765,65 +765,54 @@ All initial open questions have been answered. Here are the key decisions:
 - Architecture documentation explaining report generation flow
 - JSON schema documentation for published data
 
-## Final Implementation Questions
+## GitHub Pages Directory Structure
 
-The following clarifications are needed before starting implementation:
+**Selected Structure**: Report Type Subdirectories
 
-### 1. Subdirectory Structure Clarification
-**Question**: How exactly should the subdirectory structure be organized?
+Each report type has its own subdirectory containing both HTML and JSON files:
 
-**Option A - Report Type Subdirectories**:
 ```
-/ (root of gh-pages)
-├── index.html (main TOC)
+/ (root of gh-pages branch)
+├── index.html (main TOC page)
 ├── coverage/
-│   ├── index.html (coverage report)
-│   └── data.json (c8 output)
+│   ├── index.html (coverage report page)
+│   └── data.json (c8 coverage output)
 ├── security/
-│   ├── index.html (security report)
+│   ├── index.html (security report page)
 │   └── data.json (npm audit output)
 ├── performance/
-│   ├── index.html (performance report)
-│   └── data.json (timing data)
-└── ... (other report directories)
+│   ├── index.html (performance report page)
+│   └── data.json (performance timing data)
+├── quality/
+│   ├── index.html (lint report page)
+│   └── data.json (ESLint output)
+├── complexity/
+│   ├── index.html (complexity report page)
+│   └── data.json (complexity metrics)
+├── structure/
+│   ├── index.html (dependency graph page)
+│   └── data.json (Madge output)
+├── documentation/
+│   ├── index.html (JSDoc coverage page)
+│   └── data.json (documentation metrics)
+├── visual-regression/
+│   ├── index.html (visual diff report page)
+│   ├── data.json (visual diff metadata)
+│   └── screenshots/ (baseline and current images)
+├── trends/
+│   ├── index.html (historical trends page)
+│   └── data.json (historical metrics)
+└── metadata.json (build information and overall summary)
 ```
 
-**Option B - Build-Specific Subdirectories**:
-```
-/ (root of gh-pages)
-├── latest/ (symlink or copy to most recent build)
-│   ├── index.html
-│   ├── coverage.html
-│   ├── security.html
-│   ├── coverage.json
-│   └── security.json
-└── builds/
-    ├── abc123/ (commit SHA)
-    │   ├── index.html
-    │   ├── coverage.html
-    │   └── coverage.json
-    └── def456/ (another commit SHA)
-        └── ...
-```
+**URL Pattern**: `https://{username}.github.io/{repo}/coverage/` or `https://{username}.github.io/{repo}/security/`
 
-**Option C - Hybrid**:
-```
-/ (root of gh-pages)
-├── latest/
-│   ├── index.html (main TOC)
-│   ├── coverage/
-│   │   ├── index.html
-│   │   └── data.json
-│   ├── security/
-│   │   ├── index.html
-│   │   └── data.json
-│   └── ...
-└── builds/
-    └── [sha]/
-        └── (same structure as latest/)
-```
-
-Which structure do you prefer?
+**Benefits**:
+- Simple, clean URLs
+- Easy to navigate directly to specific report types
+- Clear separation of concerns
+- JSON files co-located with their HTML reports
+- Straightforward to link between pages
 
 ## Success Criteria
 
@@ -845,14 +834,15 @@ The enhanced build report will be considered successful when:
 1. ✅ ~~Answer open questions to resolve ambiguities~~ (COMPLETE)
 2. ✅ ~~Select specific tools for each analysis type~~ (COMPLETE)
 3. ✅ ~~Answer follow-up questions~~ (COMPLETE - 5 of 5 answered)
-4. **Answer final implementation question** (1 remaining: subdirectory structure)
-5. **Create detailed technical specifications for Phase 1 (MVP)**
-6. **Begin Phase 1 implementation**:
+4. ✅ ~~Finalize subdirectory structure~~ (COMPLETE - Option A: Report Type Subdirectories)
+5. **READY FOR IMPLEMENTATION** - All questions resolved, plan is complete
+6. **Create detailed technical specifications for Phase 1 (MVP)**
+7. **Begin Phase 1 implementation**:
    - Add c8 coverage collection
    - Configure ESLint with security plugins
    - Integrate npm audit
    - Modify API tests to include performance timing
-   - Set up subdirectory structure
+   - Set up report type subdirectory structure (coverage/, security/, performance/)
    - Generate report pages with source links
    - Publish JSON data files in internal tool formats
 
@@ -900,43 +890,49 @@ The enhanced build report will be considered successful when:
 ### Main Report (index.html) - Table of Contents
 ```
 Build Report - [Commit SHA] - [Timestamp]
+URL: https://{user}.github.io/{repo}/
+
 ├── Summary Dashboard
 │   ├── Overall Status (Pass/Fail)
 │   ├── Key Metrics (Coverage %, Security Issues, Build Duration)
 │   └── Commit Info (SHA, Author, Message, Diff Link)
-└── Reports (Links to separate pages)
-    ├── → Test Results (test-results.html)
-    ├── → Code Coverage (coverage.html) [+ JSON]
-    ├── → Security Analysis (security.html) [+ JSON]
-    ├── → Code Quality & Linting (quality.html) [+ JSON]
-    ├── → Complexity Analysis (complexity.html) [+ JSON]
-    ├── → Structural Analysis (structure.html) [+ JSON]
-    ├── → Performance Metrics (performance.html) [+ JSON]
-    ├── → Documentation Coverage (documentation.html) [+ JSON]
-    ├── → Visual Regression (visual-regression.html) [+ JSON]
-    └── → Historical Trends (trends.html) [+ JSON]
+└── Reports (Links to subdirectory pages)
+    ├── → Test Results → test-results/
+    ├── → Code Coverage → coverage/ [+ data.json]
+    ├── → Security Analysis → security/ [+ data.json]
+    ├── → Code Quality & Linting → quality/ [+ data.json]
+    ├── → Complexity Analysis → complexity/ [+ data.json]
+    ├── → Structural Analysis → structure/ [+ data.json]
+    ├── → Performance Metrics → performance/ [+ data.json]
+    ├── → Documentation Coverage → documentation/ [+ data.json]
+    ├── → Visual Regression → visual-regression/ [+ data.json]
+    └── → Historical Trends → trends/ [+ data.json]
 ```
 
 ### Individual Report Pages
-Each report page contains:
-- Header with build metadata and link back to main TOC
+Each report subdirectory contains:
+- `index.html` - Report page with metrics and visualizations
+- `data.json` - Machine-readable data in tool's native format
+- Header with build metadata and link back to main TOC (/)
 - Report-specific metrics and visualizations
 - Links to relevant source files on GitHub with line numbers
-- Download link for corresponding JSON data file
+- Download link for data.json in the same directory
 
 ### Published JSON Files
-Available for programmatic access (internal tool formats):
-- `coverage.json` - c8 coverage output format
-- `security.json` - npm audit JSON output format
-- `quality.json` - ESLint JSON output format
-- `complexity.json` - eslint-plugin-complexity output
-- `structure.json` - Madge JSON output format
-- `performance.json` - Custom timing data structure
-- `documentation.json` - JSDoc analysis output
-- `visual-regression.json` - Visual diff data with image references
-- `trends.json` - Historical data aggregation
-- `metadata.json` - Build information and overall summary
+Available for programmatic access at the following URLs (internal tool formats):
+- `https://{user}.github.io/{repo}/coverage/data.json` - c8 coverage output format
+- `https://{user}.github.io/{repo}/security/data.json` - npm audit JSON output format
+- `https://{user}.github.io/{repo}/quality/data.json` - ESLint JSON output format
+- `https://{user}.github.io/{repo}/complexity/data.json` - eslint-plugin-complexity output
+- `https://{user}.github.io/{repo}/structure/data.json` - Madge JSON output format
+- `https://{user}.github.io/{repo}/performance/data.json` - Custom timing data structure
+- `https://{user}.github.io/{repo}/documentation/data.json` - JSDoc analysis output
+- `https://{user}.github.io/{repo}/visual-regression/data.json` - Visual diff data with image references
+- `https://{user}.github.io/{repo}/trends/data.json` - Historical data aggregation
+- `https://{user}.github.io/{repo}/metadata.json` - Build information and overall summary
 
 **Format Note**: All JSON files use the internal output format of their respective tools (e.g., c8's native format, npm audit's native format) rather than a custom standardized format. This allows consumers to use existing parsers and tooling.
+
+**Naming Convention**: All JSON files are named `data.json` within their respective subdirectories for consistency.
 
 All HTML section headers and individual items link to relevant source files on GitHub with line numbers where applicable.
