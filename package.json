@@ -46,6 +46,11 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "c8": "^9.1.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-no-unsanitized": "^4.0.2",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-security": "^2.1.1",
     "wrangler": "4.47.0"
   },
   "dependencies": {
