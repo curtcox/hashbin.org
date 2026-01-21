@@ -4,7 +4,7 @@
 
 This plan describes the implementation of a content moderation system that allows:
 1. Anyone to submit removal claims against content
-2. Content owners to delete their own content
+2. Content uploaders to delete their own content
 3. A single admin to delete any content via API
 4. Transparent tracking of disputes and deletions
 
@@ -12,17 +12,41 @@ This plan describes the implementation of a content moderation system that allow
 
 ### New Components
 - **DisputeRecord** - Durable Object to store disputes (one per CID)
-- **AdminConfig** - Durable Object to store admin user ID (singleton)
+- **DisputeIndex** - Durable Object to index open disputes with caching support
+- **AdminActionLog** - Durable Object to log all admin actions (singleton)
 - **Dispute API** - Routes for creating/viewing disputes
-- **Delete API** - Routes for owner and admin content deletion
+- **Delete API** - Routes for uploader and admin content deletion
 - **Disputes List Page** - Public page showing all open disputes
 - **Dispute Form** - Public form for submitting removal claims
 
 ### Modified Components
-- **ContentMetadata** - Add `deleted_at`, `deleted_by`, `deletion_reason` fields
+- **ContentMetadata** - Add `deleted_at`, `deleted_by`, `deletion_reason`, `pending_r2_deletion` fields
 - **UserProfile** - Track deleted uploads separately
 - **PaymentRecord** - Add `content_deletion` transaction type
-- **CID Details Page** - Add dispute link and owner delete button
+- **CID Details Page** - Add dispute link, dispute form link, and uploader delete button
+
+---
+
+## Resolved Design Decisions
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Content expires with open dispute | Dispute remains open, content becomes inaccessible |
+| 2 | User can dispute own content | Yes (allowed) |
+| 3 | Dispute time limit | Auto-expires after 30 days with status `closed_expired` |
+| 4 | New dispute after denial | Yes, rate-limited to once per 30 days per CID |
+| 5 | Deleted content metadata | Keep indefinitely for audit trail |
+| 6 | Admin user setup | Environment variable `ADMIN_USER_ID` |
+| 7 | Multiple admins | No, single admin only |
+| 8 | Admin action logging | Separate AdminActionLog Durable Object |
+| 9 | R2 content deletion | Soft delete; scheduled job performs actual R2 deletion |
+| 10 | Contact info visibility | Not encrypted; only visible to authenticated users |
+| 11 | CID collisions | Original uploader is the only relevant user for deletion rights |
+| 12 | Disputes list caching | Yes, with dirty flag invalidation |
+| 13 | CAPTCHA | No |
+| 14 | Info shown to uploader | All dispute info is public except contact info; no notifications |
+| 15 | Email notifications | No |
+| 16 | Dispute form access | Both: link on CID pages AND dedicated route |
 
 ---
 
@@ -40,6 +64,7 @@ interface Dispute {
   created_at: string;          // ISO 8601 timestamp
   updated_at: string;          // ISO 8601 timestamp
   closed_at: string | null;    // When dispute was resolved
+  expires_at: string;          // Auto-expiration date (created_at + 30 days)
 
   // Submitter info
   submitter_contact: ContactInfo;
@@ -53,7 +78,13 @@ interface Dispute {
   // Resolution
   resolution: Resolution | null;
   resolution_reason: string | null;
-  resolved_by: string | null;  // "admin", "owner", "auto"
+  resolved_by: string | null;  // "admin", "uploader", "auto", "system"
+}
+
+// History of all disputes for this CID (for rate limiting re-disputes)
+interface DisputeHistory {
+  disputes: Dispute[];
+  last_dispute_closed_at: string | null;  // For 30-day rate limit
 }
 
 type DisputeStatus =
@@ -61,7 +92,7 @@ type DisputeStatus =
   | "under_review"   // Being actively reviewed
   | "closed_deleted" // Content was deleted
   | "closed_denied"  // Claim was rejected
-  | "closed_expired" // Dispute expired without resolution
+  | "closed_expired" // Dispute expired after 30 days without resolution
 
 type ClaimType =
   | "copyright"      // DMCA or copyright claim
@@ -84,7 +115,7 @@ type Resolution = "deleted" | "denied" | "expired";
 
 **Naming Convention**: `dispute-index:global` (singleton)
 
-Maintains an index of all open disputes for efficient listing.
+Maintains an index of all open disputes for efficient listing with caching support.
 
 ```typescript
 interface DisputeIndex {
@@ -93,20 +124,45 @@ interface DisputeIndex {
     dispute_id: string;
     claim_type: ClaimType;
     created_at: string;
+    expires_at: string;
   }[];
+
+  // Cache invalidation
+  last_modified: string;       // ISO 8601 timestamp
+  cache_dirty: boolean;        // Set true when disputes change
 }
 ```
 
-### AdminConfig (New Durable Object)
+**Cache Strategy**:
+- Cache the disputes list response at the edge (e.g., 5 minutes)
+- When a dispute is created, closed, or expires, set `cache_dirty = true`
+- Include `last_modified` in responses for conditional requests
+- Clients can use `If-Modified-Since` header
 
-**Naming Convention**: `admin-config:global` (singleton)
+### AdminActionLog (New Durable Object)
+
+**Naming Convention**: `admin-action-log:global` (singleton)
 
 ```typescript
-interface AdminConfig {
-  admin_user_id: string;       // The single admin user ID
-  created_at: string;
-  updated_at: string;
+interface AdminActionLog {
+  actions: AdminAction[];
 }
+
+interface AdminAction {
+  action_id: string;           // Unique ID
+  admin_user_id: string;       // Who performed the action
+  action_type: AdminActionType;
+  timestamp: string;           // ISO 8601
+  target_cid: string | null;   // If action relates to content
+  target_dispute_id: string | null;  // If action relates to dispute
+  details: Record<string, any>;  // Action-specific details
+}
+
+type AdminActionType =
+  | "content_deleted"          // Admin deleted content
+  | "dispute_denied"           // Admin denied dispute
+  | "dispute_approved"         // Admin approved dispute (leading to deletion)
+  | "dispute_status_changed"   // Admin changed dispute status
 ```
 
 ### ContentMetadata Updates
@@ -115,9 +171,10 @@ Add fields to existing ContentMetadata:
 
 ```typescript
 // New fields
-deleted_at: string | null;     // ISO 8601 timestamp of deletion
-deleted_by: string | null;     // User ID who deleted (or "admin")
-deletion_reason: string | null; // "owner_request" | "admin_removal" | "dispute:{dispute_id}"
+deleted_at: string | null;           // ISO 8601 timestamp of soft deletion
+deleted_by: string | null;           // User ID who deleted (or "admin")
+deletion_reason: string | null;      // "uploader_request" | "admin_removal" | "dispute:{dispute_id}"
+pending_r2_deletion: boolean;        // True = awaiting scheduled R2 cleanup job
 ```
 
 ### PaymentRecord Updates
@@ -136,6 +193,7 @@ interface DeletionTransaction {
   deletion_reason: string;
   dispute_id: string | null;   // If deleted due to dispute
   // No balance change - informational only
+  amount_cents: 0;
 }
 ```
 
@@ -173,6 +231,7 @@ Create a new dispute against a CID.
 - `evidence_urls`: Optional, max 10 URLs, each must be valid HTTPS URL
 - `contact.type`: Required, "email" or "url"
 - `contact.value`: Required, valid email or HTTPS URL
+- **Re-dispute rate limit**: If a previous dispute was closed, must be ≥30 days since closure
 
 **Response (201 Created)**:
 ```json
@@ -182,7 +241,8 @@ Create a new dispute against a CID.
     "dispute_id": "disp_abc123",
     "cid": "abc123def456",
     "status": "open",
-    "created_at": "2026-01-21T10:00:00Z"
+    "created_at": "2026-01-21T10:00:00Z",
+    "expires_at": "2026-02-20T10:00:00Z"
   }
 }
 ```
@@ -193,6 +253,7 @@ Create a new dispute against a CID.
 - `409 DISPUTE_EXISTS`: Open dispute already exists for this CID
 - `410 CID_DELETED`: Content already deleted
 - `429 RATE_LIMITED`: Too many disputes from this IP
+- `429 REDISPUTE_TOO_SOON`: Must wait 30 days after previous dispute closure
 
 #### GET /api/disputes
 List all open disputes (public).
@@ -214,21 +275,27 @@ List all open disputes (public).
       "cid": "abc123def456",
       "claim_type": "copyright",
       "status": "open",
-      "created_at": "2026-01-21T10:00:00Z"
+      "created_at": "2026-01-21T10:00:00Z",
+      "expires_at": "2026-02-20T10:00:00Z"
     }
   ],
   "total": 42,
   "limit": 50,
-  "offset": 0
+  "offset": 0,
+  "cache_info": {
+    "last_modified": "2026-01-21T09:00:00Z"
+  }
 }
 ```
+
+**Caching**: Response includes `Last-Modified` header. Clients can use `If-Modified-Since`.
 
 #### GET /api/disputes/{dispute_id}
 Get details of a specific dispute.
 
-**Authentication**: None required
+**Authentication**: Optional (affects contact info visibility)
 
-**Response**:
+**Response (unauthenticated)**:
 ```json
 {
   "dispute": {
@@ -240,20 +307,38 @@ Get details of a specific dispute.
     "evidence_urls": ["https://example.com/proof"],
     "created_at": "2026-01-21T10:00:00Z",
     "updated_at": "2026-01-21T10:00:00Z",
+    "expires_at": "2026-02-20T10:00:00Z"
+  }
+}
+```
+
+**Response (authenticated)**:
+```json
+{
+  "dispute": {
+    "dispute_id": "disp_abc123",
+    "cid": "abc123def456",
+    "status": "open",
+    "claim_type": "copyright",
+    "evidence": "This content infringes...",
+    "evidence_urls": ["https://example.com/proof"],
+    "created_at": "2026-01-21T10:00:00Z",
+    "updated_at": "2026-01-21T10:00:00Z",
+    "expires_at": "2026-02-20T10:00:00Z",
     "contact": {
       "type": "email",
-      "value": "rep***@example.com"  // Partially redacted
+      "value": "reporter@example.com"
     }
   }
 }
 ```
 
-**Note**: Contact info is partially redacted in public responses.
+**Note**: Contact info only included for authenticated users.
 
 #### GET /api/content/{cid}/disputes
 Get disputes for a specific CID.
 
-**Authentication**: None required
+**Authentication**: Optional (affects contact info visibility)
 
 **Response**:
 ```json
@@ -263,19 +348,22 @@ Get disputes for a specific CID.
       "dispute_id": "disp_abc123",
       "status": "open",
       "claim_type": "copyright",
-      "created_at": "2026-01-21T10:00:00Z"
+      "created_at": "2026-01-21T10:00:00Z",
+      "expires_at": "2026-02-20T10:00:00Z"
     }
   ],
-  "has_open_dispute": true
+  "has_open_dispute": true,
+  "can_file_new_dispute": false,
+  "next_dispute_allowed_at": null
 }
 ```
 
 ### Delete API
 
 #### DELETE /api/content/{cid}
-Delete content (owner or admin only).
+Delete content (uploader or admin only).
 
-**Authentication**: Required (owner or admin)
+**Authentication**: Required (uploader or admin)
 
 **Request Body (optional)**:
 ```json
@@ -285,8 +373,8 @@ Delete content (owner or admin only).
 ```
 
 **Authorization Logic**:
-1. If user is admin → allowed
-2. If user uploaded this CID (CID in user's uploads list) → allowed
+1. If user is admin (matches `ADMIN_USER_ID` env var) → allowed
+2. If user is the original uploader of this CID → allowed
 3. Otherwise → 403 Forbidden
 
 **Response (200 OK)**:
@@ -296,22 +384,23 @@ Delete content (owner or admin only).
   "deleted": {
     "cid": "abc123def456",
     "deleted_at": "2026-01-21T12:00:00Z",
-    "deleted_by": "owner"
+    "deleted_by": "uploader"
   }
 }
 ```
 
 **Side Effects**:
 - Sets `deleted_at`, `deleted_by`, `deletion_reason` on ContentMetadata
-- Deletes actual content from R2 storage
+- Sets `pending_r2_deletion = true` (R2 content NOT immediately deleted)
 - Creates `content_deletion` transaction in PaymentRecord
 - Closes any open disputes with status `closed_deleted`
 - Updates DisputeIndex to remove from open disputes list
+- Sets `cache_dirty = true` on DisputeIndex
 - Marks upload as deleted in UserProfile uploads list
 
 **Errors**:
 - `401 UNAUTHORIZED`: Not authenticated
-- `403 FORBIDDEN`: Not owner or admin
+- `403 FORBIDDEN`: Not uploader or admin
 - `404 NOT_FOUND`: CID does not exist
 - `410 ALREADY_DELETED`: Content already deleted
 
@@ -324,10 +413,12 @@ Admin-only deletion with additional options.
 ```json
 {
   "reason": "Violation of terms",
-  "dispute_id": "disp_abc123",  // Optional: link to dispute
-  "notify_owner": true           // Optional: send deletion notice
+  "dispute_id": "disp_abc123"
 }
 ```
+
+**Side Effects** (in addition to standard delete):
+- Creates entry in AdminActionLog with `action_type: "content_deleted"`
 
 **Response**: Same as DELETE /api/content/{cid}
 
@@ -338,9 +429,11 @@ Admin-only deletion with additional options.
 ### Admin API
 
 #### GET /api/admin/disputes
-Get all disputes with full details (admin only).
+Get all disputes with full details including contact info (admin only).
 
 **Authentication**: Required (admin only)
+
+**Query Parameters**: Same as GET /api/disputes
 
 **Response**: Full dispute objects with unredacted contact info.
 
@@ -357,18 +450,66 @@ Update dispute status (admin only).
 }
 ```
 
-#### POST /api/admin/config
-Set admin user ID (one-time setup or via environment variable).
+**Side Effects**:
+- Creates entry in AdminActionLog
+- If status becomes closed, updates DisputeIndex and sets `cache_dirty = true`
 
-**Authentication**: Requires `ADMIN_SETUP_KEY` environment variable
+#### GET /api/admin/actions
+Get admin action log (admin only).
 
-**Request Body**:
+**Authentication**: Required (admin only)
+
+**Query Parameters**:
+- `limit`: Max results (default: 50, max: 100)
+- `offset`: Pagination offset
+- `action_type`: Filter by action type
+
+**Response**:
 ```json
 {
-  "admin_user_id": "user_abc123",
-  "setup_key": "secret-setup-key"
+  "actions": [
+    {
+      "action_id": "act_abc123",
+      "admin_user_id": "user_admin",
+      "action_type": "content_deleted",
+      "timestamp": "2026-01-21T12:00:00Z",
+      "target_cid": "abc123def456",
+      "target_dispute_id": "disp_abc123",
+      "details": {
+        "reason": "Violation of terms"
+      }
+    }
+  ],
+  "total": 15
 }
 ```
+
+---
+
+## Scheduled Jobs
+
+### Dispute Expiration Job
+
+**Frequency**: Daily (or hourly for more precision)
+
+**Logic**:
+1. Query DisputeIndex for disputes where `expires_at < now()`
+2. For each expired dispute:
+   - Update status to `closed_expired`
+   - Set `resolution = "expired"`, `resolved_by = "system"`
+   - Remove from DisputeIndex open list
+3. Set `cache_dirty = true` on DisputeIndex
+
+### R2 Cleanup Job
+
+**Frequency**: Daily
+
+**Logic**:
+1. Query ContentMetadata for records where `pending_r2_deletion = true`
+2. For each record:
+   - Delete the actual object from R2 storage
+   - Set `pending_r2_deletion = false`
+3. Optionally: Add minimum retention period (e.g., 24 hours) before R2 deletion
 
 ---
 
@@ -376,10 +517,17 @@ Set admin user ID (one-time setup or via environment variable).
 
 ### Dispute Submission Form (/disputes/submit.html)
 
+**Access Methods**:
+1. Direct URL: `/disputes/submit.html`
+2. With CID pre-filled: `/disputes/submit.html?cid=abc123`
+3. Link from CID details page: "Report this content" link
+
 **Fields**:
 1. CID Input (text, required)
-   - Auto-populated if accessed via `/disputes/submit.html?cid=xxx`
+   - Auto-populated if accessed via `?cid=xxx`
    - Validates CID exists and isn't deleted
+   - Shows error if CID has open dispute
+   - Shows error if re-dispute too soon (< 30 days)
 2. Claim Type (dropdown, required)
    - Copyright, Illegal Content, Privacy Violation, Harassment, Malware, Other
 3. Evidence (textarea, required)
@@ -413,9 +561,12 @@ Set admin user ID (one-time setup or via environment variable).
   - CID (linked to details page)
   - Claim type badge
   - Created date
+  - Expires date
   - "View Details" link
 
 **Pagination**: Load more button, 50 per page
+
+**Caching**: Client-side caching respecting `Last-Modified` header
 
 ### CID Details Page Updates (/dashboard/uploads/detail.html)
 
@@ -425,29 +576,35 @@ Set admin user ID (one-time setup or via environment variable).
    - Warning style (yellow/orange)
    - "This content has an open dispute"
    - Link to dispute details
+   - Shows expiration date
 
 2. **Dispute History Section** (if any disputes exist)
    - List of all disputes (open and closed)
    - Status badges
    - Links to dispute details
 
-3. **Delete Button** (owner only)
+3. **Report Content Link** (always visible for non-deleted content)
+   - "Report this content" link
+   - Links to `/disputes/submit.html?cid={cid}`
+   - Disabled with tooltip if open dispute exists or re-dispute too soon
+
+4. **Delete Button** (uploader only)
    - Red danger button
    - Confirmation modal:
      - "Are you sure you want to delete this content?"
      - "This action cannot be undone."
      - Optional reason input
      - Cancel / Delete buttons
-   - Only visible if current user is the uploader
+   - Only visible if current user is the original uploader
 
 **Delete Button Visibility Logic**:
 ```javascript
 // Show delete button if:
 // 1. User is authenticated
-// 2. User's uploads list contains this CID
+// 2. User is the original uploader of this CID
 // 3. Content is not already deleted
 const showDeleteButton = isAuthenticated &&
-                         userUploads.includes(cid) &&
+                         content.uploader_id === currentUser.id &&
                          !content.deleted_at;
 ```
 
@@ -467,62 +624,71 @@ const showDeleteButton = isAuthenticated &&
 
 ### Phase 1: Data Layer
 1. Create DisputeRecord Durable Object
-2. Create DisputeIndex Durable Object
-3. Create AdminConfig Durable Object
-4. Update ContentMetadata with deletion fields
+2. Create DisputeIndex Durable Object with cache support
+3. Create AdminActionLog Durable Object
+4. Update ContentMetadata with deletion and soft-delete fields
 5. Update PaymentRecord with deletion transaction type
 6. Update UserProfile to track deleted uploads
-7. Add bindings to wrangler.toml
+7. Add `ADMIN_USER_ID` environment variable
+8. Add bindings to wrangler.toml
 
 ### Phase 2: Dispute API
-1. Implement POST /api/disputes
-2. Implement GET /api/disputes
-3. Implement GET /api/disputes/{dispute_id}
+1. Implement POST /api/disputes with re-dispute rate limiting
+2. Implement GET /api/disputes with caching headers
+3. Implement GET /api/disputes/{dispute_id} with auth-aware contact visibility
 4. Implement GET /api/content/{cid}/disputes
 5. Add rate limiting for dispute submission
 6. Add validation helpers
 
 ### Phase 3: Delete API
 1. Implement DELETE /api/content/{cid}
-2. Implement ownership check logic
-3. Implement admin check logic
-4. Implement R2 content deletion
+2. Implement uploader check logic (original uploader only)
+3. Implement admin check logic (env var comparison)
+4. Implement soft delete (set pending_r2_deletion, don't delete R2)
 5. Implement dispute closure on deletion
 6. Create deletion transaction records
 
 ### Phase 4: Admin API
-1. Implement AdminConfig initialization
-2. Implement admin authentication middleware
-3. Implement GET /api/admin/disputes
-4. Implement PATCH /api/admin/disputes/{dispute_id}
-5. Implement POST /api/admin/content/{cid}/delete
+1. Implement admin authentication middleware
+2. Implement GET /api/admin/disputes
+3. Implement PATCH /api/admin/disputes/{dispute_id}
+4. Implement POST /api/admin/content/{cid}/delete
+5. Implement GET /api/admin/actions
+6. Add AdminActionLog entries for all admin actions
 
-### Phase 5: Frontend - Dispute Form
+### Phase 5: Scheduled Jobs
+1. Implement dispute expiration job
+2. Implement R2 cleanup job
+3. Add job scheduling (Cloudflare Cron Triggers)
+
+### Phase 6: Frontend - Dispute Form
 1. Create /disputes/submit.html
 2. Create /frontend/js/dispute-submit.js
-3. Add form validation
+3. Add form validation including re-dispute rate limit check
 4. Add success/error handling
 5. Add routing in index.js
 
-### Phase 6: Frontend - Disputes List
+### Phase 7: Frontend - Disputes List
 1. Create /disputes/index.html
 2. Create /frontend/js/disputes-list.js
 3. Add filtering and pagination
-4. Add routing in index.js
+4. Add client-side caching
+5. Add routing in index.js
 
-### Phase 7: Frontend - CID Details Updates
+### Phase 8: Frontend - CID Details Updates
 1. Add dispute banner component
 2. Add dispute history section
-3. Add delete button (owner only)
-4. Add delete confirmation modal
-5. Update detail.js
+3. Add "Report this content" link
+4. Add delete button (uploader only)
+5. Add delete confirmation modal
+6. Update detail.js
 
-### Phase 8: Frontend - Transaction History Updates
+### Phase 9: Frontend - Transaction History Updates
 1. Add content_deletion transaction display
 2. Add filter option
 3. Update transactions.js
 
-### Phase 9: Integration Testing & Polish
+### Phase 10: Integration Testing & Polish
 1. End-to-end testing
 2. Error handling review
 3. UI/UX polish
@@ -543,6 +709,7 @@ TEST: Create dispute with valid data
   THEN dispute is created with status "open"
   AND dispute_id is generated
   AND created_at is set
+  AND expires_at is set to created_at + 30 days
   AND submitter_ip_hash is stored
 
 TEST: Create dispute with missing CID
@@ -585,11 +752,17 @@ TEST: Create dispute with invalid evidence URL
   WHEN POST /dispute is called
   THEN 400 error with "INVALID_EVIDENCE_URL"
 
-TEST: Get dispute returns full data
+TEST: Get dispute returns data without contact (unauthenticated)
   GIVEN an existing dispute
-  WHEN GET /dispute is called
+  WHEN GET /dispute is called without auth
+  THEN dispute fields are returned
+  AND contact info is NOT included
+
+TEST: Get dispute returns data with contact (authenticated)
+  GIVEN an existing dispute
+  WHEN GET /dispute is called with auth
   THEN all dispute fields are returned
-  AND contact info is included
+  AND contact info IS included
 
 TEST: Update dispute status to under_review
   GIVEN an open dispute
@@ -611,6 +784,30 @@ TEST: Close dispute as deleted
   THEN status changes to "closed_deleted"
   AND resolution is "deleted"
   AND closed_at is set
+
+TEST: Dispute auto-expires after 30 days
+  GIVEN an open dispute created 30 days ago
+  WHEN expiration job runs
+  THEN status changes to "closed_expired"
+  AND resolution is "expired"
+  AND resolved_by is "system"
+
+TEST: Re-dispute blocked within 30 days
+  GIVEN a dispute was closed 15 days ago for CID "cid123"
+  WHEN attempting to create new dispute for "cid123"
+  THEN 429 error with "REDISPUTE_TOO_SOON"
+
+TEST: Re-dispute allowed after 30 days
+  GIVEN a dispute was closed 31 days ago for CID "cid123"
+  WHEN attempting to create new dispute for "cid123"
+  THEN 201 success
+  AND new dispute is created
+
+TEST: User can dispute own content
+  GIVEN user_123 uploaded "cid123"
+  WHEN user_123 submits dispute for "cid123"
+  THEN 201 success
+  AND dispute is created
 ```
 
 #### DisputeIndex Durable Object
@@ -620,11 +817,13 @@ TEST: Add dispute to index
   GIVEN an empty index
   WHEN a dispute is added
   THEN open_disputes contains the dispute summary
+  AND cache_dirty is set to true
 
 TEST: Remove dispute from index on closure
   GIVEN an index with one dispute
   WHEN that dispute is closed
   THEN open_disputes is empty
+  AND cache_dirty is set to true
 
 TEST: List disputes with pagination
   GIVEN 60 open disputes
@@ -643,48 +842,61 @@ TEST: Sort disputes by created_at
   GIVEN disputes created at different times
   WHEN listing with default sort
   THEN disputes ordered newest first
+
+TEST: Cache dirty flag resets on read
+  GIVEN cache_dirty is true
+  WHEN disputes list is fetched
+  THEN response includes last_modified
+  AND cache_dirty can be reset
+
+TEST: Last-modified header included
+  GIVEN disputes exist
+  WHEN GET /api/disputes is called
+  THEN response includes Last-Modified header
 ```
 
-#### AdminConfig Durable Object
+#### AdminActionLog Durable Object
 
 ```
-TEST: Initialize admin config
-  GIVEN no admin configured
-  WHEN admin_user_id is set
-  THEN admin_user_id is stored
-  AND created_at is set
+TEST: Log admin content deletion
+  GIVEN admin deletes content "cid123"
+  WHEN deletion completes
+  THEN AdminActionLog contains entry with action_type "content_deleted"
+  AND entry includes admin_user_id, timestamp, target_cid
 
-TEST: Get admin user ID
-  GIVEN admin is configured
-  WHEN admin user ID is requested
-  THEN correct user ID returned
+TEST: Log admin dispute denial
+  GIVEN admin denies dispute "disp_123"
+  WHEN denial completes
+  THEN AdminActionLog contains entry with action_type "dispute_denied"
+  AND entry includes resolution_reason
 
-TEST: Check if user is admin - positive
-  GIVEN admin_user_id is "user_123"
-  WHEN checking "user_123"
-  THEN returns true
+TEST: Query action log with pagination
+  GIVEN 60 admin actions
+  WHEN listing with limit=50, offset=0
+  THEN 50 actions returned
 
-TEST: Check if user is admin - negative
-  GIVEN admin_user_id is "user_123"
-  WHEN checking "user_456"
-  THEN returns false
-
-TEST: Prevent changing admin once set
-  GIVEN admin is already configured
-  WHEN attempting to change admin_user_id
-  THEN 403 error with "ADMIN_ALREADY_SET"
-  (OR requires special override mechanism)
+TEST: Filter action log by type
+  GIVEN mixed action types
+  WHEN listing with action_type="content_deleted"
+  THEN only content_deleted actions returned
 ```
 
 #### ContentMetadata Updates
 
 ```
-TEST: Mark content as deleted by owner
-  GIVEN existing content owned by user_123
+TEST: Soft delete sets pending_r2_deletion
+  GIVEN existing content "cid123"
+  WHEN deleted
+  THEN deleted_at is set
+  AND pending_r2_deletion is true
+  AND R2 object still exists
+
+TEST: Mark content as deleted by uploader
+  GIVEN existing content uploaded by user_123
   WHEN deleted by user_123
   THEN deleted_at is set
   AND deleted_by is "user_123"
-  AND deletion_reason is "owner_request"
+  AND deletion_reason is "uploader_request"
 
 TEST: Mark content as deleted by admin
   GIVEN existing content
@@ -709,6 +921,12 @@ TEST: Prevent actions on deleted content
   GIVEN deleted content
   WHEN extend/download/rate-limit-purchase attempted
   THEN 410 GONE error
+
+TEST: R2 cleanup job deletes actual content
+  GIVEN content with pending_r2_deletion = true
+  WHEN R2 cleanup job runs
+  THEN R2 object is deleted
+  AND pending_r2_deletion is set to false
 ```
 
 ### API Integration Tests
@@ -722,6 +940,7 @@ TEST: Create dispute successfully
   THEN 201 response
   AND dispute is created
   AND dispute appears in GET /api/disputes
+  AND expires_at is 30 days from now
 
 TEST: Create dispute for non-existent CID
   GIVEN CID "fake123" does not exist
@@ -738,8 +957,13 @@ TEST: Create duplicate dispute
   WHEN POST /api/disputes for "cid123"
   THEN 409 DISPUTE_EXISTS
 
-TEST: Create dispute after previous closed
-  GIVEN content "cid123" had closed dispute
+TEST: Create dispute after previous closed (within 30 days)
+  GIVEN content "cid123" had dispute closed 15 days ago
+  WHEN POST /api/disputes for "cid123"
+  THEN 429 REDISPUTE_TOO_SOON
+
+TEST: Create dispute after previous closed (after 30 days)
+  GIVEN content "cid123" had dispute closed 31 days ago
   WHEN POST /api/disputes for "cid123"
   THEN 201 success (new dispute allowed)
 
@@ -752,6 +976,12 @@ TEST: Dispute rate limit resets after hour
   GIVEN IP was rate limited
   WHEN 1 hour passes
   THEN POST /api/disputes succeeds
+
+TEST: User disputes own content successfully
+  GIVEN user_123 uploaded "cid123"
+  AND user_123 is authenticated
+  WHEN POST /api/disputes for "cid123"
+  THEN 201 success
 ```
 
 #### GET /api/disputes
@@ -783,26 +1013,33 @@ TEST: Empty list returns empty array
   WHEN GET /api/disputes
   THEN disputes is empty array
   AND total is 0
+
+TEST: Response includes caching headers
+  GIVEN disputes exist
+  WHEN GET /api/disputes
+  THEN response includes Last-Modified header
+  AND response includes cache_info
 ```
 
 #### GET /api/disputes/{dispute_id}
 
 ```
-TEST: Get existing dispute
+TEST: Get existing dispute (unauthenticated)
   GIVEN dispute "disp_123" exists
-  WHEN GET /api/disputes/disp_123
-  THEN full dispute returned
-  AND contact is partially redacted
+  WHEN GET /api/disputes/disp_123 without auth
+  THEN dispute returned
+  AND contact is NOT included
+
+TEST: Get existing dispute (authenticated)
+  GIVEN dispute "disp_123" exists
+  WHEN GET /api/disputes/disp_123 with auth
+  THEN dispute returned
+  AND contact IS included
 
 TEST: Get non-existent dispute
   GIVEN dispute "disp_fake" does not exist
   WHEN GET /api/disputes/disp_fake
   THEN 404 NOT_FOUND
-
-TEST: Contact redaction works
-  GIVEN dispute with email "test@example.com"
-  WHEN GET /api/disputes/{id}
-  THEN contact.value is "tes***@example.com" or similar
 ```
 
 #### GET /api/content/{cid}/disputes
@@ -813,12 +1050,20 @@ TEST: Get disputes for CID with disputes
   WHEN GET /api/content/cid123/disputes
   THEN both disputes returned
   AND has_open_dispute is true
+  AND can_file_new_dispute is false
 
 TEST: Get disputes for CID without disputes
   GIVEN "cid456" has no disputes
   WHEN GET /api/content/cid456/disputes
   THEN disputes is empty array
   AND has_open_dispute is false
+  AND can_file_new_dispute is true
+
+TEST: Get disputes shows re-dispute availability
+  GIVEN "cid123" had dispute closed 15 days ago
+  WHEN GET /api/content/cid123/disputes
+  THEN can_file_new_dispute is false
+  AND next_dispute_allowed_at is set to 30 days after closure
 
 TEST: Get disputes for non-existent CID
   GIVEN "fake123" does not exist
@@ -829,16 +1074,17 @@ TEST: Get disputes for non-existent CID
 #### DELETE /api/content/{cid}
 
 ```
-TEST: Owner can delete own content
-  GIVEN user_123 uploaded "cid123"
+TEST: Original uploader can delete own content
+  GIVEN user_123 originally uploaded "cid123"
   AND user_123 is authenticated
   WHEN DELETE /api/content/cid123
   THEN 200 success
-  AND content is marked deleted
+  AND content is marked deleted (soft delete)
+  AND pending_r2_deletion is true
   AND deletion transaction created
 
-TEST: Non-owner cannot delete content
-  GIVEN user_123 uploaded "cid123"
+TEST: Non-uploader cannot delete content
+  GIVEN user_123 originally uploaded "cid123"
   AND user_456 is authenticated
   WHEN DELETE /api/content/cid123
   THEN 403 FORBIDDEN
@@ -870,12 +1116,13 @@ TEST: Delete closes open dispute
   WHEN DELETE /api/content/cid123
   THEN dispute status is "closed_deleted"
   AND dispute resolution is "deleted"
+  AND DisputeIndex cache_dirty is true
 
-TEST: Delete removes content from R2
+TEST: Soft delete does NOT immediately remove R2 content
   GIVEN "cid123" has content in R2
   WHEN DELETE /api/content/cid123
-  THEN R2 object is deleted
-  AND metadata retained with deleted_at
+  THEN R2 object still exists
+  AND pending_r2_deletion is true
 
 TEST: Delete creates transaction record
   GIVEN user_123 deletes "cid123"
@@ -887,7 +1134,6 @@ TEST: Delete updates user uploads list
   GIVEN user_123 has "cid123" in uploads
   WHEN DELETE /api/content/cid123
   THEN uploads list marks "cid123" as deleted
-  (or moves to deleted_uploads)
 ```
 
 #### Admin API Tests
@@ -897,7 +1143,7 @@ TEST: Admin can list all disputes with full details
   GIVEN admin is authenticated
   WHEN GET /api/admin/disputes
   THEN all disputes returned
-  AND contact info not redacted
+  AND contact info included
 
 TEST: Non-admin cannot access admin disputes
   GIVEN regular user is authenticated
@@ -909,6 +1155,7 @@ TEST: Admin can update dispute status
   AND dispute "disp_123" is open
   WHEN PATCH /api/admin/disputes/disp_123 {status: "closed_denied"}
   THEN dispute status updated
+  AND AdminActionLog entry created
 
 TEST: Admin can delete with dispute linkage
   GIVEN admin is authenticated
@@ -916,11 +1163,50 @@ TEST: Admin can delete with dispute linkage
   WHEN POST /api/admin/content/cid123/delete {dispute_id: "disp_123"}
   THEN content deleted
   AND dispute closed with deletion reference
+  AND AdminActionLog entry created
 
 TEST: Non-admin cannot use admin delete endpoint
   GIVEN regular user is authenticated
   WHEN POST /api/admin/content/cid123/delete
   THEN 403 NOT_ADMIN
+
+TEST: Admin can view action log
+  GIVEN admin is authenticated
+  AND 10 admin actions exist
+  WHEN GET /api/admin/actions
+  THEN 10 actions returned
+
+TEST: Non-admin cannot view action log
+  GIVEN regular user is authenticated
+  WHEN GET /api/admin/actions
+  THEN 403 NOT_ADMIN
+```
+
+### Scheduled Job Tests
+
+```
+TEST: Expiration job closes expired disputes
+  GIVEN dispute "disp_123" has expires_at 1 day ago
+  WHEN expiration job runs
+  THEN dispute status is "closed_expired"
+  AND resolved_by is "system"
+  AND DisputeIndex updated
+
+TEST: Expiration job ignores non-expired disputes
+  GIVEN dispute "disp_123" has expires_at 15 days from now
+  WHEN expiration job runs
+  THEN dispute status is still "open"
+
+TEST: R2 cleanup job deletes pending content
+  GIVEN content "cid123" has pending_r2_deletion = true
+  WHEN R2 cleanup job runs
+  THEN R2 object is deleted
+  AND pending_r2_deletion is set to false
+
+TEST: R2 cleanup job ignores non-pending content
+  GIVEN content "cid456" has pending_r2_deletion = false
+  WHEN R2 cleanup job runs
+  THEN R2 object still exists
 ```
 
 ### Frontend Tests
@@ -976,6 +1262,16 @@ TEST: CID pre-populated from URL parameter
   GIVEN URL is /disputes/submit.html?cid=abc123
   WHEN page loads
   THEN CID field contains "abc123"
+
+TEST: Form shows error for open dispute
+  GIVEN "cid123" has open dispute
+  WHEN user enters "cid123"
+  THEN error "This content already has an open dispute" displayed
+
+TEST: Form shows error for re-dispute too soon
+  GIVEN "cid123" had dispute closed 15 days ago
+  WHEN user enters "cid123"
+  THEN error "You must wait X days before filing another dispute" displayed
 ```
 
 #### Disputes List Page
@@ -985,6 +1281,7 @@ TEST: Displays open disputes
   GIVEN 5 open disputes exist
   WHEN page loads
   THEN 5 dispute cards displayed
+  AND each shows expiration date
 
 TEST: Filter by claim type works
   GIVEN disputes of various types
@@ -1016,6 +1313,7 @@ TEST: Shows dispute banner for open dispute
   GIVEN "cid123" has open dispute
   WHEN viewing /dashboard/uploads/cid123/
   THEN warning banner displayed
+  AND banner shows expiration date
   AND banner links to dispute details
 
 TEST: Shows dispute history section
@@ -1028,20 +1326,39 @@ TEST: No dispute section when no disputes
   GIVEN "cid456" has no disputes
   WHEN viewing details page
   THEN no dispute-related UI shown
+  AND "Report this content" link is visible
+
+TEST: Report content link present
+  GIVEN "cid456" has no disputes
+  WHEN viewing details page
+  THEN "Report this content" link visible
+  AND links to /disputes/submit.html?cid=cid456
+
+TEST: Report content link disabled during open dispute
+  GIVEN "cid123" has open dispute
+  WHEN viewing details page
+  THEN "Report this content" link disabled
+  AND tooltip explains why
+
+TEST: Report content link disabled during re-dispute cooldown
+  GIVEN "cid123" had dispute closed 15 days ago
+  WHEN viewing details page
+  THEN "Report this content" link disabled
+  AND tooltip shows days remaining
 ```
 
 #### CID Details Page - Delete Button
 
 ```
-TEST: Delete button shown for owner
+TEST: Delete button shown for original uploader
   GIVEN user_123 is logged in
-  AND user_123 uploaded "cid123"
+  AND user_123 originally uploaded "cid123"
   WHEN viewing /dashboard/uploads/cid123/
   THEN delete button is visible
 
-TEST: Delete button hidden for non-owner
+TEST: Delete button hidden for non-uploader
   GIVEN user_456 is logged in
-  AND user_123 uploaded "cid123"
+  AND user_123 originally uploaded "cid123"
   WHEN viewing /dashboard/uploads/cid123/
   THEN delete button is NOT visible
 
@@ -1083,6 +1400,20 @@ TEST: Delete error shows message
   AND modal remains open or closes appropriately
 ```
 
+#### Dispute Details Page - Contact Visibility
+
+```
+TEST: Contact info hidden when unauthenticated
+  GIVEN user is not logged in
+  WHEN viewing dispute details
+  THEN contact info section not shown
+
+TEST: Contact info shown when authenticated
+  GIVEN user is logged in
+  WHEN viewing dispute details
+  THEN contact info section shown with full details
+```
+
 #### Transaction History - Deletion Records
 
 ```
@@ -1111,21 +1442,21 @@ TEST: Dispute for content expiring soon
   GIVEN content expires in 1 hour
   WHEN dispute is filed
   THEN dispute is created
-  (content expiration should be handled separately)
+  AND dispute expires_at is 30 days from now (independent of content expiration)
 
 TEST: Content expires with open dispute
   GIVEN content "cid123" has open dispute
   WHEN content expires
   THEN content becomes inaccessible
   AND dispute remains open
-  (dispute resolution needed for record-keeping)
+  AND dispute still visible in disputes list
 
-TEST: Multiple users claim same CID
-  GIVEN "cid123" uploaded by user_123
-  AND user_456 also has "cid123" in uploads (collision)
-  WHEN user_456 tries to delete
-  THEN ownership determined by original uploader timestamp
-  OR both can delete their reference
+TEST: Dispute expires same day as content expires
+  GIVEN content expires in 30 days
+  AND dispute filed today
+  WHEN both expire
+  THEN content is inaccessible
+  AND dispute status is "closed_expired"
 
 TEST: Dispute submitted with script injection
   GIVEN evidence contains <script>alert('xss')</script>
@@ -1150,14 +1481,21 @@ TEST: Rapid dispute submission attempts
 
 TEST: Delete during active dispute resolution
   GIVEN admin is reviewing dispute
-  AND owner deletes content
-  THEN dispute is closed with owner deletion note
+  AND uploader deletes content
+  THEN dispute is closed with uploader deletion note
   AND admin sees updated status
 
 TEST: Admin deletes content then user tries to delete
   GIVEN admin deleted "cid123"
-  WHEN owner tries to delete
+  WHEN uploader tries to delete
   THEN 410 ALREADY_DELETED
+
+TEST: Uploader disputes then deletes own content
+  GIVEN user_123 uploaded "cid123"
+  AND user_123 filed dispute against "cid123"
+  WHEN user_123 deletes "cid123"
+  THEN content is deleted
+  AND dispute is closed with "closed_deleted"
 ```
 
 ### Security Tests
@@ -1168,10 +1506,20 @@ TEST: IP hashing is one-way
   WHEN attacker accesses hash
   THEN original IP cannot be derived
 
-TEST: Contact info not leaked in list endpoint
+TEST: Contact info not in unauthenticated list response
   GIVEN disputes with contact info
-  WHEN GET /api/disputes (list)
+  WHEN GET /api/disputes without auth
   THEN no contact info in response
+
+TEST: Contact info not in unauthenticated detail response
+  GIVEN dispute with contact info
+  WHEN GET /api/disputes/{id} without auth
+  THEN no contact info in response
+
+TEST: Contact info visible to authenticated users
+  GIVEN dispute with contact info
+  WHEN GET /api/disputes/{id} with auth
+  THEN contact info included
 
 TEST: Rate limiting prevents abuse
   GIVEN attacker submits disputes rapidly
@@ -1182,6 +1530,11 @@ TEST: Admin endpoint requires admin role
   GIVEN attacker knows admin endpoint
   AND attacker has valid user auth
   WHEN accessing admin endpoints
+  THEN 403 NOT_ADMIN
+
+TEST: Admin determined by env var only
+  GIVEN ADMIN_USER_ID env var is "user_admin"
+  WHEN "user_other" tries admin endpoints
   THEN 403 NOT_ADMIN
 
 TEST: Cannot delete via GET request
@@ -1202,94 +1555,32 @@ TEST: No SQL/NoSQL injection in evidence
   GIVEN evidence with injection attempt
   WHEN stored and retrieved
   THEN stored as literal string, no execution
+
+TEST: Admin action log is append-only
+  GIVEN existing admin actions
+  WHEN attempting to modify past entries
+  THEN modification fails
 ```
 
 ---
 
 ## Open Questions
 
-### Business Logic Questions
+All questions have been resolved. See "Resolved Design Decisions" table above.
 
-1. **What happens when content expires with an open dispute?**
-   - Option A: Dispute remains open for record-keeping, content becomes inaccessible
-   - Option B: Dispute auto-closes with status "closed_expired"
-   - Option C: Content expiration is paused while dispute is open
+---
 
-2. **Can a user file a dispute against their own content?**
-   - Option A: Yes, no restrictions (they can just delete it anyway)
-   - Option B: No, owner disputes blocked (just delete instead)
-   - Current assumption: Option B
+## Follow-up Questions
 
-3. **Should there be a time limit for dispute resolution?**
-   - Option A: Disputes auto-expire after X days
-   - Option B: Disputes remain open indefinitely until resolved
-   - If auto-expire, what's the duration?
+1. **R2 cleanup job retention period**: Should there be a minimum time between soft delete and actual R2 deletion? (e.g., 24 hours for potential admin recovery, or immediate eligibility for next job run)
 
-4. **Can a new dispute be filed after a previous one was denied?**
-   - Option A: Yes, allows new evidence
-   - Option B: No, prevents harassment
-   - Option C: Yes, but rate-limited (e.g., one per month)
-   - Current assumption: Option A (allowed)
+2. **Admin action log retention**: Should admin action logs be kept indefinitely, or is there a retention period?
 
-5. **Should deleted content metadata be purged after some time?**
-   - Option A: Keep indefinitely for audit trail
-   - Option B: Purge after X days/months
-   - Current assumption: Keep indefinitely
+3. **Dispute expiration job frequency**: Should the expiration job run daily (simpler, disputes may stay open up to ~24 hours past expiration) or hourly (more precise, higher cost)?
 
-### Admin Questions
+4. **Contact info for admin**: You mentioned contact info visible to logged-in users. Should admin see full contact info even when others see it? (Seems yes, but confirming admin has same view as regular authenticated users)
 
-6. **How is the admin user initially set?**
-   - Option A: Environment variable `ADMIN_USER_ID`
-   - Option B: First user to claim admin via setup key
-   - Option C: Both (env var takes precedence, fallback to setup)
-
-7. **Can there be multiple admins in the future?**
-   - Current spec says single admin. Is this permanent?
-   - Should we design for future multi-admin support?
-
-8. **Should admin actions be logged separately?**
-   - For audit trail and accountability
-   - Separate admin action log vs. regular transaction log?
-
-### Technical Questions
-
-9. **How should R2 content deletion work?**
-   - Option A: Immediate hard delete
-   - Option B: Soft delete with retention period
-   - Option C: Move to "deleted" bucket for potential recovery
-
-10. **Should dispute contact info be stored encrypted?**
-    - Privacy consideration for sensitive contact info
-    - Adds complexity but improves security
-
-11. **How to handle CID collisions (same CID uploaded by multiple users)?**
-    - Unlikely due to content-addressing, but possible
-    - Who is the "owner" for deletion rights?
-
-12. **Should the disputes list page be cached?**
-    - Could reduce load on DisputeIndex
-    - What cache invalidation strategy?
-
-### UX Questions
-
-13. **Should the dispute form require CAPTCHA?**
-    - To prevent automated abuse
-    - Adds friction for legitimate users
-
-14. **What information should be shown to content owner about disputes?**
-    - Full dispute details?
-    - Just existence of dispute?
-    - Should owner be notified?
-
-15. **Should there be email notifications for disputes?**
-    - Notify owner when dispute filed?
-    - Notify submitter when resolved?
-    - Requires email infrastructure
-
-16. **How should the dispute form be accessed?**
-    - Link on every CID page?
-    - Dedicated route only?
-    - Both?
+5. **Cache TTL for disputes list**: What should the cache duration be? Suggested: 5 minutes at edge, with `Last-Modified` / `If-Modified-Since` for conditional requests.
 
 ---
 
@@ -1297,7 +1588,9 @@ TEST: No SQL/NoSQL injection in evidence
 
 - Cloudflare Workers Durable Objects (existing)
 - Cloudflare R2 for content storage (existing)
+- Cloudflare Cron Triggers for scheduled jobs (new)
 - Clerk authentication (existing)
+- Environment variable `ADMIN_USER_ID` (new)
 - No new external dependencies required
 
 ---
@@ -1305,11 +1598,16 @@ TEST: No SQL/NoSQL injection in evidence
 ## Success Criteria
 
 1. Users can submit disputes with required evidence and contact info
-2. Open disputes are publicly visible in a list
-3. CID details pages show related disputes
-4. Content owners can delete their own content via UI
-5. Admin can delete any content via API
-6. Deletions create transaction records visible to owners
-7. Deletions close related disputes while preserving records
-8. All edge cases have defined behavior with passing tests
-9. No security vulnerabilities in dispute/delete flow
+2. Disputes auto-expire after 30 days
+3. Re-disputes are rate-limited to once per 30 days per CID
+4. Open disputes are publicly visible in a list with caching
+5. CID details pages show related disputes and "Report this content" link
+6. Content uploaders can delete their own content via UI
+7. Admin (single, env var configured) can delete any content via API
+8. All admin actions are logged in AdminActionLog
+9. Deletions are soft deletes; R2 cleanup happens via scheduled job
+10. Deletions create transaction records visible to uploaders
+11. Deletions close related disputes while preserving records
+12. Contact info only visible to authenticated users
+13. All edge cases have defined behavior with passing tests
+14. No security vulnerabilities in dispute/delete flow
