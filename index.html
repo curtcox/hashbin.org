@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build Report - HashBin.org</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 900px;
+            margin: 40px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 10px;
+        }
+        .metadata {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .metadata p {
+            margin: 5px 0;
+        }
+        .job-list {
+            list-style: none;
+            padding: 0;
+        }
+        .job-item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            transition: box-shadow 0.2s;
+        }
+        .job-item:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .job-status {
+            font-size: 24px;
+            margin-right: 15px;
+            min-width: 30px;
+        }
+        .job-name {
+            flex: 1;
+            font-weight: 500;
+            color: #333;
+        }
+        .job-link {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        .job-link:hover {
+            text-decoration: underline;
+        }
+        .summary {
+            margin: 30px 0;
+            padding: 20px;
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            border-radius: 5px;
+        }
+        .pass { color: #28a745; }
+        .fail { color: #dc3545; }
+        code {
+            background: #f8f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body style="background-color: #ffffff;">
+    <h1>🔨 Build Report</h1>
+    
+    <div class="metadata">
+        <p><strong>Repository:</strong> curtcox/hashbin.org</p>
+        <p><strong>Commit SHA:</strong> <code>aa62e9cbf431a59cee9153c58f7fe045697d3ef6</code></p>
+        <p><strong>Generated:</strong> 2026-01-21 13:37:07 UTC</p>
+        <p><strong>Run ID:</strong> <a href="https://github.com/curtcox/hashbin.org/actions/runs/21211619418" target="_blank">21211619418</a></p>
+    </div>
+    
+    <h2>📊 Test Results</h2>
+    <ul class="job-list">
+        <li class="job-item">
+            <span class="job-status">✅</span>
+            <span class="job-name">Linting</span>
+            <a href="linting.html" class="job-link">View Details →</a>
+        </li>
+        <li class="job-item">
+            <span class="job-status">✅</span>
+            <span class="job-name">Unit Tests</span>
+            <a href="unit-tests.html" class="job-link">View Details →</a>
+        </li>
+        <li class="job-item">
+            <span class="job-status">✅</span>
+            <span class="job-name">Integration Tests</span>
+            <a href="integration-tests.html" class="job-link">View Details →</a>
+        </li>
+        <li class="job-item">
+            <span class="job-status">✅</span>
+            <span class="job-name">API Tests</span>
+            <a href="api-tests.html" class="job-link">View Details →</a>
+        </li>
+        <li class="job-item">
+            <span class="job-status">✅</span>
+            <span class="job-name">E2E Tests</span>
+            <a href="e2e-tests.html" class="job-link">View Details →</a>
+        </li>
+    </ul>
+    
+    <div class="summary">
+        <h3>Summary</h3>
+        <p>Total Jobs: <strong>5</strong></p>
+        <p class="pass">Passed: <strong>5</strong></p>
+        <p class="fail">Failed: <strong>0</strong></p>
+    </div>
+</body>
+</html>
