@@ -133,6 +133,124 @@
         </div>
         <a href="performance/index.html" class="report-link">View Performance Report →</a>
       </div>
+
+      <!-- Lint Report Card -->
+      <div class="report-card {{QUALITY_EXISTS}}">
+        <span class="status-badge {{QUALITY_EXISTS}}">
+          {{QUALITY_EXISTS}}
+        </span>
+        <div class="report-icon">🧹</div>
+        <h2 class="report-title">Code Quality</h2>
+        <p class="report-description">
+          ESLint analysis highlighting errors, warnings, and potential quality issues.
+        </p>
+        <div class="report-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Errors</span>
+            <span class="metric-value">{{LINT_ERRORS}}</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Warnings</span>
+            <span class="metric-value">{{LINT_WARNINGS}}</span>
+          </div>
+        </div>
+        <a href="quality/index.html" class="report-link">View Lint Report →</a>
+      </div>
+
+      <!-- Complexity Report Card -->
+      <div class="report-card {{COMPLEXITY_EXISTS}}">
+        <span class="status-badge {{COMPLEXITY_EXISTS}}">
+          {{COMPLEXITY_EXISTS}}
+        </span>
+        <div class="report-icon">🧠</div>
+        <h2 class="report-title">Complexity</h2>
+        <p class="report-description">
+          Cyclomatic and cognitive complexity analysis with refactoring hints.
+        </p>
+        <div class="report-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Warnings</span>
+            <span class="metric-value">{{COMPLEXITY_COUNT}}</span>
+          </div>
+        </div>
+        <a href="complexity/index.html" class="report-link">View Complexity Report →</a>
+      </div>
+
+      <!-- Structural Analysis Report Card -->
+      <div class="report-card {{STRUCTURE_EXISTS}}">
+        <span class="status-badge {{STRUCTURE_EXISTS}}">
+          {{STRUCTURE_EXISTS}}
+        </span>
+        <div class="report-icon">🧩</div>
+        <h2 class="report-title">Structure</h2>
+        <p class="report-description">
+          Dependency graph, circular dependencies, and orphaned files.
+        </p>
+        <div class="report-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Circular</span>
+            <span class="metric-value">{{CIRCULAR_COUNT}}</span>
+          </div>
+        </div>
+        <a href="structure/index.html" class="report-link">View Structure Report →</a>
+      </div>
+
+      <!-- Documentation Report Card -->
+      <div class="report-card {{DOCUMENTATION_EXISTS}}">
+        <span class="status-badge {{DOCUMENTATION_EXISTS}}">
+          {{DOCUMENTATION_EXISTS}}
+        </span>
+        <div class="report-icon">📚</div>
+        <h2 class="report-title">Documentation</h2>
+        <p class="report-description">
+          JSDoc coverage and undocumented API surface tracking.
+        </p>
+        <div class="report-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Coverage</span>
+            <span class="metric-value">{{DOC_COVERAGE}}%</span>
+          </div>
+        </div>
+        <a href="documentation/index.html" class="report-link">View Documentation Report →</a>
+      </div>
+
+      <!-- Visual Regression Report Card -->
+      <div class="report-card {{VISUAL_EXISTS}}">
+        <span class="status-badge {{VISUAL_EXISTS}}">
+          {{VISUAL_EXISTS}}
+        </span>
+        <div class="report-icon">🖼️</div>
+        <h2 class="report-title">Visual Regression</h2>
+        <p class="report-description">
+          Screenshot comparisons for frontend pages with diffs.
+        </p>
+        <div class="report-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Changed Pages</span>
+            <span class="metric-value">{{VISUAL_CHANGED}}</span>
+          </div>
+        </div>
+        <a href="visual-regression/index.html" class="report-link">View Visual Report →</a>
+      </div>
+
+      <!-- Trends Report Card -->
+      <div class="report-card {{TRENDS_EXISTS}}">
+        <span class="status-badge {{TRENDS_EXISTS}}">
+          {{TRENDS_EXISTS}}
+        </span>
+        <div class="report-icon">📈</div>
+        <h2 class="report-title">Trends</h2>
+        <p class="report-description">
+          Historical trends for coverage, performance, and quality metrics.
+        </p>
+        <div class="report-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Data Points</span>
+            <span class="metric-value">{{TRENDS_COUNT}}</span>
+          </div>
+        </div>
+        <a href="trends/index.html" class="report-link">View Trends Report →</a>
+      </div>
     </div>
 
     <div class="footer">
