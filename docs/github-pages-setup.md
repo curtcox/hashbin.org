@@ -24,10 +24,8 @@ To enable GitHub Pages for this repository:
 2. Click **Settings** in the top navigation
 3. Scroll down to the **Pages** section in the left sidebar
 4. Under **Source**, select:
-   - **Source**: Deploy from a branch
-   - **Branch**: `gh-pages`
-   - **Folder**: `/ (root)`
-5. Click **Save**
+   - **Source**: GitHub Actions
+5. Click **Save** (if available)
 
 After a few minutes, your GitHub Pages site will be live at:
 ```
@@ -38,6 +36,8 @@ For this repository:
 ```
 https://curtcox.github.io/hashbin.org/
 ```
+
+**Note**: The workflow now uses the modern GitHub Actions deployment method with `actions/upload-pages-artifact` and `actions/deploy-pages`. This is the recommended approach as of 2024 and does not require a separate `gh-pages` branch.
 
 ## Workflow Trigger
 
@@ -84,19 +84,26 @@ The build report includes the following jobs:
 ## Troubleshooting
 
 ### Pages Not Showing Up
-- Ensure GitHub Pages is enabled (see steps above)
-- Check that the `gh-pages` branch exists and has content
-- Verify the workflow completed successfully in the Actions tab
+- Ensure GitHub Pages is enabled and set to "GitHub Actions" as the source
+- Check that the workflow completed successfully in the Actions tab
+- Look for the "Deploy to GitHub Pages" job and verify it succeeded
+- Check the environment URL in the deployment job for the actual Pages URL
 
 ### 404 Error
-- Wait a few minutes after enabling GitHub Pages
-- Check that the branch is set to `gh-pages` in repository settings
-- Verify the workflow has run at least once after enabling Pages
+- Wait a few minutes after the first deployment
+- Verify the Build Report workflow has run at least once after enabling Pages
+- Check that the "deploy-pages" job completed successfully
+- Ensure the Pages source is set to "GitHub Actions" not "Deploy from a branch"
 
 ### Old Reports
 - Each workflow run overwrites the previous report
 - Only the latest build report is available
 - Check the timestamp on the report to verify it's current
+
+### Deployment Fails
+- Check that the repository has GitHub Pages enabled
+- Verify that the workflow has `pages: write` and `id-token: write` permissions
+- Ensure the `github-pages` environment is configured (GitHub creates this automatically)
 
 ## Customization
 
@@ -112,7 +119,8 @@ To modify the report:
 The workflow uses:
 - `GITHUB_TOKEN` (automatically provided by GitHub Actions)
 - No additional secrets required for basic operation
-- The `gh-pages` branch is force-pushed on each run for security
+- The deployment uses the official GitHub Pages deployment actions
+- Permissions are scoped to only what's needed: `pages: write` and `id-token: write`
 
 ## Limitations
 
