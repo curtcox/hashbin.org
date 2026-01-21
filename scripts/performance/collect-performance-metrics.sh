@@ -27,7 +27,7 @@ echo "Running API tests with performance timing..."
 SUITES=""
 TOTAL_TIME=0
 TOTAL_TESTS=0
-MIN_TIME=999999
+MIN_TIME=999999  # Initialize to large value for finding minimum
 MAX_TIME=0
 
 # Run each test suite and capture timing

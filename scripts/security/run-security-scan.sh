@@ -20,10 +20,19 @@ npx eslint src/ \
   2>&1 || true
 echo "ESLint security scan complete"
 
-# Combine results into a single data.json
+# Combine results into a single data.json with summary metrics
 echo "Combining security scan results..."
-cat > build-reports/security/data.json << 'EOF'
+NPM_TOTAL=$(jq -r '.metadata.vulnerabilities | add' build-reports/security/npm-audit.json 2>/dev/null || echo "0")
+ESLINT_ERRORS=$(jq '[.[] | .errorCount] | add' build-reports/security/eslint-security.json 2>/dev/null || echo "0")
+ESLINT_WARNINGS=$(jq '[.[] | .warningCount] | add' build-reports/security/eslint-security.json 2>/dev/null || echo "0")
+
+cat > build-reports/security/data.json << EOF
 {
+  "summary": {
+    "npm_vulnerabilities": $NPM_TOTAL,
+    "eslint_errors": $ESLINT_ERRORS,
+    "eslint_warnings": $ESLINT_WARNINGS
+  },
   "npm_audit": "See npm-audit.json for details",
   "eslint": "See eslint-security.json for details"
 }
