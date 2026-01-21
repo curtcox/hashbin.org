@@ -38,15 +38,20 @@ This plan describes the implementation of a content moderation system that allow
 | 5 | Deleted content metadata | Keep indefinitely for audit trail |
 | 6 | Admin user setup | Environment variable `ADMIN_USER_ID` |
 | 7 | Multiple admins | No, single admin only |
-| 8 | Admin action logging | Separate AdminActionLog Durable Object |
-| 9 | R2 content deletion | Soft delete; scheduled job performs actual R2 deletion |
-| 10 | Contact info visibility | Not encrypted; only visible to authenticated users |
+| 8 | Admin action logging | Separate AdminActionLog Durable Object (kept indefinitely) |
+| 9 | R2 content deletion | Soft delete; 24-hour retention; daily cleanup job |
+| 10 | Contact info visibility | Not encrypted; only visible to authenticated users (including admin) |
 | 11 | CID collisions | Original uploader is the only relevant user for deletion rights |
-| 12 | Disputes list caching | Yes, with dirty flag invalidation |
+| 12 | Disputes list caching | 5-minute edge cache with `Last-Modified`/`If-Modified-Since` |
 | 13 | CAPTCHA | No |
 | 14 | Info shown to uploader | All dispute info is public except contact info; no notifications |
 | 15 | Email notifications | No |
 | 16 | Dispute form access | Both: link on CID pages AND dedicated route |
+| 17 | Dispute expiration job frequency | Daily |
+| 18 | R2 cleanup retention period | 24 hours minimum before actual deletion |
+| 19 | Admin action log retention | Keep indefinitely |
+| 20 | Admin contact info view | Same as any authenticated user |
+| 21 | Cache TTL | 5 minutes at edge |
 
 ---
 
@@ -134,10 +139,11 @@ interface DisputeIndex {
 ```
 
 **Cache Strategy**:
-- Cache the disputes list response at the edge (e.g., 5 minutes)
+- Cache the disputes list response at the edge for **5 minutes**
 - When a dispute is created, closed, or expires, set `cache_dirty = true`
 - Include `last_modified` in responses for conditional requests
-- Clients can use `If-Modified-Since` header
+- Clients can use `If-Modified-Since` header for conditional requests
+- Cache-Control: `public, max-age=300` (5 minutes)
 
 ### AdminActionLog (New Durable Object)
 
@@ -490,26 +496,39 @@ Get admin action log (admin only).
 
 ### Dispute Expiration Job
 
-**Frequency**: Daily (or hourly for more precision)
+**Frequency**: Daily (via Cloudflare Cron Trigger)
+
+**Schedule**: `0 0 * * *` (midnight UTC daily)
 
 **Logic**:
 1. Query DisputeIndex for disputes where `expires_at < now()`
 2. For each expired dispute:
    - Update status to `closed_expired`
    - Set `resolution = "expired"`, `resolved_by = "system"`
+   - Set `closed_at = now()`
    - Remove from DisputeIndex open list
 3. Set `cache_dirty = true` on DisputeIndex
 
+**Note**: Disputes may remain open up to ~24 hours past their `expires_at` due to daily frequency. This is acceptable.
+
 ### R2 Cleanup Job
 
-**Frequency**: Daily
+**Frequency**: Daily (via Cloudflare Cron Trigger)
+
+**Schedule**: `0 1 * * *` (1:00 AM UTC daily, after expiration job)
+
+**Retention Period**: 24 hours minimum
 
 **Logic**:
-1. Query ContentMetadata for records where `pending_r2_deletion = true`
-2. For each record:
+1. Query ContentMetadata for records where:
+   - `pending_r2_deletion = true`
+   - `deleted_at < now() - 24 hours` (24-hour retention)
+2. For each eligible record:
    - Delete the actual object from R2 storage
    - Set `pending_r2_deletion = false`
-3. Optionally: Add minimum retention period (e.g., 24 hours) before R2 deletion
+3. Log number of objects deleted for monitoring
+
+**Rationale**: 24-hour retention allows for potential admin recovery of accidentally deleted content before permanent removal.
 
 ---
 
@@ -1190,23 +1209,43 @@ TEST: Expiration job closes expired disputes
   WHEN expiration job runs
   THEN dispute status is "closed_expired"
   AND resolved_by is "system"
+  AND closed_at is set
   AND DisputeIndex updated
+  AND cache_dirty is true
 
 TEST: Expiration job ignores non-expired disputes
   GIVEN dispute "disp_123" has expires_at 15 days from now
   WHEN expiration job runs
   THEN dispute status is still "open"
 
-TEST: R2 cleanup job deletes pending content
+TEST: Expiration job handles multiple expired disputes
+  GIVEN 5 disputes have expires_at in the past
+  WHEN expiration job runs
+  THEN all 5 disputes are closed with status "closed_expired"
+
+TEST: R2 cleanup job deletes content after 24-hour retention
   GIVEN content "cid123" has pending_r2_deletion = true
+  AND deleted_at is 25 hours ago
   WHEN R2 cleanup job runs
   THEN R2 object is deleted
   AND pending_r2_deletion is set to false
+
+TEST: R2 cleanup job respects 24-hour retention period
+  GIVEN content "cid123" has pending_r2_deletion = true
+  AND deleted_at is 12 hours ago
+  WHEN R2 cleanup job runs
+  THEN R2 object still exists
+  AND pending_r2_deletion is still true
 
 TEST: R2 cleanup job ignores non-pending content
   GIVEN content "cid456" has pending_r2_deletion = false
   WHEN R2 cleanup job runs
   THEN R2 object still exists
+
+TEST: R2 cleanup job handles multiple eligible deletions
+  GIVEN 10 contents have pending_r2_deletion = true and deleted_at > 24 hours ago
+  WHEN R2 cleanup job runs
+  THEN all 10 R2 objects are deleted
 ```
 
 ### Frontend Tests
@@ -1567,20 +1606,6 @@ TEST: Admin action log is append-only
 ## Open Questions
 
 All questions have been resolved. See "Resolved Design Decisions" table above.
-
----
-
-## Follow-up Questions
-
-1. **R2 cleanup job retention period**: Should there be a minimum time between soft delete and actual R2 deletion? (e.g., 24 hours for potential admin recovery, or immediate eligibility for next job run)
-
-2. **Admin action log retention**: Should admin action logs be kept indefinitely, or is there a retention period?
-
-3. **Dispute expiration job frequency**: Should the expiration job run daily (simpler, disputes may stay open up to ~24 hours past expiration) or hourly (more precise, higher cost)?
-
-4. **Contact info for admin**: You mentioned contact info visible to logged-in users. Should admin see full contact info even when others see it? (Seems yes, but confirming admin has same view as regular authenticated users)
-
-5. **Cache TTL for disputes list**: What should the cache duration be? Suggested: 5 minutes at edge, with `Last-Modified` / `If-Modified-Since` for conditional requests.
 
 ---
 
