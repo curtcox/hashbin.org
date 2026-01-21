@@ -25,6 +25,7 @@ workers_dev = true
 # STRIPE_SECRET_KEY (required for payments)
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
 # API_KEY_ENCRYPTION_KEY (required for API key reveal - 256-bit AES key in base64)
+# ADMIN_SECRET_TOKEN (required for admin endpoints - 64-character hex string)
 
 # Durable Objects bindings
 [[durable_objects.bindings]]
@@ -57,6 +58,21 @@ name = "KEY_REGISTRY"
 class_name = "KeyRegistry"
 script_name = "hashbin-worker-prod"
 
+[[durable_objects.bindings]]
+name = "PLATFORM_STATS"
+class_name = "PlatformStats"
+script_name = "hashbin-worker-prod"
+
+[[durable_objects.bindings]]
+name = "ALERT_STORE"
+class_name = "AlertStore"
+script_name = "hashbin-worker-prod"
+
+[[durable_objects.bindings]]
+name = "AUDIT_LOG"
+class_name = "AuditLog"
+script_name = "hashbin-worker-prod"
+
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -74,3 +90,7 @@ new_sqlite_classes = ["ContentMetadata", "UserProfile", "PaymentRecord", "Contes
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["KeyRegistry"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["PlatformStats", "AlertStore", "AuditLog"]

@@ -10,6 +10,9 @@ export { PaymentRecord } from './durable-objects/payment-record.js';
 export { ContestRecord } from './durable-objects/contest-record.js';
 export { MessageThread } from './durable-objects/message-thread.js';
 export { KeyRegistry } from './durable-objects/key-registry.js';
+export { PlatformStats } from './durable-objects/platform-stats.js';
+export { AlertStore } from './durable-objects/alert-store.js';
+export { AuditLog } from './durable-objects/audit-log.js';
 
 // Import API route handlers
 import {
@@ -49,6 +52,18 @@ import {
 } from './api/rate-limit.js';
 
 import { handleGetUserUploads } from './api/user.js';
+
+import {
+  handleGetStats,
+  handleGetFinancialStats,
+  handleGetContentStats,
+  handleGetUserStats,
+  handleGetAdminHealth,
+  handleGetAlerts,
+  handleAcknowledgeAlert,
+  handleGetAuditLog,
+  handleExportData
+} from './api/admin.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
@@ -325,6 +340,44 @@ function handleApiRoutes(url, request, env) {
   // User API routes
   if (url.pathname === '/api/user/uploads' && request.method === 'GET') {
     return handleGetUserUploads(request, env);
+  }
+
+  // Admin API routes (no rate limiting or auth - admin token checked in handlers)
+  if (url.pathname === '/api/admin/stats' && request.method === 'GET') {
+    return handleGetStats(request, env);
+  }
+
+  if (url.pathname === '/api/admin/stats/financial' && request.method === 'GET') {
+    return handleGetFinancialStats(request, env);
+  }
+
+  if (url.pathname === '/api/admin/stats/content' && request.method === 'GET') {
+    return handleGetContentStats(request, env);
+  }
+
+  if (url.pathname === '/api/admin/stats/users' && request.method === 'GET') {
+    return handleGetUserStats(request, env);
+  }
+
+  if (url.pathname === '/api/admin/health' && request.method === 'GET') {
+    return handleGetAdminHealth(request, env);
+  }
+
+  if (url.pathname === '/api/admin/alerts' && request.method === 'GET') {
+    return handleGetAlerts(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/admin\/alerts\/[^\/]+\/acknowledge$/) && request.method === 'POST') {
+    const alertId = url.pathname.split('/')[4];
+    return handleAcknowledgeAlert(request, env, alertId);
+  }
+
+  if (url.pathname === '/api/admin/audit-log' && request.method === 'GET') {
+    return handleGetAuditLog(request, env);
+  }
+
+  if (url.pathname === '/api/admin/export' && request.method === 'GET') {
+    return handleExportData(request, env);
   }
 
   // TODO: Add API routes for:
