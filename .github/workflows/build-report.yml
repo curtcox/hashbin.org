@@ -6,15 +6,14 @@ on:
       - main
   workflow_dispatch:
 
-# Permissions required for GitHub Pages deployment
+# Permissions for GitHub Pages deployment
 permissions:
   contents: read
   pages: write
   id-token: write
 
 jobs:
-  linting:
-    name: Linting
+  build-report:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -29,141 +28,43 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run linting checks
-        id: lint
+      - name: Run coverage collection
+        run: bash scripts/coverage/collect-coverage.sh
         continue-on-error: true
-        run: |
-          # Since no specific linter is configured, we'll do basic checks
-          echo "Checking JavaScript syntax..."
-          find src -name "*.js" -type f | while read file; do
-            node -c "$file" || exit 1
-          done
-          echo "✅ Linting passed"
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
 
-      - name: Save result
-        if: always()
-        run: |
-          mkdir -p /tmp/results
-          if [ "${{ steps.lint.outcome }}" == "success" ]; then
-            echo "PASS" > /tmp/results/linting.txt
-            echo "All linting checks passed successfully." > /tmp/results/linting-details.txt
-          else
-            echo "FAIL" > /tmp/results/linting.txt
-            echo "Linting checks failed. See logs for details." > /tmp/results/linting-details.txt
-          fi
-
-      - name: Upload result
-        if: always()
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: linting-result
-          path: /tmp/results/
-
-  unit-tests:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run unit tests
-        id: unit-test
+      - name: Generate coverage report
+        run: bash scripts/coverage/generate-coverage-report.sh
         continue-on-error: true
-        run: |
-          # Run grep pattern tests as unit tests
-          bash scripts/test-grep-patterns.sh
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
 
-      - name: Save result
-        if: always()
-        run: |
-          mkdir -p /tmp/results
-          if [ "${{ steps.unit-test.outcome }}" == "success" ]; then
-            echo "PASS" > /tmp/results/unit-tests.txt
-            echo "All unit tests passed successfully." > /tmp/results/unit-tests-details.txt
-          else
-            echo "FAIL" > /tmp/results/unit-tests.txt
-            echo "Unit tests failed. See logs for details." > /tmp/results/unit-tests-details.txt
-          fi
-
-      - name: Upload result
-        if: always()
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: unit-tests-result
-          path: /tmp/results/
-
-  integration-tests:
-    name: Integration Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run integration tests
-        id: integration-test
+      - name: Run security scan
+        run: bash scripts/security/run-security-scan.sh
         continue-on-error: true
-        run: |
-          # Run git SHA injection test as integration test
-          bash scripts/test-git-sha-injection.sh
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
 
-      - name: Save result
-        if: always()
-        run: |
-          mkdir -p /tmp/results
-          if [ "${{ steps.integration-test.outcome }}" == "success" ]; then
-            echo "PASS" > /tmp/results/integration-tests.txt
-            echo "All integration tests passed successfully." > /tmp/results/integration-tests-details.txt
-          else
-            echo "FAIL" > /tmp/results/integration-tests.txt
-            echo "Integration tests failed. See logs for details." > /tmp/results/integration-tests-details.txt
-          fi
+      - name: Generate security report
+        run: bash scripts/security/generate-security-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
 
-      - name: Upload result
-        if: always()
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: integration-tests-result
-          path: /tmp/results/
-
-  api-tests:
-    name: API Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Start local server
+      - name: Start local server for performance tests
         run: |
           npm run dev:local &
           echo $! > /tmp/server.pid
+          sleep 5
 
       - name: Wait for server ready
         run: |
@@ -178,10 +79,13 @@ jobs:
           echo "Server failed to start"
           exit 1
 
-      - name: Run API tests
-        id: api-test
+      - name: Collect performance metrics
+        run: bash scripts/performance/collect-performance-metrics.sh
         continue-on-error: true
-        run: bash scripts/run-all-api-tests.sh
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
 
       - name: Stop server
         if: always()
@@ -190,108 +94,30 @@ jobs:
             kill $(cat /tmp/server.pid) 2>/dev/null || true
           fi
 
-      - name: Save result
-        if: always()
-        run: |
-          mkdir -p /tmp/results
-          if [ "${{ steps.api-test.outcome }}" == "success" ]; then
-            echo "PASS" > /tmp/results/api-tests.txt
-            echo "All API tests passed successfully." > /tmp/results/api-tests-details.txt
-          else
-            echo "FAIL" > /tmp/results/api-tests.txt
-            echo "API tests failed. See logs for details." > /tmp/results/api-tests-details.txt
-          fi
-
-      - name: Upload result
-        if: always()
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: api-tests-result
-          path: /tmp/results/
-
-  e2e-tests:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Run E2E tests
-        id: e2e-test
+      - name: Generate performance report
+        run: bash scripts/performance/generate-performance-report.sh
         continue-on-error: true
-        run: |
-          # Run auth gate and balance tests as E2E tests
-          bash scripts/test-auth-gate.sh
-          bash scripts/test-user-balance.sh
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
 
-      - name: Save result
-        if: always()
-        run: |
-          mkdir -p /tmp/results
-          if [ "${{ steps.e2e-test.outcome }}" == "success" ]; then
-            echo "PASS" > /tmp/results/e2e-tests.txt
-            echo "All E2E tests passed successfully." > /tmp/results/e2e-tests-details.txt
-          else
-            echo "FAIL" > /tmp/results/e2e-tests.txt
-            echo "E2E tests failed. See logs for details." > /tmp/results/e2e-tests-details.txt
-          fi
+      - name: Generate main report
+        run: bash scripts/reports/generate-main-report.sh
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
 
-      - name: Upload result
-        if: always()
-        uses: actions/upload-artifact@v4.6.0
-        with:
-          name: e2e-tests-result
-          path: /tmp/results/
-
-  generate-report:
-    name: Generate Build Report
-    runs-on: ubuntu-latest
-    needs: [linting, unit-tests, integration-tests, api-tests, e2e-tests]
-    if: always()
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download all results
-        uses: actions/download-artifact@v4.1.3
-        with:
-          path: /tmp/results
-
-      - name: Generate HTML report
-        run: |
-          bash scripts/generate-build-report.sh \
-            /tmp/results \
-            ./report \
-            "${{ github.sha }}" \
-            "${{ github.run_id }}" \
-            "${{ github.repository }}"
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./report
-
-  deploy-pages:
-    name: Deploy to GitHub Pages
-    runs-on: ubuntu-latest
-    needs: generate-report
-    if: always()
-    permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build-reports
+          publish_branch: gh-pages
+          force_orphan: true
+
+      - name: Output report URL
+        run: |
+          echo "📊 Build report published to: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/"

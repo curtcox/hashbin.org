@@ -579,6 +579,166 @@ echo "✅ PASSED"
 echo ""
 ```
 
+## Build Report Scripts
+
+The build report system generates comprehensive HTML reports with code coverage, security scans, and performance metrics.
+
+### Directory Structure
+
+```
+scripts/
+├── coverage/
+│   ├── collect-coverage.sh          # Collect code coverage using c8
+│   └── generate-coverage-report.sh  # Generate coverage HTML report
+├── security/
+│   ├── run-security-scan.sh         # Run npm audit and ESLint security scan
+│   └── generate-security-report.sh  # Generate security HTML report
+├── performance/
+│   ├── collect-performance-metrics.sh       # Collect API test performance metrics
+│   └── generate-performance-report.sh       # Generate performance HTML report
+└── reports/
+    ├── generate-main-report.sh      # Generate main TOC page
+    └── templates/                   # HTML templates for all reports
+```
+
+### Usage
+
+#### Run All Build Reports (via GitHub Actions)
+
+The build report system runs automatically on pushes to the `main` branch via the `.github/workflows/build-report.yml` workflow. Reports are published to GitHub Pages.
+
+View reports at: `https://<username>.github.io/<repo-name>/`
+
+#### Run Individual Components Locally
+
+**Coverage Collection:**
+```bash
+bash scripts/coverage/collect-coverage.sh
+bash scripts/coverage/generate-coverage-report.sh
+```
+
+**Security Scanning:**
+```bash
+bash scripts/security/run-security-scan.sh
+bash scripts/security/generate-security-report.sh
+```
+
+**Performance Metrics:**
+```bash
+# Start local server first, then run tests
+npm run dev:local &
+bash scripts/performance/collect-performance-metrics.sh
+bash scripts/performance/generate-performance-report.sh
+```
+
+**Main Report:**
+```bash
+bash scripts/reports/generate-main-report.sh
+```
+
+### Environment Variables
+
+All scripts use the following environment variables (automatically set by GitHub Actions):
+
+- `GITHUB_REPOSITORY` - Repository name (e.g., "owner/repo")
+- `GITHUB_SHA` - Commit SHA for source code links
+- `GITHUB_SERVER_URL` - GitHub server URL (default: https://github.com)
+- `GITHUB_RUN_ID` - Workflow run ID for build links
+
+For local testing, set these manually:
+```bash
+export GITHUB_REPOSITORY="curtcox/hashbin.org"
+export GITHUB_SHA=$(git rev-parse HEAD)
+export GITHUB_SERVER_URL="https://github.com"
+export GITHUB_RUN_ID="test-run"
+```
+
+### Output
+
+All reports are generated in the `build-reports/` directory:
+
+```
+build-reports/
+├── index.html              # Main TOC page
+├── metadata.json           # Build metadata
+├── coverage/
+│   ├── index.html          # Coverage report
+│   ├── data.json           # Coverage data (c8 format)
+│   └── raw/                # c8 HTML report
+├── security/
+│   ├── index.html          # Security report
+│   ├── data.json           # Combined security data
+│   ├── npm-audit.json      # npm audit output
+│   └── eslint-security.json # ESLint security scan output
+└── performance/
+    ├── index.html          # Performance report
+    └── data.json           # Performance metrics
+```
+
+### Features
+
+1. **Code Coverage**
+   - Collects coverage using c8
+   - Shows line, branch, function, and statement coverage
+   - Links to source files on GitHub
+   - Threshold warnings at 80% lines, 70% branches
+
+2. **Security Scanning**
+   - npm audit for dependency vulnerabilities
+   - ESLint security plugins for code issues
+   - Severity-based highlighting
+   - Links to vulnerable lines on GitHub
+
+3. **Performance Metrics**
+   - Times all API test suites
+   - Shows min/max/average response times
+   - Threshold warnings at >1000ms average
+   - Color-coded performance indicators
+
+4. **Main Report**
+   - Overview of all metrics
+   - Links to detailed reports
+   - Downloadable JSON data
+   - Metadata about the build
+
+### Non-Blocking Design
+
+All findings are warnings only and do not block the build. This is enforced by:
+- `continue-on-error: true` on all workflow steps
+- No exit code checks for failures
+- Visual warnings in reports
+
+### Customization
+
+To customize thresholds, edit the generator scripts:
+- Coverage thresholds: `scripts/coverage/generate-coverage-report.sh`
+- Performance thresholds: `scripts/performance/generate-performance-report.sh`
+
+To customize HTML styling, edit the templates:
+- `scripts/reports/templates/main-template.html`
+- `scripts/reports/templates/coverage-template.html`
+- `scripts/reports/templates/security-template.html`
+- `scripts/reports/templates/performance-template.html`
+
+### Troubleshooting
+
+**ESLint errors:**
+- Ensure `.eslintrc.cjs` is present (not `.eslintrc.js`)
+- The project uses ES modules, so ESLint config must be CommonJS
+
+**Coverage collection fails:**
+- Ensure all tests pass before collecting coverage
+- Check that c8 is installed: `npm list c8`
+
+**Performance metrics incomplete:**
+- Ensure local server is running on port 8787
+- Check that all API test scripts are executable
+
+**Report generation fails:**
+- Ensure `jq` is installed for JSON processing
+- Check that all input JSON files exist
+- Verify environment variables are set
+
 ## Future Enhancements
 
 Planned improvements for verification scripts:

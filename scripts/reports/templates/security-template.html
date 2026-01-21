@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Scan Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f6f8fa; }
+    .container { max-width: 1200px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .header { margin-bottom: 30px; }
+    .back-link { color: #0969da; text-decoration: none; font-weight: 500; }
+    .back-link:hover { text-decoration: underline; }
+    h1 { color: #24292f; margin: 20px 0 10px 0; }
+    .commit-info { color: #57606a; font-size: 14px; }
+    .commit-info a { color: #0969da; text-decoration: none; }
+    .commit-info a:hover { text-decoration: underline; }
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin: 30px 0; }
+    .metric-card { background: #f6f8fa; border: 1px solid #d0d7de; border-radius: 6px; padding: 20px; }
+    .metric-card h3 { margin-top: 0; font-size: 14px; color: #57606a; font-weight: 600; }
+    .metric-value { font-size: 36px; font-weight: bold; color: #24292f; }
+    .metric-details { color: #57606a; font-size: 14px; margin-top: 8px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 20px; margin-bottom: 30px; }
+    th, td { text-align: left; padding: 12px; border-bottom: 1px solid #d0d7de; }
+    th { background: #f6f8fa; font-weight: 600; color: #24292f; position: sticky; top: 0; }
+    tr:hover { background: #f6f8fa; }
+    a { color: #0969da; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .severity-critical { background: #da3633; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .severity-high { background: #d1242f; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .severity-moderate { background: #bf8700; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .severity-low { background: #1f883d; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .severity-error { background: #d1242f; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .severity-warning { background: #bf8700; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 600; }
+    .download-section { margin: 30px 0; padding: 20px; background: #f6f8fa; border-radius: 6px; }
+    .download-link { display: inline-block; margin-right: 10px; padding: 8px 16px; background: #0969da; color: white !important; border-radius: 6px; text-decoration: none !important; }
+    .download-link:hover { background: #0550ae; }
+    .note { padding: 15px; background: #fff8c5; border-left: 4px solid #bf8700; border-radius: 4px; margin: 20px 0; }
+    h2 { color: #24292f; border-bottom: 1px solid #d0d7de; padding-bottom: 10px; margin-top: 40px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="../index.html" class="back-link">← Back to Build Report</a>
+      <h1>🔒 Security Scan Report</h1>
+      <p class="commit-info">
+        Commit: <a href="{{REPO_URL}}/commit/{{COMMIT_SHA}}" target="_blank">{{COMMIT_SHA}}</a>
+      </p>
+    </div>
+
+    <div class="summary">
+      <div class="metric-card">
+        <h3>npm Vulnerabilities</h3>
+        <div class="metric-value">{{NPM_TOTAL}}</div>
+        <div class="metric-details">{{NPM_VULNERABILITIES}}</div>
+      </div>
+      <div class="metric-card">
+        <h3>ESLint Errors</h3>
+        <div class="metric-value">{{ESLINT_ERRORS}}</div>
+        <div class="metric-details">Security-related errors</div>
+      </div>
+      <div class="metric-card">
+        <h3>ESLint Warnings</h3>
+        <div class="metric-value">{{ESLINT_WARNINGS}}</div>
+        <div class="metric-details">Security-related warnings</div>
+      </div>
+    </div>
+
+    <div class="note">
+      <strong>⚠️ Note:</strong> All security findings are for informational purposes only and do not block builds.
+      Please review and address high-severity vulnerabilities as soon as possible.
+    </div>
+
+    <div class="download-section">
+      <h3>Download Security Data</h3>
+      <a href="npm-audit.json" class="download-link" download>📄 Download npm audit JSON</a>
+      <a href="eslint-security.json" class="download-link" download>📄 Download ESLint JSON</a>
+      <a href="data.json" class="download-link" download>📄 Download Combined JSON</a>
+    </div>
+
+    <h2>npm Audit Vulnerabilities</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Package</th>
+          <th>Severity</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{NPM_TABLE}}
+      </tbody>
+    </table>
+
+    <h2>ESLint Security Issues</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>File:Line</th>
+          <th>Severity</th>
+          <th>Rule</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ESLINT_TABLE}}
+      </tbody>
+    </table>
+  </div>
+</body>
+</html>
