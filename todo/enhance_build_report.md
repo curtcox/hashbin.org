@@ -30,11 +30,13 @@ Enhance the build report to provide comprehensive insights into code quality, se
 **Objective**: Track and visualize code coverage across all JavaScript source files.
 
 **Implementation**:
-- Add Istanbul/NYC for coverage collection
+- Add **c8** for coverage collection (native V8 coverage, faster than Istanbul/NYC)
+- Skip Cloudflare Worker-specific coverage (not attempted)
 - Generate coverage reports in multiple formats (HTML, JSON, LCOV)
 - Display coverage metrics: line, branch, function, statement coverage
-- Set coverage thresholds (e.g., 80% line coverage minimum)
+- Set coverage thresholds: 80% line coverage, 70% branch coverage (warning only, non-blocking)
 - Show file-by-file coverage breakdown with links to source
+- Publish coverage data as JSON to GitHub Pages for programmatic access
 
 **Metrics to Track**:
 - Overall coverage percentage (line, branch, function, statement)
@@ -52,10 +54,11 @@ Enhance the build report to provide comprehensive insights into code quality, se
 **Objective**: Identify complex code that may need refactoring.
 
 **Implementation**:
-- Use complexity analysis tools (e.g., complexity-report, jscomplexity)
+- Use **eslint-plugin-complexity** (built into ESLint) for cyclomatic complexity
 - Calculate cyclomatic complexity per function
-- Calculate Halstead complexity metrics
-- Identify functions exceeding thresholds
+- Calculate Halstead complexity metrics using additional tools if needed
+- Flag functions exceeding thresholds: cyclomatic complexity >10, cognitive complexity >15
+- Provide recommendations (non-blocking) for refactoring
 
 **Metrics to Track**:
 - Cyclomatic complexity per function (threshold: 10)
@@ -74,8 +77,10 @@ Enhance the build report to provide comprehensive insights into code quality, se
 **Implementation**:
 - **Dependency Scanning**: Run `npm audit` and generate JSON report
 - **SAST**: Use ESLint security plugins (eslint-plugin-security, eslint-plugin-no-unsanitized)
-- **Secret Detection**: Scan for hardcoded secrets/API keys (e.g., detect-secrets, truffleHog patterns)
+- **Secret Detection**: Scan for hardcoded secrets/API keys using custom patterns or ESLint rules
 - **Best Practices**: Check for common vulnerabilities (XSS, injection, insecure randomness)
+- **Warning Only**: Security findings warn but do not block builds (no remediation timeline enforced)
+- Publish security data as JSON to GitHub Pages
 
 **Metrics to Track**:
 - Dependency vulnerabilities by severity (critical, high, medium, low)
@@ -112,11 +117,13 @@ Enhance the build report to provide comprehensive insights into code quality, se
 **Objective**: Visualize code structure and identify architectural issues.
 
 **Implementation**:
+- Use **Madge** for dependency graph generation and circular dependency detection
 - Generate dependency graphs (file-to-file imports)
 - Identify circular dependencies
 - Calculate coupling metrics (afferent/efferent coupling)
 - Detect dead/unused code
 - Analyze module cohesion
+- Create interactive visualization using D3.js or similar (desktop-only, mobile not required)
 
 **Metrics to Track**:
 - Number of circular dependencies
@@ -134,11 +141,13 @@ Enhance the build report to provide comprehensive insights into code quality, se
 **Objective**: Track API performance and identify bottlenecks.
 
 **Implementation**:
-- Add response time tracking to API tests
+- Modify existing API tests to include response time tracking
+- Establish performance baselines first (measure current response times before setting thresholds)
 - Calculate percentiles (p50, p95, p99) for each endpoint
 - Track memory usage during test execution
 - Measure startup time for Worker
-- Identify slow endpoints (> 500ms)
+- Flag slow endpoints based on established baselines
+- Publish performance data as JSON to GitHub Pages
 
 **Metrics to Track**:
 - Response time percentiles per endpoint
@@ -193,15 +202,37 @@ Enhance the build report to provide comprehensive insights into code quality, se
 - Failing tests link to both test code and code under test
 - Example: "auth.test.js:45 - POST /api/auth" links to test file
 
-### 9. Build Metadata & History
+### 9. Visual Regression Testing
+**Objective**: Detect unintended visual changes to UI pages.
+
+**Implementation**:
+- Capture screenshots of HTML pages during build
+- Store baseline images for comparison
+- Detect visual differences between builds
+- Generate visual diff reports highlighting changes
+- Link to affected pages with side-by-side comparison
+
+**Metrics to Track**:
+- Number of pages with visual changes
+- Percentage of page area changed
+- Pages requiring baseline updates
+- Visual regression trend over time
+
+**Artifacts with Source Links**:
+- Visual diff report: Changed pages link to HTML file in repo
+- Screenshot comparison: Link to page source and CSS files
+- Example: Change detected in `upload.html` links to file and related CSS
+
+### 10. Build Metadata & History
 **Objective**: Provide context and historical trends.
 
 **Implementation**:
-- Store historical build data (JSON format)
+- Store historical build data as GitHub Actions artifacts (use GitHub default retention policy)
 - Generate trend charts (coverage over time, test count, etc.)
 - Compare current build to previous builds
 - Show commit changes that triggered build
 - Link to PR if build is from PR
+- Publish historical data as JSON to GitHub Pages for trend analysis
 
 **Metrics to Track**:
 - Build duration trend
@@ -217,57 +248,74 @@ Enhance the build report to provide comprehensive insights into code quality, se
 
 ## Implementation Plan
 
-### Phase 1: Foundation (Coverage & Enhanced Linting)
-1. Add NYC/Istanbul for coverage collection
+**Strategy**: Implement phases sequentially. Phase 1 (Coverage + Security) is the MVP.
+
+### Phase 1: MVP - Coverage & Security
+1. Add c8 for coverage collection
 2. Configure ESLint with security and quality plugins
-3. Update build-report.yml to run coverage collection
-4. Generate coverage HTML reports with source links
-5. Update report generator to include coverage section
-6. Add lint report with categorized issues
+3. Integrate npm audit for dependency scanning
+4. Update build-report.yml to run on main branch only
+5. Generate coverage HTML reports with source links
+6. Generate security findings report with source links
+7. Create main report page as table of contents
+8. Create separate report pages for coverage and security
+9. Publish JSON data files (coverage.json, security.json) to GitHub Pages
+10. Establish performance baselines (measure but don't report yet)
 
 **Deliverables**:
-- Coverage reports with file links
-- Enhanced lint reports with source links
-- Updated build report HTML with new sections
+- Coverage reports with file links (HTML + JSON)
+- Security vulnerability reports with source links (HTML + JSON)
+- Main report page (TOC) linking to separate job-specific reports
+- Performance baseline data for future use
 
-### Phase 2: Security & Complexity
-1. Integrate npm audit into workflow
-2. Add complexity analysis tool
-3. Configure secret detection scanning
-4. Generate security findings report
-5. Create complexity threshold warnings
-6. Add security section to build report
+### Phase 2: Code Quality & Complexity
+1. Add complexity analysis (eslint-plugin-complexity)
+2. Enhance linting with additional rules and plugins
+3. Add dead code detection
+4. Create complexity report page with source links
+5. Generate enhanced lint report page
+6. Update main TOC to link to new report pages
+7. Publish JSON data files (complexity.json, lint.json)
 
 **Deliverables**:
-- Security vulnerability report
-- Complexity analysis report
-- Security section in build report HTML
+- Complexity analysis report (HTML + JSON)
+- Enhanced lint report (HTML + JSON)
+- Updated main report page
 
 ### Phase 3: Structure & Performance
-1. Add dependency graph generation
+1. Add Madge for dependency graph generation
 2. Implement circular dependency detection
-3. Add performance timing to API tests
-4. Generate performance metrics report
-5. Create structural analysis section
-6. Add performance dashboard
+3. Add performance timing to existing API tests (using established baselines)
+4. Generate performance metrics report page
+5. Create structural analysis report page with interactive graph
+6. Update main TOC to link to new report pages
+7. Publish JSON data files (structure.json, performance.json)
 
 **Deliverables**:
-- Dependency visualization
-- Performance metrics dashboard
-- Structural analysis report
+- Dependency visualization with interactive graph (HTML + JSON)
+- Performance metrics report (HTML + JSON)
+- Structural analysis report (HTML + JSON)
+- Updated main report page
 
-### Phase 4: Documentation & History
+### Phase 4: Documentation, History & Visual Regression
 1. Add JSDoc coverage analysis
 2. Generate API documentation
-3. Implement historical data storage
-4. Create trend visualization
+3. Implement historical data storage (GitHub Actions artifacts)
+4. Create trend visualization using historical data
 5. Add comparison to previous builds
-6. Complete all report sections
+6. Implement visual regression testing for UI pages
+7. Create documentation report page
+8. Create historical trends page
+9. Create visual regression report page
+10. Update main TOC to link to all report pages
+11. Publish all JSON data files
 
 **Deliverables**:
-- Documentation coverage report
-- Historical trends dashboard
-- Complete enhanced build report
+- Documentation coverage report (HTML + JSON)
+- Historical trends page with charts (HTML + JSON)
+- Visual regression report (HTML + JSON)
+- Complete enhanced build report with all sections
+- Full JSON data export for all metrics
 
 ## Test Plan
 
@@ -653,124 +701,92 @@ Enhance the build report to provide comprehensive insights into code quality, se
 - **Then**: Each build has unique report (timestamp/SHA in path)
 - **Verification**: No conflicts, both reports accessible
 
-## Open Questions
+## Resolved Decisions
 
-### Technical Implementation
+All initial open questions have been answered. Here are the key decisions:
 
-1. **Coverage Tool Selection**: Should we use NYC/Istanbul or c8 (V8 coverage)?
-   - NYC is more mature but c8 is faster and uses native V8 coverage
-   - Decision needed on tool choice
+### Technical Decisions
+- **Coverage Tool**: c8 (native V8 coverage, faster than Istanbul/NYC)
+- **Worker Coverage**: Not attempted (too complex for current scope)
+- **Historical Storage**: GitHub Actions artifacts with default retention policy
+- **Dependency Graph**: Madge with D3.js for visualization
+- **Performance Baseline**: Establish baselines first, then set thresholds based on measurements
+- **Report Size**: Main page is TOC, separate pages for each analysis type
+- **External Dependencies**: Approved to add npm packages as needed
 
-2. **Cloudflare Worker Coverage**: How do we collect coverage for code running in Cloudflare Workers environment?
-   - Workers have unique runtime, standard Node.js coverage may not work
-   - Need to investigate Worker-compatible coverage collection
+### Process & Policy Decisions
+- **Coverage Thresholds**: 80% line coverage, 70% branch coverage - warning only (non-blocking)
+- **Complexity Thresholds**: Cyclomatic >10, cognitive >15 - recommend refactoring (non-blocking)
+- **Security Findings**: Warning only, no build blocking, no remediation timeline enforced
+- **Test Ownership**: Recommend CI/CD maintainer owns test infrastructure (see below)
 
-3. **Historical Data Storage**: Where should we store historical build data?
-   - Options: Git (gh-pages branch), GitHub Actions artifacts, external storage
-   - Need to decide on retention policy (how many builds to keep)
+### User Experience Decisions
+- **Report Navigation**: Main page is table of contents, links to separate job-specific report pages
+- **Mobile Responsiveness**: Desktop-only, mobile not required
+- **Accessibility**: WCAG compliance testing not included
+- **Notifications**: No automated notifications/alerts
 
-4. **Dependency Graph Generation**: Which tool to use?
-   - Options: Madge, dependency-cruiser, custom script
-   - Need interactive visualization library (D3.js, Cytoscape, etc.)
+### Scope & Integration Decisions
+- **Phase Strategy**: Sequential implementation (safer, easier to manage)
+- **MVP**: Phase 1 = Coverage + Security
+- **Backward Compatibility**: Don't maintain old format, learn from existing publishing mechanism only
+- **CI/CD Performance**: Try full implementation first, split into fast/slow reports if needed
+- **Branch Strategy**: Run on main branch only
+- **API Test Performance**: Modify existing tests to include timing
+- **Visual Regression**: Included in Phase 4
+- **Load Testing**: Not included
+- **Custom Metrics**: Not included
+- **Report API**: Publish JSON data files to GitHub Pages alongside HTML reports
 
-5. **Performance Baseline**: What are acceptable response time thresholds?
-   - Current endpoints have no documented SLAs
-   - Need to establish baselines before flagging as "slow"
+### Test Ownership Recommendation
+**Primary Owner**: The person or team responsible for maintaining CI/CD infrastructure should own the build report system.
 
-6. **Report Size**: Could the enhanced report become too large for GitHub Pages?
-   - May need pagination, lazy loading, or separate report pages
-   - Need to estimate final report size
+**Responsibilities**:
+- Maintain and update analysis tools
+- Update dependencies when needed
+- Add new analysis types as requirements evolve
+- Document procedures for adding new tools
+- Review and respond to build report issues
 
-### Process & Policy
+**Documentation Required**:
+- Setup guide for adding new analysis tools
+- Troubleshooting guide for common issues
+- Architecture documentation explaining report generation flow
+- JSON schema documentation for published data
 
-7. **Coverage Thresholds**: What coverage percentage should we enforce?
-   - Suggest: 80% line coverage, 70% branch coverage
-   - Should this block merges or just warn?
+## Follow-Up Questions
 
-8. **Complexity Thresholds**: What complexity values should trigger warnings?
-   - Suggested: Cyclomatic complexity >10, cognitive complexity >15
-   - Should refactoring be enforced or recommended?
+The following questions remain to finalize implementation details:
 
-9. **Security Findings**: How should we handle security vulnerabilities?
-   - Should critical vulnerabilities block builds?
-   - What's the remediation timeline for different severity levels?
+### 1. Visual Regression Testing Scope
+**Question**: Which HTML pages should we capture for visual regression testing?
+- **Option A**: All 14 HTML frontend files
+- **Option B**: Only key pages (landing, upload, dashboard, api-keys)
+- **Option C**: Specify which specific pages
 
-10. **Test Ownership**: Who maintains the new test infrastructure?
-    - Need designated owner for test framework updates
-    - Documentation for adding new analysis tools
+### 2. Performance Baseline Timing
+**Question**: When should we establish performance baselines?
+- **Option A**: Run baseline measurement as part of Phase 1 (store data, don't report yet)
+- **Option B**: Run baseline measurement before starting Phase 1
+- **Option C**: Run baseline measurement in Phase 3 when performance reporting is implemented
 
-### User Experience
+### 3. JSON Data Structure
+**Question**: What structure should the published JSON files follow?
+- **Option A**: Mirror internal tool output formats (c8 format for coverage, npm audit format for security)
+- **Option B**: Create standardized custom format (easier to consume but requires transformation)
+- **Option C**: Provide both raw tool output and standardized format
 
-11. **Report Navigation**: With many new sections, how should users navigate?
-    - Table of contents? Tabbed interface? Multiple pages?
-    - Need UX design for enhanced report
+### 4. Report File Organization
+**Question**: How should report files be organized in the gh-pages branch?
+- **Option A**: Flat structure: `index.html`, `coverage.html`, `security.html`, `coverage.json`, etc.
+- **Option B**: Subdirectories: `index.html`, `coverage/index.html`, `coverage/data.json`, etc.
+- **Option C**: Separate directories per build: `builds/[sha]/index.html`, `builds/[sha]/coverage.html`, etc.
 
-12. **Mobile Responsiveness**: Should the detailed charts/graphs work on mobile?
-    - Current report is responsive, but complex visualizations may not be
-    - Acceptable to have desktop-only features?
-
-13. **Accessibility**: Should we add WCAG compliance testing?
-    - Not mentioned in original requirements but could be valuable
-    - Would add complexity to report
-
-14. **Notifications**: Should severe issues trigger notifications?
-    - GitHub issue creation? Slack/email alerts?
-    - Or just rely on developers checking report?
-
-### Scope & Timeline
-
-15. **Phase Prioritization**: Should we implement phases sequentially or in parallel?
-    - Sequential is safer but slower
-    - Parallel requires more coordination
-
-16. **MVP Definition**: What's the minimum viable enhancement?
-    - Coverage + Security might be sufficient for first release
-    - Or do we need all features for cohesive experience?
-
-17. **Backward Compatibility**: Should we maintain old report format during transition?
-    - Gradual rollout vs. big switch
-    - Fallback if new report fails?
-
-18. **External Dependencies**: Are we comfortable adding npm packages for analysis?
-    - Increases attack surface and maintenance burden
-    - Some tools may have licenses incompatible with project
-
-### Integration
-
-19. **CI/CD Performance Impact**: How much can we slow down the build?
-    - Current build time unknown
-    - Additional analyses could add 5-15 minutes
-    - Need to set acceptable build duration limit
-
-20. **Branch vs. Main**: Should enhanced reports run on all branches or just main?
-    - Running on all branches increases CI costs
-    - But developers may want feedback before merge
-
-21. **API Test Performance Metrics**: Should we modify existing API tests or add separate performance tests?
-    - Modifying existing may affect stability
-    - Separate tests may duplicate coverage
-
-22. **Artifact Retention**: How long should we keep detailed artifacts (coverage files, JSON reports)?
-    - GitHub has storage limits for artifacts
-    - Need retention policy
-
-### Future Considerations
-
-23. **Visual Regression Testing**: Should we add screenshot comparison for UI?
-    - Not mentioned in requirements but could be valuable
-    - Would require storing baseline images
-
-24. **Load Testing**: Should we add load/stress testing beyond single-user API tests?
-    - Could identify scaling issues
-    - But may require separate infrastructure
-
-25. **Custom Metrics**: Should we allow user-defined custom metrics?
-    - Makes system more flexible
-    - Adds configuration complexity
-
-26. **Report API**: Should build data be available via API (not just HTML)?
-    - Could enable external dashboards, integrations
-    - Additional maintenance burden
+### 5. Build Performance Monitoring
+**Question**: Should we measure and report the build process performance itself?
+- **Option A**: Yes, add timing for each analysis phase and include in build metadata
+- **Option B**: No, rely on GitHub Actions built-in timing
+- **Option C**: Add basic timing but don't emphasize it in reports
 
 ## Success Criteria
 
@@ -789,28 +805,32 @@ The enhanced build report will be considered successful when:
 
 ## Next Steps
 
-1. Review this plan and identify any missing requirements
-2. Answer open questions to resolve ambiguities
-3. Prioritize phases based on business value
-4. Select specific tools for each analysis type
-5. Create detailed technical specifications for Phase 1
-6. Begin implementation
+1. ✅ ~~Answer open questions to resolve ambiguities~~ (COMPLETE)
+2. ✅ ~~Select specific tools for each analysis type~~ (COMPLETE)
+3. **Answer follow-up questions** (5 remaining questions)
+4. **Create detailed technical specifications for Phase 1 (MVP)**
+5. **Begin Phase 1 implementation**:
+   - Add c8 coverage collection
+   - Configure ESLint with security plugins
+   - Integrate npm audit
+   - Generate report pages with source links
+   - Publish JSON data files
+   - Establish performance baselines
 
 ## Appendix A: Tool Candidates
 
 ### Coverage
-- **c8**: Native V8 coverage, fast, Node.js 10.12+
-- **NYC/Istanbul**: Mature, widely used, comprehensive reports
-- **Recommendation**: Start with c8, fallback to NYC if Worker issues
+- **c8**: ✅ **SELECTED** - Native V8 coverage, fast, Node.js 10.12+
+- **NYC/Istanbul**: Alternative option (more mature but slower)
 
 ### Linting
 - **ESLint**: Industry standard, highly configurable
 - **Plugins**: security, no-unsanitized, promise, node, jsdoc
 
 ### Complexity
-- **eslint-plugin-complexity**: Built into ESLint
-- **complexity-report**: Standalone tool with detailed metrics
-- **jscomplexity**: Fast, simple complexity analysis
+- **eslint-plugin-complexity**: ✅ **SELECTED** - Built into ESLint, integrates with existing linting
+- **complexity-report**: Alternative for detailed Halstead metrics
+- **jscomplexity**: Alternative for simple analysis
 
 ### Security
 - **npm audit**: Built-in dependency scanning
@@ -819,66 +839,63 @@ The enhanced build report will be considered successful when:
 - **detect-secrets**: Pattern-based secret detection
 
 ### Structural Analysis
-- **Madge**: Dependency graph generator, circular dependency detection
-- **dependency-cruiser**: Comprehensive dependency validation
-- **D3.js**: For visualizing dependency graphs
+- **Madge**: ✅ **SELECTED** - Dependency graph generator, circular dependency detection
+- **D3.js**: ✅ **SELECTED** - For visualizing dependency graphs (or similar library)
+- **dependency-cruiser**: Alternative option with more validation features
 
 ### Documentation
 - **JSDoc**: Documentation generation and validation
 - **documentation.js**: Alternative JSDoc tool with better output
 
 ### Performance
-- **Custom scripts**: Wrap existing API tests with timing
-- **autocannon**: HTTP load testing (for future)
+- **Custom scripts**: ✅ **SELECTED** - Modify existing API tests to include timing
+- **autocannon**: Not included (load testing out of scope)
+
+### Visual Regression
+- **Puppeteer**: ✅ **CANDIDATE** - Headless browser for screenshots
+- **Playwright**: Alternative option with better multi-browser support
+- **pixelmatch**: For image comparison and diff generation
 
 ## Appendix B: Example Report Structure
 
+### Main Report (index.html) - Table of Contents
 ```
-Build Report
+Build Report - [Commit SHA] - [Timestamp]
 ├── Summary Dashboard
 │   ├── Overall Status (Pass/Fail)
-│   ├── Key Metrics (Coverage %, Security Issues, Complexity)
+│   ├── Key Metrics (Coverage %, Security Issues, Build Duration)
 │   └── Commit Info (SHA, Author, Message, Diff Link)
-├── Test Results
-│   ├── All Tests Summary (Pass/Fail counts)
-│   ├── Execution Times
-│   ├── Flaky Tests
-│   └── Links to Test Files
-├── Code Coverage
-│   ├── Overall Coverage (Line, Branch, Function, Statement)
-│   ├── Coverage by Directory
-│   ├── Files Below Threshold
-│   └── Uncovered Lines (with links)
-├── Security Analysis
-│   ├── Dependency Vulnerabilities (by severity)
-│   ├── SAST Findings (by category)
-│   ├── Secret Detection Results
-│   └── Links to Affected Files
-├── Code Quality
-│   ├── Lint Errors and Warnings
-│   ├── Complexity Metrics
-│   ├── Maintainability Index
-│   └── Functions Needing Refactoring
-├── Structural Analysis
-│   ├── Dependency Graph (interactive)
-│   ├── Circular Dependencies
-│   ├── Dead Code
-│   └── Coupling Metrics
-├── Performance
-│   ├── API Response Times (by endpoint)
-│   ├── Slow Endpoints
-│   ├── Memory Usage
-│   └── Performance Trends
-├── Documentation
-│   ├── Documentation Coverage %
-│   ├── Undocumented Functions
-│   ├── JSDoc Validation Errors
-│   └── Generated API Docs
-└── Historical Trends
-    ├── Coverage Over Time
-    ├── Test Count Trend
-    ├── Build Duration
-    └── Frequently Failing Tests
+└── Reports (Links to separate pages)
+    ├── → Test Results (test-results.html)
+    ├── → Code Coverage (coverage.html) [+ JSON]
+    ├── → Security Analysis (security.html) [+ JSON]
+    ├── → Code Quality & Linting (quality.html) [+ JSON]
+    ├── → Complexity Analysis (complexity.html) [+ JSON]
+    ├── → Structural Analysis (structure.html) [+ JSON]
+    ├── → Performance Metrics (performance.html) [+ JSON]
+    ├── → Documentation Coverage (documentation.html) [+ JSON]
+    ├── → Visual Regression (visual-regression.html) [+ JSON]
+    └── → Historical Trends (trends.html) [+ JSON]
 ```
 
-All section headers and individual items link to relevant source files on GitHub with line numbers where applicable.
+### Individual Report Pages
+Each report page contains:
+- Header with build metadata and link back to main TOC
+- Report-specific metrics and visualizations
+- Links to relevant source files on GitHub with line numbers
+- Download link for corresponding JSON data file
+
+### Published JSON Files
+Available for programmatic access:
+- `coverage.json` - Coverage metrics by file
+- `security.json` - Vulnerability and security findings
+- `quality.json` - Lint errors and warnings
+- `complexity.json` - Complexity metrics by function
+- `structure.json` - Dependency graph and coupling data
+- `performance.json` - API response times and percentiles
+- `documentation.json` - JSDoc coverage data
+- `visual-regression.json` - Visual diff results
+- `trends.json` - Historical data and comparisons
+- `metadata.json` - Build information and overall summary
+
+All HTML section headers and individual items link to relevant source files on GitHub with line numbers where applicable.
