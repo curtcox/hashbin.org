@@ -10,43 +10,79 @@ COMMIT_SHA="${GITHUB_SHA}"
 TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 BUILD_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
-# Check if all component reports exist
+# Report availability
 COVERAGE_EXISTS="unavailable"
 SECURITY_EXISTS="unavailable"
 PERFORMANCE_EXISTS="unavailable"
+QUALITY_EXISTS="unavailable"
+COMPLEXITY_EXISTS="unavailable"
+STRUCTURE_EXISTS="unavailable"
+DOCUMENTATION_EXISTS="unavailable"
+VISUAL_EXISTS="unavailable"
+TRENDS_EXISTS="unavailable"
 
-if [ -f "build-reports/coverage/index.html" ]; then
-  COVERAGE_EXISTS="available"
-fi
+[ -f "build-reports/coverage/index.html" ] && COVERAGE_EXISTS="available"
+[ -f "build-reports/security/index.html" ] && SECURITY_EXISTS="available"
+[ -f "build-reports/performance/index.html" ] && PERFORMANCE_EXISTS="available"
+[ -f "build-reports/quality/index.html" ] && QUALITY_EXISTS="available"
+[ -f "build-reports/complexity/index.html" ] && COMPLEXITY_EXISTS="available"
+[ -f "build-reports/structure/index.html" ] && STRUCTURE_EXISTS="available"
+[ -f "build-reports/documentation/index.html" ] && DOCUMENTATION_EXISTS="available"
+[ -f "build-reports/visual-regression/index.html" ] && VISUAL_EXISTS="available"
+[ -f "build-reports/trends/index.html" ] && TRENDS_EXISTS="available"
 
-if [ -f "build-reports/security/index.html" ]; then
-  SECURITY_EXISTS="available"
-fi
-
-if [ -f "build-reports/performance/index.html" ]; then
-  PERFORMANCE_EXISTS="available"
-fi
-
-# Extract metrics from component data files
+# Metrics
+COVERAGE_LINES="N/A"
 if [ "$COVERAGE_EXISTS" == "available" ] && [ -f "build-reports/coverage/data.json" ]; then
-  COVERAGE_LINES=$(jq -r '[.[] | .s] | add / length * 100' build-reports/coverage/data.json 2>/dev/null | xargs printf "%.2f" 2>/dev/null || echo "0.00")
-else
-  COVERAGE_LINES="N/A"
+  COVERAGE_LINES=$(jq -r '.total.lines.pct // empty' build-reports/coverage/data.json 2>/dev/null || echo "")
+  if [ -z "$COVERAGE_LINES" ] || [ "$COVERAGE_LINES" == "null" ]; then
+    COVERAGE_LINES="N/A"
+  fi
 fi
 
+SECURITY_VULNS="N/A"
 if [ "$SECURITY_EXISTS" == "available" ] && [ -f "build-reports/security/npm-audit.json" ]; then
   SECURITY_VULNS=$(jq -r '.metadata.vulnerabilities | add' build-reports/security/npm-audit.json 2>/dev/null || echo "0")
-else
-  SECURITY_VULNS="N/A"
 fi
 
+PERF_AVG="N/A"
 if [ "$PERFORMANCE_EXISTS" == "available" ] && [ -f "build-reports/performance/data.json" ]; then
   PERF_AVG=$(jq -r '.summary.avg_response_time_ms' build-reports/performance/data.json 2>/dev/null || echo "0")
-else
-  PERF_AVG="N/A"
 fi
 
-# Generate metadata JSON
+LINT_ERRORS="N/A"
+LINT_WARNINGS="N/A"
+if [ "$QUALITY_EXISTS" == "available" ] && [ -f "build-reports/quality/summary.json" ]; then
+  LINT_ERRORS=$(jq -r '.errors // 0' build-reports/quality/summary.json 2>/dev/null || echo "0")
+  LINT_WARNINGS=$(jq -r '.warnings // 0' build-reports/quality/summary.json 2>/dev/null || echo "0")
+fi
+
+COMPLEXITY_COUNT="N/A"
+if [ "$COMPLEXITY_EXISTS" == "available" ] && [ -f "build-reports/complexity/summary.json" ]; then
+  COMPLEXITY_COUNT=$(jq -r '.complexity_issues // 0' build-reports/complexity/summary.json 2>/dev/null || echo "0")
+fi
+
+CIRCULAR_COUNT="N/A"
+if [ "$STRUCTURE_EXISTS" == "available" ] && [ -f "build-reports/structure/summary.json" ]; then
+  CIRCULAR_COUNT=$(jq -r '.circular_dependencies // 0' build-reports/structure/summary.json 2>/dev/null || echo "0")
+fi
+
+DOC_COVERAGE="N/A"
+if [ "$DOCUMENTATION_EXISTS" == "available" ] && [ -f "build-reports/documentation/data.json" ]; then
+  DOC_COVERAGE=$(jq -r '.summary.coverage_pct // 0' build-reports/documentation/data.json 2>/dev/null || echo "0")
+fi
+
+VISUAL_CHANGED="N/A"
+if [ "$VISUAL_EXISTS" == "available" ] && [ -f "build-reports/visual-regression/data.json" ]; then
+  VISUAL_CHANGED=$(jq -r '.summary.changed_pages // 0' build-reports/visual-regression/data.json 2>/dev/null || echo "0")
+fi
+
+TRENDS_COUNT="N/A"
+if [ "$TRENDS_EXISTS" == "available" ] && [ -f "build-reports/trends/data.json" ]; then
+  TRENDS_COUNT=$(jq -r 'length' build-reports/trends/data.json 2>/dev/null || echo "0")
+fi
+
+# Metadata JSON
 cat > build-reports/metadata.json << EOF
 {
   "generated_at": "$TIMESTAMP",
@@ -65,12 +101,36 @@ cat > build-reports/metadata.json << EOF
     "performance": {
       "available": $([ "$PERFORMANCE_EXISTS" == "available" ] && echo "true" || echo "false"),
       "avg_time_ms": "$PERF_AVG"
+    },
+    "quality": {
+      "available": $([ "$QUALITY_EXISTS" == "available" ] && echo "true" || echo "false"),
+      "lint_errors": "$LINT_ERRORS",
+      "lint_warnings": "$LINT_WARNINGS"
+    },
+    "complexity": {
+      "available": $([ "$COMPLEXITY_EXISTS" == "available" ] && echo "true" || echo "false"),
+      "issues": "$COMPLEXITY_COUNT"
+    },
+    "structure": {
+      "available": $([ "$STRUCTURE_EXISTS" == "available" ] && echo "true" || echo "false"),
+      "circular_dependencies": "$CIRCULAR_COUNT"
+    },
+    "documentation": {
+      "available": $([ "$DOCUMENTATION_EXISTS" == "available" ] && echo "true" || echo "false"),
+      "coverage_pct": "$DOC_COVERAGE"
+    },
+    "visual_regression": {
+      "available": $([ "$VISUAL_EXISTS" == "available" ] && echo "true" || echo "false"),
+      "changed_pages": "$VISUAL_CHANGED"
+    },
+    "trends": {
+      "available": $([ "$TRENDS_EXISTS" == "available" ] && echo "true" || echo "false"),
+      "data_points": "$TRENDS_COUNT"
     }
   }
 }
 EOF
 
-# Substitute values into template
 sed -e "s|{{REPO_URL}}|${REPO_URL}|g" \
     -e "s|{{COMMIT_SHA}}|${COMMIT_SHA}|g" \
     -e "s|{{TIMESTAMP}}|${TIMESTAMP}|g" \
@@ -78,12 +138,22 @@ sed -e "s|{{REPO_URL}}|${REPO_URL}|g" \
     -e "s|{{COVERAGE_EXISTS}}|${COVERAGE_EXISTS}|g" \
     -e "s|{{SECURITY_EXISTS}}|${SECURITY_EXISTS}|g" \
     -e "s|{{PERFORMANCE_EXISTS}}|${PERFORMANCE_EXISTS}|g" \
+    -e "s|{{QUALITY_EXISTS}}|${QUALITY_EXISTS}|g" \
+    -e "s|{{COMPLEXITY_EXISTS}}|${COMPLEXITY_EXISTS}|g" \
+    -e "s|{{STRUCTURE_EXISTS}}|${STRUCTURE_EXISTS}|g" \
+    -e "s|{{DOCUMENTATION_EXISTS}}|${DOCUMENTATION_EXISTS}|g" \
+    -e "s|{{VISUAL_EXISTS}}|${VISUAL_EXISTS}|g" \
+    -e "s|{{TRENDS_EXISTS}}|${TRENDS_EXISTS}|g" \
     -e "s|{{COVERAGE_LINES}}|${COVERAGE_LINES}|g" \
     -e "s|{{SECURITY_VULNS}}|${SECURITY_VULNS}|g" \
     -e "s|{{PERF_AVG}}|${PERF_AVG}|g" \
+    -e "s|{{LINT_ERRORS}}|${LINT_ERRORS}|g" \
+    -e "s|{{LINT_WARNINGS}}|${LINT_WARNINGS}|g" \
+    -e "s|{{COMPLEXITY_COUNT}}|${COMPLEXITY_COUNT}|g" \
+    -e "s|{{CIRCULAR_COUNT}}|${CIRCULAR_COUNT}|g" \
+    -e "s|{{DOC_COVERAGE}}|${DOC_COVERAGE}|g" \
+    -e "s|{{VISUAL_CHANGED}}|${VISUAL_CHANGED}|g" \
+    -e "s|{{TRENDS_COUNT}}|${TRENDS_COUNT}|g" \
     "$TEMPLATE" > "$OUTPUT"
 
 echo "Main build report generated: $OUTPUT"
-echo "  Coverage: $COVERAGE_LINES%"
-echo "  Security: $SECURITY_VULNS vulnerabilities"
-echo "  Performance: ${PERF_AVG}ms average"

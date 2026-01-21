@@ -100,6 +100,106 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
 
+      - name: Run lint report
+        run: bash scripts/quality/run-lint-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Generate lint report
+        run: bash scripts/quality/generate-lint-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Run complexity analysis
+        run: bash scripts/complexity/run-complexity-analysis.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Generate complexity report
+        run: bash scripts/complexity/generate-complexity-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Run structural analysis
+        run: bash scripts/structure/run-structural-analysis.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Generate structural report
+        run: bash scripts/structure/generate-structure-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Analyze documentation coverage
+        run: bash scripts/documentation/analyze-documentation.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Generate documentation report
+        run: bash scripts/documentation/generate-documentation-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        continue-on-error: true
+
+      - name: Run visual regression tests
+        run: bash scripts/visual-regression/run-visual-regression.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Generate visual regression report
+        run: bash scripts/visual-regression/generate-visual-regression-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Update trends data
+        run: bash scripts/trends/update-trends.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Generate trends report
+        run: bash scripts/trends/generate-trends-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
       - name: Generate main report
         run: bash scripts/reports/generate-main-report.sh
         env:

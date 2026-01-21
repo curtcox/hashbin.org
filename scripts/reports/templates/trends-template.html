@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Build Trends</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 20px; }
+    .header { margin-bottom: 30px; }
+    .back-link { color: #0969da; text-decoration: none; }
+    .back-link:hover { text-decoration: underline; }
+    canvas { max-width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <a href="../" class="back-link">← Back to Build Report</a>
+    <h1>Historical Trends</h1>
+    <p>Commit: <a href="{{REPO_URL}}/commit/{{COMMIT_SHA}}" target="_blank">{{COMMIT_SHA}}</a></p>
+  </div>
+
+  <h2>Coverage & Performance Trends</h2>
+  <canvas id="trendChart" height="120"></canvas>
+
+  <h2>Quality & Security</h2>
+  <canvas id="qualityChart" height="120"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1"></script>
+  <script>
+    fetch('data.json')
+      .then((response) => response.json())
+      .then((data) => {
+        const labels = data.map((entry) => entry.timestamp);
+        const coverage = data.map((entry) => Number(entry.coverage_lines || 0));
+        const perf = data.map((entry) => entry.perf_avg_ms);
+        const security = data.map((entry) => entry.security_vulnerabilities);
+        const lintErrors = data.map((entry) => entry.lint_errors);
+        const lintWarnings = data.map((entry) => entry.lint_warnings);
+
+        new Chart(document.getElementById('trendChart'), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Line Coverage %', data: coverage, borderColor: '#0969da', tension: 0.2 },
+              { label: 'Avg Perf (ms)', data: perf, borderColor: '#bf8700', tension: 0.2 },
+            ],
+          },
+          options: { responsive: true, scales: { x: { display: false } } },
+        });
+
+        new Chart(document.getElementById('qualityChart'), {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Security Vulnerabilities', data: security, borderColor: '#d1242f', tension: 0.2 },
+              { label: 'Lint Errors', data: lintErrors, borderColor: '#cf222e', tension: 0.2 },
+              { label: 'Lint Warnings', data: lintWarnings, borderColor: '#bf8700', tension: 0.2 },
+            ],
+          },
+          options: { responsive: true, scales: { x: { display: false } } },
+        });
+      });
+  </script>
+</body>
+</html>

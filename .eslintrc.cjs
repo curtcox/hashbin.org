@@ -5,8 +5,11 @@ module.exports = {
   },
   extends: [
     'eslint:recommended',
+    'plugin:promise/recommended',
+    'plugin:node/recommended',
+    'plugin:jsdoc/recommended',
   ],
-  plugins: ['security', 'no-unsanitized'],
+  plugins: ['security', 'no-unsanitized', 'promise', 'node', 'jsdoc'],
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
@@ -24,6 +27,18 @@ module.exports = {
     'security/detect-no-csrf-before-method-override': 'warn',
     'no-unsanitized/method': 'error',
     'no-unsanitized/property': 'error',
+    'jsdoc/require-jsdoc': [
+      'warn',
+      {
+        contexts: [
+          'FunctionDeclaration',
+          'MethodDefinition',
+          'ArrowFunctionExpression',
+          'FunctionExpression',
+        ],
+        publicOnly: true,
+      },
+    ],
     
     // General best practices
     'no-console': 'off', // Console is acceptable in Workers
