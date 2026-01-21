@@ -142,22 +142,22 @@ Enhance the build report to provide comprehensive insights into code quality, se
 
 **Implementation**:
 - Modify existing API tests to include response time tracking
-- Establish performance baselines first (measure current response times before setting thresholds)
+- Measure and report performance data from Phase 1 (MVP)
 - Calculate percentiles (p50, p95, p99) for each endpoint
 - Track memory usage during test execution
 - Measure startup time for Worker
-- Flag slow endpoints based on established baselines
-- Publish performance data as JSON to GitHub Pages
+- Report all performance metrics (no failure thresholds - warning only)
+- Publish performance data as JSON to GitHub Pages (raw tool output format)
 
 **Metrics to Track**:
 - Response time percentiles per endpoint
 - Average response time by API category
 - Memory usage during tests
-- Number of endpoints exceeding thresholds
-- Performance regression detection
+- Performance trends over time
+- Endpoints with increasing response times
 
 **Artifacts with Source Links**:
-- Performance report: Slow endpoints link to handler implementation
+- Performance report: Endpoints link to handler implementation
 - Example: POST /api/content (1.2s avg) links to `src/api/content.js:uploadContent`
 
 ### 7. Documentation Coverage
@@ -206,11 +206,15 @@ Enhance the build report to provide comprehensive insights into code quality, se
 **Objective**: Detect unintended visual changes to UI pages.
 
 **Implementation**:
-- Capture screenshots of HTML pages during build
+- Capture screenshots of all 14 HTML frontend pages during build
 - Store baseline images for comparison
 - Detect visual differences between builds
 - Generate visual diff reports highlighting changes
 - Link to affected pages with side-by-side comparison
+- Use Puppeteer or Playwright for screenshot capture
+
+**Pages to Test** (all 14 frontend HTML files):
+- Landing page, upload, dashboard, api-keys, transactions, admin, login, profile, settings, docs, help, privacy, terms, contact (or actual file list from repository)
 
 **Metrics to Track**:
 - Number of pages with visual changes
@@ -248,25 +252,29 @@ Enhance the build report to provide comprehensive insights into code quality, se
 
 ## Implementation Plan
 
-**Strategy**: Implement phases sequentially. Phase 1 (Coverage + Security) is the MVP.
+**Strategy**: Implement phases sequentially. Phase 1 (Coverage + Security + Performance) is the MVP.
 
-### Phase 1: MVP - Coverage & Security
+### Phase 1: MVP - Coverage, Security & Performance
 1. Add c8 for coverage collection
 2. Configure ESLint with security and quality plugins
 3. Integrate npm audit for dependency scanning
-4. Update build-report.yml to run on main branch only
-5. Generate coverage HTML reports with source links
-6. Generate security findings report with source links
-7. Create main report page as table of contents
-8. Create separate report pages for coverage and security
-9. Publish JSON data files (coverage.json, security.json) to GitHub Pages
-10. Establish performance baselines (measure but don't report yet)
+4. Modify existing API tests to include performance timing
+5. Update build-report.yml to run on main branch only
+6. Set up subdirectory structure for reports (see Appendix B)
+7. Generate coverage HTML reports with source links
+8. Generate security findings report with source links
+9. Generate performance metrics report with source links
+10. Create main report page as table of contents
+11. Create separate report pages for coverage, security, and performance
+12. Publish JSON data files in internal tool formats (coverage.json, security.json, performance.json)
+13. All findings are warnings only (non-blocking)
 
 **Deliverables**:
-- Coverage reports with file links (HTML + JSON)
-- Security vulnerability reports with source links (HTML + JSON)
+- Coverage reports with file links (HTML + JSON in internal tool format)
+- Security vulnerability reports with source links (HTML + JSON in internal tool format)
+- Performance metrics report with endpoint timings (HTML + JSON)
 - Main report page (TOC) linking to separate job-specific reports
-- Performance baseline data for future use
+- Subdirectory structure for organized report files
 
 ### Phase 2: Code Quality & Complexity
 1. Add complexity analysis (eslint-plugin-complexity)
@@ -282,18 +290,16 @@ Enhance the build report to provide comprehensive insights into code quality, se
 - Enhanced lint report (HTML + JSON)
 - Updated main report page
 
-### Phase 3: Structure & Performance
+### Phase 3: Structural Analysis
 1. Add Madge for dependency graph generation
 2. Implement circular dependency detection
-3. Add performance timing to existing API tests (using established baselines)
-4. Generate performance metrics report page
-5. Create structural analysis report page with interactive graph
-6. Update main TOC to link to new report pages
-7. Publish JSON data files (structure.json, performance.json)
+3. Create structural analysis report page with interactive graph (D3.js or similar)
+4. Update main TOC to link to structural analysis report
+5. Publish JSON data file (structure.json in internal tool format)
 
 **Deliverables**:
 - Dependency visualization with interactive graph (HTML + JSON)
-- Performance metrics report (HTML + JSON)
+- Circular dependency detection (HTML + JSON)
 - Structural analysis report (HTML + JSON)
 - Updated main report page
 
@@ -303,19 +309,20 @@ Enhance the build report to provide comprehensive insights into code quality, se
 3. Implement historical data storage (GitHub Actions artifacts)
 4. Create trend visualization using historical data
 5. Add comparison to previous builds
-6. Implement visual regression testing for UI pages
-7. Create documentation report page
-8. Create historical trends page
-9. Create visual regression report page
-10. Update main TOC to link to all report pages
-11. Publish all JSON data files
+6. Implement visual regression testing for all 14 HTML frontend pages
+7. Set up Puppeteer/Playwright for screenshot capture
+8. Create documentation report page
+9. Create historical trends page
+10. Create visual regression report page with side-by-side comparisons
+11. Update main TOC to link to all report pages
+12. Publish all JSON data files (internal tool formats)
 
 **Deliverables**:
 - Documentation coverage report (HTML + JSON)
 - Historical trends page with charts (HTML + JSON)
-- Visual regression report (HTML + JSON)
+- Visual regression report for all 14 pages (HTML + JSON with baseline/current screenshots)
 - Complete enhanced build report with all sections
-- Full JSON data export for all metrics
+- Full JSON data export for all metrics in internal tool formats
 
 ## Test Plan
 
@@ -710,9 +717,13 @@ All initial open questions have been answered. Here are the key decisions:
 - **Worker Coverage**: Not attempted (too complex for current scope)
 - **Historical Storage**: GitHub Actions artifacts with default retention policy
 - **Dependency Graph**: Madge with D3.js for visualization
-- **Performance Baseline**: Establish baselines first, then set thresholds based on measurements
+- **Performance Reporting**: Measure and report from Phase 1, no failure thresholds (warnings only)
 - **Report Size**: Main page is TOC, separate pages for each analysis type
 - **External Dependencies**: Approved to add npm packages as needed
+- **JSON Format**: Publish internal tool output formats (c8 format, npm audit format, etc.)
+- **Report Organization**: Subdirectory structure for organized report files
+- **Build Timing**: Use GitHub Actions logs, no custom build performance tracking
+- **Visual Regression Scope**: All 14 HTML frontend pages
 
 ### Process & Policy Decisions
 - **Coverage Thresholds**: 80% line coverage, 70% branch coverage - warning only (non-blocking)
@@ -728,15 +739,15 @@ All initial open questions have been answered. Here are the key decisions:
 
 ### Scope & Integration Decisions
 - **Phase Strategy**: Sequential implementation (safer, easier to manage)
-- **MVP**: Phase 1 = Coverage + Security
+- **MVP**: Phase 1 = Coverage + Security + Performance
 - **Backward Compatibility**: Don't maintain old format, learn from existing publishing mechanism only
 - **CI/CD Performance**: Try full implementation first, split into fast/slow reports if needed
 - **Branch Strategy**: Run on main branch only
-- **API Test Performance**: Modify existing tests to include timing
-- **Visual Regression**: Included in Phase 4
+- **API Test Performance**: Modify existing tests to include timing (Phase 1)
+- **Visual Regression**: Included in Phase 4, all 14 HTML frontend pages
 - **Load Testing**: Not included
 - **Custom Metrics**: Not included
-- **Report API**: Publish JSON data files to GitHub Pages alongside HTML reports
+- **Report API**: Publish JSON data files (internal tool formats) to GitHub Pages alongside HTML reports
 
 ### Test Ownership Recommendation
 **Primary Owner**: The person or team responsible for maintaining CI/CD infrastructure should own the build report system.
@@ -754,39 +765,65 @@ All initial open questions have been answered. Here are the key decisions:
 - Architecture documentation explaining report generation flow
 - JSON schema documentation for published data
 
-## Follow-Up Questions
+## Final Implementation Questions
 
-The following questions remain to finalize implementation details:
+The following clarifications are needed before starting implementation:
 
-### 1. Visual Regression Testing Scope
-**Question**: Which HTML pages should we capture for visual regression testing?
-- **Option A**: All 14 HTML frontend files
-- **Option B**: Only key pages (landing, upload, dashboard, api-keys)
-- **Option C**: Specify which specific pages
+### 1. Subdirectory Structure Clarification
+**Question**: How exactly should the subdirectory structure be organized?
 
-### 2. Performance Baseline Timing
-**Question**: When should we establish performance baselines?
-- **Option A**: Run baseline measurement as part of Phase 1 (store data, don't report yet)
-- **Option B**: Run baseline measurement before starting Phase 1
-- **Option C**: Run baseline measurement in Phase 3 when performance reporting is implemented
+**Option A - Report Type Subdirectories**:
+```
+/ (root of gh-pages)
+├── index.html (main TOC)
+├── coverage/
+│   ├── index.html (coverage report)
+│   └── data.json (c8 output)
+├── security/
+│   ├── index.html (security report)
+│   └── data.json (npm audit output)
+├── performance/
+│   ├── index.html (performance report)
+│   └── data.json (timing data)
+└── ... (other report directories)
+```
 
-### 3. JSON Data Structure
-**Question**: What structure should the published JSON files follow?
-- **Option A**: Mirror internal tool output formats (c8 format for coverage, npm audit format for security)
-- **Option B**: Create standardized custom format (easier to consume but requires transformation)
-- **Option C**: Provide both raw tool output and standardized format
+**Option B - Build-Specific Subdirectories**:
+```
+/ (root of gh-pages)
+├── latest/ (symlink or copy to most recent build)
+│   ├── index.html
+│   ├── coverage.html
+│   ├── security.html
+│   ├── coverage.json
+│   └── security.json
+└── builds/
+    ├── abc123/ (commit SHA)
+    │   ├── index.html
+    │   ├── coverage.html
+    │   └── coverage.json
+    └── def456/ (another commit SHA)
+        └── ...
+```
 
-### 4. Report File Organization
-**Question**: How should report files be organized in the gh-pages branch?
-- **Option A**: Flat structure: `index.html`, `coverage.html`, `security.html`, `coverage.json`, etc.
-- **Option B**: Subdirectories: `index.html`, `coverage/index.html`, `coverage/data.json`, etc.
-- **Option C**: Separate directories per build: `builds/[sha]/index.html`, `builds/[sha]/coverage.html`, etc.
+**Option C - Hybrid**:
+```
+/ (root of gh-pages)
+├── latest/
+│   ├── index.html (main TOC)
+│   ├── coverage/
+│   │   ├── index.html
+│   │   └── data.json
+│   ├── security/
+│   │   ├── index.html
+│   │   └── data.json
+│   └── ...
+└── builds/
+    └── [sha]/
+        └── (same structure as latest/)
+```
 
-### 5. Build Performance Monitoring
-**Question**: Should we measure and report the build process performance itself?
-- **Option A**: Yes, add timing for each analysis phase and include in build metadata
-- **Option B**: No, rely on GitHub Actions built-in timing
-- **Option C**: Add basic timing but don't emphasize it in reports
+Which structure do you prefer?
 
 ## Success Criteria
 
@@ -807,15 +844,17 @@ The enhanced build report will be considered successful when:
 
 1. ✅ ~~Answer open questions to resolve ambiguities~~ (COMPLETE)
 2. ✅ ~~Select specific tools for each analysis type~~ (COMPLETE)
-3. **Answer follow-up questions** (5 remaining questions)
-4. **Create detailed technical specifications for Phase 1 (MVP)**
-5. **Begin Phase 1 implementation**:
+3. ✅ ~~Answer follow-up questions~~ (COMPLETE - 5 of 5 answered)
+4. **Answer final implementation question** (1 remaining: subdirectory structure)
+5. **Create detailed technical specifications for Phase 1 (MVP)**
+6. **Begin Phase 1 implementation**:
    - Add c8 coverage collection
    - Configure ESLint with security plugins
    - Integrate npm audit
+   - Modify API tests to include performance timing
+   - Set up subdirectory structure
    - Generate report pages with source links
-   - Publish JSON data files
-   - Establish performance baselines
+   - Publish JSON data files in internal tool formats
 
 ## Appendix A: Tool Candidates
 
@@ -886,16 +925,18 @@ Each report page contains:
 - Download link for corresponding JSON data file
 
 ### Published JSON Files
-Available for programmatic access:
-- `coverage.json` - Coverage metrics by file
-- `security.json` - Vulnerability and security findings
-- `quality.json` - Lint errors and warnings
-- `complexity.json` - Complexity metrics by function
-- `structure.json` - Dependency graph and coupling data
-- `performance.json` - API response times and percentiles
-- `documentation.json` - JSDoc coverage data
-- `visual-regression.json` - Visual diff results
-- `trends.json` - Historical data and comparisons
+Available for programmatic access (internal tool formats):
+- `coverage.json` - c8 coverage output format
+- `security.json` - npm audit JSON output format
+- `quality.json` - ESLint JSON output format
+- `complexity.json` - eslint-plugin-complexity output
+- `structure.json` - Madge JSON output format
+- `performance.json` - Custom timing data structure
+- `documentation.json` - JSDoc analysis output
+- `visual-regression.json` - Visual diff data with image references
+- `trends.json` - Historical data aggregation
 - `metadata.json` - Build information and overall summary
+
+**Format Note**: All JSON files use the internal output format of their respective tools (e.g., c8's native format, npm audit's native format) rather than a custom standardized format. This allows consumers to use existing parsers and tooling.
 
 All HTML section headers and individual items link to relevant source files on GitHub with line numbers where applicable.
