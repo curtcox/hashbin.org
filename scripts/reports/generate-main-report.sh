@@ -11,36 +11,36 @@ TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 BUILD_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
 # Check if all component reports exist
-COVERAGE_EXISTS="false"
-SECURITY_EXISTS="false"
-PERFORMANCE_EXISTS="false"
+COVERAGE_EXISTS="unavailable"
+SECURITY_EXISTS="unavailable"
+PERFORMANCE_EXISTS="unavailable"
 
 if [ -f "build-reports/coverage/index.html" ]; then
-  COVERAGE_EXISTS="true"
+  COVERAGE_EXISTS="available"
 fi
 
 if [ -f "build-reports/security/index.html" ]; then
-  SECURITY_EXISTS="true"
+  SECURITY_EXISTS="available"
 fi
 
 if [ -f "build-reports/performance/index.html" ]; then
-  PERFORMANCE_EXISTS="true"
+  PERFORMANCE_EXISTS="available"
 fi
 
 # Extract metrics from component data files
-if [ "$COVERAGE_EXISTS" == "true" ] && [ -f "build-reports/coverage/data.json" ]; then
+if [ "$COVERAGE_EXISTS" == "available" ] && [ -f "build-reports/coverage/data.json" ]; then
   COVERAGE_LINES=$(jq -r '[.[] | .s] | add / length * 100' build-reports/coverage/data.json 2>/dev/null | xargs printf "%.2f" 2>/dev/null || echo "0.00")
 else
   COVERAGE_LINES="N/A"
 fi
 
-if [ "$SECURITY_EXISTS" == "true" ] && [ -f "build-reports/security/npm-audit.json" ]; then
+if [ "$SECURITY_EXISTS" == "available" ] && [ -f "build-reports/security/npm-audit.json" ]; then
   SECURITY_VULNS=$(jq -r '.metadata.vulnerabilities | add' build-reports/security/npm-audit.json 2>/dev/null || echo "0")
 else
   SECURITY_VULNS="N/A"
 fi
 
-if [ "$PERFORMANCE_EXISTS" == "true" ] && [ -f "build-reports/performance/data.json" ]; then
+if [ "$PERFORMANCE_EXISTS" == "available" ] && [ -f "build-reports/performance/data.json" ]; then
   PERF_AVG=$(jq -r '.summary.avg_response_time_ms' build-reports/performance/data.json 2>/dev/null || echo "0")
 else
   PERF_AVG="N/A"
@@ -51,19 +51,19 @@ cat > build-reports/metadata.json << EOF
 {
   "generated_at": "$TIMESTAMP",
   "commit_sha": "$COMMIT_SHA",
-  "repository": "$GITHUB_REPOSITORY",
+  "repository": "${GITHUB_REPOSITORY}",
   "build_url": "$BUILD_URL",
   "reports": {
     "coverage": {
-      "available": $COVERAGE_EXISTS,
+      "available": $([ "$COVERAGE_EXISTS" == "available" ] && echo "true" || echo "false"),
       "line_coverage": "$COVERAGE_LINES"
     },
     "security": {
-      "available": $SECURITY_EXISTS,
+      "available": $([ "$SECURITY_EXISTS" == "available" ] && echo "true" || echo "false"),
       "vulnerabilities": "$SECURITY_VULNS"
     },
     "performance": {
-      "available": $PERFORMANCE_EXISTS,
+      "available": $([ "$PERFORMANCE_EXISTS" == "available" ] && echo "true" || echo "false"),
       "avg_time_ms": "$PERF_AVG"
     }
   }
