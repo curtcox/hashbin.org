@@ -5,8 +5,9 @@ module.exports = {
   },
   extends: [
     'eslint:recommended',
+    'plugin:node/recommended',
   ],
-  plugins: ['security', 'no-unsanitized'],
+  plugins: ['security', 'no-unsanitized', 'node'],
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
@@ -24,7 +25,6 @@ module.exports = {
     'security/detect-no-csrf-before-method-override': 'warn',
     'no-unsanitized/method': 'error',
     'no-unsanitized/property': 'error',
-    
     // General best practices
     'no-console': 'off', // Console is acceptable in Workers
     'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
