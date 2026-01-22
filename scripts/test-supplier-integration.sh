@@ -47,7 +47,7 @@ fi
 response=$(curl -s -X POST "$BASE_URL/api/suppliers" \
   -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Test Group\",\"supplier_type":"CID_GROUP","base_url":"https://raw.githubusercontent.com/test/repo/main/cids"}')
+  -d '{"name":"Test Group","supplier_type":"CID_GROUP","base_url":"https://raw.githubusercontent.com/test/repo/main/cids"}')
 
 supplier_id2=$(echo "$response" | grep -o '"supplier_id":"[^"]*"' | cut -d'"' -f4)
 if [ -n "$supplier_id2" ]; then

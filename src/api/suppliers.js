@@ -754,6 +754,10 @@ async function performSupplierScan(env, supplierId, supplier) {
         const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);
         const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);
         
+        // Construct URL properly (avoid double slashes)
+        const baseUrl = supplier.base_url.replace(/\/$/, ''); // Remove trailing slash
+        const supplierUrl = `${baseUrl}/${cid}`;
+        
         await contentMetadataStub.fetch(
           new Request('http://internal/suppliers/add', {
             method: 'POST',
@@ -761,7 +765,7 @@ async function performSupplierScan(env, supplierId, supplier) {
             body: JSON.stringify({
               supplier_id: supplierId,
               supplier_name: supplier.name,
-              supplier_url: `${supplier.base_url}/${cid}`
+              supplier_url: supplierUrl
             })
           })
         );

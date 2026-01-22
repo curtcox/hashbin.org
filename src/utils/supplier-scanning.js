@@ -6,7 +6,12 @@
 import { generate256tHash, validate256tCID, getContentSize } from './hash256t.js';
 
 const FETCH_TIMEOUT_MS = 30000; // 30 seconds
-const MAX_SCAN_CIDS = 10000; // Maximum CIDs to scan from a group supplier
+const MAX_SCAN_CIDS = 1000; // Maximum CIDs to scan from a group supplier (reduced for serverless environments)
+
+// GitHub URL pattern for parsing raw URLs
+// Example: https://raw.githubusercontent.com/user/repo/refs/heads/main/cids
+// Captures: owner, repo, branch, path
+const GITHUB_URL_PATTERN = /github\.com\/([^\/]+)\/([^\/]+)\/(?:refs\/heads\/)?([^\/]+)(?:\/(.*))?/;
 
 /**
  * Scan a single CID supplier
@@ -104,10 +109,8 @@ export async function scanSingleCID(baseUrl, cid) {
 export async function scanGitHubRepository(repoUrl, githubToken) {
   try {
     // Parse the GitHub raw URL to get API URL
-    // Example: https://raw.githubusercontent.com/user/repo/refs/heads/main/cids
-    // To API: https://api.github.com/repos/user/repo/contents/cids?ref=main
-    
-    const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/]+)\/(?:refs\/heads\/)?([^\/]+)(?:\/(.*))?/);
+    // Uses GITHUB_URL_PATTERN to extract owner, repo, branch, and path components
+    const match = repoUrl.match(GITHUB_URL_PATTERN);
     if (!match) {
       return {
         success: false,
@@ -120,13 +123,17 @@ export async function scanGitHubRepository(repoUrl, githubToken) {
     const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path || ''}?ref=${branch}`;
     
     // Fetch directory listing from GitHub API
-    const response = await fetch(apiUrl, {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'Authorization': githubToken ? `Bearer ${githubToken}` : undefined,
-        'User-Agent': 'HashBin.org'
-      }
-    });
+    const headers = {
+      'Accept': 'application/vnd.github.v3+json',
+      'User-Agent': 'HashBin.org'
+    };
+    
+    // Only add Authorization header if token is present
+    if (githubToken) {
+      headers['Authorization'] = `Bearer ${githubToken}`;
+    }
+    
+    const response = await fetch(apiUrl, { headers });
     
     if (!response.ok) {
       return {

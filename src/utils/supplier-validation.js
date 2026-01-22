@@ -52,6 +52,16 @@ export function validateSupplierURL(url) {
   const parts = hostname.split('.');
   if (parts.length === 4 && parts[0] === '172') {
     const second = parseInt(parts[1], 10);
+    // Ensure all parts are valid numbers
+    const allValid = parts.every(p => {
+      const num = parseInt(p, 10);
+      return !isNaN(num) && num >= 0 && num <= 255 && p === num.toString();
+    });
+    
+    if (!allValid) {
+      return { valid: false, error: 'Malformed IP address' };
+    }
+    
     if (second >= 16 && second <= 31) {
       return { valid: false, error: 'Private IP addresses are not allowed' };
     }
@@ -126,8 +136,9 @@ export function validateSupplierName(name) {
  * @returns {string} Sanitized name
  */
 export function sanitizeSupplierName(name) {
-  // Basic HTML entity encoding to prevent XSS
+  // HTML entity encoding to prevent XSS
   return name
+    .replace(/\\/g, '&#x5C;')  // Backslash
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')

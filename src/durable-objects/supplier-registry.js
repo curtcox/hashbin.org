@@ -365,3 +365,6 @@ export class SupplierRegistry {
     };
   }
 }
+
+// Configuration constants (export for testing)
+export const ROLLING_WINDOW_SIZE = 100;

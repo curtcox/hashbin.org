@@ -6,14 +6,33 @@
 import { generate256tHash, getContentSize } from './hash256t.js';
 import { getMimeType } from './mime-types.js';
 
+// Configuration constants
+const ROLLING_WINDOW_SIZE = 100; // Rolling window size for statistics
+const SUCCESS_RATE_THRESHOLD = 0.95; // 95% success rate required for redirect
+const WARMUP_REQUEST_COUNT = 100; // Requests before redirect is allowed
+const PERIODIC_PROXY_INTERVAL = 100; // Proxy every Nth request for verification
+
+/**
+ * Fisher-Yates shuffle for uniform random distribution
+ * @param {Array} array - Array to shuffle
+ * @returns {Array} Shuffled array (in-place)
+ */
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+}
+
 /**
  * Decide whether to proxy or redirect based on supplier statistics
  * @param {Object} stats - Supplier statistics
  * @returns {string} 'proxy' or 'redirect'
  */
 export function decideProxyOrRedirect(stats) {
-  // Warmup period: first 100 requests must be proxied
-  if (stats.total_requests < 100) {
+  // Warmup period: first N requests must be proxied
+  if (stats.total_requests < WARMUP_REQUEST_COUNT) {
     return 'proxy';
   }
 
@@ -21,12 +40,12 @@ export function decideProxyOrRedirect(stats) {
   const recentTotal = stats.recent_success_count + stats.recent_failure_count;
   const recentSuccessRate = recentTotal > 0 ? stats.recent_success_count / recentTotal : 0;
   
-  if (recentSuccessRate < 0.95) {
+  if (recentSuccessRate < SUCCESS_RATE_THRESHOLD) {
     return 'proxy';
   }
 
-  // Periodic verification: every 100th request
-  if (stats.requests_since_last_proxy >= 100) {
+  // Periodic verification: every Nth request
+  if (stats.requests_since_last_proxy >= PERIODIC_PROXY_INTERVAL) {
     return 'proxy';
   }
 
@@ -48,10 +67,13 @@ export async function fetchFromAlternate(supplierUrl, cid, request) {
     // Build headers for alternate request
     const fetchHeaders = new Headers();
     
-    // Forward Range header if present
+    // Forward Range header if present (with validation)
     const rangeHeader = request.headers.get('Range');
     if (rangeHeader) {
-      fetchHeaders.set('Range', rangeHeader);
+      // Validate Range header format (basic validation)
+      if (/^bytes=\d+-\d*$/.test(rangeHeader) || /^bytes=\d+-$/.test(rangeHeader)) {
+        fetchHeaders.set('Range', rangeHeader);
+      }
     }
 
     // Fetch from alternate
@@ -156,8 +178,8 @@ export async function tryAlternateSuppliers(env, cid, request, extension = null)
       return null;
     }
 
-    // Randomly shuffle suppliers for load distribution
-    const shuffled = alternateSuppliers.sort(() => Math.random() - 0.5);
+    // Use Fisher-Yates shuffle for uniform random distribution
+    const shuffled = shuffleArray([...alternateSuppliers]);
 
     // Try each supplier
     for (const supplier of shuffled) {
