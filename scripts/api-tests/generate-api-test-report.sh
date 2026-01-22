@@ -44,28 +44,33 @@ fi
 
 # Generate test suite table
 SUITE_TABLE=""
-for suite_idx in $(jq -r '.suites | to_entries | .[] | .key' "$API_JSON" 2>/dev/null); do
-  NAME=$(jq -r ".suites[$suite_idx].name" "$API_JSON")
-  STATUS=$(jq -r ".suites[$suite_idx].status" "$API_JSON")
-  TOTAL=$(jq -r ".suites[$suite_idx].total" "$API_JSON")
-  PASSED=$(jq -r ".suites[$suite_idx].passed" "$API_JSON")
-  FAILED=$(jq -r ".suites[$suite_idx].failed" "$API_JSON")
-  
-  if [ "$STATUS" == "pass" ]; then
-    STATUS_ICON="✅"
-    ROW_CLASS="pass"
-  else
-    STATUS_ICON="❌"
-    ROW_CLASS="fail"
-  fi
-  
-  SUITE_TABLE+="<tr class='${ROW_CLASS}'>"
-  SUITE_TABLE+="<td>${NAME}</td>"
-  SUITE_TABLE+="<td>${STATUS_ICON}</td>"
-  SUITE_TABLE+="<td>${PASSED}/${TOTAL}</td>"
-  SUITE_TABLE+="<td>${FAILED}</td>"
-  SUITE_TABLE+="</tr>"
-done
+# Check if suites array exists and has content
+SUITE_COUNT=$(jq -r '.suites | length' "$API_JSON" 2>/dev/null || echo "0")
+
+if [ "$SUITE_COUNT" -gt 0 ]; then
+  for suite_idx in $(jq -r '.suites | to_entries | .[] | .key' "$API_JSON" 2>/dev/null); do
+    NAME=$(jq -r ".suites[$suite_idx].name" "$API_JSON")
+    STATUS=$(jq -r ".suites[$suite_idx].status" "$API_JSON")
+    TOTAL=$(jq -r ".suites[$suite_idx].total" "$API_JSON")
+    PASSED=$(jq -r ".suites[$suite_idx].passed" "$API_JSON")
+    FAILED=$(jq -r ".suites[$suite_idx].failed" "$API_JSON")
+    
+    if [ "$STATUS" == "pass" ]; then
+      STATUS_ICON="✅"
+      ROW_CLASS="pass"
+    else
+      STATUS_ICON="❌"
+      ROW_CLASS="fail"
+    fi
+    
+    SUITE_TABLE+="<tr class='${ROW_CLASS}'>"
+    SUITE_TABLE+="<td>${NAME}</td>"
+    SUITE_TABLE+="<td>${STATUS_ICON}</td>"
+    SUITE_TABLE+="<td>${PASSED}/${TOTAL}</td>"
+    SUITE_TABLE+="<td>${FAILED}</td>"
+    SUITE_TABLE+="</tr>"
+  done
+fi
 
 # If no suites found, add a message
 if [ -z "$SUITE_TABLE" ]; then

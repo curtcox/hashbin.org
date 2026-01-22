@@ -34,7 +34,30 @@ PASSED_TESTS=0
 FAILED_TESTS=0
 
 # Run each test suite and capture results
-for test_script in scripts/api-tests/test-local-*.sh; do
+shopt -s nullglob  # Handle empty glob matches gracefully
+test_scripts=(scripts/api-tests/test-local-*.sh)
+
+if [ ${#test_scripts[@]} -eq 0 ]; then
+  echo "Warning: No test scripts found matching pattern scripts/api-tests/test-local-*.sh"
+  # Generate final JSON with empty results
+  cat > build-reports/api-tests/data.json << EOF
+{
+  "suites": [],
+  "summary": {
+    "total_suites": 0,
+    "passed_suites": 0,
+    "failed_suites": 0,
+    "total_tests": 0,
+    "passed_tests": 0,
+    "failed_tests": 0
+  }
+}
+EOF
+  echo "API test results collection complete (no tests found)"
+  exit 0
+fi
+
+for test_script in "${test_scripts[@]}"; do
   TEST_NAME=$(basename "$test_script" .sh | sed 's/test-local-//')
   
   echo "Running $TEST_NAME tests..."
@@ -64,14 +87,20 @@ for test_script in scripts/api-tests/test-local-*.sh; do
   PASSED_TESTS=$((PASSED_TESTS + SUITE_PASSED))
   FAILED_TESTS=$((FAILED_TESTS + SUITE_FAILED))
   
-  # Extract test details
-  TEST_DETAILS="[]"
+  # Build suite data using jq for proper JSON formatting
+  SUITE_JSON=$(jq -n \
+    --arg name "$TEST_NAME" \
+    --arg status "$STATUS" \
+    --argjson total "$SUITE_TOTAL" \
+    --argjson passed "$SUITE_PASSED" \
+    --argjson failed "$SUITE_FAILED" \
+    '{name: $name, status: $status, total: $total, passed: $passed, failed: $failed, tests: []}')
   
-  # Add to suites data
+  # Add to suites array
   if [ -z "$SUITES" ]; then
-    SUITES="{\"name\":\"$TEST_NAME\",\"status\":\"$STATUS\",\"total\":$SUITE_TOTAL,\"passed\":$SUITE_PASSED,\"failed\":$SUITE_FAILED,\"tests\":$TEST_DETAILS}"
+    SUITES="$SUITE_JSON"
   else
-    SUITES="$SUITES,{\"name\":\"$TEST_NAME\",\"status\":\"$STATUS\",\"total\":$SUITE_TOTAL,\"passed\":$SUITE_PASSED,\"failed\":$SUITE_FAILED,\"tests\":$TEST_DETAILS}"
+    SUITES="$SUITES,$SUITE_JSON"
   fi
   
   echo "  $TEST_NAME: $SUITE_PASSED passed, $SUITE_FAILED failed ($STATUS)"
