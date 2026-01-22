@@ -14,6 +14,7 @@ BUILD_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions
 COVERAGE_EXISTS="unavailable"
 SECURITY_EXISTS="unavailable"
 PERFORMANCE_EXISTS="unavailable"
+API_TESTS_EXISTS="unavailable"
 QUALITY_EXISTS="unavailable"
 COMPLEXITY_EXISTS="unavailable"
 STRUCTURE_EXISTS="unavailable"
@@ -24,6 +25,7 @@ TRENDS_EXISTS="unavailable"
 [ -f "build-reports/coverage/index.html" ] && COVERAGE_EXISTS="available"
 [ -f "build-reports/security/index.html" ] && SECURITY_EXISTS="available"
 [ -f "build-reports/performance/index.html" ] && PERFORMANCE_EXISTS="available"
+[ -f "build-reports/api-tests/index.html" ] && API_TESTS_EXISTS="available"
 [ -f "build-reports/quality/index.html" ] && QUALITY_EXISTS="available"
 [ -f "build-reports/complexity/index.html" ] && COMPLEXITY_EXISTS="available"
 [ -f "build-reports/structure/index.html" ] && STRUCTURE_EXISTS="available"
@@ -48,6 +50,19 @@ fi
 PERF_AVG="N/A"
 if [ "$PERFORMANCE_EXISTS" == "available" ] && [ -f "build-reports/performance/data.json" ]; then
   PERF_AVG=$(jq -r '.summary.avg_response_time_ms' build-reports/performance/data.json 2>/dev/null || echo "0")
+fi
+
+API_TESTS_PASSED="N/A"
+API_TESTS_TOTAL="N/A"
+API_TESTS_PASS_RATE="N/A"
+if [ "$API_TESTS_EXISTS" == "available" ] && [ -f "build-reports/api-tests/data.json" ]; then
+  API_TESTS_PASSED=$(jq -r '.summary.passed_suites' build-reports/api-tests/data.json 2>/dev/null || echo "0")
+  API_TESTS_TOTAL=$(jq -r '.summary.total_suites' build-reports/api-tests/data.json 2>/dev/null || echo "0")
+  if [ "$API_TESTS_TOTAL" != "0" ] && [ "$API_TESTS_TOTAL" != "N/A" ]; then
+    API_TESTS_PASS_RATE=$(awk "BEGIN {printf \"%.1f\", ($API_TESTS_PASSED / $API_TESTS_TOTAL) * 100}" 2>/dev/null || echo "0.0")
+  else
+    API_TESTS_PASS_RATE="0.0"
+  fi
 fi
 
 LINT_ERRORS="N/A"
@@ -102,6 +117,12 @@ cat > build-reports/metadata.json << EOF
       "available": $([ "$PERFORMANCE_EXISTS" == "available" ] && echo "true" || echo "false"),
       "avg_time_ms": "$PERF_AVG"
     },
+    "api_tests": {
+      "available": $([ "$API_TESTS_EXISTS" == "available" ] && echo "true" || echo "false"),
+      "passed_suites": "$API_TESTS_PASSED",
+      "total_suites": "$API_TESTS_TOTAL",
+      "pass_rate": "$API_TESTS_PASS_RATE"
+    },
     "quality": {
       "available": $([ "$QUALITY_EXISTS" == "available" ] && echo "true" || echo "false"),
       "lint_errors": "$LINT_ERRORS",
@@ -138,6 +159,7 @@ sed -e "s|{{REPO_URL}}|${REPO_URL}|g" \
     -e "s|{{COVERAGE_EXISTS}}|${COVERAGE_EXISTS}|g" \
     -e "s|{{SECURITY_EXISTS}}|${SECURITY_EXISTS}|g" \
     -e "s|{{PERFORMANCE_EXISTS}}|${PERFORMANCE_EXISTS}|g" \
+    -e "s|{{API_TESTS_EXISTS}}|${API_TESTS_EXISTS}|g" \
     -e "s|{{QUALITY_EXISTS}}|${QUALITY_EXISTS}|g" \
     -e "s|{{COMPLEXITY_EXISTS}}|${COMPLEXITY_EXISTS}|g" \
     -e "s|{{STRUCTURE_EXISTS}}|${STRUCTURE_EXISTS}|g" \
@@ -147,6 +169,9 @@ sed -e "s|{{REPO_URL}}|${REPO_URL}|g" \
     -e "s|{{COVERAGE_LINES}}|${COVERAGE_LINES}|g" \
     -e "s|{{SECURITY_VULNS}}|${SECURITY_VULNS}|g" \
     -e "s|{{PERF_AVG}}|${PERF_AVG}|g" \
+    -e "s|{{API_TESTS_PASSED}}|${API_TESTS_PASSED}|g" \
+    -e "s|{{API_TESTS_TOTAL}}|${API_TESTS_TOTAL}|g" \
+    -e "s|{{API_TESTS_PASS_RATE}}|${API_TESTS_PASS_RATE}|g" \
     -e "s|{{LINT_ERRORS}}|${LINT_ERRORS}|g" \
     -e "s|{{LINT_WARNINGS}}|${LINT_WARNINGS}|g" \
     -e "s|{{COMPLEXITY_COUNT}}|${COMPLEXITY_COUNT}|g" \
