@@ -85,6 +85,14 @@ jobs:
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
 
+      - name: Run unit tests
+        run: bash scripts/unit-tests/collect-unit-test-results.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
       - name: Run API tests
         run: bash scripts/api-tests/collect-api-test-results.sh
         continue-on-error: true
@@ -102,6 +110,14 @@ jobs:
 
       - name: Generate performance report
         run: bash scripts/performance/generate-performance-report.sh
+        continue-on-error: true
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+
+      - name: Generate unit tests report
+        run: bash scripts/unit-tests/generate-unit-test-report.sh
         continue-on-error: true
         env:
           GITHUB_REPOSITORY: ${{ github.repository }}

@@ -134,12 +134,35 @@
         <a href="performance/index.html" class="report-link">View Performance Report →</a>
       </div>
 
+      <!-- Unit Tests Report Card -->
+      <div class="report-card {{UNIT_TESTS_EXISTS}}">
+        <span class="status-badge {{UNIT_TESTS_EXISTS}}">
+          {{UNIT_TESTS_EXISTS}}
+        </span>
+        <div class="report-icon">🧪</div>
+        <h2 class="report-title">Unit Tests</h2>
+        <p class="report-description">
+          Standalone unit tests that verify individual components without requiring a running server.
+        </p>
+        <div class="report-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Pass Rate</span>
+            <span class="metric-value">{{UNIT_TESTS_PASS_RATE}}%</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Passed Tests</span>
+            <span class="metric-value">{{UNIT_TESTS_PASSED}}/{{UNIT_TESTS_TOTAL}}</span>
+          </div>
+        </div>
+        <a href="unit-tests/index.html" class="report-link">View Unit Tests Report →</a>
+      </div>
+
       <!-- API Tests Report Card -->
       <div class="report-card {{API_TESTS_EXISTS}}">
         <span class="status-badge {{API_TESTS_EXISTS}}">
           {{API_TESTS_EXISTS}}
         </span>
-        <div class="report-icon">🧪</div>
+        <div class="report-icon">🔌</div>
         <h2 class="report-title">API Tests</h2>
         <p class="report-description">
           Local API test results validating authentication, uploads, downloads, and error handling.
