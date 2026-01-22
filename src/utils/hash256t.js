@@ -99,6 +99,20 @@ export function isInlineContent(cid) {
 }
 
 /**
+ * Get content size from CID
+ * @param {string} cid - 256t content identifier
+ * @returns {number} Content size in bytes
+ */
+export function getContentSize(cid) {
+  if (cid.length < 8) {
+    throw new Error('Invalid CID: too short');
+  }
+  
+  const prefix = cid.substring(0, 8);
+  return decodeLengthPrefix(prefix);
+}
+
+/**
  * Extract content from inline CID
  * @param {string} cid - 256t content identifier
  * @returns {Uint8Array} Original content

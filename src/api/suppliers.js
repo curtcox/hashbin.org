@@ -11,6 +11,7 @@ import {
   sanitizeSupplierName
 } from '../utils/supplier-validation.js';
 import { validate256tCID } from '../utils/hash256t.js';
+import { scanSupplier } from '../utils/supplier-scanning.js';
 
 const MAX_SUPPLIERS_PER_USER = 20;
 const SCAN_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour
@@ -167,8 +168,11 @@ export async function handleCreateSupplier(request, env) {
       })
     );
 
-    // TODO: Trigger async scan job
-    // For now, return with pending status
+    // Trigger scan asynchronously
+    // Note: We don't await this so the user gets a quick response
+    performSupplierScan(env, supplierId, supplier).catch(err => {
+      console.error(`Scan failed for supplier ${supplierId}:`, err);
+    });
 
     return new Response(
       JSON.stringify({
@@ -601,7 +605,10 @@ export async function handleRescanSupplier(request, env, supplierId) {
       })
     );
 
-    // TODO: Trigger async scan job
+    // Trigger scan asynchronously
+    performSupplierScan(env, supplierId, supplier).catch(err => {
+      console.error(`Rescan failed for supplier ${supplierId}:`, err);
+    });
 
     return new Response(
       JSON.stringify({
@@ -683,3 +690,114 @@ export async function handleGetCIDSuppliers(request, env, cid) {
     );
   }
 }
+
+/**
+ * Perform supplier scan (async helper)
+ * @param {Object} env - Environment bindings
+ * @param {string} supplierId - Supplier ID
+ * @param {Object} supplier - Supplier object
+ */
+async function performSupplierScan(env, supplierId, supplier) {
+  const supplierRegistryId = env.SUPPLIER_REGISTRY.idFromName(supplierId);
+  const supplierRegistryStub = env.SUPPLIER_REGISTRY.get(supplierRegistryId);
+
+  try {
+    // Update status to scanning
+    supplier.scan_status = 'scanning';
+    await supplierRegistryStub.fetch(
+      new Request('http://internal/supplier', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(supplier)
+      })
+    );
+
+    // Perform scan
+    const githubToken = env.GITHUB_TOKEN || null;
+    const scanResult = await scanSupplier(supplier, githubToken);
+
+    if (!scanResult.success) {
+      // Mark as failed
+      supplier.scan_status = 'failed';
+      supplier.scan_error = scanResult.error;
+      supplier.last_scanned_at = new Date().toISOString();
+      
+      await supplierRegistryStub.fetch(
+        new Request('http://internal/supplier', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(supplier)
+        })
+      );
+      
+      return;
+    }
+
+    // Clear existing CIDs and add new ones
+    await supplierRegistryStub.fetch(
+      new Request('http://internal/cids', {
+        method: 'DELETE'
+      })
+    );
+
+    await supplierRegistryStub.fetch(
+      new Request('http://internal/cids', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cids: scanResult.cids })
+      })
+    );
+
+    // Update ContentMetadata for each CID
+    for (const cid of scanResult.cids) {
+      try {
+        const contentMetadataId = env.CONTENT_METADATA.idFromName(cid);
+        const contentMetadataStub = env.CONTENT_METADATA.get(contentMetadataId);
+        
+        await contentMetadataStub.fetch(
+          new Request('http://internal/suppliers/add', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              supplier_id: supplierId,
+              supplier_name: supplier.name,
+              supplier_url: `${supplier.base_url}/${cid}`
+            })
+          })
+        );
+      } catch (error) {
+        console.error(`Failed to update ContentMetadata for ${cid}:`, error);
+      }
+    }
+
+    // Mark as completed
+    supplier.scan_status = 'completed';
+    supplier.scan_error = null;
+    supplier.last_scanned_at = new Date().toISOString();
+    supplier.cid_count = scanResult.cids.length;
+    
+    await supplierRegistryStub.fetch(
+      new Request('http://internal/supplier', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(supplier)
+      })
+    );
+  } catch (error) {
+    console.error(`Scan error for supplier ${supplierId}:`, error);
+    
+    // Mark as failed
+    supplier.scan_status = 'failed';
+    supplier.scan_error = error.message;
+    supplier.last_scanned_at = new Date().toISOString();
+    
+    await supplierRegistryStub.fetch(
+      new Request('http://internal/supplier', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(supplier)
+      })
+    );
+  }
+}
+
