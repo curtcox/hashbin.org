@@ -73,6 +73,11 @@ name = "AUDIT_LOG"
 class_name = "AuditLog"
 script_name = "hashbin-worker-prod"
 
+[[durable_objects.bindings]]
+name = "SUPPLIER_REGISTRY"
+class_name = "SupplierRegistry"
+script_name = "hashbin-worker-prod"
+
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -94,3 +99,7 @@ new_sqlite_classes = ["KeyRegistry"]
 [[migrations]]
 tag = "v3"
 new_sqlite_classes = ["PlatformStats", "AlertStore", "AuditLog"]
+
+[[migrations]]
+tag = "v4"
+new_sqlite_classes = ["SupplierRegistry"]

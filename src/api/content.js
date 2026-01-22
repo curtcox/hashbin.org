@@ -20,6 +20,7 @@ import {
 } from '../utils/hash256t.js';
 import { getMimeType } from '../utils/mime-types.js';
 import { recordContentUpload, recordContentDownload, recordPayment } from '../utils/platform-stats.js';
+import { tryAlternateSuppliers } from '../utils/supplier-fallback.js';
 
 /**
  * POST /api/content
@@ -690,6 +691,14 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     // Check if content is expired
     const expiresAt = new Date(metadata.expires_at);
     if (expiresAt < new Date()) {
+      // Content expired, try alternate suppliers
+      const alternateResponse = await tryAlternateSuppliers(env, cid, request, extension);
+      
+      if (alternateResponse) {
+        return alternateResponse;
+      }
+
+      // No alternates available
       return new Response(
         JSON.stringify({
           error: 'not_found',
@@ -831,6 +840,14 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     }
 
     if (!r2Object) {
+      // Content not in R2, try alternate suppliers
+      const alternateResponse = await tryAlternateSuppliers(env, cid, request, extension);
+      
+      if (alternateResponse) {
+        return alternateResponse;
+      }
+
+      // No alternates available or all failed
       return new Response(
         JSON.stringify({
           error: 'not_found',

@@ -13,6 +13,7 @@ export { KeyRegistry } from './durable-objects/key-registry.js';
 export { PlatformStats } from './durable-objects/platform-stats.js';
 export { AlertStore } from './durable-objects/alert-store.js';
 export { AuditLog } from './durable-objects/audit-log.js';
+export { SupplierRegistry } from './durable-objects/supplier-registry.js';
 
 // Import API route handlers
 import {
@@ -52,6 +53,16 @@ import {
 } from './api/rate-limit.js';
 
 import { handleGetUserUploads } from './api/user.js';
+
+import {
+  handleCreateSupplier,
+  handleListSuppliers,
+  handleGetSupplier,
+  handleDeleteSupplier,
+  handleUpdateSupplier,
+  handleRescanSupplier,
+  handleGetCIDSuppliers
+} from './api/suppliers.js';
 
 import {
   handleGetStats,
@@ -340,6 +351,40 @@ function handleApiRoutes(url, request, env) {
   // User API routes
   if (url.pathname === '/api/user/uploads' && request.method === 'GET') {
     return handleGetUserUploads(request, env);
+  }
+
+  // Supplier API routes
+  if (url.pathname === '/api/suppliers' && request.method === 'POST') {
+    return handleCreateSupplier(request, env);
+  }
+
+  if (url.pathname === '/api/suppliers' && request.method === 'GET') {
+    return handleListSuppliers(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/suppliers\/[^\/]+$/) && request.method === 'GET') {
+    const supplierId = url.pathname.split('/')[3];
+    return handleGetSupplier(request, env, supplierId);
+  }
+
+  if (url.pathname.match(/^\/api\/suppliers\/[^\/]+$/) && request.method === 'DELETE') {
+    const supplierId = url.pathname.split('/')[3];
+    return handleDeleteSupplier(request, env, supplierId);
+  }
+
+  if (url.pathname.match(/^\/api\/suppliers\/[^\/]+$/) && request.method === 'PATCH') {
+    const supplierId = url.pathname.split('/')[3];
+    return handleUpdateSupplier(request, env, supplierId);
+  }
+
+  if (url.pathname.match(/^\/api\/suppliers\/[^\/]+\/scan$/) && request.method === 'POST') {
+    const supplierId = url.pathname.split('/')[3];
+    return handleRescanSupplier(request, env, supplierId);
+  }
+
+  if (url.pathname.match(/^\/api\/content\/[^\/]+\/suppliers$/) && request.method === 'GET') {
+    const cid = url.pathname.split('/')[3];
+    return handleGetCIDSuppliers(request, env, cid);
   }
 
   // Admin API routes (no rate limiting or auth - admin token checked in handlers)

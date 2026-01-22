@@ -61,6 +61,23 @@ export class ContentMetadata {
         return await this.purchaseRateLimit(data);
       }
 
+      // Get alternate suppliers
+      if (url.pathname === '/suppliers' && method === 'GET') {
+        return await this.getSuppliers();
+      }
+
+      // Add alternate supplier
+      if (url.pathname === '/suppliers/add' && method === 'POST') {
+        const data = await request.json();
+        return await this.addSupplier(data);
+      }
+
+      // Remove alternate supplier
+      if (url.pathname === '/suppliers/remove' && method === 'POST') {
+        const data = await request.json();
+        return await this.removeSupplier(data);
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -135,7 +152,9 @@ export class ContentMetadata {
       default_rate_limit: isInline ? null : {
         min_time_between_requests_ms: DEFAULT_RATE_LIMIT_MS,
         expires_at: new Date(created_at.getTime() + DEFAULT_RATE_LIMIT_MS).toISOString()
-      }
+      },
+      // Alternate suppliers
+      alternate_suppliers: []
     };
 
     await this.state.storage.put('content', content);
@@ -548,5 +567,127 @@ export class ContentMetadata {
 
     // Return the lowest MTBR (most permissive)
     return Math.min(...activeRateLimits);
+  }
+
+  /**
+   * Get alternate suppliers
+   */
+  async getSuppliers() {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        alternate_suppliers: content.alternate_suppliers || []
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Add alternate supplier
+   */
+  async addSupplier(data) {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    if (!content.alternate_suppliers) {
+      content.alternate_suppliers = [];
+    }
+
+    // Check if supplier already exists
+    const exists = content.alternate_suppliers.some(s => s.supplier_id === data.supplier_id);
+    if (exists) {
+      return new Response(
+        JSON.stringify({
+          error: 'Supplier already added'
+        }),
+        {
+          status: 409,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Add supplier
+    content.alternate_suppliers.push({
+      supplier_id: data.supplier_id,
+      supplier_name: data.supplier_name,
+      supplier_url: data.supplier_url,
+      verified_at: new Date().toISOString()
+    });
+
+    await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Remove alternate supplier
+   */
+  async removeSupplier(data) {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    if (!content.alternate_suppliers) {
+      content.alternate_suppliers = [];
+    }
+
+    // Remove supplier
+    content.alternate_suppliers = content.alternate_suppliers.filter(
+      s => s.supplier_id !== data.supplier_id
+    );
+
+    await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
   }
 }
