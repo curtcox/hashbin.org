@@ -134,6 +134,29 @@
         <a href="performance/index.html" class="report-link">View Performance Report →</a>
       </div>
 
+      <!-- API Tests Report Card -->
+      <div class="report-card {{API_TESTS_EXISTS}}">
+        <span class="status-badge {{API_TESTS_EXISTS}}">
+          {{API_TESTS_EXISTS}}
+        </span>
+        <div class="report-icon">🧪</div>
+        <h2 class="report-title">API Tests</h2>
+        <p class="report-description">
+          Local API test results validating authentication, uploads, downloads, and error handling.
+        </p>
+        <div class="report-metrics">
+          <div class="metric-row">
+            <span class="metric-label">Pass Rate</span>
+            <span class="metric-value">{{API_TESTS_PASS_RATE}}%</span>
+          </div>
+          <div class="metric-row">
+            <span class="metric-label">Passed Suites</span>
+            <span class="metric-value">{{API_TESTS_PASSED}}/{{API_TESTS_TOTAL}}</span>
+          </div>
+        </div>
+        <a href="api-tests/index.html" class="report-link">View API Tests Report →</a>
+      </div>
+
       <!-- Lint Report Card -->
       <div class="report-card {{QUALITY_EXISTS}}">
         <span class="status-badge {{QUALITY_EXISTS}}">
