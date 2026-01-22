@@ -76,10 +76,10 @@ for test_script in "${test_scripts[@]}"; do
   fi
   
   # Parse test results from output
-  # Count passed tests (lines with "✅ PASSED")
-  SUITE_PASSED=$(grep -c "✅ PASSED" "$TEST_OUTPUT" 2>/dev/null || echo "0")
-  # Count failed tests (lines with "❌ FAILED")
-  SUITE_FAILED=$(grep -c "❌ FAILED" "$TEST_OUTPUT" 2>/dev/null || echo "0")
+  # Count passed tests (lines with "✅ PASS")
+  SUITE_PASSED=$(grep -c "✅ PASS" "$TEST_OUTPUT" 2>/dev/null || echo "0")
+  # Count failed tests (lines with "❌ FAIL")
+  SUITE_FAILED=$(grep -c "❌ FAIL" "$TEST_OUTPUT" 2>/dev/null || echo "0")
   SUITE_TOTAL=$((SUITE_PASSED + SUITE_FAILED))
   
   # Update totals
@@ -109,6 +109,11 @@ for test_script in "${test_scripts[@]}"; do
   # Clean up temp file
   rm -f "$TEST_OUTPUT"
 done
+
+# Handle empty suites case
+if [ -z "$SUITES" ]; then
+  SUITES=""
+fi
 
 # Generate final JSON
 cat > build-reports/api-tests/data.json << EOF
