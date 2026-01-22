@@ -679,27 +679,27 @@ All design questions have been resolved. See "Resolved Design Decisions" table a
 ## Implementation Phases
 
 ### Phase 1: Core Infrastructure
-- [ ] Create SupplierRegistry Durable Object
-- [ ] Add supplier fields to UserProfile
-- [ ] Implement supplier CRUD API endpoints
-- [ ] Add URL and CID validation utilities
-- [ ] Implement statistics storage
+- [x] Create SupplierRegistry Durable Object
+- [x] Add supplier fields to UserProfile
+- [x] Implement supplier CRUD API endpoints
+- [x] Add URL and CID validation utilities
+- [x] Implement statistics storage
 
 ### Phase 2: Scanning System
-- [ ] Implement single CID verification (with size check)
-- [ ] Implement GitHub repository scanning (with service token)
-- [ ] Implement generic web directory scanning
-- [ ] Add async scan job processing
-- [ ] Implement scan cooldown
+- [x] Implement single CID verification (with size check)
+- [x] Implement GitHub repository scanning (with service token)
+- [x] Implement generic web directory scanning
+- [x] Add async scan job processing
+- [x] Implement scan cooldown
 
 ### Phase 3: Fallback Logic
-- [ ] Modify content download handler for fallback
-- [ ] Implement random supplier selection
-- [ ] Implement proxy mode with hash verification
-- [ ] Implement redirect mode
-- [ ] Add proxy vs redirect decision logic
-- [ ] Add response headers for alternate sources
-- [ ] Update statistics on each request
+- [x] Modify content download handler for fallback
+- [x] Implement random supplier selection
+- [x] Implement proxy mode with hash verification
+- [x] Implement redirect mode
+- [x] Add proxy vs redirect decision logic
+- [x] Add response headers for alternate sources
+- [x] Update statistics on each request
 
 ### Phase 4: Frontend
 - [ ] Create supplier management page
@@ -709,9 +709,9 @@ All design questions have been resolved. See "Resolved Design Decisions" table a
 - [ ] Add rescan button
 
 ### Phase 5: Testing & Documentation
-- [ ] Unit tests
-- [ ] Integration tests
-- [ ] End-to-end tests
+- [x] Unit tests (URL validation, CID validation)
+- [x] Integration tests (supplier registration, management)
+- [ ] End-to-end tests (256t.org integration, GitHub scanning)
 - [ ] API documentation
 - [ ] User documentation
 
@@ -740,4 +740,71 @@ All design questions have been resolved. See "Resolved Design Decisions" table a
 ---
 
 *Last updated: 2026-01-22*
-*Status: Ready for implementation - All design questions resolved*
+*Status: Backend implementation complete - Ready for frontend and E2E testing*
+
+## Implementation Notes
+
+### Completed (2026-01-22)
+
+**Core Infrastructure:**
+- Created SupplierRegistry Durable Object with full statistics tracking
+- Added validation utilities with SSRF protection (blocks private IPs, localhost, .local domains)
+- Extended UserProfile to track supplier_ids and supplier_count
+- Extended ContentMetadata with alternate_suppliers array
+- Added Durable Object migration (v4) for SupplierRegistry
+
+**API Endpoints:**
+- POST /api/suppliers - Register new supplier
+- GET /api/suppliers - List user's suppliers with pagination
+- GET /api/suppliers/{id} - Get supplier details
+- DELETE /api/suppliers/{id} - Remove supplier
+- POST /api/suppliers/{id}/scan - Request rescan (with 1-hour cooldown)
+- PATCH /api/suppliers/{id} - Update supplier name and active status
+- GET /api/content/{cid}/suppliers - Get alternate suppliers for a CID
+
+**Scanning System:**
+- Single CID verification with hash and size validation
+- GitHub repository scanning via GitHub API
+- Generic web directory scanning
+- Async scan processing triggered on supplier registration
+- Automatic ContentMetadata updates for verified CIDs
+
+**Fallback & Redirect Logic:**
+- Modified handleDownloadContent to use alternates when R2 returns 404 or content expired
+- Random supplier selection for load distribution
+- Proxy mode with full hash verification and Range request support
+- Redirect mode (302) for efficient serving
+- Proxy vs redirect decision logic:
+  - Warmup: First 100 requests are proxied
+  - 95% success rate threshold over last 100 requests
+  - Periodic verification: Every 100th request is proxied
+- Statistics tracking per request (success/failure, response time, verification)
+- Response headers: X-HashBin-Source, X-HashBin-Supplier, X-HashBin-Supplier-URL
+
+**Testing:**
+- Unit tests for URL validation (SSRF protection, format validation)
+- Integration tests for supplier registration and management
+- Tests added to npm test suite
+
+### Deviations from Plan
+
+None significant. Implementation follows the plan closely.
+
+### Known Limitations
+
+1. Frontend not yet implemented - suppliers can only be managed via API
+2. GitHub API token (GITHUB_TOKEN secret) should be configured for rate limit avoidance
+3. No automatic re-scanning - scans are only triggered manually or on registration
+4. Statistics never reset (as per design) - may accumulate indefinitely
+
+### Next Steps
+
+1. Implement frontend supplier management page
+2. Add E2E tests with real 256t.org and GitHub repositories
+3. Configure GITHUB_TOKEN secret for production
+4. Monitor supplier statistics and adjust thresholds if needed
+
+---
+
+*Last updated: 2026-01-22*
+*Status: Backend implementation complete - Ready for frontend and E2E testing*
