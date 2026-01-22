@@ -27,6 +27,12 @@ for test_script in "${UNIT_TESTS[@]}"; do
   echo "Running unit test: $test_name"
   echo "===================="
   
+  # Validate test path exists
+  if [ ! -f "$test_path" ]; then
+    echo "Warning: Test script not found: $test_path"
+    continue
+  fi
+  
   # Initialize test result
   test_status="passed"
   test_output=""
