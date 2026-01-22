@@ -56,12 +56,20 @@ API_TESTS_PASSED="N/A"
 API_TESTS_TOTAL="N/A"
 API_TESTS_PASS_RATE="N/A"
 if [ "$API_TESTS_EXISTS" == "available" ] && [ -f "build-reports/api-tests/data.json" ]; then
-  API_TESTS_PASSED=$(jq -r '.summary.passed_suites' build-reports/api-tests/data.json 2>/dev/null || echo "0")
-  API_TESTS_TOTAL=$(jq -r '.summary.total_suites' build-reports/api-tests/data.json 2>/dev/null || echo "0")
-  if [ "$API_TESTS_TOTAL" != "0" ] && [ "$API_TESTS_TOTAL" != "N/A" ]; then
-    API_TESTS_PASS_RATE=$(awk "BEGIN {printf \"%.1f\", ($API_TESTS_PASSED / $API_TESTS_TOTAL) * 100}" 2>/dev/null || echo "0.0")
+  API_TESTS_PASSED=$(jq -r '.summary.passed_suites // 0' build-reports/api-tests/data.json 2>/dev/null || echo "0")
+  API_TESTS_TOTAL=$(jq -r '.summary.total_suites // 0' build-reports/api-tests/data.json 2>/dev/null || echo "0")
+  
+  # Validate that values are numeric before calculation
+  if [[ "$API_TESTS_PASSED" =~ ^[0-9]+$ ]] && [[ "$API_TESTS_TOTAL" =~ ^[0-9]+$ ]]; then
+    if [ "$API_TESTS_TOTAL" != "0" ]; then
+      API_TESTS_PASS_RATE=$(awk "BEGIN {printf \"%.1f\", ($API_TESTS_PASSED / $API_TESTS_TOTAL) * 100}" 2>/dev/null || echo "0.0")
+    else
+      API_TESTS_PASS_RATE="0.0"
+    fi
   else
-    API_TESTS_PASS_RATE="0.0"
+    API_TESTS_PASSED="N/A"
+    API_TESTS_TOTAL="N/A"
+    API_TESTS_PASS_RATE="N/A"
   fi
 fi
 

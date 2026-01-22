@@ -88,13 +88,14 @@ for test_script in "${test_scripts[@]}"; do
   FAILED_TESTS=$((FAILED_TESTS + SUITE_FAILED))
   
   # Build suite data using jq for proper JSON formatting
+  # Use --arg and convert to numbers in jq to safely handle numeric values
   SUITE_JSON=$(jq -n \
     --arg name "$TEST_NAME" \
     --arg status "$STATUS" \
-    --argjson total "$SUITE_TOTAL" \
-    --argjson passed "$SUITE_PASSED" \
-    --argjson failed "$SUITE_FAILED" \
-    '{name: $name, status: $status, total: $total, passed: $passed, failed: $failed, tests: []}')
+    --arg total "$SUITE_TOTAL" \
+    --arg passed "$SUITE_PASSED" \
+    --arg failed "$SUITE_FAILED" \
+    '{name: $name, status: $status, total: ($total | tonumber), passed: ($passed | tonumber), failed: ($failed | tonumber), tests: []}')
   
   # Add to suites array
   if [ -z "$SUITES" ]; then

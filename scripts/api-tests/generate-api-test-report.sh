@@ -15,17 +15,27 @@ if [ ! -f "$API_JSON" ]; then
   exit 1
 fi
 
-# Extract summary metrics
-TOTAL_SUITES=$(jq -r '.summary.total_suites' "$API_JSON")
-PASSED_SUITES=$(jq -r '.summary.passed_suites' "$API_JSON")
-FAILED_SUITES=$(jq -r '.summary.failed_suites' "$API_JSON")
-TOTAL_TESTS=$(jq -r '.summary.total_tests' "$API_JSON")
-PASSED_TESTS=$(jq -r '.summary.passed_tests' "$API_JSON")
-FAILED_TESTS=$(jq -r '.summary.failed_tests' "$API_JSON")
+# Extract summary metrics and ensure they are valid numbers
+TOTAL_SUITES=$(jq -r '.summary.total_suites // 0' "$API_JSON")
+PASSED_SUITES=$(jq -r '.summary.passed_suites // 0' "$API_JSON")
+FAILED_SUITES=$(jq -r '.summary.failed_suites // 0' "$API_JSON")
+TOTAL_TESTS=$(jq -r '.summary.total_tests // 0' "$API_JSON")
+PASSED_TESTS=$(jq -r '.summary.passed_tests // 0' "$API_JSON")
+FAILED_TESTS=$(jq -r '.summary.failed_tests // 0' "$API_JSON")
+
+# Validate that values are numeric
+[[ "$TOTAL_SUITES" =~ ^[0-9]+$ ]] || TOTAL_SUITES=0
+[[ "$PASSED_SUITES" =~ ^[0-9]+$ ]] || PASSED_SUITES=0
+[[ "$FAILED_SUITES" =~ ^[0-9]+$ ]] || FAILED_SUITES=0
+[[ "$TOTAL_TESTS" =~ ^[0-9]+$ ]] || TOTAL_TESTS=0
+[[ "$PASSED_TESTS" =~ ^[0-9]+$ ]] || PASSED_TESTS=0
+[[ "$FAILED_TESTS" =~ ^[0-9]+$ ]] || FAILED_TESTS=0
 
 # Calculate pass rate
-if [ "$TOTAL_SUITES" -gt 0 ]; then
+if [ "$TOTAL_SUITES" -gt 0 ] && [ "$PASSED_SUITES" -gt 0 ]; then
   PASS_RATE=$(awk "BEGIN {printf \"%.1f\", ($PASSED_SUITES / $TOTAL_SUITES) * 100}")
+elif [ "$TOTAL_SUITES" -eq 0 ]; then
+  PASS_RATE="0.0"
 else
   PASS_RATE="0.0"
 fi
