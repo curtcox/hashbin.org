@@ -94,6 +94,16 @@ export class UserProfile {
         return await this.debitBalance(data);
       }
 
+      if (url.pathname === '/suppliers/add' && method === 'POST') {
+        const data = await request.json();
+        return await this.addSupplier(data);
+      }
+
+      if (url.pathname === '/suppliers/remove' && method === 'POST') {
+        const data = await request.json();
+        return await this.removeSupplier(data);
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -165,7 +175,9 @@ export class UserProfile {
       uploads: [],
       balance_cents: initialBalance,
       total_deposited_cents: initialBalance,
-      total_spent_cents: 0
+      total_spent_cents: 0,
+      supplier_ids: [],
+      supplier_count: 0
     };
 
     await this.state.storage.put('profile', profile);
@@ -974,6 +986,113 @@ export class UserProfile {
         balance_before_cents: balance_before,
         balance_after_cents: balance_after,
         amount_cents: amount_cents
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Add supplier to user profile
+   */
+  async addSupplier(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({
+          error: 'Profile not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const supplierId = data.supplier_id;
+    
+    // Initialize supplier arrays if needed
+    if (!profile.supplier_ids) {
+      profile.supplier_ids = [];
+    }
+    if (!profile.supplier_count) {
+      profile.supplier_count = 0;
+    }
+
+    // Check if already added
+    if (profile.supplier_ids.includes(supplierId)) {
+      return new Response(
+        JSON.stringify({
+          error: 'Supplier already added'
+        }),
+        {
+          status: 409,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Add supplier
+    profile.supplier_ids.push(supplierId);
+    profile.supplier_count = profile.supplier_ids.length;
+    profile.updated_at = new Date().toISOString();
+
+    await this.state.storage.put('profile', profile);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        supplier_count: profile.supplier_count
+      }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Remove supplier from user profile
+   */
+  async removeSupplier(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(
+        JSON.stringify({
+          error: 'Profile not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    const supplierId = data.supplier_id;
+    
+    // Initialize supplier arrays if needed
+    if (!profile.supplier_ids) {
+      profile.supplier_ids = [];
+    }
+    if (!profile.supplier_count) {
+      profile.supplier_count = 0;
+    }
+
+    // Remove supplier
+    profile.supplier_ids = profile.supplier_ids.filter(id => id !== supplierId);
+    profile.supplier_count = profile.supplier_ids.length;
+    profile.updated_at = new Date().toISOString();
+
+    await this.state.storage.put('profile', profile);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        supplier_count: profile.supplier_count
       }),
       {
         status: 200,
