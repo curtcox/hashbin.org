@@ -48,6 +48,7 @@ This feature allows users to specify alternate CID suppliers that can serve cont
 | Success rate threshold for redirect | 95%+ success rate to prefer redirect |
 | New supplier warmup | Require 95% success over 100 requests before redirecting |
 | Statistics reset | Never reset (always accumulate) |
+| Range requests when proxying | Forward Range header to alternate if supported; fall back to full fetch |
 
 ---
 
@@ -346,6 +347,28 @@ X-HashBin-Source: redirect
 X-HashBin-Supplier: {supplier_name}
 ```
 
+### Range Request Handling (Proxy Mode)
+
+When proxying content and the client sends a Range header:
+
+1. **Forward the Range header** to the alternate supplier
+2. If alternate returns `206 Partial Content`:
+   - Verify the partial content (cannot verify full hash, but can verify size consistency)
+   - Serve the partial response to client with appropriate headers
+3. If alternate returns `200 OK` (doesn't support ranges):
+   - Accept the full content
+   - Extract and serve only the requested range to client
+   - Verify full content hash since we have it
+4. If alternate returns error:
+   - Try next alternate supplier
+
+**Note**: When redirecting (not proxying), the client negotiates Range support directly with the alternate supplier.
+
+**Partial Content Verification Limitations**:
+- Cannot verify content hash for partial responses (hash requires full content)
+- Can only verify that returned size is consistent with expected range
+- Full verification happens on periodic full-content proxy requests
+
 ---
 
 ## Frontend Changes
@@ -558,23 +581,33 @@ New page: `/suppliers/{supplier_id}`
 | E20 | 95% threshold boundary | 95 success, 5 failure | GET /{cid} | 302 redirect |
 | E21 | Just under 95% threshold | 94 success, 6 failure | GET /{cid} | Proxied |
 
+#### Range Request Tests (Proxy Mode)
+| # | Test Case | Setup | Action | Expected Result |
+|---|-----------|-------|--------|-----------------|
+| E22 | Range forwarded to alternate | Alternate supports ranges | GET /{cid} Range: bytes=0-99 | 206 with partial content |
+| E23 | Alternate returns 206 | Alternate supports ranges | GET /{cid} Range: bytes=500-999 | 206, correct byte range |
+| E24 | Alternate doesn't support ranges | Alternate returns 200 | GET /{cid} Range: bytes=0-99 | 206 with extracted range |
+| E25 | Full content hash verified on fallback | Alternate returns full 200 | GET /{cid} Range: bytes=0-99 | Hash verified, range served |
+| E26 | Range request via redirect | Redirecting to alternate | GET /{cid} Range: bytes=0-99 | 302, client negotiates directly |
+| E27 | Invalid range handled | Range beyond content size | GET /{cid} Range: bytes=9999-10000 | 416 Range Not Satisfiable |
+
 #### Statistics Update Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| E22 | Successful proxy updates stats | Proxy succeeds | Check stats | success count +1, time recorded |
-| E23 | Failed proxy updates stats | Proxy fails | Check stats | failure count +1, time recorded |
-| E24 | Redirect doesn't update stats | Redirect issued | Check stats | No change (can't verify) |
-| E25 | Verification failure recorded | Hash mismatch on proxy | Check stats | verification_failures +1 |
-| E26 | Proxy resets periodic counter | After proxy | Check stats | requests_since_last_proxy = 0 |
-| E27 | Redirect increments periodic counter | After redirect | Check stats | requests_since_last_proxy +1 |
+| E28 | Successful proxy updates stats | Proxy succeeds | Check stats | success count +1, time recorded |
+| E29 | Failed proxy updates stats | Proxy fails | Check stats | failure count +1, time recorded |
+| E30 | Redirect doesn't update stats | Redirect issued | Check stats | No change (can't verify) |
+| E31 | Verification failure recorded | Hash mismatch on proxy | Check stats | verification_failures +1 |
+| E32 | Proxy resets periodic counter | After proxy | Check stats | requests_since_last_proxy = 0 |
+| E33 | Redirect increments periodic counter | After redirect | Check stats | requests_since_last_proxy +1 |
 
 #### Details Page Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| E28 | Suppliers shown on details page | CID with 2 suppliers | View details page | Both suppliers listed |
-| E29 | No suppliers section when none exist | CID with no suppliers | View details page | Section hidden or "None" |
-| E30 | Supplier link goes to public page | CID with supplier | Click supplier link | Navigates to /suppliers/{id} |
-| E31 | Statistics visible on supplier page | Supplier with activity | View supplier page | Success rate, response time shown |
+| E34 | Suppliers shown on details page | CID with 2 suppliers | View details page | Both suppliers listed |
+| E35 | No suppliers section when none exist | CID with no suppliers | View details page | Section hidden or "None" |
+| E36 | Supplier link goes to public page | CID with supplier | Click supplier link | Navigates to /suppliers/{id} |
+| E37 | Statistics visible on supplier page | Supplier with activity | View supplier page | Success rate, response time shown |
 
 ### Edge Case Tests
 
@@ -639,25 +672,7 @@ New page: `/suppliers/{supplier_id}`
 
 ## Open Questions
 
-### Range Requests (Partial Content)
-
-**Q1: Range Request Handling When Proxying**
-
-When a client sends an HTTP Range header (e.g., `Range: bytes=500-999`) for a CID that must be served from an alternate supplier via proxy:
-
-- **Option A**: Fetch full content from alternate, then serve only the requested range
-  - Pro: Simple, always works
-  - Con: Wastes bandwidth fetching unused bytes
-
-- **Option B**: Forward the Range request to the alternate supplier (if it supports ranges)
-  - Pro: Efficient, minimal bandwidth
-  - Con: More complex, alternate may not support ranges
-
-- **Option C**: Don't support range requests for alternate-sourced content
-  - Pro: Simplest implementation
-  - Con: Breaks video seeking, download resumption for alternate content
-
-**Note**: This only applies to **proxy mode**. When redirecting, the client negotiates Range support directly with the alternate supplier.
+All design questions have been resolved. See "Resolved Design Decisions" table above.
 
 ---
 
@@ -725,4 +740,4 @@ When a client sends an HTTP Range header (e.g., `Range: bytes=500-999`) for a CI
 ---
 
 *Last updated: 2026-01-22*
-*Status: Draft - Pending answer to range request question*
+*Status: Ready for implementation - All design questions resolved*
