@@ -26,7 +26,68 @@ This feature allows users to specify alternate CID suppliers that can serve cont
 
 ---
 
+## Resolved Design Decisions
+
+| Decision | Resolution |
+|----------|------------|
+| Supplier ownership transfer | No explicit transfer support. Suppliers deleted when user account deleted. |
+| Fallback priority order | Random selection among available alternates |
+| Content caching from alternates | Never cache in R2. Proxy and redirect are both allowed. |
+| Expired content behavior | Redirect to alternate supplier |
+| Rate limiting for alternates | No rate limits applied to alternate-sourced content |
+| Supplier verification frequency | Only on manual rescan (no automatic re-verification) |
+| Public vs private suppliers | Always public |
+| Anonymous registration | Not allowed; authentication required |
+| URL pattern flexibility | Only `{base}/{cid}` format supported initially |
+| GitHub API authentication | Use hashbin.org service token |
+| Scan depth for group suppliers | Scan all CIDs (no limit) |
+| Content size mismatch | Strictly reject if size doesn't match CID |
+| Circular redirects | Defer handling until it becomes a problem |
+
+---
+
 ## Architecture Design
+
+### Serving Strategy: Proxy vs Redirect
+
+The system uses **both proxy and redirect** approaches:
+
+- **Redirect (302)**: Efficient, no hashbin.org bandwidth used, but no content verification at serve time
+- **Proxy**: hashbin.org fetches and serves content, allowing verification and MIME type control
+
+**Decision Logic**: Proxy requests occasionally to verify content and gather statistics. Use these statistics to inform whether to proxy or redirect for future requests. This provides a balance between efficiency (redirect) and verification (proxy).
+
+**MIME Type Handling**:
+- When redirecting: No control over MIME type (alternate supplier determines it)
+- When proxying: hashbin.org sets MIME type based on file extension in the request URL
+
+### Supplier Statistics Model
+
+Instead of binary "online/offline" states, track statistics per supplier:
+
+```javascript
+SupplierStats {
+  supplier_id: string,
+
+  // Request statistics
+  total_requests: integer,          // Total redirect/proxy attempts
+  successful_requests: integer,     // Requests that succeeded
+  failed_requests: integer,         // Requests that failed
+
+  // Recent history (rolling window)
+  recent_success_count: integer,    // Successes in last N requests
+  recent_failure_count: integer,    // Failures in last N requests
+
+  // Timing statistics
+  avg_response_time_ms: float,      // Average response time when proxying
+  last_success_at: ISO8601,         // Most recent successful request
+  last_failure_at: ISO8601,         // Most recent failed request
+
+  // Verification statistics
+  last_verified_at: ISO8601,        // Last time content hash was verified
+  verification_failures: integer,   // Times content didn't match hash
+}
+```
 
 ### Supplier Types
 
@@ -45,7 +106,8 @@ AlternateSupplier {
   name: string,                  // User-provided display name
   supplier_type: SupplierType,   // SINGLE_CID or CID_GROUP
   base_url: string,              // Base URL for the supplier
-  url_pattern: string,           // Pattern for constructing CID URLs (e.g., "{base}/{cid}")
+
+  // URL pattern is always "{base}/{cid}" for now
 
   // For SINGLE_CID suppliers
   single_cid: string | null,     // The CID this supplier serves
@@ -59,6 +121,9 @@ AlternateSupplier {
   scan_error: string | null,
   cid_count: integer,            // Number of valid CIDs found
   is_active: boolean,            // User can disable without deleting
+
+  // Statistics (see SupplierStats above)
+  stats: SupplierStats,
 }
 ```
 
@@ -154,8 +219,7 @@ POST /api/suppliers
 {
   "name": "256t.org GitHub Repository",
   "supplier_type": "CID_GROUP",
-  "base_url": "https://raw.githubusercontent.com/curtcox/256t.org/refs/heads/main/cids",
-  "url_pattern": "{base}/{cid}"
+  "base_url": "https://raw.githubusercontent.com/curtcox/256t.org/refs/heads/main/cids"
 }
 ```
 
@@ -179,21 +243,23 @@ POST /api/suppliers
 
 ### Single CID Supplier Scanning
 
-1. Construct URL from base_url and single_cid
+1. Construct URL: `{base_url}/{single_cid}`
 2. Fetch content with HEAD request first (check availability)
 3. Fetch full content
 4. Compute 256t hash of content
 5. Verify hash matches declared CID
-6. Mark as verified or failed
+6. Verify content size matches CID's encoded size
+7. Mark as verified or failed
 
 ### CID Group Supplier Scanning
 
 #### For GitHub-style repositories:
-1. Use GitHub API to list files in the directory
+1. Use GitHub API (with hashbin.org service token) to list all files in the directory
 2. Filter filenames that match CID pattern (8-94 chars, Base64URL)
 3. For each potential CID:
-   - Construct raw content URL
-   - Verify content hash matches filename
+   - Construct raw content URL: `{base_url}/{cid}`
+   - Fetch content and verify hash matches filename
+   - Verify content size matches CID's encoded size
 4. Store list of verified CIDs
 
 #### For web directories:
@@ -201,11 +267,11 @@ POST /api/suppliers
 2. Parse HTML for links matching CID pattern
 3. Verify each discovered CID
 
-### Scan Rate Limiting
+### Scan Completion
 
-- Maximum 100 CIDs verified per scan operation
-- Scans queued and processed asynchronously
-- 1 hour cooldown between rescans of same supplier
+- All CIDs in a group are scanned (no limit)
+- Scans processed asynchronously
+- 1 hour cooldown between manual rescans of same supplier
 
 ---
 
@@ -215,26 +281,43 @@ POST /api/suppliers
 
 Content fetch from alternate suppliers occurs when:
 1. Content not found in R2 storage (404)
-2. Content expired but alternate supplier available
-3. User explicitly requests alternate source (future)
+2. Content expired in hashbin.org (redirect to alternate)
 
-### Fallback Order
+### Fallback Selection
 
 1. Try primary R2 storage
 2. If unavailable, query SupplierCIDMapping for alternates
-3. Try each alternate in order of:
-   - Most recently verified
-   - Closest geographically (future)
-4. Verify content hash before serving
-5. Cache fetched content (configurable TTL)
+3. Select alternate randomly from available options
+4. Decide whether to proxy or redirect based on statistics
+
+### Proxy vs Redirect Decision
+
+Use statistics to decide:
+- **Proxy when**:
+  - Supplier has never been verified for this CID
+  - Recent failure rate is high (need to verify availability)
+  - Periodic verification needed (e.g., every Nth request)
+- **Redirect when**:
+  - Supplier has good recent success rate
+  - Content was recently verified
+  - Efficiency is prioritized
 
 ### Response Headers
 
-When serving from alternate:
+When proxying from alternate:
 ```http
 X-HashBin-Source: alternate
 X-HashBin-Supplier: {supplier_name}
 X-HashBin-Supplier-URL: {supplier_url}
+Content-Type: {determined by extension}
+```
+
+When redirecting to alternate:
+```http
+HTTP/1.1 302 Found
+Location: {supplier_url}/{cid}
+X-HashBin-Source: redirect
+X-HashBin-Supplier: {supplier_name}
 ```
 
 ---
@@ -248,7 +331,8 @@ New page: `/dashboard/suppliers/`
 - List all registered suppliers
 - Add new supplier form
 - Supplier status indicators (active, scanning, failed)
-- Scan history and CID counts
+- Statistics display (success rate, response times)
+- Rescan button
 - Delete/disable controls
 
 ### CID Details Page Updates
@@ -267,17 +351,18 @@ New page: `/suppliers/{supplier_id}`
 - Public view of supplier information
 - List of CIDs available (paginated)
 - Registration date and owner
-- Scan status and history
+- Statistics summary (success rate, availability)
 
 ---
 
 ## Security Considerations
 
 1. **URL Validation**: Validate supplier URLs against allowlist of protocols (https only)
-2. **Content Verification**: Always verify content hash matches CID before serving
-3. **Rate Limiting**: Limit scan requests to prevent abuse
-4. **Privacy**: Supplier ownership is public information
-5. **SSRF Prevention**: Block internal/private IP ranges in supplier URLs
+2. **Content Verification**: Always verify content hash matches CID when proxying
+3. **Size Verification**: Reject content if size doesn't match CID's encoded size
+4. **Rate Limiting**: Limit scan requests to prevent abuse (1 hour cooldown)
+5. **Privacy**: Supplier ownership is public information
+6. **SSRF Prevention**: Block internal/private IP ranges in supplier URLs
 
 ---
 
@@ -324,6 +409,21 @@ New page: `/suppliers/{supplier_id}`
 | U22 | Deleting supplier decrements count | delete supplier | count = count - 1 |
 | U23 | Disabled suppliers count toward limit | 20 disabled suppliers | cannot add more |
 
+#### Size Validation Tests
+| # | Test Case | Input | Expected Output |
+|---|-----------|-------|-----------------|
+| U24 | Content size matches CID prefix | 100-byte content, CID says 100 | valid |
+| U25 | Content size smaller than CID prefix | 50-byte content, CID says 100 | rejected |
+| U26 | Content size larger than CID prefix | 150-byte content, CID says 100 | rejected |
+
+#### Statistics Calculation Tests
+| # | Test Case | Input | Expected Output |
+|---|-----------|-------|-----------------|
+| U27 | Success rate calculation | 8 success, 2 failure | 80% |
+| U28 | Success rate with zero requests | 0 requests | 0% or undefined |
+| U29 | Rolling window updates correctly | Add success to full window | Oldest removed, new added |
+| U30 | Average response time calculation | [100, 200, 300] ms | 200ms |
+
 ### Integration Tests
 
 #### Supplier Registration Tests
@@ -341,40 +441,43 @@ New page: `/suppliers/{supplier_id}`
 |---|-----------|-------|--------|-----------------|
 | I7 | List own suppliers | User with 3 suppliers | GET /api/suppliers | Returns 3 suppliers |
 | I8 | Empty list for new user | New user | GET /api/suppliers | Returns empty array |
-| I9 | Cannot see other user's suppliers | User A suppliers exist | GET /api/suppliers as User B | Empty array |
+| I9 | Cannot see other user's suppliers in list | User A suppliers exist | GET /api/suppliers as User B | Empty array |
 | I10 | Pagination works | User with 25 suppliers | GET /api/suppliers?limit=10 | 10 items, has_more=true |
+| I11 | Statistics included in response | Supplier with activity | GET /api/suppliers | Stats fields populated |
 
 #### Supplier Deletion Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| I11 | Delete own supplier | User owns supplier | DELETE /api/suppliers/{id} | 200, supplier removed |
-| I12 | Cannot delete other's supplier | User A owns supplier | DELETE as User B | 403 forbidden |
-| I13 | Delete removes CID mappings | Supplier with 10 CIDs | DELETE supplier | All mappings removed |
-| I14 | Delete non-existent supplier | No supplier | DELETE /api/suppliers/{fake_id} | 404 not found |
+| I12 | Delete own supplier | User owns supplier | DELETE /api/suppliers/{id} | 200, supplier removed |
+| I13 | Cannot delete other's supplier | User A owns supplier | DELETE as User B | 403 forbidden |
+| I14 | Delete removes CID mappings | Supplier with 10 CIDs | DELETE supplier | All mappings removed |
+| I15 | Delete non-existent supplier | No supplier | DELETE /api/suppliers/{fake_id} | 404 not found |
+| I16 | User account deletion removes suppliers | User with 5 suppliers | Delete user account | All 5 suppliers removed |
 
 #### Scan Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| I15 | Initial scan triggered on create | New supplier | POST /api/suppliers | scan_status = "pending" |
-| I16 | Manual rescan request | Existing supplier | POST /api/suppliers/{id}/scan | 200, scan initiated |
-| I17 | Rescan respects cooldown | Scanned 30 min ago | POST /api/suppliers/{id}/scan | 429 too early |
-| I18 | Rescan allowed after cooldown | Scanned 2 hours ago | POST /api/suppliers/{id}/scan | 200, scan initiated |
-| I19 | Cannot scan other's supplier | User A supplier | POST as User B | 403 forbidden |
+| I17 | Initial scan triggered on create | New supplier | POST /api/suppliers | scan_status = "pending" |
+| I18 | Manual rescan request | Existing supplier | POST /api/suppliers/{id}/scan | 200, scan initiated |
+| I19 | Rescan respects cooldown | Scanned 30 min ago | POST /api/suppliers/{id}/scan | 429 too early |
+| I20 | Rescan allowed after cooldown | Scanned 2 hours ago | POST /api/suppliers/{id}/scan | 200, scan initiated |
+| I21 | Cannot scan other's supplier | User A supplier | POST as User B | 403 forbidden |
 
 #### Content Verification Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| I20 | Valid content hash verified | Real 256t.org content | Scan supplier | content_hash_match = true |
-| I21 | Invalid content hash detected | Content doesn't match CID | Scan supplier | content_hash_match = false |
-| I22 | Unreachable URL marked failed | Offline URL | Scan supplier | scan_status = "failed" |
-| I23 | Timeout handled gracefully | Slow server (>30s) | Scan supplier | scan_status = "failed" |
+| I22 | Valid content hash verified | Real 256t.org content | Scan supplier | content_hash_match = true |
+| I23 | Invalid content hash detected | Content doesn't match CID | Scan supplier | content_hash_match = false |
+| I24 | Unreachable URL marked failed | Offline URL | Scan supplier | scan_status = "failed" |
+| I25 | Timeout handled gracefully | Slow server (>30s) | Scan supplier | scan_status = "failed" |
+| I26 | Size mismatch rejected | Content size != CID size | Scan supplier | CID marked invalid |
 
 #### CID Supplier Lookup Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| I24 | CID with suppliers returns list | CID in 2 suppliers | GET /api/content/{cid}/suppliers | Returns 2 suppliers |
-| I25 | CID without suppliers returns empty | CID not in any supplier | GET /api/content/{cid}/suppliers | Empty array |
-| I26 | Only verified suppliers returned | 1 verified, 1 failed | GET /api/content/{cid}/suppliers | Returns 1 supplier |
+| I27 | CID with suppliers returns list | CID in 2 suppliers | GET /api/content/{cid}/suppliers | Returns 2 suppliers |
+| I28 | CID without suppliers returns empty | CID not in any supplier | GET /api/content/{cid}/suppliers | Empty array |
+| I29 | Only verified suppliers returned | 1 verified, 1 failed | GET /api/content/{cid}/suppliers | Returns 1 supplier |
 
 ### End-to-End Tests
 
@@ -382,32 +485,52 @@ New page: `/suppliers/{supplier_id}`
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
 | E1 | Register 256t.org as single CID supplier | Known valid CID on 256t.org | Register supplier | CID verified, supplier active |
-| E2 | Content served from 256t.org fallback | Content deleted from R2 | GET /{cid} | Content served, X-HashBin-Source: alternate |
-| E3 | Invalid CID on 256t.org | Non-existent CID | Register supplier | scan_status = "failed" |
+| E2 | Content proxied from 256t.org | Content not in R2, good stats | GET /{cid} | Content served via proxy |
+| E3 | Content redirected to 256t.org | Content not in R2, verified | GET /{cid} | 302 redirect to 256t.org |
+| E4 | Invalid CID on 256t.org | Non-existent CID | Register supplier | scan_status = "failed" |
 
 #### GitHub Repository Integration Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| E4 | Scan GitHub cids folder | Real GitHub repo URL | Register supplier | Multiple CIDs discovered |
-| E5 | GitHub rate limit handled | Many requests | Scan large repo | Graceful degradation |
-| E6 | Private repo rejected | Private repo URL | Register supplier | scan_status = "failed" |
-| E7 | Non-existent repo rejected | Fake repo URL | Register supplier | scan_status = "failed" |
+| E5 | Scan GitHub cids folder | Real GitHub repo URL | Register supplier | All CIDs discovered |
+| E6 | GitHub API uses service token | Many files | Scan large repo | No rate limit errors |
+| E7 | Private repo rejected | Private repo URL | Register supplier | scan_status = "failed" |
+| E8 | Non-existent repo rejected | Fake repo URL | Register supplier | scan_status = "failed" |
 
 #### Fallback Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| E8 | Primary available, no fallback used | Content in R2 + alternate | GET /{cid} | Served from R2, no alternate header |
-| E9 | Primary unavailable, fallback used | Content only in alternate | GET /{cid} | Served from alternate |
-| E10 | Multiple fallbacks tried in order | 3 alternates, first 2 fail | GET /{cid} | Served from 3rd alternate |
-| E11 | All fallbacks fail | All alternates offline | GET /{cid} | 404 not found |
-| E12 | Fallback content hash mismatch | Alternate returns wrong content | GET /{cid} | Skip to next alternate or 404 |
+| E9 | Primary available, no fallback used | Content in R2 + alternate | GET /{cid} | Served from R2, no alternate header |
+| E10 | Primary unavailable, fallback used | Content only in alternate | GET /{cid} | Served from alternate |
+| E11 | Multiple alternates, random selection | 3 alternates available | 100 requests | ~33% to each |
+| E12 | All fallbacks fail | All alternates offline | GET /{cid} | 404 not found |
+| E13 | Fallback content hash mismatch | Alternate returns wrong content | GET /{cid} (proxy) | Skip to next alternate or 404 |
+| E14 | Expired content redirects to alternate | Expired in R2, alternate exists | GET /{cid} | 302 redirect to alternate |
+
+#### Proxy vs Redirect Tests
+| # | Test Case | Setup | Action | Expected Result |
+|---|-----------|-------|--------|-----------------|
+| E15 | Never-verified supplier triggers proxy | New supplier, no stats | GET /{cid} | Proxied, verified |
+| E16 | Good stats supplier redirects | High success rate | GET /{cid} | 302 redirect |
+| E17 | Poor stats supplier proxies | Low recent success | GET /{cid} | Proxied, stats updated |
+| E18 | Periodic verification triggers proxy | Last verified long ago | GET /{cid} | Proxied for verification |
+| E19 | MIME type set by extension when proxying | File with .json extension | GET /{cid}.json (proxy) | Content-Type: application/json |
+
+#### Statistics Update Tests
+| # | Test Case | Setup | Action | Expected Result |
+|---|-----------|-------|--------|-----------------|
+| E20 | Successful proxy updates stats | Proxy succeeds | Check stats | success count +1, time recorded |
+| E21 | Failed proxy updates stats | Proxy fails | Check stats | failure count +1, time recorded |
+| E22 | Redirect assumed successful | Redirect issued | Check stats | No change (can't verify) |
+| E23 | Verification failure recorded | Hash mismatch on proxy | Check stats | verification_failures +1 |
 
 #### Details Page Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| E13 | Suppliers shown on details page | CID with 2 suppliers | View details page | Both suppliers listed |
-| E14 | No suppliers section when none exist | CID with no suppliers | View details page | Section hidden or "None" |
-| E15 | Supplier link goes to public page | CID with supplier | Click supplier link | Navigates to /suppliers/{id} |
+| E24 | Suppliers shown on details page | CID with 2 suppliers | View details page | Both suppliers listed |
+| E25 | No suppliers section when none exist | CID with no suppliers | View details page | Section hidden or "None" |
+| E26 | Supplier link goes to public page | CID with supplier | Click supplier link | Navigates to /suppliers/{id} |
+| E27 | Statistics visible on supplier page | Supplier with activity | View supplier page | Success rate, response time shown |
 
 ### Edge Case Tests
 
@@ -417,38 +540,33 @@ New page: `/suppliers/{supplier_id}`
 | EC1 | Concurrent scan requests | Same supplier | 2 simultaneous scan requests | Only 1 scan runs |
 | EC2 | Concurrent supplier creation | Same user at limit (19) | 2 simultaneous POST requests | Only 1 succeeds |
 | EC3 | Scan during deletion | Start scan, then delete | Delete during scan | Deletion succeeds, scan cancelled |
+| EC4 | Concurrent stats updates | Many requests at once | Update stats | All updates recorded correctly |
 
 #### Data Consistency Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| EC4 | Supplier count matches actual | Various operations | Check count | count = actual supplier count |
-| EC5 | CID mapping cleanup on supplier delete | Supplier with 50 CIDs | Delete supplier | All 50 mappings removed |
-| EC6 | Orphaned mappings don't affect lookup | Orphaned data | GET /api/content/{cid}/suppliers | Only valid suppliers returned |
-
-#### URL Pattern Tests
-| # | Test Case | URL Pattern | CID | Expected URL |
-|---|-----------|-------------|-----|--------------|
-| EC7 | Simple base + CID | "{base}/{cid}" | "ABC123" | "https://example.com/ABC123" |
-| EC8 | Custom path pattern | "{base}/content/{cid}" | "ABC123" | "https://example.com/content/ABC123" |
-| EC9 | Pattern with extension | "{base}/{cid}.bin" | "ABC123" | "https://example.com/ABC123.bin" |
-| EC10 | Missing {cid} placeholder | "{base}/fixed" | any | Error on registration |
+| EC5 | Supplier count matches actual | Various operations | Check count | count = actual supplier count |
+| EC6 | CID mapping cleanup on supplier delete | Supplier with 50 CIDs | Delete supplier | All 50 mappings removed |
+| EC7 | Orphaned mappings don't affect lookup | Orphaned data | GET /api/content/{cid}/suppliers | Only valid suppliers returned |
 
 #### Large Scale Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| EC11 | Supplier with 1000+ CIDs | Large CID group | Scan | Paginated discovery, max 100 per scan |
-| EC12 | CID in 50 different suppliers | Many suppliers for 1 CID | GET suppliers | All 50 returned (paginated) |
-| EC13 | User at exact limit (20) | 20 suppliers | GET /api/suppliers | Returns all 20 |
+| EC8 | Supplier with 1000+ CIDs | Large CID group | Scan | All CIDs discovered |
+| EC9 | CID in 50 different suppliers | Many suppliers for 1 CID | GET suppliers | All 50 returned (paginated) |
+| EC10 | User at exact limit (20) | 20 suppliers | GET /api/suppliers | Returns all 20 |
+| EC11 | Large GitHub repo scan | 5000 files | Scan | All valid CIDs found |
 
 #### Error Handling Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| EC14 | Network timeout during scan | Slow/unresponsive URL | Scan | Timeout after 30s, mark failed |
-| EC15 | SSL certificate error | Invalid cert URL | Scan | Mark failed, log error |
-| EC16 | DNS resolution failure | Non-existent domain | Scan | Mark failed, specific error |
-| EC17 | HTTP 403 from supplier | Access denied | Scan | Mark failed, "access denied" error |
-| EC18 | HTTP 429 from supplier | Rate limited | Scan | Retry with backoff, then fail |
-| EC19 | Malformed content response | Binary garbage | Scan | Hash mismatch, mark CID unverified |
+| EC12 | Network timeout during scan | Slow/unresponsive URL | Scan | Timeout after 30s, mark failed |
+| EC13 | SSL certificate error | Invalid cert URL | Scan | Mark failed, log error |
+| EC14 | DNS resolution failure | Non-existent domain | Scan | Mark failed, specific error |
+| EC15 | HTTP 403 from supplier | Access denied | Scan | Mark failed, "access denied" error |
+| EC16 | HTTP 429 from supplier | Rate limited | Scan | Retry with backoff, then fail |
+| EC17 | Malformed content response | Binary garbage | Scan | Hash mismatch, mark CID unverified |
+| EC18 | Network error during proxy | Connection reset | Proxy attempt | Stats updated, try next alternate |
 
 ### Security Tests
 
@@ -460,109 +578,48 @@ New page: `/suppliers/{supplier_id}`
 | S4 | SSRF via DNS rebinding | URL with rebinding domain | Scan | IP checked at fetch time |
 | S5 | XSS in supplier name | name = "<script>..." | Register | Sanitized/escaped |
 | S6 | SQL injection in supplier name | name = "'; DROP TABLE..." | Register | Properly escaped |
-| S7 | Path traversal in URL pattern | pattern = "../../../etc/passwd" | Register | Rejected |
+| S7 | Path traversal in URL | base_url with "../" | Register | Rejected or sanitized |
 
 ### Performance Tests
 
 | # | Test Case | Target | Expected Result |
 |---|-----------|--------|-----------------|
 | P1 | Supplier lookup latency | < 100ms | p99 under 100ms |
-| P2 | CID fallback adds latency | < 500ms additional | p99 under 500ms |
-| P3 | Scan completion time | 100 CIDs | < 60 seconds |
-| P4 | Details page load with suppliers | 10 suppliers | < 200ms additional |
+| P2 | CID fallback (proxy) adds latency | < 500ms additional | p99 under 500ms |
+| P3 | CID fallback (redirect) adds latency | < 50ms additional | p99 under 50ms |
+| P4 | Full scan completion time | 1000 CIDs | < 10 minutes |
+| P5 | Details page load with suppliers | 10 suppliers | < 200ms additional |
+| P6 | Statistics update latency | Per-request update | < 10ms |
 
 ---
 
 ## Open Questions
 
-### Business Logic Questions
+### Statistics and Decision Making
 
-1. **Q1: Supplier Ownership Transfer** - Can suppliers be transferred to another user? What happens if a user account is deleted?
+1. **Q1: Statistics Window Size** - For the rolling window of recent requests, how many requests should be tracked?
+   - Last 10 requests?
+   - Last 100 requests?
+   - Time-based (last 24 hours)?
 
-2. **Q2: Duplicate CID Handling** - If the same CID exists in multiple suppliers, how do we order fallback priority? Options:
-   - Most recently verified first
-   - User preference order
-   - Geographic proximity
-   - Random for load distribution
+2. **Q2: Proxy Frequency for Verification** - How often should we proxy instead of redirect to verify content is still valid?
+   - Every Nth request (what is N)?
+   - Random percentage (what percentage)?
+   - Time-based (if not verified in X hours)?
 
-3. **Q3: Content Caching from Alternates** - When content is fetched from an alternate supplier, should we:
-   - Cache it temporarily in R2?
-   - Cache it permanently (re-upload)?
-   - Never cache (always fetch from alternate)?
+3. **Q3: Success Rate Threshold** - At what success rate should we prefer redirect over proxy?
+   - 90%+ success = prefer redirect?
+   - 95%+ success = prefer redirect?
+   - Should response time also factor in?
 
-4. **Q4: Expired Content Behavior** - If hashbin.org content is expired but alternate has it:
-   - Serve from alternate?
-   - Require retention payment before serving?
-   - Show as "available from alternate" but not serve?
+4. **Q4: New Supplier Warmup** - How many successful proxies before we trust a supplier enough to redirect?
+   - First N requests always proxy?
+   - Require X% success over Y requests?
 
-5. **Q5: Rate Limiting for Alternates** - Should rate limits apply to alternate-sourced content?
-   - Same rate limits as primary?
-   - No rate limits (delegate to alternate)?
-   - Separate rate limit tier?
-
-6. **Q6: Supplier Verification Frequency** - How often should we re-verify that alternates still have content?
-   - On every access attempt?
-   - Daily background scan?
-   - Weekly background scan?
-   - Only on manual rescan?
-
-7. **Q7: Public vs Private Suppliers** - Should suppliers always be public? Options:
-   - Always public (current plan)
-   - User chooses public/private
-   - Private by default, opt-in public
-
-8. **Q8: Anonymous Supplier Registration** - Can unauthenticated users register suppliers?
-   - No, require authentication (current plan)
-   - Yes, with captcha
-   - Yes, but limited to 1 supplier
-
-### Technical Questions
-
-9. **Q9: URL Pattern Flexibility** - What URL patterns should we support?
-   - Only `{base}/{cid}` format?
-   - Custom patterns with placeholders?
-   - Query string parameters (e.g., `?cid={cid}`)?
-
-10. **Q10: GitHub API Authentication** - For scanning GitHub repos:
-    - Use unauthenticated API (60 req/hour limit)?
-    - Require user's GitHub token?
-    - Use hashbin.org service token?
-
-11. **Q11: Scan Depth for Group Suppliers** - For large repositories:
-    - Scan all CIDs (could be thousands)?
-    - Limit to first N CIDs?
-    - Paginate and scan incrementally?
-
-12. **Q12: Content-Type Handling** - When serving from alternate:
-    - Trust alternate's Content-Type header?
-    - Use hashbin.org's stored Content-Type?
-    - Detect from content?
-
-13. **Q13: Redirect vs Proxy** - When using alternate:
-    - Redirect user to alternate URL (302)?
-    - Proxy content through hashbin.org?
-    - Offer both options?
-
-14. **Q14: Offline Supplier Grace Period** - If a supplier becomes unreachable:
-    - Immediately mark as failed?
-    - Retry for X hours before failing?
-    - Keep in list but mark as "unreachable"?
-
-### Edge Cases
-
-15. **Q15: Circular Redirects** - What if 256t.org redirects back to hashbin.org?
-    - Detect and prevent loops
-    - Limit redirect depth
-    - Block self-references
-
-16. **Q16: Content Size Mismatch** - If alternate returns content with different size than CID indicates:
-    - Always reject (strict)?
-    - Accept if hash matches (lenient)?
-
-17. **Q17: Partial Content (Range Requests)** - Should we support range requests from alternates?
-    - Yes, if alternate supports it
-    - No, always fetch full content
-    - Proxy range requests
+5. **Q5: Statistics Reset** - Should statistics ever be reset?
+   - On manual rescan?
+   - After extended periods of inactivity?
+   - Never (always accumulate)?
 
 ---
 
@@ -573,25 +630,30 @@ New page: `/suppliers/{supplier_id}`
 - [ ] Add supplier fields to UserProfile
 - [ ] Implement supplier CRUD API endpoints
 - [ ] Add URL and CID validation utilities
+- [ ] Implement statistics storage
 
 ### Phase 2: Scanning System
-- [ ] Implement single CID verification
-- [ ] Implement GitHub repository scanning
+- [ ] Implement single CID verification (with size check)
+- [ ] Implement GitHub repository scanning (with service token)
 - [ ] Implement generic web directory scanning
 - [ ] Add async scan job processing
-- [ ] Implement scan rate limiting
+- [ ] Implement scan cooldown
 
 ### Phase 3: Fallback Logic
-- [ ] Modify content download handler
-- [ ] Implement supplier priority ordering
-- [ ] Add content hash verification for alternates
+- [ ] Modify content download handler for fallback
+- [ ] Implement random supplier selection
+- [ ] Implement proxy mode with hash verification
+- [ ] Implement redirect mode
+- [ ] Add proxy vs redirect decision logic
 - [ ] Add response headers for alternate sources
+- [ ] Update statistics on each request
 
 ### Phase 4: Frontend
 - [ ] Create supplier management page
 - [ ] Update CID details page
 - [ ] Create public supplier page
-- [ ] Add supplier status indicators
+- [ ] Add supplier statistics display
+- [ ] Add rescan button
 
 ### Phase 5: Testing & Documentation
 - [ ] Unit tests
@@ -606,21 +668,23 @@ New page: `/suppliers/{supplier_id}`
 
 - Number of suppliers registered
 - Number of CIDs discovered via scanning
-- Fallback usage rate (% of requests served from alternates)
+- Redirect vs proxy ratio
+- Fallback usage rate (% of requests using alternates)
 - Scan success/failure rates
-- Average fallback latency added
-- Supplier availability rates
+- Average proxy latency
+- Supplier success rates (aggregate)
+- Verification failure rates
 
 ---
 
 ## Dependencies
 
 - Cloudflare Workers fetch API for external requests
-- GitHub API for repository scanning
+- GitHub API for repository scanning (with service token)
 - Existing 256t hash verification utilities
 - Existing authentication system
 
 ---
 
 *Last updated: 2026-01-22*
-*Status: Draft - Pending answers to open questions*
+*Status: Draft - Pending answers to statistics questions*
