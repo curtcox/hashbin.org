@@ -32,10 +32,8 @@ FAILED_TESTS=$(jq -r '.summary.failed_tests // 0' "$API_JSON")
 [[ "$FAILED_TESTS" =~ ^[0-9]+$ ]] || FAILED_TESTS=0
 
 # Calculate pass rate
-if [ "$TOTAL_SUITES" -gt 0 ] && [ "$PASSED_SUITES" -gt 0 ]; then
+if [ "$TOTAL_SUITES" -gt 0 ]; then
   PASS_RATE=$(awk "BEGIN {printf \"%.1f\", ($PASSED_SUITES / $TOTAL_SUITES) * 100}")
-elif [ "$TOTAL_SUITES" -eq 0 ]; then
-  PASS_RATE="0.0"
 else
   PASS_RATE="0.0"
 fi
