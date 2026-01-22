@@ -43,6 +43,11 @@ This feature allows users to specify alternate CID suppliers that can serve cont
 | Scan depth for group suppliers | Scan all CIDs (no limit) |
 | Content size mismatch | Strictly reject if size doesn't match CID |
 | Circular redirects | Defer handling until it becomes a problem |
+| Statistics window size | Last 100 requests |
+| Proxy verification frequency | Every 100th request |
+| Success rate threshold for redirect | 95%+ success rate to prefer redirect |
+| New supplier warmup | Require 95% success over 100 requests before redirecting |
+| Statistics reset | Never reset (always accumulate) |
 
 ---
 
@@ -74,9 +79,10 @@ SupplierStats {
   successful_requests: integer,     // Requests that succeeded
   failed_requests: integer,         // Requests that failed
 
-  // Recent history (rolling window)
-  recent_success_count: integer,    // Successes in last N requests
-  recent_failure_count: integer,    // Failures in last N requests
+  // Recent history (rolling window of last 100 requests)
+  recent_results: boolean[],        // Circular buffer: true=success, false=failure
+  recent_success_count: integer,    // Successes in last 100 requests
+  recent_failure_count: integer,    // Failures in last 100 requests
 
   // Timing statistics
   avg_response_time_ms: float,      // Average response time when proxying
@@ -86,8 +92,18 @@ SupplierStats {
   // Verification statistics
   last_verified_at: ISO8601,        // Last time content hash was verified
   verification_failures: integer,   // Times content didn't match hash
+
+  // Proxy counter for periodic verification
+  requests_since_last_proxy: integer, // Counter for every-100th-request proxy
 }
 ```
+
+**Statistics Configuration:**
+- **Window size**: 100 requests (rolling)
+- **Proxy frequency**: Every 100th request for verification
+- **Redirect threshold**: 95%+ success rate over 100 requests
+- **Warmup requirement**: 100 requests with 95%+ success before redirecting
+- **Reset policy**: Never reset (statistics always accumulate)
 
 ### Supplier Types
 
@@ -293,14 +309,24 @@ Content fetch from alternate suppliers occurs when:
 ### Proxy vs Redirect Decision
 
 Use statistics to decide:
-- **Proxy when**:
-  - Supplier has never been verified for this CID
-  - Recent failure rate is high (need to verify availability)
-  - Periodic verification needed (e.g., every Nth request)
-- **Redirect when**:
-  - Supplier has good recent success rate
-  - Content was recently verified
-  - Efficiency is prioritized
+
+**Proxy when** (any of these conditions):
+- Supplier has fewer than 100 total requests (warmup period)
+- Recent success rate is below 95% (in the last 100 requests)
+- It's been 100 requests since last proxy (periodic verification)
+
+**Redirect when** (all conditions met):
+- Supplier has at least 100 total requests
+- Recent success rate is 95% or higher (in the last 100 requests)
+- Not due for periodic verification
+
+**Decision Algorithm:**
+```
+if (total_requests < 100) → PROXY (warmup)
+else if (recent_success_rate < 0.95) → PROXY (low confidence)
+else if (requests_since_last_proxy >= 100) → PROXY (periodic check)
+else → REDIRECT
+```
 
 ### Response Headers
 
@@ -421,8 +447,22 @@ New page: `/suppliers/{supplier_id}`
 |---|-----------|-------|-----------------|
 | U27 | Success rate calculation | 8 success, 2 failure | 80% |
 | U28 | Success rate with zero requests | 0 requests | 0% or undefined |
-| U29 | Rolling window updates correctly | Add success to full window | Oldest removed, new added |
+| U29 | Rolling window updates correctly | Add success to full window (100) | Oldest removed, new added |
 | U30 | Average response time calculation | [100, 200, 300] ms | 200ms |
+| U31 | Window capped at 100 | 150 requests | Only last 100 tracked |
+| U32 | Proxy counter increments | Each redirect | requests_since_last_proxy +1 |
+| U33 | Proxy counter resets on proxy | After proxy | requests_since_last_proxy = 0 |
+
+#### Proxy vs Redirect Decision Tests
+| # | Test Case | Input | Expected Output |
+|---|-----------|-------|-----------------|
+| U34 | Warmup period forces proxy | 50 total requests, 100% success | PROXY |
+| U35 | Low success rate forces proxy | 100 requests, 90% success | PROXY |
+| U36 | Periodic check forces proxy | 100+ requests, 95%+ success, 100 since proxy | PROXY |
+| U37 | All conditions met, redirect | 100+ requests, 95%+ success, 50 since proxy | REDIRECT |
+| U38 | Exactly 95% triggers redirect | 95 success, 5 failure in window | REDIRECT |
+| U39 | Just under 95% forces proxy | 94 success, 6 failure in window | PROXY |
+| U40 | Exactly 100 requests, 95% success | 100 requests, 95 success | REDIRECT |
 
 ### Integration Tests
 
@@ -510,27 +550,31 @@ New page: `/suppliers/{supplier_id}`
 #### Proxy vs Redirect Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| E15 | Never-verified supplier triggers proxy | New supplier, no stats | GET /{cid} | Proxied, verified |
-| E16 | Good stats supplier redirects | High success rate | GET /{cid} | 302 redirect |
-| E17 | Poor stats supplier proxies | Low recent success | GET /{cid} | Proxied, stats updated |
-| E18 | Periodic verification triggers proxy | Last verified long ago | GET /{cid} | Proxied for verification |
+| E15 | Warmup period forces proxy | Supplier with 50 requests | GET /{cid} | Proxied (warmup) |
+| E16 | Warmup complete, redirect | 100 requests, 95%+ success | GET /{cid} | 302 redirect |
+| E17 | Low success rate forces proxy | 100 requests, 90% success | GET /{cid} | Proxied |
+| E18 | Periodic verification (every 100) | 100 requests since last proxy | GET /{cid} | Proxied for verification |
 | E19 | MIME type set by extension when proxying | File with .json extension | GET /{cid}.json (proxy) | Content-Type: application/json |
+| E20 | 95% threshold boundary | 95 success, 5 failure | GET /{cid} | 302 redirect |
+| E21 | Just under 95% threshold | 94 success, 6 failure | GET /{cid} | Proxied |
 
 #### Statistics Update Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| E20 | Successful proxy updates stats | Proxy succeeds | Check stats | success count +1, time recorded |
-| E21 | Failed proxy updates stats | Proxy fails | Check stats | failure count +1, time recorded |
-| E22 | Redirect assumed successful | Redirect issued | Check stats | No change (can't verify) |
-| E23 | Verification failure recorded | Hash mismatch on proxy | Check stats | verification_failures +1 |
+| E22 | Successful proxy updates stats | Proxy succeeds | Check stats | success count +1, time recorded |
+| E23 | Failed proxy updates stats | Proxy fails | Check stats | failure count +1, time recorded |
+| E24 | Redirect doesn't update stats | Redirect issued | Check stats | No change (can't verify) |
+| E25 | Verification failure recorded | Hash mismatch on proxy | Check stats | verification_failures +1 |
+| E26 | Proxy resets periodic counter | After proxy | Check stats | requests_since_last_proxy = 0 |
+| E27 | Redirect increments periodic counter | After redirect | Check stats | requests_since_last_proxy +1 |
 
 #### Details Page Tests
 | # | Test Case | Setup | Action | Expected Result |
 |---|-----------|-------|--------|-----------------|
-| E24 | Suppliers shown on details page | CID with 2 suppliers | View details page | Both suppliers listed |
-| E25 | No suppliers section when none exist | CID with no suppliers | View details page | Section hidden or "None" |
-| E26 | Supplier link goes to public page | CID with supplier | Click supplier link | Navigates to /suppliers/{id} |
-| E27 | Statistics visible on supplier page | Supplier with activity | View supplier page | Success rate, response time shown |
+| E28 | Suppliers shown on details page | CID with 2 suppliers | View details page | Both suppliers listed |
+| E29 | No suppliers section when none exist | CID with no suppliers | View details page | Section hidden or "None" |
+| E30 | Supplier link goes to public page | CID with supplier | Click supplier link | Navigates to /suppliers/{id} |
+| E31 | Statistics visible on supplier page | Supplier with activity | View supplier page | Success rate, response time shown |
 
 ### Edge Case Tests
 
@@ -595,31 +639,25 @@ New page: `/suppliers/{supplier_id}`
 
 ## Open Questions
 
-### Statistics and Decision Making
+### Range Requests (Partial Content)
 
-1. **Q1: Statistics Window Size** - For the rolling window of recent requests, how many requests should be tracked?
-   - Last 10 requests?
-   - Last 100 requests?
-   - Time-based (last 24 hours)?
+**Q1: Range Request Handling When Proxying**
 
-2. **Q2: Proxy Frequency for Verification** - How often should we proxy instead of redirect to verify content is still valid?
-   - Every Nth request (what is N)?
-   - Random percentage (what percentage)?
-   - Time-based (if not verified in X hours)?
+When a client sends an HTTP Range header (e.g., `Range: bytes=500-999`) for a CID that must be served from an alternate supplier via proxy:
 
-3. **Q3: Success Rate Threshold** - At what success rate should we prefer redirect over proxy?
-   - 90%+ success = prefer redirect?
-   - 95%+ success = prefer redirect?
-   - Should response time also factor in?
+- **Option A**: Fetch full content from alternate, then serve only the requested range
+  - Pro: Simple, always works
+  - Con: Wastes bandwidth fetching unused bytes
 
-4. **Q4: New Supplier Warmup** - How many successful proxies before we trust a supplier enough to redirect?
-   - First N requests always proxy?
-   - Require X% success over Y requests?
+- **Option B**: Forward the Range request to the alternate supplier (if it supports ranges)
+  - Pro: Efficient, minimal bandwidth
+  - Con: More complex, alternate may not support ranges
 
-5. **Q5: Statistics Reset** - Should statistics ever be reset?
-   - On manual rescan?
-   - After extended periods of inactivity?
-   - Never (always accumulate)?
+- **Option C**: Don't support range requests for alternate-sourced content
+  - Pro: Simplest implementation
+  - Con: Breaks video seeking, download resumption for alternate content
+
+**Note**: This only applies to **proxy mode**. When redirecting, the client negotiates Range support directly with the alternate supplier.
 
 ---
 
@@ -687,4 +725,4 @@ New page: `/suppliers/{supplier_id}`
 ---
 
 *Last updated: 2026-01-22*
-*Status: Draft - Pending answers to statistics questions*
+*Status: Draft - Pending answer to range request question*
