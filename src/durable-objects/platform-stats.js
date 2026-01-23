@@ -21,6 +21,12 @@ export class PlatformStats {
         return this.incrementCounter(body);
       }
 
+      // Set value (for non-numeric values like timestamps)
+      if (path === '/set' && request.method === 'POST') {
+        const body = await request.json();
+        return this.setValue(body);
+      }
+
       // Get statistics
       if (path === '/stats' && request.method === 'GET') {
         return this.getStats(url.searchParams);
@@ -59,6 +65,27 @@ export class PlatformStats {
 
     return new Response(
       JSON.stringify({ counter, value: current + value }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+
+  /**
+   * Set a value directly (for non-numeric values like timestamps)
+   */
+  async setValue(body) {
+    const { key, value } = body;
+
+    if (!key) {
+      return new Response(
+        JSON.stringify({ error: 'Key name required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    await this.state.storage.put(key, value);
+
+    return new Response(
+      JSON.stringify({ key, value }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     );
   }

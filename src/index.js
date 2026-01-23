@@ -219,23 +219,138 @@ export default {
 
   /**
    * Scheduled handler for cron jobs
-   * Used for daily backups and expiration checks
+   * Runs every 6 hours for:
+   * - Platform statistics snapshot computation
+   * - Audit log cleanup (1-year retention)
+   * - Anomaly detection
    */
   async scheduled(event, env, ctx) {
     try {
       console.log('Scheduled job executed:', new Date().toISOString());
 
-      // Run content expiration checks
-      // Note: In a real implementation, we would need to maintain an index
-      // of all content and their expiration dates. For now, this is a placeholder.
-      // TODO: Implement content expiration index and cleanup
-      
-      // Check for content expiring in 30 days (warning emails)
-      // TODO: Implement 30-day warning email system
-      
+      // 1. Compute platform statistics snapshot
+      await this.computePlatformSnapshot(env);
+
+      // 2. Clean up old audit log entries (older than 1 year)
+      await this.cleanupAuditLog(env);
+
+      // 3. Run anomaly detection
+      await this.runAnomalyDetection(env);
+
       console.log('Scheduled tasks completed');
     } catch (error) {
       console.error('Scheduled job error:', error);
+    }
+  },
+
+  /**
+   * Compute platform statistics snapshot
+   */
+  async computePlatformSnapshot(env) {
+    try {
+      console.log('Computing platform statistics snapshot...');
+      
+      const statsId = env.PLATFORM_STATS.idFromName('global');
+      const statsStub = env.PLATFORM_STATS.get(statsId);
+      
+      await statsStub.fetch(new Request('https://dummy/snapshot', {
+        method: 'POST'
+      }));
+      
+      console.log('Platform statistics snapshot computed');
+    } catch (error) {
+      console.error('Error computing platform snapshot:', error);
+    }
+  },
+
+  /**
+   * Clean up old audit log entries (older than 1 year)
+   */
+  async cleanupAuditLog(env) {
+    try {
+      console.log('Cleaning up old audit log entries...');
+      
+      const auditLogId = env.AUDIT_LOG.idFromName('global');
+      const auditLogStub = env.AUDIT_LOG.get(auditLogId);
+      
+      const response = await auditLogStub.fetch(new Request('https://dummy/cleanup', {
+        method: 'POST'
+      }));
+      
+      const result = await response.json();
+      console.log(`Audit log cleanup complete. Removed ${result.deleted_count || 0} entries`);
+    } catch (error) {
+      console.error('Error cleaning up audit log:', error);
+    }
+  },
+
+  /**
+   * Run anomaly detection and create alerts
+   */
+  async runAnomalyDetection(env) {
+    try {
+      console.log('Running anomaly detection...');
+      
+      const statsId = env.PLATFORM_STATS.idFromName('global');
+      const statsStub = env.PLATFORM_STATS.get(statsId);
+      const alertStoreId = env.ALERT_STORE.idFromName('global');
+      const alertStoreStub = env.ALERT_STORE.get(alertStoreId);
+      
+      // Get current statistics
+      const statsResponse = await statsStub.fetch(new Request('https://dummy/stats?type=all'));
+      const stats = await statsResponse.json();
+      
+      // Check for anomalies and create alerts
+      
+      // 1. Check for high error rate (>5% in last 6 hours)
+      // This would need error tracking to be implemented
+      // Placeholder for now
+      
+      // 2. Check for unusual deposit velocity
+      const depositRate = stats.financial?.deposits_last_hour || 0;
+      const normalDepositRate = stats.financial?.avg_deposits_per_hour || 10;
+      if (depositRate > normalDepositRate * 5 || depositRate > 20) {
+        await alertStoreStub.fetch(new Request('https://dummy/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'unusual_deposit_velocity',
+            severity: 'warning',
+            title: 'Unusual Deposit Activity Detected',
+            message: `Deposit rate (${depositRate}/hour) exceeds normal rate (${normalDepositRate}/hour)`,
+            metadata: {
+              current_rate: depositRate,
+              normal_rate: normalDepositRate,
+              threshold: normalDepositRate * 5
+            }
+          })
+        }));
+      }
+      
+      // 3. Check for unusual upload velocity
+      const uploadRate = stats.content?.uploads_last_hour || 0;
+      const normalUploadRate = stats.content?.avg_uploads_per_hour || 50;
+      if (uploadRate > normalUploadRate * 5 || uploadRate > 100) {
+        await alertStoreStub.fetch(new Request('https://dummy/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'unusual_upload_velocity',
+            severity: 'warning',
+            title: 'Unusual Upload Activity Detected',
+            message: `Upload rate (${uploadRate}/hour) exceeds normal rate (${normalUploadRate}/hour)`,
+            metadata: {
+              current_rate: uploadRate,
+              normal_rate: normalUploadRate,
+              threshold: normalUploadRate * 5
+            }
+          })
+        }));
+      }
+      
+      console.log('Anomaly detection complete');
+    } catch (error) {
+      console.error('Error running anomaly detection:', error);
     }
   }
 };
@@ -579,6 +694,67 @@ async function handleHealth(env) {
     overallStatus = 'unhealthy';
   } else if (anyDegraded) {
     overallStatus = 'degraded';
+  }
+
+  // Create alerts for degraded or unhealthy components
+  try {
+    if (anyDown || anyDegraded) {
+      const alertStoreId = env.ALERT_STORE.idFromName('global');
+      const alertStoreStub = env.ALERT_STORE.get(alertStoreId);
+      
+      for (const [componentName, check] of Object.entries(checks)) {
+        if (check.status === 'down') {
+          await alertStoreStub.fetch(new Request('https://dummy/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'health_unhealthy',
+              severity: 'critical',
+              title: `Component Down: ${componentName}`,
+              message: `${componentName} health check failed: ${check.error || 'Unknown error'}`,
+              metadata: {
+                component: componentName,
+                error: check.error || null,
+                timestamp: new Date().toISOString()
+              }
+            })
+          }));
+        } else if (check.status === 'degraded') {
+          await alertStoreStub.fetch(new Request('https://dummy/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'health_degraded',
+              severity: 'warning',
+              title: `Component Degraded: ${componentName}`,
+              message: `${componentName} health check shows degraded performance`,
+              metadata: {
+                component: componentName,
+                timestamp: new Date().toISOString()
+              }
+            })
+          }));
+        }
+      }
+      
+      // Auto-resolve alerts if all components are now healthy
+      if (allOperational) {
+        // Resolve health_degraded and health_unhealthy alerts
+        const alertsResponse = await alertStoreStub.fetch(new Request('https://dummy/list'));
+        const alertsData = await alertsResponse.json();
+        
+        for (const alert of alertsData.alerts || []) {
+          if ((alert.type === 'health_degraded' || alert.type === 'health_unhealthy') && !alert.resolved_at) {
+            await alertStoreStub.fetch(new Request(`https://dummy/resolve/${alert.id}`, {
+              method: 'POST'
+            }));
+          }
+        }
+      }
+    }
+  } catch (alertError) {
+    console.error('Error creating health alerts:', alertError);
+    // Don't fail the health check if alert creation fails
   }
 
   // Determine git SHA: prefer bundled value (embedded at build time), fall back to secret, then placeholder
