@@ -384,15 +384,33 @@ export async function handleExportData(request, env) {
       );
     }
 
-    // Rate limiting: Check last export time
-    // TODO: Implement proper rate limiting (1 export per minute)
+    // Rate limiting: Check last export time (1 export per minute)
+    const rateLimitCheck = await checkExportRateLimit(env);
+    if (rateLimitCheck.limited) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Rate limit exceeded. Maximum 1 export per minute.',
+          retry_after_seconds: rateLimitCheck.retryAfter
+        }),
+        { 
+          status: 429, 
+          headers: { 
+            'Content-Type': 'application/json',
+            'Retry-After': String(rateLimitCheck.retryAfter)
+          } 
+        }
+      );
+    }
 
     let csvData;
     if (exportType === 'audit') {
       csvData = await exportAuditLog(env, limit, offset);
-    } else {
-      // For other types, return a placeholder
-      csvData = `type,id,timestamp\n${exportType},placeholder,${new Date().toISOString()}\n`;
+    } else if (exportType === 'transactions') {
+      csvData = await exportTransactions(env, limit, offset);
+    } else if (exportType === 'users') {
+      csvData = await exportUsers(env, limit, offset);
+    } else if (exportType === 'content') {
+      csvData = await exportContent(env, limit, offset);
     }
 
     await logAuditEntry(env, {
@@ -421,6 +439,53 @@ export async function handleExportData(request, env) {
 }
 
 /**
+ * Helper: Check export rate limit (1 per minute)
+ */
+async function checkExportRateLimit(env) {
+  try {
+    const statsId = env.PLATFORM_STATS.idFromName('global');
+    const statsStub = env.PLATFORM_STATS.get(statsId);
+    
+    const response = await statsStub.fetch(new Request('https://dummy/stats?type=all'));
+    const stats = await response.json();
+    
+    const lastExportAt = stats.last_export_at;
+    const now = Date.now();
+    
+    if (lastExportAt) {
+      const timeSinceLastExport = now - new Date(lastExportAt).getTime();
+      const oneMinuteMs = 60 * 1000;
+      
+      if (timeSinceLastExport < oneMinuteMs) {
+        return {
+          limited: true,
+          retryAfter: Math.ceil((oneMinuteMs - timeSinceLastExport) / 1000)
+        };
+      }
+    }
+    
+    // Update last export time
+    await statsStub.fetch(new Request('https://dummy/set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key: 'last_export_at',
+        value: new Date().toISOString()
+      })
+    }));
+    
+    return { limited: false, retryAfter: 0 };
+  } catch (error) {
+    console.error('Error checking export rate limit:', error);
+    // On error, allow the export
+    return { limited: false, retryAfter: 0 };
+  }
+}
+
+/**
+ * Helper: Export audit log to CSV
+ */
+/**
  * Helper: Export audit log to CSV
  */
 async function exportAuditLog(env, limit, offset) {
@@ -438,6 +503,43 @@ async function exportAuditLog(env, limit, offset) {
     csv += `"${entry.id}","${entry.timestamp}","${entry.actor_type}","${entry.actor_id}","${entry.action}","${entry.resource_type || ''}","${entry.resource_id || ''}","${entry.ip_address || ''}"\n`;
   }
 
+  return csv;
+}
+
+/**
+ * Helper: Export transactions to CSV
+ * Note: This is a placeholder implementation
+ * In a full implementation, this would iterate through PaymentRecord DOs
+ */
+async function exportTransactions(env, limit, offset) {
+  // This would need to iterate through all payment records
+  // For now, return headers only with a note in the filename
+  const csv = 'id,type,amount_cents,user_id,created_at,status\n';
+  return csv;
+}
+
+/**
+ * Helper: Export users to CSV (no PII)
+ * Note: This is a placeholder implementation
+ * In a full implementation, this would iterate through UserProfile DOs
+ */
+async function exportUsers(env, limit, offset) {
+  // This would need to iterate through all user profiles
+  // For now, return headers only
+  // PII (email, name) is excluded from export
+  const csv = 'user_id,created_at,balance_cents,total_deposited_cents,total_spent_cents\n';
+  return csv;
+}
+
+/**
+ * Helper: Export content to CSV
+ * Note: This is a placeholder implementation
+ * In a full implementation, this would iterate through ContentMetadata DOs
+ */
+async function exportContent(env, limit, offset) {
+  // This would need to iterate through all content metadata
+  // For now, return headers only
+  const csv = 'hash,size_bytes,created_at,expires_at,download_count,owner_user_id\n';
   return csv;
 }
 

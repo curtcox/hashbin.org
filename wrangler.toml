@@ -112,3 +112,7 @@ new_sqlite_classes = ["SupplierRegistry"]
 [[migrations]]
 tag = "v5"
 new_sqlite_classes = ["InfrastructureCost"]
+
+# Scheduled jobs (cron triggers)
+[triggers]
+crons = ["0 */6 * * *"]  # Run every 6 hours
