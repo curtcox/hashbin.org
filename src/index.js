@@ -15,6 +15,7 @@ export { AlertStore } from './durable-objects/alert-store.js';
 export { AuditLog } from './durable-objects/audit-log.js';
 export { SupplierRegistry } from './durable-objects/supplier-registry.js';
 export { InfrastructureCost } from './durable-objects/infrastructure-cost.js';
+export { DeletionRecord } from './durable-objects/deletion-record.js';
 
 // Import API route handlers
 import {
@@ -80,6 +81,12 @@ import {
   handleGetProfitability,
   handleRecordCost
 } from './api/admin.js';
+
+import {
+  handleListDeletions,
+  handleGetDeletion,
+  handleGetDeletionStats
+} from './api/public-deletions.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
@@ -581,9 +588,22 @@ function handleApiRoutes(url, request, env) {
     return handleGetProfitability(request, env);
   }
 
+  // Public deletion records API routes (no auth required for transparency)
+  if (url.pathname === '/api/public/deletions/stats' && request.method === 'GET') {
+    return handleGetDeletionStats(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/public\/deletions\/[^\/]+$/) && request.method === 'GET') {
+    const hash = url.pathname.split('/')[4];
+    return handleGetDeletion(request, env, hash);
+  }
+
+  if (url.pathname === '/api/public/deletions' && request.method === 'GET') {
+    return handleListDeletions(request, env);
+  }
+
   // TODO: Add API routes for:
   // - Contests
-  // - Public records
 
   return new Response(
     JSON.stringify({

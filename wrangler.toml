@@ -83,6 +83,11 @@ name = "INFRASTRUCTURE_COST"
 class_name = "InfrastructureCost"
 script_name = "hashbin-worker-prod"
 
+[[durable_objects.bindings]]
+name = "DELETION_RECORD"
+class_name = "DeletionRecord"
+script_name = "hashbin-worker-prod"
+
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -112,6 +117,10 @@ new_sqlite_classes = ["SupplierRegistry"]
 [[migrations]]
 tag = "v5"
 new_sqlite_classes = ["InfrastructureCost"]
+
+[[migrations]]
+tag = "v6"
+new_sqlite_classes = ["DeletionRecord"]
 
 # Scheduled jobs (cron triggers)
 [triggers]
