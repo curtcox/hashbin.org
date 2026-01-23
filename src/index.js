@@ -74,7 +74,11 @@ import {
   handleGetAlerts,
   handleAcknowledgeAlert,
   handleGetAuditLog,
-  handleExportData
+  handleExportData,
+  handleGetCosts,
+  handleGetCostsByService,
+  handleGetProfitability,
+  handleRecordCost
 } from './api/admin.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
@@ -433,6 +437,23 @@ function handleApiRoutes(url, request, env) {
 
   if (url.pathname === '/api/admin/export' && request.method === 'GET') {
     return handleExportData(request, env);
+  }
+
+  // Admin cost and profitability endpoints
+  if (url.pathname === '/api/admin/costs' && request.method === 'GET') {
+    return handleGetCosts(request, env);
+  }
+
+  if (url.pathname === '/api/admin/costs/by-service' && request.method === 'GET') {
+    return handleGetCostsByService(request, env);
+  }
+
+  if (url.pathname === '/api/admin/costs/record' && request.method === 'POST') {
+    return handleRecordCost(request, env);
+  }
+
+  if (url.pathname === '/api/admin/profitability' && request.method === 'GET') {
+    return handleGetProfitability(request, env);
   }
 
   // TODO: Add API routes for:
