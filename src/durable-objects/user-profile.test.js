@@ -377,3 +377,348 @@ describe('UserProfile Durable Object - P0 Balance Tests', () => {
     });
   });
 });
+
+describe('UserProfile Durable Object - P0 Key Management Tests', () => {
+  let mockState;
+  let mockEnv;
+  let userProfile;
+
+  beforeEach(() => {
+    mockState = createMockState();
+    mockEnv = {
+      ENVIRONMENT: 'test',
+    };
+    userProfile = new UserProfile(mockState, mockEnv);
+  });
+
+  /**
+   * Helper to create a test API key
+   */
+  function createTestApiKey(overrides = {}) {
+    return {
+      key_id: 'key_' + Math.random().toString(36).substr(2, 9),
+      key_hash: 'hash_' + Math.random().toString(36).substr(2, 16),
+      key_encrypted: 'encrypted_value',
+      name: 'Test Key',
+      created_at: new Date().toISOString(),
+      expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      last_used_at: null,
+      usage_count: 0,
+      revoked_at: null,
+      reveal_timestamps: [],
+      ...overrides,
+    };
+  }
+
+  // KEYMGMT-01: List keys shows all user's keys
+  describe('KEYMGMT-01: List keys shows all user\'s keys', () => {
+    it('should return all API keys for user', async () => {
+      const key1 = createTestApiKey({ name: 'Key 1' });
+      const key2 = createTestApiKey({ name: 'Key 2' });
+      const key3 = createTestApiKey({ name: 'Key 3' });
+      
+      const profile = createBasicProfile({
+        api_keys: [key1, key2, key3],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const request = new Request('http://test.com/apikeys', { method: 'GET' });
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data).toHaveLength(3);
+      expect(data[0].name).toBe('Key 1');
+      expect(data[1].name).toBe('Key 2');
+      expect(data[2].name).toBe('Key 3');
+    });
+
+    it('should return empty array when user has no keys', async () => {
+      const profile = createBasicProfile({
+        api_keys: [],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const request = new Request('http://test.com/apikeys', { method: 'GET' });
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data).toHaveLength(0);
+    });
+  });
+
+  // KEYMGMT-02: List keys does not show key values
+  describe('KEYMGMT-02: List keys does not show key values', () => {
+    it('should not include key_hash in list response', async () => {
+      const key = createTestApiKey({
+        key_hash: 'secret_hash_value',
+        key_encrypted: 'secret_encrypted_value',
+      });
+      
+      const profile = createBasicProfile({
+        api_keys: [key],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const request = new Request('http://test.com/apikeys', { method: 'GET' });
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data).toHaveLength(1);
+      expect(data[0]).not.toHaveProperty('key_hash');
+      expect(data[0]).not.toHaveProperty('key_encrypted');
+      expect(data[0]).toHaveProperty('key_id');
+      expect(data[0]).toHaveProperty('name');
+      expect(data[0]).toHaveProperty('created_at');
+      expect(data[0]).toHaveProperty('expires_at');
+    });
+  });
+
+  // KEYMGMT-03: List keys shows revoked keys
+  describe('KEYMGMT-03: List keys shows revoked keys', () => {
+    it('should include revoked keys in list', async () => {
+      const activeKey = createTestApiKey({ name: 'Active Key' });
+      const revokedKey = createTestApiKey({
+        name: 'Revoked Key',
+        revoked_at: new Date().toISOString(),
+      });
+      
+      const profile = createBasicProfile({
+        api_keys: [activeKey, revokedKey],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const request = new Request('http://test.com/apikeys', { method: 'GET' });
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data).toHaveLength(2);
+      expect(data[0].revoked).toBe(false);
+      expect(data[1].revoked).toBe(true);
+    });
+  });
+
+  // KEYMGMT-04: Revoke key marks it as revoked
+  describe('KEYMGMT-04: Revoke key marks it as revoked', () => {
+    it('should mark key as revoked', async () => {
+      const key = createTestApiKey({ name: 'Key to Revoke' });
+      
+      const profile = createBasicProfile({
+        api_keys: [key],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const request = new Request(`http://test.com/apikeys/${key.key_id}`, {
+        method: 'DELETE',
+      });
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.message).toBe('API key revoked successfully');
+      
+      // Verify key is actually revoked
+      const listRequest = new Request('http://test.com/apikeys', { method: 'GET' });
+      const listResponse = await userProfile.fetch(listRequest);
+      const listData = await listResponse.json();
+      
+      expect(listData[0].revoked).toBe(true);
+    });
+  });
+
+  // KEYMGMT-05: Cannot revoke another user's key (tested via proper isolation in actual API)
+  // This test verifies the DO design - each user has their own DO instance
+  describe('KEYMGMT-05: Key isolation per user', () => {
+    it('should only revoke keys within user\'s own profile', async () => {
+      const key = createTestApiKey({ key_id: 'key_user1' });
+      
+      const profile = createBasicProfile({
+        user_id: 'user_123',
+        api_keys: [key],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      // Try to revoke a key that doesn't exist in this user's profile
+      const request = new Request('http://test.com/apikeys/key_other_user', {
+        method: 'DELETE',
+      });
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(404);
+      
+      const data = await response.json();
+      expect(data.error).toBe('API key not found');
+    });
+  });
+
+  // KEYMGMT-06: Cannot revoke already-revoked key (idempotent)
+  describe('KEYMGMT-06: Revoke already-revoked key is idempotent', () => {
+    it('should return success when revoking already-revoked key', async () => {
+      const key = createTestApiKey({
+        name: 'Already Revoked Key',
+        revoked_at: new Date().toISOString(),
+      });
+      
+      const profile = createBasicProfile({
+        api_keys: [key],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const request = new Request(`http://test.com/apikeys/${key.key_id}`, {
+        method: 'DELETE',
+      });
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(200);
+      
+      const data = await response.json();
+      expect(data.success).toBe(true);
+      expect(data.message).toBe('API key already revoked');
+      expect(data.revoked_at).toBe(key.revoked_at);
+    });
+  });
+
+  // KEYMGMT-07: Revoke non-existent key returns 404
+  describe('KEYMGMT-07: Revoke non-existent key returns 404', () => {
+    it('should return 404 when revoking non-existent key', async () => {
+      const profile = createBasicProfile({
+        api_keys: [],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const request = new Request('http://test.com/apikeys/nonexistent_key', {
+        method: 'DELETE',
+      });
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(404);
+      
+      const data = await response.json();
+      expect(data.error).toBe('API key not found');
+    });
+  });
+
+  // KEYGEN-10: Maximum 25 keys per user enforced
+  describe('KEYGEN-10: Maximum 25 keys per user enforced', () => {
+    it('should reject creation of 26th key', async () => {
+      // Create 25 active keys
+      const keys = Array.from({ length: 25 }, (_, i) => 
+        createTestApiKey({ name: `Key ${i + 1}` })
+      );
+      
+      const profile = createBasicProfile({
+        api_keys: keys,
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      // Try to create the 26th key
+      const request = new Request('http://test.com/apikeys', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          key_id: 'key_26',
+          key_hash: 'hash_26',
+          key_encrypted: 'encrypted_26',
+          name: 'Key 26',
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
+      });
+      
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(400);
+      
+      const data = await response.json();
+      expect(data.error).toBe('AUTH_KEY_LIMIT');
+      expect(data.message).toContain('Maximum of 25 API keys allowed');
+    });
+
+    it('should allow creation of key when count is below limit', async () => {
+      // Create 24 active keys
+      const keys = Array.from({ length: 24 }, (_, i) => 
+        createTestApiKey({ name: `Key ${i + 1}` })
+      );
+      
+      const profile = createBasicProfile({
+        api_keys: keys,
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      // Create the 25th key - should succeed
+      const request = new Request('http://test.com/apikeys', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          key_id: 'key_25',
+          key_hash: 'hash_25',
+          key_encrypted: 'encrypted_25',
+          name: 'Key 25',
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
+      });
+      
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(201);
+      
+      const data = await response.json();
+      expect(data.key_id).toBe('key_25');
+      expect(data.name).toBe('Key 25');
+    });
+
+    it('should not count revoked keys towards limit', async () => {
+      // Create 24 active keys and 5 revoked keys
+      const activeKeys = Array.from({ length: 24 }, (_, i) => 
+        createTestApiKey({ name: `Active Key ${i + 1}` })
+      );
+      const revokedKeys = Array.from({ length: 5 }, (_, i) => 
+        createTestApiKey({
+          name: `Revoked Key ${i + 1}`,
+          revoked_at: new Date().toISOString(),
+        })
+      );
+      
+      const profile = createBasicProfile({
+        api_keys: [...activeKeys, ...revokedKeys],
+      });
+      mockState = createMockState({ profile });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      // Should be able to create one more key (25th active)
+      const request = new Request('http://test.com/apikeys', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          key_id: 'key_25',
+          key_hash: 'hash_25',
+          key_encrypted: 'encrypted_25',
+          name: 'Key 25',
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
+      });
+      
+      const response = await userProfile.fetch(request);
+      
+      expect(response.status).toBe(201);
+    });
+  });
+});

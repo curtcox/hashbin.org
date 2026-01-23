@@ -64,14 +64,27 @@ This document plans the implementation of tests that were designed in planning d
 - BAL-11: Prevent race conditions / double-spend (2 tests) ✅
 - All tests passing ✅
 
+✅ **Phase 6: P0 Key Management Tests** (Complete - 11 tests)
+- Implemented P0 key management tests in `src/durable-objects/user-profile.test.js`
+- KEYMGMT-01: List keys shows all user's keys (2 tests) ✅
+- KEYMGMT-02: List keys does not show key values (1 test) ✅
+- KEYMGMT-03: List keys shows revoked keys (1 test) ✅
+- KEYMGMT-04: Revoke key marks it as revoked (1 test) ✅
+- KEYMGMT-05: Key isolation per user (1 test) ✅
+- KEYMGMT-06: Revoke already-revoked key is idempotent (1 test) ✅
+- KEYMGMT-07: Revoke non-existent key returns 404 (1 test) ✅
+- KEYGEN-10: Maximum 25 keys per user enforced (3 tests) ✅
+- All tests passing ✅
+
 ### Summary
 
-**Total JavaScript Unit Tests: 106 tests (104 passing, 2 skipped)**
+**Total JavaScript Unit Tests: 117 tests (115 passing, 2 skipped)**
 - Pricing tests: 20 tests ✅
 - Auth utils tests: 37 tests (35 passing, 2 skipped) ✅
 - Auth middleware tests: 24 tests ✅
 - Payment webhook tests: 11 tests ✅
 - Balance operation tests: 14 tests ✅
+- Key management tests: 11 tests ✅
 
 ### Bugs Discovered
 
@@ -199,7 +212,7 @@ These were specified but never created as JavaScript test files.
 | KEYGEN-10 | Maximum 25 keys per user enforced | P0 | Not Implemented | VERIFY |
 | KEYGEN-11 | Expiration beyond 5 years rejected | P1 | ✅ Implemented | OK |
 | KEYGEN-12 | Duplicate key names allowed | P2 | Not Implemented | OK |
-| KEYGEN-13 | Key 25 succeeds, key 26 fails | P1 | Not Implemented | VERIFY |
+| KEYGEN-13 | Key 25 succeeds, key 26 fails | P1 | ✅ Implemented (3 tests) | VERIFY |
 | KEYVAL-01 | Valid API key is accepted | P0 | ✅ Implemented | OK |
 | KEYVAL-02 | Non-existent API key is rejected | P0 | ✅ Implemented | OK |
 | KEYVAL-03 | Revoked API key is rejected | P0 | ✅ Implemented (2 tests) | OK |
@@ -211,13 +224,13 @@ These were specified but never created as JavaScript test files.
 | KEYVAL-09 | Legacy hb_test_ prefix handled | P0 | ⏭️ Skipped (Bug) | **BUG FOUND** |
 | KEYVAL-10 | Legacy hb_live_ prefix handled | P0 | ⏭️ Skipped (Bug) | **BUG FOUND** |
 | KEYVAL-11 | last_used_at updated on successful validation | P2 | Not Implemented | OK |
-| KEYMGMT-01 | List keys shows all user's keys | P0 | Not Implemented | OK |
-| KEYMGMT-02 | List keys does not show key values | P0 | Not Implemented | OK |
-| KEYMGMT-03 | List keys shows revoked keys | P1 | Not Implemented | OK |
-| KEYMGMT-04 | Revoke key marks it as revoked | P0 | Not Implemented | OK |
-| KEYMGMT-05 | Cannot revoke another user's key | P0 | Not Implemented | OK |
-| KEYMGMT-06 | Cannot revoke already-revoked key | P2 | Not Implemented | OK |
-| KEYMGMT-07 | Revoke non-existent key returns 404 | P1 | Not Implemented | OK |
+| KEYMGMT-01 | List keys shows all user's keys | P0 | ✅ Implemented (2 tests) | OK |
+| KEYMGMT-02 | List keys does not show key values | P0 | ✅ Implemented | OK |
+| KEYMGMT-03 | List keys shows revoked keys | P1 | ✅ Implemented | OK |
+| KEYMGMT-04 | Revoke key marks it as revoked | P0 | ✅ Implemented | OK |
+| KEYMGMT-05 | Cannot revoke another user's key | P0 | ✅ Implemented | OK |
+| KEYMGMT-06 | Cannot revoke already-revoked key | P2 | ✅ Implemented | OK |
+| KEYMGMT-07 | Revoke non-existent key returns 404 | P1 | ✅ Implemented | OK |
 | KEYMGMT-08 | Revoked keys retained for 5 years | P2 | Not Implemented | OK |
 | ENCRYPT-01 | Encrypt API key with AES-256-GCM | P1 | Not Implemented | OK |
 | ENCRYPT-02 | Decrypt API key successfully | P1 | Not Implemented | OK |
@@ -654,11 +667,11 @@ Continue with remaining tests by priority.
 
 | Category | Planned | Updated | Implemented | Gap |
 |----------|---------|---------|-------------|-----|
-| JavaScript Unit Tests | ~180 | ~186 | 106 (104 passing, 2 skipped) | 80 |
+| JavaScript Unit Tests | ~180 | ~186 | 117 (115 passing, 2 skipped) | 69 |
 | Shell API Tests | 137 | 137 | 137 | 0* |
 | Shell Validation Tests | 89 | 89 | 89 | 0* |
 | Standalone Test Scripts | ~10 | ~10 | ~10 | 0* |
-| **Total** | **~416** | **~422** | **~342** | **~80** |
+| **Total** | **~416** | **~422** | **~353** | **~69** |
 
 *Need verification that shell tests are all running in CI
 
@@ -670,8 +683,8 @@ Continue with remaining tests by priority.
 | `src/auth/utils.test.js` | 37 | ✅ 35 passing, 2 skipped (bug found) |
 | `src/auth/middleware.test.js` | 24 | ✅ All passing |
 | `src/api/payments.test.js` | 11 | ✅ All passing |
-| `src/durable-objects/user-profile.test.js` | 14 | ✅ All passing |
-| **Total Implemented** | **106** | **104 passing, 2 skipped** |
+| `src/durable-objects/user-profile.test.js` | 25 | ✅ All passing (14 balance + 11 key mgmt) |
+| **Total Implemented** | **117** | **115 passing, 2 skipped** |
 
 ---
 
