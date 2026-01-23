@@ -246,7 +246,7 @@ if [ -f "build-reports/documentation/data.json" ]; then
   UNDOCUMENTED=$(jq -r '.summary.undocumented // 0' build-reports/documentation/data.json 2>/dev/null || echo "0")
   
   # Warn if coverage is below 80% or there are undocumented items
-  if [ "$(echo "$DOC_COVERAGE < 80" | bc 2>/dev/null || echo "0")" == "1" ] || [ "$UNDOCUMENTED" != "0" ]; then
+  if [ "$(echo "$DOC_COVERAGE 80" | awk '$1 < $2 {print 1}')" == "1" ] || [ "$UNDOCUMENTED" != "0" ]; then
     cat >> "$OUTPUT" << EOF
 ===============================================================================
 DOCUMENTATION WARNINGS
@@ -303,7 +303,7 @@ if [ -f "build-reports/performance/data.json" ]; then
   PERF_AVG=$(jq -r '.summary.avg_response_time_ms // 0' build-reports/performance/data.json 2>/dev/null || echo "0")
   
   # Warn if average response time is above 1000ms
-  if [ "$(echo "$PERF_AVG > 1000" | bc 2>/dev/null || echo "0")" == "1" ]; then
+  if [ "$(echo "$PERF_AVG 1000" | awk '$1 > $2 {print 1}')" == "1" ]; then
     cat >> "$OUTPUT" << EOF
 ===============================================================================
 PERFORMANCE WARNINGS
@@ -333,7 +333,7 @@ if [ -f "build-reports/coverage/data.json" ]; then
   COVERAGE_LINES=$(jq -r '.total.lines.pct // 100' build-reports/coverage/data.json 2>/dev/null || echo "100")
   
   # Warn if line coverage is below 80%
-  if [ "$(echo "$COVERAGE_LINES < 80" | bc 2>/dev/null || echo "0")" == "1" ]; then
+  if [ "$(echo "$COVERAGE_LINES 80" | awk '$1 < $2 {print 1}')" == "1" ]; then
     cat >> "$OUTPUT" << EOF
 ===============================================================================
 COVERAGE WARNINGS
