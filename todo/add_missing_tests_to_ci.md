@@ -54,13 +54,24 @@ This document plans the implementation of tests that were designed in planning d
 - Found bug: Legacy prefix support not working (KEYVAL-09, 10 skipped)
 - 28 tests passing, 2 skipped with documentation ✅
 
+✅ **Phase 5: P0 Balance Tests** (Complete - 14 tests)
+- Implemented all P0 balance tests in `src/durable-objects/user-profile.test.js`
+- BAL-01: Credit balance on successful deposit (4 tests) ✅
+- BAL-05: Debit balance on successful upload (2 tests) ✅
+- BAL-07: Reject if balance insufficient (2 tests) ✅
+- BAL-08: Return 0 for new users (2 tests) ✅
+- BAL-09: Never return negative balance (2 tests) ✅
+- BAL-11: Prevent race conditions / double-spend (2 tests) ✅
+- All tests passing ✅
+
 ### Summary
 
-**Total JavaScript Unit Tests: 92 tests (90 passing, 2 skipped)**
+**Total JavaScript Unit Tests: 106 tests (104 passing, 2 skipped)**
 - Pricing tests: 20 tests ✅
 - Auth utils tests: 37 tests (35 passing, 2 skipped) ✅
 - Auth middleware tests: 24 tests ✅
 - Payment webhook tests: 11 tests ✅
+- Balance operation tests: 14 tests ✅
 
 ### Bugs Discovered
 
@@ -392,18 +403,18 @@ These were specified but never created as JavaScript test files.
 
 | Test ID | Test Name | Priority | Status | Drift? |
 |---------|-----------|----------|--------|--------|
-| BAL-01 | Credit balance on successful deposit | P0 | Not Implemented | OK |
-| BAL-02 | Record transaction with before/after balance | P0 | Not Implemented | OK |
-| BAL-03 | Update total_deposited_cents | P1 | Not Implemented | VERIFY |
-| BAL-04 | Handle multiple deposits correctly | P1 | Not Implemented | OK |
-| BAL-05 | Debit balance on successful upload | P0 | Not Implemented | OK |
-| BAL-06 | Update total_spent_cents | P1 | Not Implemented | VERIFY |
-| BAL-07 | Reject if balance insufficient | P0 | Not Implemented | OK |
-| BAL-08 | Return 0 for new users | P0 | Not Implemented | OK |
-| BAL-09 | Never return negative balance | P0 | Not Implemented | OK |
-| BAL-10 | Handle concurrent deposits | P1 | Not Implemented | OK |
-| BAL-11 | Prevent race conditions (double-spend) | P0 | Not Implemented | OK |
-| BAL-12 | Serialize balance modifications | P1 | Not Implemented | OK |
+| BAL-01 | Credit balance on successful deposit | P0 | ✅ Implemented (4 tests) | OK |
+| BAL-02 | Record transaction with before/after balance | P0 | ✅ Implemented (implicit) | OK |
+| BAL-03 | Update total_deposited_cents | P1 | ✅ Implemented | VERIFY |
+| BAL-04 | Handle multiple deposits correctly | P1 | ✅ Implemented | OK |
+| BAL-05 | Debit balance on successful upload | P0 | ✅ Implemented (2 tests) | OK |
+| BAL-06 | Update total_spent_cents | P1 | ✅ Implemented | VERIFY |
+| BAL-07 | Reject if balance insufficient | P0 | ✅ Implemented (2 tests) | OK |
+| BAL-08 | Return 0 for new users | P0 | ✅ Implemented (2 tests) | OK |
+| BAL-09 | Never return negative balance | P0 | ✅ Implemented (2 tests) | OK |
+| BAL-10 | Handle concurrent deposits | P1 | ✅ Implemented (partial) | OK |
+| BAL-11 | Prevent race conditions (double-spend) | P0 | ✅ Implemented (2 tests) | OK |
+| BAL-12 | Serialize balance modifications | P1 | ✅ Implemented (via BAL-11) | OK |
 
 #### C3. Upload Payment Validation Tests (12 tests)
 
@@ -643,11 +654,11 @@ Continue with remaining tests by priority.
 
 | Category | Planned | Updated | Implemented | Gap |
 |----------|---------|---------|-------------|-----|
-| JavaScript Unit Tests | ~180 | ~186 | 92 (90 passing, 2 skipped) | 94 |
+| JavaScript Unit Tests | ~180 | ~186 | 106 (104 passing, 2 skipped) | 80 |
 | Shell API Tests | 137 | 137 | 137 | 0* |
 | Shell Validation Tests | 89 | 89 | 89 | 0* |
 | Standalone Test Scripts | ~10 | ~10 | ~10 | 0* |
-| **Total** | **~416** | **~422** | **~328** | **~94** |
+| **Total** | **~416** | **~422** | **~342** | **~80** |
 
 *Need verification that shell tests are all running in CI
 
@@ -659,7 +670,8 @@ Continue with remaining tests by priority.
 | `src/auth/utils.test.js` | 37 | ✅ 35 passing, 2 skipped (bug found) |
 | `src/auth/middleware.test.js` | 24 | ✅ All passing |
 | `src/api/payments.test.js` | 11 | ✅ All passing |
-| **Total Implemented** | **92** | **90 passing, 2 skipped** |
+| `src/durable-objects/user-profile.test.js` | 14 | ✅ All passing |
+| **Total Implemented** | **106** | **104 passing, 2 skipped** |
 
 ---
 
