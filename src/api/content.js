@@ -717,7 +717,6 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     // Build base headers
     const headers = {
       'Content-Type': mimeType,
-      'Cache-Control': 'public, max-age=31536000, immutable',
       'ETag': `"${cid}"`,
       'Accept-Ranges': 'bytes',
       'Access-Control-Allow-Origin': '*',
@@ -746,7 +745,9 @@ export async function handleDownloadContent(request, env, cid, extension = null)
       // Inline content has no rate limit - serve immediately
       // Extract content from CID itself
       const contentBytes = extractInlineContent(cid);
-      
+
+      // Inline content is immutable and can be aggressively cached
+      headers['Cache-Control'] = 'public, max-age=31536000, immutable';
       headers['Content-Length'] = contentBytes.length.toString();
       
       // Add Content-Disposition if ?download=true
