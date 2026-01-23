@@ -240,6 +240,14 @@ jobs:
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_RUN_ID: ${{ github.run_id }}
 
+      - name: Generate problems.txt
+        run: bash scripts/reports/generate-problems-txt.sh
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_SERVER_URL: ${{ github.server_url }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
