@@ -9,7 +9,7 @@
 - v2.0: Resolved 11 of 15 open questions, added key editing, usage count, expiration sorting/highlighting
 **Related:**
 - `todo/user_stories.md` (API Developers section, lines 172-194)
-- `todo/key_management_backend.md` (Backend implementation plan)
+- `done/key_management_backend.md` (Backend implementation plan)
 
 ## Overview
 
@@ -860,7 +860,7 @@ Headers: `Retry-After: 3245` (seconds)
    - Increment counter in `updateLastUsed()` method
    - Return in `GET /api/auth/apikeys` response
    - Effort: ~4-6 hours
-   - Details: See `todo/key_management_backend.md`
+   - Details: See `done/key_management_backend.md`
 
 2. **✅ PATCH Endpoint for Name Updates**
    - Implement `PATCH /api/auth/apikeys/:id` endpoint
@@ -868,7 +868,7 @@ Headers: `Retry-After: 3245` (seconds)
    - Validate name (1-100 characters)
    - Return updated key metadata
    - Effort: ~4-6 hours
-   - Details: See `todo/key_management_backend.md`
+   - Details: See `done/key_management_backend.md`
 
 ### Timeline:
 - **Backend implementation:** ~8-12 hours (1-2 days)

@@ -149,8 +149,9 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Maximum file size: 5TB (R2 single object limit for MVP)
 
 **Sub-Plans:**
-- `todo/content_operations.md` - Upload/download implementation
-- `todo/256t_integration.md` - Hash generation and validation
+- `done/upload.md` - Upload implementation with 256t hash generation ✅
+- `done/download.md` - Download implementation ✅
+- `todo/download_remaining.md` - Remaining: info page, contested content handling, performance testing
 
 **No search/discovery features** - Hash-only access as per architectural decision #12
 
@@ -216,20 +217,22 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 
 ### Phase 5: Retention & Expiration Management
 **Goal:** Automate content lifecycle management
+**Status:** Foundation Complete - Planning Done, Implementation Pending
 
 **Deliverables:**
-- Scheduled job for expiration checks (Cloudflare Cron Triggers)
-- Content deletion process (R2 + Durable Objects cleanup)
-- Retention extension API endpoint
-- Retention payment tracking
-- Public deletion records
+- ✅ Retention extension API endpoint
+- ✅ Retention payment tracking
+- ⏳ Scheduled job for expiration checks (Cloudflare Cron Triggers)
+- ⏳ Content deletion process (R2 + Durable Objects cleanup)
+- ⏳ Public deletion records
 - **No grace period** - Immediate deletion when job runs (see Decision #8)
 - **No expiration notifications** - Users responsible for tracking
 
 **Sub-Plans:**
-- `todo/retention_system.md` - Content lifecycle management
+- `done/content_lifecycle.md` - Planning and foundation ✅
+- `todo/content_lifecycle_remaining.md` - Implementation of cron jobs, deletion, public records
 
-**Implementation:** Use Cloudflare Workers Cron Triggers (runs hourly or daily)
+**Implementation:** Use Cloudflare Workers Cron Triggers (runs daily at 2 AM UTC)
 
 ### Phase 6: Contestation System
 **Goal:** Implement transparent content dispute resolution
@@ -949,15 +952,26 @@ No blocking questions remain for beginning implementation.
    - GitHub Actions CI/CD
    - Backup strategy (deferred to Phase 2)
 
-2. **`todo/256t_integration.md`** - Hash generation library (Phase 2) - TO CREATE
-   - JavaScript implementation of 256t spec
+2. **`done/upload.md`** - Upload and 256t hash implementation (Phase 2) ✅ COMPLETE
+   - JavaScript implementation of 256t spec (client and server)
    - Hash generation and validation
-   - Testing with reference implementations
-
-3. **`todo/content_operations.md`** - Upload/download implementation (Phase 2) - TO CREATE
    - Content upload API endpoint
-   - Content download API endpoint
    - R2 storage integration
+   - Inline content support (≤64 bytes)
+   - Upload UI with drag-and-drop
+
+3. **`done/download.md`** - Download implementation (Phase 2) ✅ COMPLETE
+   - Content download API endpoint
+   - Inline content extraction from CID
+   - MIME type handling (60+ extensions)
+   - Caching and range request support
+   - Download count tracking
+   - HEAD and Range request support
+
+3a. **`todo/download_remaining.md`** - Download remaining (Phase 2/6)
+   - Contested content handling (451 status) - requires contest system
+   - Info page (`/info/{cid}`) - UX enhancement
+   - Performance testing with large files - requires production
 
 4. **`done/user_authorization.md`** - Authentication system (Phase 3) ✅ COMPLETE
    - Clerk integration
@@ -998,23 +1012,26 @@ Before creating sub-plans, set up local development tools:
 4. `done/payments.md` - Payment integration and processing ✅
 5. `done/stripe.md` - Stripe integration details ✅
 6. `done/deployment_validation.md` - Deployment smoke tests ✅
+7. `done/upload.md` - Content upload implementation (256t, inline content, UI) ✅
+8. `done/download.md` - Content download implementation (MIME types, caching, range requests) ✅
+9. `done/clerk.md` - Clerk backend and monitoring implementation ✅
+10. `done/content_lifecycle.md` - Content lifecycle planning and foundation ✅
+11. `done/only_production.md` - Single production environment consolidation ✅
+12. `done/user_transaction_history.md` - Transaction history UI and backend ✅
+13. `done/key_management_backend.md` - API key usage tracking and name updates ✅
+14. `done/running_fully_local.md` - Local development environment setup ✅
 
 ### Pending Plans (todo/)
 
-1. `todo/content_operations.md` - Upload and download implementation
-2. `todo/256t_integration.md` - Hash generation and validation library
-3. `todo/pricing_model.md` - Storage pricing and calculations
-4. `todo/retention_system.md` - Content lifecycle and expiration
-5. `todo/contestation_system.md` - Dispute resolution workflow
-6. `todo/content_moderation.md` - Review and moderation tools
-7. `todo/public_records.md` - Transparency and reporting
-8. `todo/frontend_ui.md` - Web interface implementation
-9. `todo/api_documentation.md` - Public API documentation
-10. `todo/testing_strategy.md` - Comprehensive testing plan
-11. `todo/security_audit.md` - Security review and hardening
-12. `todo/legal_compliance.md` - Terms of Service, Privacy Policy, DMCA
-13. `todo/operations.md` - Production operations and monitoring
-14. `todo/monitoring.md` - System monitoring and alerting
+1. `todo/download_remaining.md` - Download: info page, contested content, performance testing
+2. `todo/content_lifecycle_remaining.md` - Expiration automation: cron jobs, deletion, public records
+3. `todo/clerk_remaining.md` - Clerk production deployment and configuration
+4. `todo/deployment_setup.md` - Deployment configuration guide
+5. `todo/frontend_ui.md` - Web interface enhancements
+6. `todo/content_moderation.md` - Review and moderation tools (Phase 6)
+7. `todo/balance_transfer.md` - Balance transfer between users
+8. `todo/account_management.md` - Account management features
+9. Other planning documents for future phases (see todo/ directory)
 
 ---
 
