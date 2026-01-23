@@ -15,6 +15,8 @@ export { AlertStore } from './durable-objects/alert-store.js';
 export { AuditLog } from './durable-objects/audit-log.js';
 export { SupplierRegistry } from './durable-objects/supplier-registry.js';
 export { InfrastructureCost } from './durable-objects/infrastructure-cost.js';
+export { DeletionRecord } from './durable-objects/deletion-record.js';
+export { ExpirationIndex } from './durable-objects/expiration-index.js';
 
 // Import API route handlers
 import {
@@ -80,6 +82,14 @@ import {
   handleGetProfitability,
   handleRecordCost
 } from './api/admin.js';
+
+import {
+  handleListDeletions,
+  handleGetDeletion,
+  handleGetDeletionStats
+} from './api/public-deletions.js';
+
+import { deleteContent, getContentMetadata } from './services/content-deletion.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
@@ -227,7 +237,8 @@ export default {
 
   /**
    * Scheduled handler for cron jobs
-   * Runs every 6 hours for:
+   * Runs daily at 2 AM UTC for:
+   * - Content expiration processing
    * - Platform statistics snapshot computation
    * - Audit log cleanup (1-year retention)
    * - Anomaly detection
@@ -236,18 +247,96 @@ export default {
     try {
       console.log('Scheduled job executed:', new Date().toISOString());
 
-      // 1. Compute platform statistics snapshot
+      // 1. Process expired content
+      await this.processExpiredContent(env);
+
+      // 2. Compute platform statistics snapshot
       await this.computePlatformSnapshot(env);
 
-      // 2. Clean up old audit log entries (older than 1 year)
+      // 3. Clean up old audit log entries (older than 1 year)
       await this.cleanupAuditLog(env);
 
-      // 3. Run anomaly detection
+      // 4. Run anomaly detection
       await this.runAnomalyDetection(env);
 
       console.log('Scheduled tasks completed');
     } catch (error) {
       console.error('Scheduled job error:', error);
+    }
+  },
+
+  /**
+   * Process expired content
+   * 
+   * Batch processes content that has expired for the current date.
+   * Implements "extension wins" strategy: validates metadata before deletion
+   * to ensure content wasn't extended after being indexed for expiration.
+   * 
+   * Batch Limit: Maximum 5,000 deletions per run (Cloudflare Workers 30s CPU limit)
+   * Strategy: Check metadata expires_at before deletion; skip if extended
+   * 
+   * @param {Object} env - Environment bindings
+   */
+  async processExpiredContent(env) {
+    try {
+      console.log('Processing expired content...');
+      
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const expirationIndexId = env.EXPIRATION_INDEX.idFromName('global');
+      const expirationIndexStub = env.EXPIRATION_INDEX.get(expirationIndexId);
+      
+      // Get expired content for today
+      const expiredResponse = await expirationIndexStub.fetch(
+        new Request(`https://dummy/expired?date=${today}`, { method: 'GET' })
+      );
+      const expiredData = await expiredResponse.json();
+      const expiredHashes = expiredData.hashes || [];
+      
+      console.log(`Found ${expiredHashes.length} expired content items for ${today}`);
+      
+      let deleted = 0;
+      let skipped = 0;
+      let failed = 0;
+      const BATCH_LIMIT = 5000;
+      
+      // Process up to BATCH_LIMIT items
+      for (const hash of expiredHashes.slice(0, BATCH_LIMIT)) {
+        try {
+          // Get current metadata to check for extension ("extension wins" strategy)
+          const metadata = await getContentMetadata(env, hash);
+          
+          if (!metadata) {
+            // Already deleted
+            skipped++;
+            continue;
+          }
+          
+          const expiresDate = metadata.expires_at.split('T')[0];
+          
+          // Check if content was extended after being indexed for expiration
+          if (expiresDate > today) {
+            console.log(`Skipping ${hash}: extended to ${expiresDate}`);
+            skipped++;
+            continue;
+          }
+          
+          // Use deletion service for consistent deletion logic
+          const result = await deleteContent(env, hash, metadata, 'expired');
+          
+          if (result.success) {
+            deleted++;
+          } else {
+            failed++;
+          }
+        } catch (error) {
+          failed++;
+          console.error(`Failed to delete ${hash}:`, error);
+        }
+      }
+      
+      console.log(`Expiration job complete: ${deleted} deleted, ${skipped} skipped, ${failed} failed`);
+    } catch (error) {
+      console.error('Error processing expired content:', error);
     }
   },
 
@@ -581,9 +670,22 @@ function handleApiRoutes(url, request, env) {
     return handleGetProfitability(request, env);
   }
 
+  // Public deletion records API routes (no auth required for transparency)
+  if (url.pathname === '/api/public/deletions/stats' && request.method === 'GET') {
+    return handleGetDeletionStats(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/public\/deletions\/[^\/]+$/) && request.method === 'GET') {
+    const hash = url.pathname.split('/')[4];
+    return handleGetDeletion(request, env, hash);
+  }
+
+  if (url.pathname === '/api/public/deletions' && request.method === 'GET') {
+    return handleListDeletions(request, env);
+  }
+
   // TODO: Add API routes for:
   // - Contests
-  // - Public records
 
   return new Response(
     JSON.stringify({

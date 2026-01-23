@@ -365,6 +365,28 @@ export async function handleUploadContent(request, env) {
       await recordPayment(env, 'upload_payment', cost_cents);
     }
 
+    // Register with ExpirationIndex for expiration tracking (skip inline content)
+    if (!isInline && metadata.expires_at) {
+      try {
+        const expirationIndexId = env.EXPIRATION_INDEX.idFromName('global');
+        const expirationIndexStub = env.EXPIRATION_INDEX.get(expirationIndexId);
+        
+        await expirationIndexStub.fetch(
+          new Request('http://internal/register', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              hash_256t: hash_256t,
+              expires_at: metadata.expires_at
+            })
+          })
+        );
+      } catch (error) {
+        // Log error but don't fail the upload
+        console.error('Failed to register with ExpirationIndex:', error);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         cid: hash_256t,
@@ -589,6 +611,29 @@ export async function handleExtendContent(request, env, cid) {
     );
 
     const extendData = await extendResponse.json();
+
+    // Update ExpirationIndex with new expiration date
+    if (content.expires_at && extendData.expires_at) {
+      try {
+        const expirationIndexId = env.EXPIRATION_INDEX.idFromName('global');
+        const expirationIndexStub = env.EXPIRATION_INDEX.get(expirationIndexId);
+        
+        await expirationIndexStub.fetch(
+          new Request('http://internal/update', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              hash_256t: cid,
+              old_expires_at: content.expires_at,
+              new_expires_at: extendData.expires_at
+            })
+          })
+        );
+      } catch (error) {
+        // Log error but don't fail the extension
+        console.error('Failed to update ExpirationIndex:', error);
+      }
+    }
 
     // Record transaction
     const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
