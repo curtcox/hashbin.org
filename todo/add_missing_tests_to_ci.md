@@ -19,6 +19,21 @@ This document plans the implementation of tests that were designed in planning d
 - Added npm scripts: `test:unit` and `test:unit:watch`
 - Updated `.github/workflows/local-api-tests.yml` to run unit tests
 
+✅ **Phase 2: P0 Security Tests** (Complete - 26 tests)
+- Implemented security tests in `src/auth/middleware.test.js` (10 tests)
+- SEC-01: Timing attack protection (2 tests) ✅
+- SEC-02: Key enumeration prevention (4 tests) ✅
+- SEC-03: JWT signature bypass protection (3 tests) ✅
+- AUTHMW-01: Anonymous access support (2 tests) ✅
+- Added SEC-06 to `src/auth/utils.test.js` (5 tests) ✅
+- Implemented webhook security tests in `src/api/payments.test.js` (11 tests)
+- SEC-10: Webhook signature validation (2 tests) ✅
+- STRIPE-01: Accept valid signatures (2 tests) ✅
+- STRIPE-02: Reject missing signatures (2 tests) ✅
+- STRIPE-03: Reject invalid signatures (3 tests) ✅
+- STRIPE-05: Replay attack protection (2 tests) ✅
+- All tests passing ✅
+
 ✅ **Phase 3: P0 Pricing Tests** (Complete - 20 tests)
 - Implemented all P0 pricing tests in `src/utils/pricing.test.js`
 - PRICE-19, PRICE-20, PRICE-21: Inline content and minimum cost tests
@@ -33,6 +48,14 @@ This document plans the implementation of tests that were designed in planning d
 - KEYGEN-06, 08-09, 11: Expiration and name validation tests
 - Found bug: Legacy prefix support not working (KEYVAL-09, 10 skipped)
 - 28 tests passing, 2 skipped with documentation ✅
+
+### Summary
+
+**Total JavaScript Unit Tests: 76 tests (74 passing, 2 skipped)**
+- Pricing tests: 20 tests ✅
+- Auth utils tests: 37 tests (35 passing, 2 skipped) ✅
+- Auth middleware tests: 10 tests ✅
+- Payment webhook tests: 11 tests ✅
 
 ### Bugs Discovered
 
@@ -262,7 +285,7 @@ These were specified but never created as JavaScript test files.
 
 | Test ID | Test Name | Priority | Status | Drift? |
 |---------|-----------|----------|--------|--------|
-| AUTHMW-01 | Anonymous access to public endpoint | P0 | Not Implemented | OK |
+| AUTHMW-01 | Anonymous access to public endpoint | P0 | ✅ Implemented (2 tests) | OK |
 | AUTHMW-02 | Anonymous access to public content | P0 | Not Implemented | OK |
 | AUTHMW-03 | Anonymous access to protected endpoint rejected | P0 | Not Implemented | OK |
 | AUTHMW-04 | Clerk session provides user context | P0 | Not Implemented | OK |
@@ -321,16 +344,16 @@ These were specified but never created as JavaScript test files.
 
 | Test ID | Test Name | Priority | Status | Drift? |
 |---------|-----------|----------|--------|--------|
-| SEC-01 | Timing attack on key validation | P0 | Not Implemented | OK |
-| SEC-02 | Key enumeration prevention | P0 | Not Implemented | OK |
-| SEC-03 | JWT signature bypass (alg:none) | P0 | Not Implemented | MOCK |
+| SEC-01 | Timing attack on key validation | P0 | ✅ Implemented (2 tests) | OK |
+| SEC-02 | Key enumeration prevention | P0 | ✅ Implemented (4 tests) | OK |
+| SEC-03 | JWT signature bypass (alg:none) | P0 | ✅ Implemented (3 tests) | MOCK |
 | SEC-04 | Session fixation prevention | P1 | Not Implemented | MOCK |
 | SEC-05 | CSRF on key creation | P1 | Not Implemented | OK |
-| SEC-06 | XSS in key name | P0 | Not Implemented | OK |
+| SEC-06 | XSS in key name | P0 | ✅ Implemented (5 tests) | OK |
 | SEC-07 | SQL/NoSQL injection in user_id | P0 | Not Implemented | OK |
 | SEC-08 | Key in URL parameter rejected | P1 | Not Implemented | VERIFY |
 | SEC-09 | Key logging prevention | P1 | Not Implemented | OK |
-| SEC-10 | Webhook signature validation | P0 | Not Implemented | OK |
+| SEC-10 | Webhook signature validation | P0 | ✅ Implemented (2 tests) | OK |
 
 ### Category C: Unit Tests from payments.md (NOT IMPLEMENTED)
 
@@ -398,11 +421,11 @@ These were specified but never created as JavaScript test files.
 
 | Test ID | Test Name | Priority | Status | Drift? |
 |---------|-----------|----------|--------|--------|
-| STRIPE-01 | Accept valid Stripe signature | P0 | Not Implemented | MOCK |
-| STRIPE-02 | Reject missing signature header | P0 | Not Implemented | MOCK |
-| STRIPE-03 | Reject invalid signature | P0 | Not Implemented | MOCK |
-| STRIPE-04 | Reject expired signature | P1 | Not Implemented | MOCK |
-| STRIPE-05 | Reject replayed webhook (duplicate event ID) | P0 | Not Implemented | OK |
+| STRIPE-01 | Accept valid Stripe signature | P0 | ✅ Implemented (2 tests) | MOCK |
+| STRIPE-02 | Reject missing signature header | P0 | ✅ Implemented (2 tests) | MOCK |
+| STRIPE-03 | Reject invalid signature | P0 | ✅ Implemented (3 tests) | MOCK |
+| STRIPE-04 | Reject expired signature | P1 | ✅ Implemented (in STRIPE-03) | MOCK |
+| STRIPE-05 | Reject replayed webhook (duplicate event ID) | P0 | ✅ Implemented (2 tests) | OK |
 | STRIPE-06 | checkout.session.completed credits balance | P0 | Not Implemented | OK |
 | STRIPE-07 | Record transaction with before/after balance | P0 | Not Implemented | OK |
 | STRIPE-08 | Webhook is idempotent | P0 | Not Implemented | OK |
@@ -615,11 +638,11 @@ Continue with remaining tests by priority.
 
 | Category | Planned | Updated | Implemented | Gap |
 |----------|---------|---------|-------------|-----|
-| JavaScript Unit Tests | ~180 | ~186 | 50 (48 passing, 2 skipped) | 136 |
+| JavaScript Unit Tests | ~180 | ~186 | 76 (74 passing, 2 skipped) | 110 |
 | Shell API Tests | 137 | 137 | 137 | 0* |
 | Shell Validation Tests | 89 | 89 | 89 | 0* |
 | Standalone Test Scripts | ~10 | ~10 | ~10 | 0* |
-| **Total** | **~416** | **~422** | **~286** | **~136** |
+| **Total** | **~416** | **~422** | **~312** | **~110** |
 
 *Need verification that shell tests are all running in CI
 
@@ -628,8 +651,10 @@ Continue with remaining tests by priority.
 | Test File | Tests | Status |
 |-----------|-------|--------|
 | `src/utils/pricing.test.js` | 20 | ✅ All passing |
-| `src/auth/utils.test.js` | 30 | ✅ 28 passing, 2 skipped (bug found) |
-| **Total Implemented** | **50** | **48 passing, 2 skipped** |
+| `src/auth/utils.test.js` | 37 | ✅ 35 passing, 2 skipped (bug found) |
+| `src/auth/middleware.test.js` | 10 | ✅ All passing |
+| `src/api/payments.test.js` | 11 | ✅ All passing |
+| **Total Implemented** | **78** | **76 passing, 2 skipped** |
 
 ---
 
