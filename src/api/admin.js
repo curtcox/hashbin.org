@@ -478,6 +478,7 @@ export async function handleGetCosts(request, env) {
     const costId = env.INFRASTRUCTURE_COST.idFromName('global');
     const costStub = env.INFRASTRUCTURE_COST.get(costId);
     
+    // Note: Durable Object stubs use dummy URLs - the DO only looks at pathname and query params
     const response = await costStub.fetch(
       new Request(`https://dummy/summary?period=${period}`)
     );

@@ -3,6 +3,18 @@
  * Tracks platform-wide infrastructure costs
  * Single instance stores aggregate costs for all services
  */
+
+/**
+ * Get current month period string in YYYY-MM format
+ * @returns {string} Current month period (e.g., "2026-01")
+ */
+function getCurrentMonthPeriod() {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = String(now.getUTCMonth() + 1).padStart(2, '0');
+  return `${year}-${month}`;
+}
+
 export class InfrastructureCost {
   constructor(state, env) {
     this.state = state;
@@ -92,7 +104,8 @@ export class InfrastructureCost {
     }
 
     // Use current month if period not specified
-    const costPeriod = period || new Date().toISOString().substring(0, 7); // YYYY-MM
+    // Format: YYYY-MM (e.g., "2026-01")
+    const costPeriod = period || getCurrentMonthPeriod();
 
     // Create cost record
     const costRecord = {

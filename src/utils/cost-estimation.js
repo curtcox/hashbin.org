@@ -1,7 +1,7 @@
 /**
  * Cost Estimation Utility
  * Calculates infrastructure costs for Cloudflare services and Stripe fees
- * Based on the pricing analysis in todo/track_and_predict_expenses.md
+ * Based on the pricing analysis in done/track_and_predict_expenses.md
  */
 
 // Cloudflare Workers pricing
@@ -262,6 +262,7 @@ export function calculateUserCosts(user) {
 
   // Download costs
   if (user.downloads) {
+    // Calculate total download size: either directly provided or calculated from count * average
     const totalDownloadGB = user.downloads.sizeGB || 
                            (user.downloads.count * (user.downloads.avgSizeGB || 1));
     const downloadCost = calculateDownloadCost({
