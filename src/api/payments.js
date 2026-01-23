@@ -322,6 +322,12 @@ async function handleCheckoutSessionCompleted(session, env) {
       const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
       const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
 
+      // Calculate Stripe fee from the total charged amount
+      // The session metadata contains the credit amount the user receives
+      // We need to calculate the fee based on the actual charge
+      const totalCharged = session.amount_total; // in cents
+      const stripeFee = totalCharged - amount_cents; // fee = total - credit
+
       await paymentRecordStub.fetch(
         new Request('http://internal/transaction', {
           method: 'POST',
@@ -334,7 +340,8 @@ async function handleCheckoutSessionCompleted(session, env) {
             balance_before_cents: balance_before,
             balance_after_cents: depositData.balance_after_cents,
             stripe_session_id: session.id,
-            stripe_payment_intent: session.payment_intent
+            stripe_payment_intent: session.payment_intent,
+            stripe_fee_cents: stripeFee
           })
         })
       );
@@ -388,6 +395,10 @@ async function handleCheckoutSessionCompleted(session, env) {
         const paymentRecordId = env.PAYMENT_RECORDS.idFromName(donorId);
         const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
 
+        // Calculate Stripe fee
+        const totalCharged = session.amount_total; // in cents
+        const stripeFee = totalCharged - amount_cents;
+
         await paymentRecordStub.fetch(
           new Request('http://internal/transaction', {
             method: 'POST',
@@ -401,6 +412,7 @@ async function handleCheckoutSessionCompleted(session, env) {
               balance_after_cents: 0,
               stripe_session_id: session.id,
               stripe_payment_intent: session.payment_intent,
+              stripe_fee_cents: stripeFee,
               cid: cid,
               retention_months: monthsToAdd
             })

@@ -461,3 +461,198 @@ async function logAuditEntry(env, entry) {
     // Don't fail the request if audit logging fails
   }
 }
+
+/**
+ * Get infrastructure costs
+ * GET /api/admin/costs
+ */
+export async function handleGetCosts(request, env) {
+  const authError = requireAdmin(request, env);
+  if (authError) return authError;
+
+  try {
+    const url = new URL(request.url);
+    const period = url.searchParams.get('period') || 'all_time';
+
+    // Get InfrastructureCost Durable Object
+    const costId = env.INFRASTRUCTURE_COST.idFromName('global');
+    const costStub = env.INFRASTRUCTURE_COST.get(costId);
+    
+    // Note: Durable Object stubs use dummy URLs - the DO only looks at pathname and query params
+    const response = await costStub.fetch(
+      new Request(`https://dummy/summary?period=${period}`)
+    );
+    const costs = await response.json();
+
+    await logAuditEntry(env, {
+      actor_type: 'admin',
+      actor_id: 'admin',
+      action: 'view_costs',
+      resource_type: 'infrastructure_cost',
+      resource_id: 'global'
+    });
+
+    return new Response(JSON.stringify(costs), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Error getting costs:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to retrieve costs' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+/**
+ * Get costs by service
+ * GET /api/admin/costs/by-service
+ */
+export async function handleGetCostsByService(request, env) {
+  const authError = requireAdmin(request, env);
+  if (authError) return authError;
+
+  try {
+    const url = new URL(request.url);
+    const period = url.searchParams.get('period') || 'all_time';
+
+    const costId = env.INFRASTRUCTURE_COST.idFromName('global');
+    const costStub = env.INFRASTRUCTURE_COST.get(costId);
+    
+    const response = await costStub.fetch(
+      new Request(`https://dummy/by-service?period=${period}`)
+    );
+    const breakdown = await response.json();
+
+    await logAuditEntry(env, {
+      actor_type: 'admin',
+      actor_id: 'admin',
+      action: 'view_costs_by_service',
+      resource_type: 'infrastructure_cost',
+      resource_id: 'global'
+    });
+
+    return new Response(JSON.stringify(breakdown), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Error getting costs by service:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to retrieve cost breakdown' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+/**
+ * Get profitability overview (revenue vs costs)
+ * GET /api/admin/profitability
+ */
+export async function handleGetProfitability(request, env) {
+  const authError = requireAdmin(request, env);
+  if (authError) return authError;
+
+  try {
+    const url = new URL(request.url);
+    const period = url.searchParams.get('period') || 'all_time';
+
+    // Get costs
+    const costId = env.INFRASTRUCTURE_COST.idFromName('global');
+    const costStub = env.INFRASTRUCTURE_COST.get(costId);
+    
+    const costResponse = await costStub.fetch(
+      new Request(`https://dummy/summary?period=${period}`)
+    );
+    const costData = await costResponse.json();
+
+    // Get revenue from PlatformStats
+    const statsId = env.PLATFORM_STATS.idFromName('global');
+    const statsStub = env.PLATFORM_STATS.get(statsId);
+    
+    const statsResponse = await statsStub.fetch(
+      new Request('https://dummy/stats?type=financial')
+    );
+    const statsData = await statsResponse.json();
+
+    // Calculate profitability metrics
+    const totalCosts = costData.costs.total;
+    const totalRevenue = statsData.revenue.total_cents;
+    const profit = totalRevenue - totalCosts;
+    const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
+
+    const profitability = {
+      period,
+      revenue_cents: totalRevenue,
+      revenue_dollars: totalRevenue / 100,
+      costs_cents: totalCosts,
+      costs_dollars: totalCosts / 100,
+      profit_cents: profit,
+      profit_dollars: profit / 100,
+      margin_percentage: margin,
+      status: profit >= 0 ? 'profitable' : 'unprofitable',
+      timestamp: new Date().toISOString()
+    };
+
+    await logAuditEntry(env, {
+      actor_type: 'admin',
+      actor_id: 'admin',
+      action: 'view_profitability',
+      resource_type: 'profitability',
+      resource_id: 'global'
+    });
+
+    return new Response(JSON.stringify(profitability), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  } catch (error) {
+    console.error('Error getting profitability:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to calculate profitability' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}
+
+/**
+ * Record infrastructure cost
+ * POST /api/admin/costs/record
+ */
+export async function handleRecordCost(request, env) {
+  const authError = requireAdmin(request, env);
+  if (authError) return authError;
+
+  try {
+    const data = await request.json();
+
+    const costId = env.INFRASTRUCTURE_COST.idFromName('global');
+    const costStub = env.INFRASTRUCTURE_COST.get(costId);
+    
+    const response = await costStub.fetch(
+      new Request('https://dummy/record', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      })
+    );
+
+    await logAuditEntry(env, {
+      actor_type: 'admin',
+      actor_id: 'admin',
+      action: 'record_cost',
+      resource_type: 'infrastructure_cost',
+      resource_id: 'global',
+      metadata: { service: data.service, cost_cents: data.cost_cents }
+    });
+
+    return response;
+  } catch (error) {
+    console.error('Error recording cost:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to record cost' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
+}

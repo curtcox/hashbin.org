@@ -66,6 +66,7 @@ export class PaymentRecord {
       balance_after_cents: data.balance_after_cents,
       stripe_session_id: data.stripe_session_id || null,
       stripe_payment_intent: data.stripe_payment_intent || null,
+      stripe_fee_cents: data.stripe_fee_cents || null, // Stripe processing fee
       cid: data.cid || null,
       retention_months: data.retention_months || null,
       // Rate limit purchase fields

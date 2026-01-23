@@ -14,6 +14,7 @@ export { PlatformStats } from './durable-objects/platform-stats.js';
 export { AlertStore } from './durable-objects/alert-store.js';
 export { AuditLog } from './durable-objects/audit-log.js';
 export { SupplierRegistry } from './durable-objects/supplier-registry.js';
+export { InfrastructureCost } from './durable-objects/infrastructure-cost.js';
 
 // Import API route handlers
 import {
@@ -73,7 +74,11 @@ import {
   handleGetAlerts,
   handleAcknowledgeAlert,
   handleGetAuditLog,
-  handleExportData
+  handleExportData,
+  handleGetCosts,
+  handleGetCostsByService,
+  handleGetProfitability,
+  handleRecordCost
 } from './api/admin.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
@@ -432,6 +437,23 @@ function handleApiRoutes(url, request, env) {
 
   if (url.pathname === '/api/admin/export' && request.method === 'GET') {
     return handleExportData(request, env);
+  }
+
+  // Admin cost and profitability endpoints
+  if (url.pathname === '/api/admin/costs' && request.method === 'GET') {
+    return handleGetCosts(request, env);
+  }
+
+  if (url.pathname === '/api/admin/costs/by-service' && request.method === 'GET') {
+    return handleGetCostsByService(request, env);
+  }
+
+  if (url.pathname === '/api/admin/costs/record' && request.method === 'POST') {
+    return handleRecordCost(request, env);
+  }
+
+  if (url.pathname === '/api/admin/profitability' && request.method === 'GET') {
+    return handleGetProfitability(request, env);
   }
 
   // TODO: Add API routes for:
