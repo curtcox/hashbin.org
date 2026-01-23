@@ -103,6 +103,31 @@ if [ "$QUALITY_EXISTS" == "available" ] && [ -f "build-reports/quality/summary.j
   LINT_WARNINGS=$(jq -r '.warnings // 0' build-reports/quality/summary.json 2>/dev/null || echo "0")
 fi
 
+COMPLEXITY_COUNT="N/A"
+if [ "$COMPLEXITY_EXISTS" == "available" ] && [ -f "build-reports/complexity/summary.json" ]; then
+  COMPLEXITY_COUNT=$(jq -r '.complexity_issues // 0' build-reports/complexity/summary.json 2>/dev/null || echo "0")
+fi
+
+CIRCULAR_COUNT="N/A"
+if [ "$STRUCTURE_EXISTS" == "available" ] && [ -f "build-reports/structure/summary.json" ]; then
+  CIRCULAR_COUNT=$(jq -r '.circular_dependencies // 0' build-reports/structure/summary.json 2>/dev/null || echo "0")
+fi
+
+DOC_COVERAGE="N/A"
+if [ "$DOCUMENTATION_EXISTS" == "available" ] && [ -f "build-reports/documentation/data.json" ]; then
+  DOC_COVERAGE=$(jq -r '.summary.coverage_pct // 0' build-reports/documentation/data.json 2>/dev/null || echo "0")
+fi
+
+VISUAL_CHANGED="N/A"
+if [ "$VISUAL_EXISTS" == "available" ] && [ -f "build-reports/visual-regression/data.json" ]; then
+  VISUAL_CHANGED=$(jq -r '.summary.changed_pages // 0' build-reports/visual-regression/data.json 2>/dev/null || echo "0")
+fi
+
+TRENDS_COUNT="N/A"
+if [ "$TRENDS_EXISTS" == "available" ] && [ -f "build-reports/trends/data.json" ]; then
+  TRENDS_COUNT=$(jq -r 'length' build-reports/trends/data.json 2>/dev/null || echo "0")
+fi
+
 # Determine status for each report (has-error, has-warning, or ok)
 # Treat unavailable reports as having errors
 
@@ -203,31 +228,6 @@ elif [[ "$COVERAGE_STATUS" == "has-warning" || "$SECURITY_STATUS" == "has-warnin
         "$COMPLEXITY_STATUS" == "has-warning" || "$STRUCTURE_STATUS" == "has-warning" || "$DOCUMENTATION_STATUS" == "has-warning" || \
         "$VISUAL_STATUS" == "has-warning" || "$TRENDS_STATUS" == "has-warning" ]]; then
   PAGE_STATUS="has-warning"
-fi
-
-COMPLEXITY_COUNT="N/A"
-if [ "$COMPLEXITY_EXISTS" == "available" ] && [ -f "build-reports/complexity/summary.json" ]; then
-  COMPLEXITY_COUNT=$(jq -r '.complexity_issues // 0' build-reports/complexity/summary.json 2>/dev/null || echo "0")
-fi
-
-CIRCULAR_COUNT="N/A"
-if [ "$STRUCTURE_EXISTS" == "available" ] && [ -f "build-reports/structure/summary.json" ]; then
-  CIRCULAR_COUNT=$(jq -r '.circular_dependencies // 0' build-reports/structure/summary.json 2>/dev/null || echo "0")
-fi
-
-DOC_COVERAGE="N/A"
-if [ "$DOCUMENTATION_EXISTS" == "available" ] && [ -f "build-reports/documentation/data.json" ]; then
-  DOC_COVERAGE=$(jq -r '.summary.coverage_pct // 0' build-reports/documentation/data.json 2>/dev/null || echo "0")
-fi
-
-VISUAL_CHANGED="N/A"
-if [ "$VISUAL_EXISTS" == "available" ] && [ -f "build-reports/visual-regression/data.json" ]; then
-  VISUAL_CHANGED=$(jq -r '.summary.changed_pages // 0' build-reports/visual-regression/data.json 2>/dev/null || echo "0")
-fi
-
-TRENDS_COUNT="N/A"
-if [ "$TRENDS_EXISTS" == "available" ] && [ -f "build-reports/trends/data.json" ]; then
-  TRENDS_COUNT=$(jq -r 'length' build-reports/trends/data.json 2>/dev/null || echo "0")
 fi
 
 # Metadata JSON
