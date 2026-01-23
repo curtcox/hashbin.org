@@ -3,8 +3,8 @@
  * Calculates costs for rate limit bandwidth purchases
  */
 
-// Rate per byte: $0.01 per GB
-export const RATE_PER_BYTE = 0.01 / (1024 * 1024 * 1024); // $0.00000000000931 per byte
+// Rate per byte: $0.02 per GB (updated from $0.01 for profitability)
+export const RATE_PER_BYTE = 0.02 / (1024 * 1024 * 1024); // $0.00000000001863 per byte
 
 // Minimum time between requests: 100ms
 export const MINIMUM_MTBR_MS = 100;
