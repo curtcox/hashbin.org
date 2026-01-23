@@ -269,6 +269,10 @@
               <span class="nav-icon">📦</span>
               <span>My Uploads</span>
             </a>
+            <a href="/dashboard/suppliers/">
+              <span class="nav-icon">🔗</span>
+              <span>Suppliers</span>
+            </a>
             <a href="/deposit.html">
               <span class="nav-icon">💰</span>
               <span>Add Funds</span>
@@ -333,6 +337,17 @@
               <h3 style="margin-bottom: 1rem;">Current Rate Limit Status</h3>
               <div id="current-rate-limit-status">
                 <p style="color: var(--color-text-light);">Loading rate limit status...</p>
+          </div>
+        </div>
+        
+        <!-- Alternate Suppliers -->
+        <div class="info-card" id="alternate-suppliers-card" style="display: none;">
+          <h3 style="margin-bottom: 1rem;">🔗 Alternate Suppliers</h3>
+          <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+            This content is also available from the following alternate suppliers:
+          </p>
+          <div id="alternate-suppliers-list">
+            <p style="color: var(--color-text-light);">Loading alternate suppliers...</p>
           </div>
         </div>
         
@@ -472,6 +487,57 @@
     } else if (cid) {
       document.getElementById('breadcrumb-hash').textContent = cid;
     }
+    
+    // Load alternate suppliers
+    async function loadAlternateSuppliers() {
+      if (!cid) return;
+      
+      try {
+        const { getCIDSuppliers, formatRelativeTime } = await import('/js/suppliers.js');
+        const suppliers = await getCIDSuppliers(cid);
+        
+        if (suppliers && suppliers.length > 0) {
+          const suppliersCard = document.getElementById('alternate-suppliers-card');
+          const suppliersList = document.getElementById('alternate-suppliers-list');
+          
+          suppliersCard.style.display = 'block';
+          suppliersList.innerHTML = suppliers.map(supplier => `
+            <div style="background: var(--color-bg); padding: 1rem; border-radius: 4px; margin-bottom: 0.75rem; border: 1px solid var(--color-border);">
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.5rem;">
+                <div>
+                  <strong style="color: var(--color-text);">${escapeHtml(supplier.supplier_name)}</strong>
+                  <div style="font-size: 0.85rem; color: var(--color-text-light); margin-top: 0.25rem;">
+                    Registered by: ${escapeHtml(supplier.owner_name || 'Unknown')}
+                  </div>
+                </div>
+                <a href="/dashboard/suppliers/${supplier.supplier_id}" 
+                   class="btn btn-secondary btn-sm" 
+                   style="flex-shrink: 0;">
+                  View Supplier
+                </a>
+              </div>
+              <div style="font-family: 'Courier New', monospace; font-size: 0.85rem; color: var(--color-text-light); margin-bottom: 0.5rem; word-break: break-all;">
+                ${escapeHtml(supplier.supplier_url)}
+              </div>
+              <div style="font-size: 0.85rem; color: var(--color-text-light);">
+                Last verified: ${formatRelativeTime(supplier.verified_at)}
+              </div>
+            </div>
+          `).join('');
+        }
+      } catch (error) {
+        console.error('Error loading alternate suppliers:', error);
+      }
+    }
+    
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Load suppliers after page loads
+    loadAlternateSuppliers();
   </script>
   <script type="module" src="/js/app.js"></script>
   <script type="module" src="/js/rate-limit-purchase.js"></script>

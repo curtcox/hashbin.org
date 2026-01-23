@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Supplier Management - HashBin.org">
+  <title>Supplier Management - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .supplier-card {
+      background: var(--color-bg-secondary);
+      padding: 1.5rem;
+      border-radius: 8px;
+      margin-bottom: 1rem;
+      border: 1px solid var(--color-border);
+    }
+    
+    .supplier-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 1rem;
+    }
+    
+    .supplier-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: 0.5rem;
+    }
+    
+    .supplier-url {
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      color: var(--color-text-light);
+      word-break: break-all;
+    }
+    
+    .supplier-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .supplier-meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .supplier-meta-label {
+      font-size: 0.8rem;
+      color: var(--color-text-light);
+      margin-bottom: 0.25rem;
+    }
+    
+    .supplier-meta-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    
+    .supplier-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    
+    .badge-success {
+      background: #10b981;
+      color: white;
+    }
+    
+    .badge-warning {
+      background: #f59e0b;
+      color: white;
+    }
+    
+    .badge-error {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .badge-secondary {
+      background: var(--color-bg-secondary);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+    }
+    
+    .badge-info {
+      background: #3b82f6;
+      color: white;
+    }
+    
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--color-text-light);
+    }
+    
+    .empty-state-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+    }
+    
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+    
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    
+    .form-help {
+      display: block;
+      margin-top: 0.25rem;
+      font-size: 0.875rem;
+      color: var(--color-text-light);
+    }
+    
+    .form-control {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: 4px;
+      font-size: 1rem;
+      background: var(--color-bg);
+      color: var(--color-text);
+    }
+    
+    .form-control:focus {
+      outline: none;
+      border-color: var(--color-primary);
+    }
+    
+    .radio-group {
+      display: flex;
+      gap: 1.5rem;
+      margin-top: 0.5rem;
+    }
+    
+    .radio-option {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      overflow-y: auto;
+    }
+    
+    .modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    
+    .modal-content {
+      background: var(--color-bg);
+      border-radius: 8px;
+      padding: 2rem;
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+    
+    .modal-title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--color-text-light);
+      padding: 0;
+      line-height: 1;
+    }
+    
+    .modal-close:hover {
+      color: var(--color-text);
+    }
+    
+    .error-list {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 4px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+    
+    .error-list ul {
+      margin: 0;
+      padding-left: 1.5rem;
+      color: #dc2626;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header"></header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <div class="dashboard-layout">
+        <!-- Dashboard Sidebar -->
+        <aside class="dashboard-sidebar">
+          <nav>
+            <a href="/dashboard.html">
+              <span class="nav-icon">📊</span>
+              <span>Overview</span>
+            </a>
+            <a href="/api-keys.html">
+              <span class="nav-icon">🔑</span>
+              <span>API Keys</span>
+            </a>
+            <a href="/dashboard/uploads/">
+              <span class="nav-icon">📦</span>
+              <span>My Uploads</span>
+            </a>
+            <a href="/dashboard/suppliers/" class="nav-active">
+              <span class="nav-icon">🔗</span>
+              <span>Suppliers</span>
+            </a>
+            <a href="/deposit.html">
+              <span class="nav-icon">💰</span>
+              <span>Add Funds</span>
+            </a>
+            <a href="/transactions.html">
+              <span class="nav-icon">💳</span>
+              <span>Transactions</span>
+            </a>
+            <a href="#" onclick="return false;" style="cursor: not-allowed; opacity: 0.6;">
+              <span class="nav-icon">⚙️</span>
+              <span>Account Settings</span>
+              <span class="coming-soon">(Coming Soon)</span>
+            </a>
+            <a href="/terms.html">
+              <span class="nav-icon">📄</span>
+              <span>Terms of Service</span>
+            </a>
+          </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="dashboard-content">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h1>Alternate Suppliers</h1>
+            <button id="btn-add-supplier" class="btn btn-primary">+ Add Supplier</button>
+          </div>
+
+          <div class="card" style="margin-bottom: 1.5rem;">
+            <p style="margin: 0; color: var(--color-text-light);">
+              Register alternate suppliers that can serve your content when HashBin.org storage is unavailable. 
+              You can register up to 20 suppliers.
+            </p>
+          </div>
+
+          <!-- Loading State -->
+          <div id="loading-state" style="text-align: center; padding: 3rem;">
+            <div class="spinner"></div>
+            <p style="margin-top: 1rem; color: var(--color-text-light);">Loading suppliers...</p>
+          </div>
+
+          <!-- Error State -->
+          <div id="error-state" class="card" style="display: none;">
+            <div style="text-align: center; color: var(--color-error);">
+              <p><strong>Error loading suppliers</strong></p>
+              <p id="error-message" style="color: var(--color-text-light);"></p>
+              <button onclick="location.reload()" class="btn btn-secondary" style="margin-top: 1rem;">Retry</button>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div id="empty-state" class="card" style="display: none;">
+            <div class="empty-state">
+              <div class="empty-state-icon">🔗</div>
+              <h3>No Suppliers Yet</h3>
+              <p>Add your first alternate supplier to enable content fallback.</p>
+              <button onclick="document.getElementById('btn-add-supplier').click()" class="btn btn-primary" style="margin-top: 1rem;">
+                + Add Your First Supplier
+              </button>
+            </div>
+          </div>
+
+          <!-- Suppliers List -->
+          <div id="suppliers-list"></div>
+
+          <!-- Pagination -->
+          <div id="pagination" style="display: none; margin-top: 2rem; text-align: center;">
+            <button id="btn-prev" class="btn btn-secondary" disabled>← Previous</button>
+            <span id="pagination-info" style="margin: 0 1rem; color: var(--color-text-light);"></span>
+            <button id="btn-next" class="btn btn-secondary" disabled>Next →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add Supplier Modal -->
+  <div id="modal-add-supplier" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">Add Alternate Supplier</h2>
+        <button class="modal-close" onclick="closeAddSupplierModal()">×</button>
+      </div>
+
+      <div id="form-errors" class="error-list" style="display: none;">
+        <ul id="error-list"></ul>
+      </div>
+
+      <form id="form-add-supplier">
+        <div class="form-group">
+          <label class="form-label" for="supplier-name">Supplier Name</label>
+          <input type="text" id="supplier-name" class="form-control" maxlength="100" required
+                 placeholder="e.g., My 256t Mirror">
+          <span class="form-help">A display name for this supplier (max 100 characters)</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Supplier Type</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input type="radio" name="supplier-type" value="SINGLE_CID" checked>
+              <span>Single CID</span>
+            </label>
+            <label class="radio-option">
+              <input type="radio" name="supplier-type" value="CID_GROUP">
+              <span>CID Group</span>
+            </label>
+          </div>
+          <span class="form-help">Single CID serves one piece of content, CID Group contains multiple CIDs</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="supplier-base-url">Base URL</label>
+          <input type="url" id="supplier-base-url" class="form-control" required
+                 placeholder="https://256t.org">
+          <span class="form-help">HTTPS URL where content is served (e.g., https://256t.org or https://raw.githubusercontent.com/user/repo/main/cids)</span>
+        </div>
+
+        <div class="form-group" id="single-cid-group">
+          <label class="form-label" for="supplier-single-cid">CID</label>
+          <input type="text" id="supplier-single-cid" class="form-control" 
+                 placeholder="AAAAA757nKdtrwSEpqwvo5YVhusXd4wN5uOnCv7dwzQj...">
+          <span class="form-help">The Content ID this supplier serves</span>
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
+          <button type="button" class="btn btn-secondary" onclick="closeAddSupplierModal()">Cancel</button>
+          <button type="submit" class="btn btn-primary">Add Supplier</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { loadNavHeader } from '/js/nav-header.js';
+    import { initAuthGate } from '/js/auth-gate.js';
+    import {
+      listSuppliers,
+      createSupplier,
+      updateSupplier,
+      deleteSupplier,
+      rescanSupplier,
+      formatSupplierType,
+      formatScanStatus,
+      formatSuccessRate,
+      formatResponseTime,
+      formatRelativeTime,
+      canRescan,
+      getRescanCooldown,
+      validateSupplierForm
+    } from '/js/suppliers.js';
+
+    // Global state
+    let suppliers = [];
+    let currentOffset = 0;
+    const pageSize = 20;
+
+    // Initialize page
+    async function init() {
+      await loadNavHeader();
+      await initAuthGate();
+      await loadSuppliers();
+      
+      // Setup event listeners
+      document.getElementById('btn-add-supplier').addEventListener('click', openAddSupplierModal);
+      document.getElementById('form-add-supplier').addEventListener('submit', handleAddSupplier);
+      document.getElementById('btn-prev').addEventListener('click', () => loadSuppliers(currentOffset - pageSize));
+      document.getElementById('btn-next').addEventListener('click', () => loadSuppliers(currentOffset + pageSize));
+      
+      // Setup supplier type toggle
+      document.querySelectorAll('input[name="supplier-type"]').forEach(radio => {
+        radio.addEventListener('change', updateSupplierTypeFields);
+      });
+    }
+
+    // Load suppliers
+    async function loadSuppliers(offset = 0) {
+      currentOffset = offset;
+      showLoading();
+      
+      try {
+        const result = await listSuppliers({ limit: pageSize, offset });
+        suppliers = result.suppliers;
+        
+        if (suppliers.length === 0 && offset === 0) {
+          showEmptyState();
+        } else {
+          showSuppliersList();
+          renderSuppliers();
+          updatePagination(result.total, result.has_more);
+        }
+      } catch (error) {
+        console.error('Error loading suppliers:', error);
+        showError(error.message);
+      }
+    }
+
+    // Render suppliers list
+    function renderSuppliers() {
+      const list = document.getElementById('suppliers-list');
+      list.innerHTML = suppliers.map(supplier => `
+        <div class="supplier-card">
+          <div class="supplier-header">
+            <div style="flex: 1;">
+              <div class="supplier-title">${escapeHtml(supplier.name)}</div>
+              <div class="supplier-url">${escapeHtml(supplier.base_url)}</div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-end;">
+              <span class="badge ${supplier.is_active ? 'badge-success' : 'badge-secondary'}">
+                ${supplier.is_active ? 'Active' : 'Inactive'}
+              </span>
+              <span class="badge ${formatScanStatus(supplier.scan_status).class}">
+                ${formatScanStatus(supplier.scan_status).text}
+              </span>
+            </div>
+          </div>
+          
+          <div class="supplier-meta">
+            <div class="supplier-meta-item">
+              <span class="supplier-meta-label">Type</span>
+              <span class="supplier-meta-value">${formatSupplierType(supplier.supplier_type)}</span>
+            </div>
+            <div class="supplier-meta-item">
+              <span class="supplier-meta-label">CIDs</span>
+              <span class="supplier-meta-value">${supplier.cid_count || 0}</span>
+            </div>
+            <div class="supplier-meta-item">
+              <span class="supplier-meta-label">Success Rate</span>
+              <span class="supplier-meta-value">${formatSuccessRate(supplier.stats)}</span>
+            </div>
+            <div class="supplier-meta-item">
+              <span class="supplier-meta-label">Avg Response</span>
+              <span class="supplier-meta-value">${formatResponseTime(supplier.stats?.avg_response_time_ms)}</span>
+            </div>
+            <div class="supplier-meta-item">
+              <span class="supplier-meta-label">Last Scanned</span>
+              <span class="supplier-meta-value">${formatRelativeTime(supplier.last_scanned_at)}</span>
+            </div>
+            <div class="supplier-meta-item">
+              <span class="supplier-meta-label">Created</span>
+              <span class="supplier-meta-value">${formatRelativeTime(supplier.created_at)}</span>
+            </div>
+          </div>
+          
+          ${supplier.scan_error ? `
+            <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 4px; padding: 0.75rem; margin-top: 1rem;">
+              <strong style="color: #dc2626;">Scan Error:</strong>
+              <span style="color: #991b1b;">${escapeHtml(supplier.scan_error)}</span>
+            </div>
+          ` : ''}
+          
+          <div class="supplier-actions" style="margin-top: 1rem;">
+            <a href="/dashboard/suppliers/${supplier.supplier_id}" class="btn btn-secondary btn-sm">View Details</a>
+            ${canRescan(supplier.last_scanned_at) ? `
+              <button onclick="handleRescan('${supplier.supplier_id}')" class="btn btn-secondary btn-sm">
+                🔄 Rescan
+              </button>
+            ` : `
+              <button class="btn btn-secondary btn-sm" disabled title="Cooldown: ${getRescanCooldown(supplier.last_scanned_at)}">
+                🔄 Rescan (${getRescanCooldown(supplier.last_scanned_at)})
+              </button>
+            `}
+            <button onclick="handleToggleActive('${supplier.supplier_id}', ${!supplier.is_active})" 
+                    class="btn btn-secondary btn-sm">
+              ${supplier.is_active ? 'Disable' : 'Enable'}
+            </button>
+            <button onclick="handleDelete('${supplier.supplier_id}')" class="btn btn-danger btn-sm">
+              Delete
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Update pagination
+    function updatePagination(total, hasMore) {
+      const pagination = document.getElementById('pagination');
+      const prevBtn = document.getElementById('btn-prev');
+      const nextBtn = document.getElementById('btn-next');
+      const info = document.getElementById('pagination-info');
+      
+      if (total <= pageSize) {
+        pagination.style.display = 'none';
+        return;
+      }
+      
+      pagination.style.display = 'block';
+      prevBtn.disabled = currentOffset === 0;
+      nextBtn.disabled = !hasMore;
+      
+      const start = currentOffset + 1;
+      const end = Math.min(currentOffset + suppliers.length, total);
+      info.textContent = `${start}-${end} of ${total}`;
+    }
+
+    // Modal functions
+    function openAddSupplierModal() {
+      document.getElementById('modal-add-supplier').classList.add('active');
+      document.getElementById('form-add-supplier').reset();
+      document.getElementById('form-errors').style.display = 'none';
+      updateSupplierTypeFields();
+    }
+
+    window.closeAddSupplierModal = function() {
+      document.getElementById('modal-add-supplier').classList.remove('active');
+    };
+
+    // Update form fields based on supplier type
+    function updateSupplierTypeFields() {
+      const type = document.querySelector('input[name="supplier-type"]:checked').value;
+      const singleCidGroup = document.getElementById('single-cid-group');
+      const singleCidInput = document.getElementById('supplier-single-cid');
+      
+      if (type === 'SINGLE_CID') {
+        singleCidGroup.style.display = 'block';
+        singleCidInput.required = true;
+      } else {
+        singleCidGroup.style.display = 'none';
+        singleCidInput.required = false;
+      }
+    }
+
+    // Handle add supplier form submission
+    async function handleAddSupplier(e) {
+      e.preventDefault();
+      
+      const formData = {
+        name: document.getElementById('supplier-name').value.trim(),
+        supplier_type: document.querySelector('input[name="supplier-type"]:checked').value,
+        base_url: document.getElementById('supplier-base-url').value.trim(),
+      };
+      
+      if (formData.supplier_type === 'SINGLE_CID') {
+        formData.single_cid = document.getElementById('supplier-single-cid').value.trim();
+      }
+      
+      // Validate form
+      const validation = validateSupplierForm(formData);
+      if (!validation.valid) {
+        showFormErrors(validation.errors);
+        return;
+      }
+      
+      // Submit form
+      try {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Adding...';
+        
+        await createSupplier(formData);
+        
+        window.closeAddSupplierModal();
+        await loadSuppliers(currentOffset);
+        
+        // Show success message
+        alert('Supplier added successfully! Scanning will begin shortly.');
+      } catch (error) {
+        console.error('Error adding supplier:', error);
+        showFormErrors([error.message || 'Failed to add supplier']);
+      } finally {
+        const submitBtn = e.target.querySelector('button[type="submit"]');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Add Supplier';
+      }
+    }
+
+    // Show form validation errors
+    function showFormErrors(errors) {
+      const errorList = document.getElementById('error-list');
+      errorList.innerHTML = errors.map(err => `<li>${escapeHtml(err)}</li>`).join('');
+      document.getElementById('form-errors').style.display = 'block';
+    }
+
+    // Handle rescan
+    window.handleRescan = async function(supplierId) {
+      if (!confirm('Rescan this supplier? This will verify all CIDs.')) {
+        return;
+      }
+      
+      try {
+        await rescanSupplier(supplierId);
+        alert('Rescan initiated successfully!');
+        await loadSuppliers(currentOffset);
+      } catch (error) {
+        console.error('Error rescanning supplier:', error);
+        alert(`Failed to rescan: ${error.message}`);
+      }
+    };
+
+    // Handle toggle active
+    window.handleToggleActive = async function(supplierId, isActive) {
+      try {
+        await updateSupplier(supplierId, { is_active: isActive });
+        await loadSuppliers(currentOffset);
+      } catch (error) {
+        console.error('Error updating supplier:', error);
+        alert(`Failed to update supplier: ${error.message}`);
+      }
+    };
+
+    // Handle delete
+    window.handleDelete = async function(supplierId) {
+      if (!confirm('Delete this supplier? This action cannot be undone.')) {
+        return;
+      }
+      
+      try {
+        await deleteSupplier(supplierId);
+        await loadSuppliers(currentOffset);
+      } catch (error) {
+        console.error('Error deleting supplier:', error);
+        alert(`Failed to delete supplier: ${error.message}`);
+      }
+    };
+
+    // UI state functions
+    function showLoading() {
+      document.getElementById('loading-state').style.display = 'block';
+      document.getElementById('error-state').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('suppliers-list').style.display = 'none';
+      document.getElementById('pagination').style.display = 'none';
+    }
+
+    function showError(message) {
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('error-state').style.display = 'block';
+      document.getElementById('error-message').textContent = message;
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('suppliers-list').style.display = 'none';
+      document.getElementById('pagination').style.display = 'none';
+    }
+
+    function showEmptyState() {
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('error-state').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'block';
+      document.getElementById('suppliers-list').style.display = 'none';
+      document.getElementById('pagination').style.display = 'none';
+    }
+
+    function showSuppliersList() {
+      document.getElementById('loading-state').style.display = 'none';
+      document.getElementById('error-state').style.display = 'none';
+      document.getElementById('empty-state').style.display = 'none';
+      document.getElementById('suppliers-list').style.display = 'block';
+    }
+
+    // Utility function
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Initialize on page load
+    init();
+  </script>
+</body>
+</html>
