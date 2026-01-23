@@ -78,6 +78,11 @@ export class ContentMetadata {
         return await this.removeSupplier(data);
       }
 
+      // Delete content metadata (hard delete for expiration)
+      if (url.pathname === '/content' && method === 'DELETE') {
+        return await this.deleteContent();
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -681,6 +686,36 @@ export class ContentMetadata {
     );
 
     await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Delete content metadata (hard delete)
+   * Used by expiration system to remove expired content
+   */
+  async deleteContent() {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      // Already deleted or never existed
+      return new Response(
+        JSON.stringify({ success: true, alreadyDeleted: true }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    // Delete all stored data for this content
+    await this.state.storage.deleteAll();
 
     return new Response(
       JSON.stringify({ success: true }),
