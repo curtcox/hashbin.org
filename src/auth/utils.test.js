@@ -364,3 +364,156 @@ describe('Authentication Utilities - P0 Tests', () => {
     });
   });
 });
+
+describe('Authentication Utilities - P1 Encryption Tests', () => {
+  // Helper to generate a mock 256-bit encryption key (32 bytes base64 encoded)
+  const generateMockEncryptionKey = () => {
+    const keyBytes = new Uint8Array(32);
+    crypto.getRandomValues(keyBytes);
+    return btoa(String.fromCharCode(...keyBytes));
+  };
+
+  // ENCRYPT-01: Encrypt API key with AES-256-GCM
+  describe('ENCRYPT-01: Encrypt API key with AES-256-GCM', () => {
+    it('should encrypt API key successfully', async () => {
+      const { generateApiKey, encryptApiKey } = await import('./utils.js');
+      const apiKey = generateApiKey();
+      const encryptionKey = generateMockEncryptionKey();
+
+      const encrypted = await encryptApiKey(apiKey, encryptionKey);
+
+      expect(encrypted).toBeDefined();
+      expect(typeof encrypted).toBe('string');
+      expect(encrypted.length).toBeGreaterThan(0);
+      expect(encrypted).not.toBe(apiKey);
+    });
+
+    it('should produce different output for same key on repeated calls', async () => {
+      const { generateApiKey, encryptApiKey } = await import('./utils.js');
+      const apiKey = generateApiKey();
+      const encryptionKey = generateMockEncryptionKey();
+
+      const encrypted1 = await encryptApiKey(apiKey, encryptionKey);
+      const encrypted2 = await encryptApiKey(apiKey, encryptionKey);
+
+      // Should be different due to random IV
+      expect(encrypted1).not.toBe(encrypted2);
+    });
+  });
+
+  // ENCRYPT-02: Decrypt API key successfully
+  describe('ENCRYPT-02: Decrypt API key successfully', () => {
+    it('should decrypt encrypted API key', async () => {
+      const { generateApiKey, encryptApiKey, decryptApiKey } = await import('./utils.js');
+      const apiKey = generateApiKey();
+      const encryptionKey = generateMockEncryptionKey();
+
+      const encrypted = await encryptApiKey(apiKey, encryptionKey);
+      const decrypted = await decryptApiKey(encrypted, encryptionKey);
+
+      expect(decrypted).toBe(apiKey);
+    });
+
+    it('should decrypt multiple different keys correctly', async () => {
+      const { generateApiKey, encryptApiKey, decryptApiKey } = await import('./utils.js');
+      const encryptionKey = generateMockEncryptionKey();
+
+      const apiKey1 = generateApiKey();
+      const apiKey2 = generateApiKey();
+      const apiKey3 = generateApiKey();
+
+      const encrypted1 = await encryptApiKey(apiKey1, encryptionKey);
+      const encrypted2 = await encryptApiKey(apiKey2, encryptionKey);
+      const encrypted3 = await encryptApiKey(apiKey3, encryptionKey);
+
+      expect(await decryptApiKey(encrypted1, encryptionKey)).toBe(apiKey1);
+      expect(await decryptApiKey(encrypted2, encryptionKey)).toBe(apiKey2);
+      expect(await decryptApiKey(encrypted3, encryptionKey)).toBe(apiKey3);
+    });
+  });
+
+  // ENCRYPT-03: Decryption fails with wrong key
+  describe('ENCRYPT-03: Decryption fails with wrong key', () => {
+    it('should fail to decrypt with wrong encryption key', async () => {
+      const { generateApiKey, encryptApiKey, decryptApiKey } = await import('./utils.js');
+      const apiKey = generateApiKey();
+      const encryptionKey1 = generateMockEncryptionKey();
+      const encryptionKey2 = generateMockEncryptionKey();
+
+      const encrypted = await encryptApiKey(apiKey, encryptionKey1);
+
+      await expect(
+        decryptApiKey(encrypted, encryptionKey2)
+      ).rejects.toThrow('Decryption failed');
+    });
+
+    it('should fail to decrypt with corrupted data', async () => {
+      const { decryptApiKey } = await import('./utils.js');
+      const encryptionKey = generateMockEncryptionKey();
+      const corruptedData = 'invalid_base64_data!!!';
+
+      await expect(
+        decryptApiKey(corruptedData, encryptionKey)
+      ).rejects.toThrow();
+    });
+  });
+
+  // ENCRYPT-04: Each encryption uses unique IV
+  describe('ENCRYPT-04: Each encryption uses unique IV', () => {
+    it('should use different IV for each encryption', async () => {
+      const { generateApiKey, encryptApiKey } = await import('./utils.js');
+      const apiKey = generateApiKey();
+      const encryptionKey = generateMockEncryptionKey();
+
+      const encrypted1 = await encryptApiKey(apiKey, encryptionKey);
+      const encrypted2 = await encryptApiKey(apiKey, encryptionKey);
+
+      // Decode base64 to check IV (first 12 bytes)
+      const data1 = Uint8Array.from(atob(encrypted1), c => c.charCodeAt(0));
+      const data2 = Uint8Array.from(atob(encrypted2), c => c.charCodeAt(0));
+
+      const iv1 = data1.slice(0, 12);
+      const iv2 = data2.slice(0, 12);
+
+      // IVs should be different
+      expect(Buffer.from(iv1).toString('hex')).not.toBe(Buffer.from(iv2).toString('hex'));
+    });
+
+    it('should include IV in encrypted output', async () => {
+      const { generateApiKey, encryptApiKey } = await import('./utils.js');
+      const apiKey = generateApiKey();
+      const encryptionKey = generateMockEncryptionKey();
+
+      const encrypted = await encryptApiKey(apiKey, encryptionKey);
+      const data = Uint8Array.from(atob(encrypted), c => c.charCodeAt(0));
+
+      // Should have at least 12 bytes for IV plus some ciphertext
+      expect(data.length).toBeGreaterThan(12);
+    });
+  });
+
+  // ENCRYPT-05: Encrypted output is base64 encoded
+  describe('ENCRYPT-05: Encrypted output is base64 encoded', () => {
+    it('should produce valid base64 output', async () => {
+      const { generateApiKey, encryptApiKey } = await import('./utils.js');
+      const apiKey = generateApiKey();
+      const encryptionKey = generateMockEncryptionKey();
+
+      const encrypted = await encryptApiKey(apiKey, encryptionKey);
+
+      // Valid base64 should decode without error
+      expect(() => atob(encrypted)).not.toThrow();
+    });
+
+    it('should only contain base64 characters', async () => {
+      const { generateApiKey, encryptApiKey } = await import('./utils.js');
+      const apiKey = generateApiKey();
+      const encryptionKey = generateMockEncryptionKey();
+
+      const encrypted = await encryptApiKey(apiKey, encryptionKey);
+
+      // Base64 regex: only A-Z, a-z, 0-9, +, /, and = for padding
+      expect(encrypted).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    });
+  });
+});
