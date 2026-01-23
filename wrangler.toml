@@ -88,6 +88,11 @@ name = "DELETION_RECORD"
 class_name = "DeletionRecord"
 script_name = "hashbin-worker-prod"
 
+[[durable_objects.bindings]]
+name = "EXPIRATION_INDEX"
+class_name = "ExpirationIndex"
+script_name = "hashbin-worker-prod"
+
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -122,6 +127,10 @@ new_sqlite_classes = ["InfrastructureCost"]
 tag = "v6"
 new_sqlite_classes = ["DeletionRecord"]
 
+[[migrations]]
+tag = "v7"
+new_sqlite_classes = ["ExpirationIndex"]
+
 # Scheduled jobs (cron triggers)
 [triggers]
-crons = ["0 */6 * * *"]  # Run every 6 hours
+crons = ["0 2 * * *"]  # Daily at 2 AM UTC for content expiration

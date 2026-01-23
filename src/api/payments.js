@@ -377,7 +377,7 @@ async function handleCheckoutSessionCompleted(session, env) {
 
       // Extend retention
       const transactionId = crypto.randomUUID();
-      await contentMetadataStub.fetch(
+      const extendResponse = await contentMetadataStub.fetch(
         new Request('http://internal/extend', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -389,6 +389,31 @@ async function handleCheckoutSessionCompleted(session, env) {
           })
         })
       );
+
+      const extendData = await extendResponse.json();
+
+      // Update ExpirationIndex with new expiration date
+      if (content.expires_at && extendData.expires_at) {
+        try {
+          const expirationIndexId = env.EXPIRATION_INDEX.idFromName('global');
+          const expirationIndexStub = env.EXPIRATION_INDEX.get(expirationIndexId);
+          
+          await expirationIndexStub.fetch(
+            new Request('http://internal/update', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                hash_256t: cid,
+                old_expires_at: content.expires_at,
+                new_expires_at: extendData.expires_at
+              })
+            })
+          );
+        } catch (error) {
+          // Log error but don't fail the donation
+          console.error('Failed to update ExpirationIndex:', error);
+        }
+      }
 
       // If donor is authenticated, record transaction
       if (donorId) {

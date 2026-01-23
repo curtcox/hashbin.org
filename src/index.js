@@ -16,6 +16,7 @@ export { AuditLog } from './durable-objects/audit-log.js';
 export { SupplierRegistry } from './durable-objects/supplier-registry.js';
 export { InfrastructureCost } from './durable-objects/infrastructure-cost.js';
 export { DeletionRecord } from './durable-objects/deletion-record.js';
+export { ExpirationIndex } from './durable-objects/expiration-index.js';
 
 // Import API route handlers
 import {
@@ -234,7 +235,8 @@ export default {
 
   /**
    * Scheduled handler for cron jobs
-   * Runs every 6 hours for:
+   * Runs daily at 2 AM UTC for:
+   * - Content expiration processing
    * - Platform statistics snapshot computation
    * - Audit log cleanup (1-year retention)
    * - Anomaly detection
@@ -243,18 +245,120 @@ export default {
     try {
       console.log('Scheduled job executed:', new Date().toISOString());
 
-      // 1. Compute platform statistics snapshot
+      // 1. Process expired content
+      await this.processExpiredContent(env);
+
+      // 2. Compute platform statistics snapshot
       await this.computePlatformSnapshot(env);
 
-      // 2. Clean up old audit log entries (older than 1 year)
+      // 3. Clean up old audit log entries (older than 1 year)
       await this.cleanupAuditLog(env);
 
-      // 3. Run anomaly detection
+      // 4. Run anomaly detection
       await this.runAnomalyDetection(env);
 
       console.log('Scheduled tasks completed');
     } catch (error) {
       console.error('Scheduled job error:', error);
+    }
+  },
+
+  /**
+   * Process expired content
+   * Batch delete content that has expired
+   */
+  async processExpiredContent(env) {
+    try {
+      console.log('Processing expired content...');
+      
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const expirationIndexId = env.EXPIRATION_INDEX.idFromName('global');
+      const expirationIndexStub = env.EXPIRATION_INDEX.get(expirationIndexId);
+      
+      // Get expired content for today
+      const expiredResponse = await expirationIndexStub.fetch(
+        new Request(`https://dummy/expired?date=${today}`, { method: 'GET' })
+      );
+      const expiredData = await expiredResponse.json();
+      const expiredHashes = expiredData.hashes || [];
+      
+      console.log(`Found ${expiredHashes.length} expired content items for ${today}`);
+      
+      let deleted = 0;
+      let skipped = 0;
+      let failed = 0;
+      const BATCH_LIMIT = 5000;
+      
+      // Process up to BATCH_LIMIT items
+      for (const hash of expiredHashes.slice(0, BATCH_LIMIT)) {
+        try {
+          // Get current metadata to check for extension ("extension wins" strategy)
+          const metadataId = env.CONTENT_METADATA.idFromName(hash);
+          const metadataStub = env.CONTENT_METADATA.get(metadataId);
+          
+          const metadataResponse = await metadataStub.fetch(
+            new Request('https://dummy/content', { method: 'GET' })
+          );
+          
+          if (metadataResponse.status === 404) {
+            // Already deleted
+            skipped++;
+            continue;
+          }
+          
+          const metadata = await metadataResponse.json();
+          const expiresDate = metadata.expires_at.split('T')[0];
+          
+          // Check if content was extended after being indexed for expiration
+          if (expiresDate > today) {
+            console.log(`Skipping ${hash}: extended to ${expiresDate}`);
+            skipped++;
+            continue;
+          }
+          
+          // Delete content from R2
+          const isInline = metadata.size_bytes && metadata.size_bytes <= 64;
+          if (!isInline) {
+            try {
+              await env.CONTENT_BUCKET.delete(hash);
+            } catch (error) {
+              console.warn(`Failed to delete R2 object ${hash}:`, error.message);
+            }
+          }
+          
+          // Delete metadata
+          await metadataStub.fetch(
+            new Request('https://dummy/content', { method: 'DELETE' })
+          );
+          
+          // Create deletion record
+          const deletionRecordId = env.DELETION_RECORD.idFromName('global');
+          const deletionRecordStub = env.DELETION_RECORD.get(deletionRecordId);
+          
+          await deletionRecordStub.fetch(
+            new Request('https://dummy/record', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({
+                hash_256t: hash,
+                reason: 'expired',
+                uploader_id: metadata.uploader_id,
+                size_bytes: metadata.size_bytes,
+                content_type: metadata.content_type
+              })
+            })
+          );
+          
+          deleted++;
+        } catch (error) {
+          failed++;
+          console.error(`Failed to delete ${hash}:`, error);
+        }
+      }
+      
+      console.log(`Expiration job complete: ${deleted} deleted, ${skipped} skipped, ${failed} failed`);
+    } catch (error) {
+      console.error('Error processing expired content:', error);
     }
   },
 
