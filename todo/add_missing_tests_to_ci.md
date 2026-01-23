@@ -76,11 +76,20 @@ This document plans the implementation of tests that were designed in planning d
 - KEYGEN-10: Maximum 25 keys per user enforced (3 tests) ✅
 - All tests passing ✅
 
+✅ **Phase 7: P1 Encryption Tests** (Complete - 10 tests)
+- Implemented P1 encryption tests in `src/auth/utils.test.js`
+- ENCRYPT-01: Encrypt API key with AES-256-GCM (2 tests) ✅
+- ENCRYPT-02: Decrypt API key successfully (2 tests) ✅
+- ENCRYPT-03: Decryption fails with wrong key (2 tests) ✅
+- ENCRYPT-04: Each encryption uses unique IV (2 tests) ✅
+- ENCRYPT-05: Encrypted output is base64 encoded (2 tests) ✅
+- All tests passing ✅
+
 ### Summary
 
-**Total JavaScript Unit Tests: 117 tests (115 passing, 2 skipped)**
+**Total JavaScript Unit Tests: 127 tests (125 passing, 2 skipped)**
 - Pricing tests: 20 tests ✅
-- Auth utils tests: 37 tests (35 passing, 2 skipped) ✅
+- Auth utils tests: 47 tests (45 passing, 2 skipped) ✅
 - Auth middleware tests: 24 tests ✅
 - Payment webhook tests: 11 tests ✅
 - Balance operation tests: 14 tests ✅
@@ -667,11 +676,11 @@ Continue with remaining tests by priority.
 
 | Category | Planned | Updated | Implemented | Gap |
 |----------|---------|---------|-------------|-----|
-| JavaScript Unit Tests | ~180 | ~186 | 117 (115 passing, 2 skipped) | 69 |
+| JavaScript Unit Tests | ~180 | ~186 | 127 (125 passing, 2 skipped) | 59 |
 | Shell API Tests | 137 | 137 | 137 | 0* |
 | Shell Validation Tests | 89 | 89 | 89 | 0* |
 | Standalone Test Scripts | ~10 | ~10 | ~10 | 0* |
-| **Total** | **~416** | **~422** | **~353** | **~69** |
+| **Total** | **~416** | **~422** | **~363** | **~59** |
 
 *Need verification that shell tests are all running in CI
 
@@ -680,11 +689,11 @@ Continue with remaining tests by priority.
 | Test File | Tests | Status |
 |-----------|-------|--------|
 | `src/utils/pricing.test.js` | 20 | ✅ All passing |
-| `src/auth/utils.test.js` | 37 | ✅ 35 passing, 2 skipped (bug found) |
+| `src/auth/utils.test.js` | 47 | ✅ 45 passing, 2 skipped (bug found) |
 | `src/auth/middleware.test.js` | 24 | ✅ All passing |
 | `src/api/payments.test.js` | 11 | ✅ All passing |
 | `src/durable-objects/user-profile.test.js` | 25 | ✅ All passing (14 balance + 11 key mgmt) |
-| **Total Implemented** | **117** | **115 passing, 2 skipped** |
+| **Total Implemented** | **127** | **125 passing, 2 skipped** |
 
 ---
 
