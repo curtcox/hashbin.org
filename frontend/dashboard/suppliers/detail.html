@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Supplier Details - HashBin.org">
+  <title>Supplier Details - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .supplier-header {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+      color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+    }
+    
+    .supplier-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    
+    .supplier-url {
+      font-family: 'Courier New', monospace;
+      font-size: 1rem;
+      word-break: break-all;
+      opacity: 0.9;
+    }
+    
+    .info-card {
+      background: var(--color-bg-secondary);
+      padding: 2rem;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+    }
+    
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.75rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    
+    .info-label {
+      font-weight: 500;
+      color: var(--color-text-light);
+    }
+    
+    .info-value {
+      font-weight: 600;
+      color: var(--color-text);
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+    
+    .badge-success {
+      background: #10b981;
+      color: white;
+    }
+    
+    .badge-warning {
+      background: #f59e0b;
+      color: white;
+    }
+    
+    .badge-error {
+      background: #ef4444;
+      color: white;
+    }
+    
+    .badge-secondary {
+      background: var(--color-bg-secondary);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+    }
+    
+    .cid-item {
+      background: var(--color-bg);
+      padding: 1rem;
+      border-radius: 4px;
+      margin-bottom: 0.75rem;
+      border: 1px solid var(--color-border);
+      font-family: 'Courier New', monospace;
+      font-size: 0.9rem;
+      word-break: break-all;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    
+    .cid-text {
+      flex: 1;
+      color: var(--color-text);
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header"></header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <!-- Breadcrumb Navigation -->
+      <nav class="breadcrumbs" style="margin-bottom: 2rem;" aria-label="Breadcrumb">
+        <a href="/dashboard.html">Dashboard</a>
+        <span class="separator">›</span>
+        <a href="/dashboard/suppliers/">Suppliers</a>
+        <span class="separator">›</span>
+        <span class="current" id="breadcrumb-name">Loading...</span>
+      </nav>
+
+      <!-- Loading State -->
+      <div id="loading" style="text-align: center; padding: 3rem;">
+        <div class="spinner"></div>
+        <p style="margin-top: 1rem; color: var(--color-text-light);">Loading supplier details...</p>
+      </div>
+
+      <!-- Error State -->
+      <div id="error" class="card" style="display: none;">
+        <div style="text-align: center; color: var(--color-error);">
+          <p><strong>Error loading supplier</strong></p>
+          <p id="error-message" style="color: var(--color-text-light);"></p>
+          <button onclick="location.reload()" class="btn btn-secondary" style="margin-top: 1rem;">Retry</button>
+        </div>
+      </div>
+
+      <!-- Supplier Details -->
+      <div id="supplier-details" style="display: none;">
+        <div class="supplier-header">
+          <div class="supplier-name" id="supplier-name"></div>
+          <div class="supplier-url" id="supplier-url"></div>
+        </div>
+
+        <!-- Supplier Information -->
+        <div class="info-card">
+          <h2 style="margin-bottom: 1rem;">Supplier Information</h2>
+          <div class="info-row">
+            <span class="info-label">Type</span>
+            <span class="info-value" id="supplier-type"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Status</span>
+            <span class="info-value" id="supplier-status"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Scan Status</span>
+            <span class="info-value" id="supplier-scan-status"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Registered By</span>
+            <span class="info-value" id="supplier-owner"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Registration Date</span>
+            <span class="info-value" id="supplier-created"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Last Scanned</span>
+            <span class="info-value" id="supplier-last-scanned"></span>
+          </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="info-card">
+          <h2 style="margin-bottom: 1rem;">Statistics</h2>
+          <div class="info-row">
+            <span class="info-label">Total Requests</span>
+            <span class="info-value" id="stats-total-requests"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Successful Requests</span>
+            <span class="info-value" id="stats-successful-requests"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Failed Requests</span>
+            <span class="info-value" id="stats-failed-requests"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Success Rate</span>
+            <span class="info-value" id="stats-success-rate"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Average Response Time</span>
+            <span class="info-value" id="stats-response-time"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Last Success</span>
+            <span class="info-value" id="stats-last-success"></span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">Last Failure</span>
+            <span class="info-value" id="stats-last-failure"></span>
+          </div>
+        </div>
+
+        <!-- Available CIDs -->
+        <div class="info-card">
+          <h2 style="margin-bottom: 1rem;">
+            Available CIDs
+            <span id="cid-count-badge" class="badge badge-secondary" style="margin-left: 0.5rem;">0</span>
+          </h2>
+          <div id="cids-list"></div>
+          <div id="cids-pagination" style="display: none; margin-top: 1.5rem; text-align: center;">
+            <button id="btn-prev-cids" class="btn btn-secondary" disabled>← Previous</button>
+            <span id="cids-pagination-info" style="margin: 0 1rem; color: var(--color-text-light);"></span>
+            <button id="btn-next-cids" class="btn btn-secondary" disabled>Next →</button>
+          </div>
+        </div>
+
+        <!-- Scan Error -->
+        <div id="scan-error-card" class="info-card" style="display: none; background: #fef2f2; border: 1px solid #fecaca;">
+          <h3 style="color: #dc2626; margin-bottom: 0.5rem;">Scan Error</h3>
+          <p id="scan-error-message" style="color: #991b1b; margin: 0;"></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { loadNavHeader } from '/js/nav-header.js';
+    import { 
+      getSupplier, 
+      formatSupplierType, 
+      formatScanStatus,
+      formatSuccessRate,
+      formatResponseTime,
+      formatRelativeTime
+    } from '/js/suppliers.js';
+
+    // Get supplier ID from URL
+    const pathParts = window.location.pathname.split('/').filter(p => p);
+    const supplierId = pathParts[pathParts.length - 1];
+
+    // Pagination state for CIDs
+    let currentCIDPage = 0;
+    const cidsPerPage = 20;
+
+    // Initialize page
+    async function init() {
+      await loadNavHeader();
+      
+      if (!supplierId) {
+        showError('No supplier ID provided');
+        return;
+      }
+      
+      await loadSupplier();
+    }
+
+    // Load supplier details
+    async function loadSupplier() {
+      showLoading();
+      
+      try {
+        const supplier = await getSupplier(supplierId);
+        
+        // Update breadcrumb
+        document.getElementById('breadcrumb-name').textContent = supplier.name;
+        
+        // Display supplier details
+        displaySupplier(supplier);
+        showDetails();
+      } catch (error) {
+        console.error('Error loading supplier:', error);
+        showError(error.message || 'Failed to load supplier');
+      }
+    }
+
+    // Display supplier details
+    function displaySupplier(supplier) {
+      // Header
+      document.getElementById('supplier-name').textContent = supplier.name;
+      document.getElementById('supplier-url').textContent = supplier.base_url;
+      
+      // Basic info
+      document.getElementById('supplier-type').textContent = formatSupplierType(supplier.supplier_type);
+      
+      const statusBadge = `<span class="badge ${supplier.is_active ? 'badge-success' : 'badge-secondary'}">
+        ${supplier.is_active ? 'Active' : 'Inactive'}
+      </span>`;
+      document.getElementById('supplier-status').innerHTML = statusBadge;
+      
+      const scanStatusInfo = formatScanStatus(supplier.scan_status);
+      const scanStatusBadge = `<span class="badge ${scanStatusInfo.class}">${scanStatusInfo.text}</span>`;
+      document.getElementById('supplier-scan-status').innerHTML = scanStatusBadge;
+      
+      document.getElementById('supplier-owner').textContent = supplier.owner_name || 'Unknown';
+      document.getElementById('supplier-created').textContent = formatRelativeTime(supplier.created_at);
+      document.getElementById('supplier-last-scanned').textContent = formatRelativeTime(supplier.last_scanned_at);
+      
+      // Statistics
+      const stats = supplier.stats || {};
+      document.getElementById('stats-total-requests').textContent = stats.total_requests || 0;
+      document.getElementById('stats-successful-requests').textContent = stats.successful_requests || 0;
+      document.getElementById('stats-failed-requests').textContent = stats.failed_requests || 0;
+      document.getElementById('stats-success-rate').textContent = formatSuccessRate(stats);
+      document.getElementById('stats-response-time').textContent = formatResponseTime(stats.avg_response_time_ms);
+      document.getElementById('stats-last-success').textContent = formatRelativeTime(stats.last_success_at);
+      document.getElementById('stats-last-failure').textContent = formatRelativeTime(stats.last_failure_at);
+      
+      // CIDs
+      const cids = supplier.discovered_cids || (supplier.single_cid ? [supplier.single_cid] : []);
+      document.getElementById('cid-count-badge').textContent = cids.length;
+      displayCIDs(cids);
+      
+      // Scan error
+      if (supplier.scan_error) {
+        document.getElementById('scan-error-card').style.display = 'block';
+        document.getElementById('scan-error-message').textContent = supplier.scan_error;
+      }
+    }
+
+    // Display CIDs with pagination
+    function displayCIDs(cids) {
+      if (cids.length === 0) {
+        document.getElementById('cids-list').innerHTML = 
+          '<p style="color: var(--color-text-light);">No CIDs available</p>';
+        return;
+      }
+      
+      const start = currentCIDPage * cidsPerPage;
+      const end = start + cidsPerPage;
+      const pageCids = cids.slice(start, end);
+      
+      document.getElementById('cids-list').innerHTML = pageCids.map(cid => `
+        <div class="cid-item">
+          <span class="cid-text">${escapeHtml(cid)}</span>
+          <a href="/dashboard/uploads/${cid}" class="btn btn-secondary btn-sm">View</a>
+        </div>
+      `).join('');
+      
+      // Update pagination
+      if (cids.length > cidsPerPage) {
+        document.getElementById('cids-pagination').style.display = 'block';
+        document.getElementById('btn-prev-cids').disabled = currentCIDPage === 0;
+        document.getElementById('btn-next-cids').disabled = end >= cids.length;
+        document.getElementById('cids-pagination-info').textContent = 
+          `${start + 1}-${Math.min(end, cids.length)} of ${cids.length}`;
+        
+        // Setup pagination buttons
+        document.getElementById('btn-prev-cids').onclick = () => {
+          if (currentCIDPage > 0) {
+            currentCIDPage--;
+            displayCIDs(cids);
+          }
+        };
+        
+        document.getElementById('btn-next-cids').onclick = () => {
+          if (end < cids.length) {
+            currentCIDPage++;
+            displayCIDs(cids);
+          }
+        };
+      }
+    }
+
+    // UI state functions
+    function showLoading() {
+      document.getElementById('loading').style.display = 'block';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('supplier-details').style.display = 'none';
+    }
+
+    function showError(message) {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'block';
+      document.getElementById('error-message').textContent = message;
+      document.getElementById('supplier-details').style.display = 'none';
+    }
+
+    function showDetails() {
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('error').style.display = 'none';
+      document.getElementById('supplier-details').style.display = 'block';
+    }
+
+    // Utility function
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Initialize on page load
+    init();
+  </script>
+</body>
+</html>

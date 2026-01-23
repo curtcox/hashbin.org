@@ -178,6 +178,15 @@ export default {
           }
         }
         
+        // Special handling for /dashboard/suppliers/{supplier_id} -> serve detail.html
+        if (url.pathname.match(/^\/dashboard\/suppliers\/[^\/]+\/?$/)) {
+          const detailRequest = new Request(new URL('/dashboard/suppliers/detail.html', url), request);
+          const detailAsset = await env.ASSETS.fetch(detailRequest);
+          if (detailAsset.status !== 404) {
+            return withGitShaComment(detailAsset, env);
+          }
+        }
+        
         // Serve static files
         const asset = await env.ASSETS.fetch(request);
         
