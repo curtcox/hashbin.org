@@ -256,6 +256,18 @@ describe('Payments API - P0 Security Tests', () => {
     it('should process event only once with same event ID', async () => {
       const event = createCheckoutSessionCompletedEvent({
         id: 'evt_unique_123',
+        data: {
+          object: {
+            id: 'cs_unique_123', // Session ID must be unique
+            client_reference_id: 'user_idempotency_test',
+            metadata: {
+              user_id: 'user_idempotency_test',
+              type: 'deposit',
+              amount_cents: '10000',
+            },
+            amount_total: 10000,
+          },
+        },
       });
       const body = JSON.stringify(event);
       
@@ -277,17 +289,30 @@ describe('Payments API - P0 Security Tests', () => {
         body,
       });
 
-      // First request should succeed
+      // First request should succeed and process
       const response1 = await handleStripeWebhook(request1, mockEnv);
       expect(response1.status).toBe(200);
 
+      // Get user profile to check balance after first processing
+      const userProfileId = mockEnv.USER_PROFILES.idFromName('user_idempotency_test');
+      const userProfileStub = mockEnv.USER_PROFILES.get(userProfileId);
+      const balanceResponse1 = await userProfileStub.fetch(
+        new Request('http://internal/balance')
+      );
+      const balance1 = await balanceResponse1.json();
+      expect(balance1.balance_cents).toBe(10000);
+
       // Second request with same event ID should be idempotent
-      // Current implementation doesn't track event IDs, but should
+      // The implementation checks if session was already processed
       const response2 = await handleStripeWebhook(request2, mockEnv);
       expect(response2.status).toBe(200);
       
-      // Note: Real implementation should prevent duplicate processing
-      // This test documents the expected behavior
+      // Balance should still be 10000, not 20000 (no double-processing)
+      const balanceResponse2 = await userProfileStub.fetch(
+        new Request('http://internal/balance')
+      );
+      const balance2 = await balanceResponse2.json();
+      expect(balance2.balance_cents).toBe(10000); // Not doubled!
     });
 
     it('should handle replay attacks gracefully', async () => {
@@ -419,7 +444,7 @@ function createMockPaymentRecords() {
   const transactions = [];
   
   return {
-    idFromName: () => ({ toString: () => 'global' }),
+    idFromName: (userId) => ({ toString: () => userId }),
     get: () => ({
       fetch: async (request) => {
         const url = new URL(request.url);
@@ -436,6 +461,22 @@ function createMockPaymentRecords() {
         }
         
         // Handle record transaction
+        if (request.method === 'POST' && url.pathname === '/transaction') {
+          const body = await request.json();
+          transactions.push(body);
+          
+          // Mark session as processed
+          if (body.stripe_session_id) {
+            processedSessions.add(body.stripe_session_id);
+          }
+          
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+        
+        // Handle legacy /record endpoint
         if (request.method === 'POST' && url.pathname === '/record') {
           const body = await request.json();
           transactions.push(body);
