@@ -19,12 +19,17 @@ This document plans the implementation of tests that were designed in planning d
 - Added npm scripts: `test:unit` and `test:unit:watch`
 - Updated `.github/workflows/local-api-tests.yml` to run unit tests
 
-✅ **Phase 2: P0 Security Tests** (Complete - 26 tests)
-- Implemented security tests in `src/auth/middleware.test.js` (10 tests)
+✅ **Phase 2: P0 Security Tests** (Complete - 40 tests)
+- Implemented security tests in `src/auth/middleware.test.js` (24 tests)
 - SEC-01: Timing attack protection (2 tests) ✅
 - SEC-02: Key enumeration prevention (4 tests) ✅
 - SEC-03: JWT signature bypass protection (3 tests) ✅
 - AUTHMW-01: Anonymous access support (2 tests) ✅
+- CLERK-01: Valid JWT acceptance (3 tests) ✅
+- CLERK-02: Expired JWT rejection (3 tests) ✅
+- CLERK-03: Malformed JWT rejection (3 tests) ✅
+- KEYVAL-03: Revoked key rejection (2 tests) ✅
+- KEYVAL-04: Expired key rejection (3 tests) ✅
 - Added SEC-06 to `src/auth/utils.test.js` (5 tests) ✅
 - Implemented webhook security tests in `src/api/payments.test.js` (11 tests)
 - SEC-10: Webhook signature validation (2 tests) ✅
@@ -51,10 +56,10 @@ This document plans the implementation of tests that were designed in planning d
 
 ### Summary
 
-**Total JavaScript Unit Tests: 76 tests (74 passing, 2 skipped)**
+**Total JavaScript Unit Tests: 92 tests (90 passing, 2 skipped)**
 - Pricing tests: 20 tests ✅
 - Auth utils tests: 37 tests (35 passing, 2 skipped) ✅
-- Auth middleware tests: 10 tests ✅
+- Auth middleware tests: 24 tests ✅
 - Payment webhook tests: 11 tests ✅
 
 ### Bugs Discovered
@@ -186,8 +191,8 @@ These were specified but never created as JavaScript test files.
 | KEYGEN-13 | Key 25 succeeds, key 26 fails | P1 | Not Implemented | VERIFY |
 | KEYVAL-01 | Valid API key is accepted | P0 | ✅ Implemented | OK |
 | KEYVAL-02 | Non-existent API key is rejected | P0 | ✅ Implemented | OK |
-| KEYVAL-03 | Revoked API key is rejected | P0 | Not Implemented | OK |
-| KEYVAL-04 | Expired API key is rejected | P0 | Not Implemented | OK |
+| KEYVAL-03 | Revoked API key is rejected | P0 | ✅ Implemented (2 tests) | OK |
+| KEYVAL-04 | Expired API key is rejected | P0 | ✅ Implemented (3 tests) | OK |
 | KEYVAL-05 | API key for deleted user is rejected | P1 | Not Implemented | OK |
 | KEYVAL-06 | Malformed API key is rejected | P0 | ✅ Implemented | OK |
 | KEYVAL-07 | Empty API key is rejected | P0 | ✅ Implemented | OK |
@@ -259,9 +264,9 @@ These were specified but never created as JavaScript test files.
 
 | Test ID | Test Name | Priority | Status | Drift? |
 |---------|-----------|----------|--------|--------|
-| CLERK-01 | Valid Clerk JWT is accepted | P0 | Not Implemented | OK |
-| CLERK-02 | Expired Clerk JWT is rejected | P0 | Not Implemented | OK |
-| CLERK-03 | Malformed Clerk JWT is rejected | P0 | Not Implemented | OK |
+| CLERK-01 | Valid Clerk JWT is accepted | P0 | ✅ Implemented (3 tests) | OK |
+| CLERK-02 | Expired Clerk JWT is rejected | P0 | ✅ Implemented (3 tests) | OK |
+| CLERK-03 | Malformed Clerk JWT is rejected | P0 | ✅ Implemented (3 tests) | OK |
 | CLERK-04 | Missing Authorization header for protected route | P0 | Not Implemented | OK |
 | CLERK-05 | Clerk webhook creates new user profile | P1 | Not Implemented | VERIFY |
 | CLERK-06 | Clerk webhook updates existing user | P1 | Not Implemented | VERIFY |
@@ -638,11 +643,11 @@ Continue with remaining tests by priority.
 
 | Category | Planned | Updated | Implemented | Gap |
 |----------|---------|---------|-------------|-----|
-| JavaScript Unit Tests | ~180 | ~186 | 76 (74 passing, 2 skipped) | 110 |
+| JavaScript Unit Tests | ~180 | ~186 | 92 (90 passing, 2 skipped) | 94 |
 | Shell API Tests | 137 | 137 | 137 | 0* |
 | Shell Validation Tests | 89 | 89 | 89 | 0* |
 | Standalone Test Scripts | ~10 | ~10 | ~10 | 0* |
-| **Total** | **~416** | **~422** | **~312** | **~110** |
+| **Total** | **~416** | **~422** | **~328** | **~94** |
 
 *Need verification that shell tests are all running in CI
 
@@ -652,9 +657,9 @@ Continue with remaining tests by priority.
 |-----------|-------|--------|
 | `src/utils/pricing.test.js` | 20 | ✅ All passing |
 | `src/auth/utils.test.js` | 37 | ✅ 35 passing, 2 skipped (bug found) |
-| `src/auth/middleware.test.js` | 10 | ✅ All passing |
+| `src/auth/middleware.test.js` | 24 | ✅ All passing |
 | `src/api/payments.test.js` | 11 | ✅ All passing |
-| **Total Implemented** | **78** | **76 passing, 2 skipped** |
+| **Total Implemented** | **92** | **90 passing, 2 skipped** |
 
 ---
 
