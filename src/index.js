@@ -14,6 +14,7 @@ export { PlatformStats } from './durable-objects/platform-stats.js';
 export { AlertStore } from './durable-objects/alert-store.js';
 export { AuditLog } from './durable-objects/audit-log.js';
 export { SupplierRegistry } from './durable-objects/supplier-registry.js';
+export { InfrastructureCost } from './durable-objects/infrastructure-cost.js';
 
 // Import API route handlers
 import {
