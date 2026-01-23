@@ -313,6 +313,278 @@ describe('Authentication Middleware - P0 Security Tests', () => {
       expect(result.error).toBeNull();
     });
   });
+
+  // CLERK-01: Valid Clerk JWT is accepted
+  describe('CLERK-01: Valid JWT acceptance', () => {
+    it('should accept valid Clerk JWT', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer valid_token' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(true);
+      expect(result.user).not.toBeNull();
+      expect(result.user.userId).toBe('user_123');
+      expect(result.error).toBeNull();
+    });
+
+    it('should extract user ID from valid JWT', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer valid_token' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.user.userId).toBe('user_123');
+      expect(result.user.sessionId).toBe('sess_456');
+    });
+
+    it('should provide user context from Clerk JWT', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer valid_token' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(true);
+      expect(result.user).toBeDefined();
+      expect(result.user.userId).toBeTruthy();
+    });
+  });
+
+  // CLERK-02: Expired Clerk JWT is rejected
+  describe('CLERK-02: Expired JWT rejection', () => {
+    it('should reject expired Clerk JWT', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer expired_token' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error).toBe(AUTH_ERROR_CODES.AUTH_EXPIRED);
+    });
+
+    it('should not provide user context for expired JWT', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer expired_token' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+      expect(result.user).toBeNull();
+    });
+
+    it('should return appropriate error message for expired token', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer expired_token' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.error).toBe(AUTH_ERROR_CODES.AUTH_EXPIRED);
+      expect(result.authenticated).toBe(false);
+    });
+  });
+
+  // CLERK-03: Malformed Clerk JWT is rejected
+  describe('CLERK-03: Malformed JWT rejection', () => {
+    it('should reject malformed JWT', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer invalid_token' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error).toBe(AUTH_ERROR_CODES.AUTH_INVALID_FORMAT);
+    });
+
+    it('should reject JWT with invalid format', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer not.a.valid.jwt' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+    });
+
+    it('should reject non-JWT bearer tokens', async () => {
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': 'Bearer plaintext_token' }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error).toBe(AUTH_ERROR_CODES.AUTH_INVALID_FORMAT);
+    });
+  });
+
+  // KEYVAL-03: Revoked API key is rejected
+  describe('KEYVAL-03: Revoked key rejection', () => {
+    it('should reject revoked API key', async () => {
+      const validKey = generateApiKey();
+      
+      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
+        lookup: async () => ({ user_id: 'user_789', key_id: 'key_revoked' })
+      });
+      
+      mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
+        getApiKey: () => ({
+          id: 'key_revoked',
+          key_hash: 'hash_revoked',
+          name: 'Revoked Key',
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+          revoked_at: new Date().toISOString(), // Key is revoked
+        }),
+        getProfile: () => ({
+          user_id: 'user_789',
+          balance_cents: 5000,
+          deleted_at: null,
+        }),
+      });
+
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': `ApiKey ${validKey}` }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error).toBe(AUTH_ERROR_CODES.AUTH_KEY_REVOKED);
+    });
+
+    it('should not provide user context for revoked key', async () => {
+      const validKey = generateApiKey();
+      
+      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
+        lookup: async () => ({ user_id: 'user_789', key_id: 'key_revoked' })
+      });
+      
+      mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
+        getApiKey: () => ({
+          id: 'key_revoked',
+          revoked_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        }),
+        getProfile: () => ({
+          user_id: 'user_789',
+          balance_cents: 5000,
+          deleted_at: null,
+        }),
+      });
+
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': `ApiKey ${validKey}` }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+      expect(result.user).toBeNull();
+    });
+  });
+
+  // KEYVAL-04: Expired API key is rejected
+  describe('KEYVAL-04: Expired key rejection', () => {
+    it('should reject expired API key', async () => {
+      const validKey = generateApiKey();
+      
+      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
+        lookup: async () => ({ user_id: 'user_999', key_id: 'key_expired' })
+      });
+      
+      mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
+        getApiKey: () => ({
+          id: 'key_expired',
+          key_hash: 'hash_expired',
+          name: 'Expired Key',
+          created_at: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
+          expires_at: new Date(Date.now() - 1000).toISOString(), // Expired
+          revoked_at: null,
+        }),
+        getProfile: () => ({
+          user_id: 'user_999',
+          balance_cents: 2000,
+          deleted_at: null,
+        }),
+      });
+
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': `ApiKey ${validKey}` }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+      expect(result.error).toBe(AUTH_ERROR_CODES.AUTH_EXPIRED);
+    });
+
+    it('should not provide user context for expired key', async () => {
+      const validKey = generateApiKey();
+      
+      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
+        lookup: async () => ({ user_id: 'user_999', key_id: 'key_expired' })
+      });
+      
+      mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
+        getApiKey: () => ({
+          id: 'key_expired',
+          expires_at: new Date(Date.now() - 86400000).toISOString(), // Expired yesterday
+          revoked_at: null,
+        }),
+        getProfile: () => ({
+          user_id: 'user_999',
+          balance_cents: 2000,
+          deleted_at: null,
+        }),
+      });
+
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': `ApiKey ${validKey}` }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      expect(result.authenticated).toBe(false);
+      expect(result.user).toBeNull();
+    });
+
+    it('should reject key that expired exactly now', async () => {
+      const validKey = generateApiKey();
+      
+      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
+        lookup: async () => ({ user_id: 'user_999', key_id: 'key_expired' })
+      });
+      
+      mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
+        getApiKey: () => ({
+          id: 'key_expired',
+          expires_at: new Date(Date.now()).toISOString(), // Expires right now
+          revoked_at: null,
+        }),
+        getProfile: () => ({
+          user_id: 'user_999',
+          balance_cents: 2000,
+          deleted_at: null,
+        }),
+      });
+
+      const request = new Request('http://test.com', {
+        headers: { 'Authorization': `ApiKey ${validKey}` }
+      });
+
+      const result = await authenticate(request, mockEnv);
+
+      // Key that expires "now" should be considered expired
+      expect(result.authenticated).toBe(false);
+    });
+  });
 });
 
 /**
