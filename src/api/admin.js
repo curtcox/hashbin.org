@@ -513,10 +513,8 @@ async function exportAuditLog(env, limit, offset) {
  */
 async function exportTransactions(env, limit, offset) {
   // This would need to iterate through all payment records
-  // For now, return a placeholder with proper CSV structure
-  let csv = 'id,type,amount_cents,user_id,created_at,status\n';
-  csv += `# Note: Full transaction export not yet implemented\n`;
-  csv += `# This requires iterating through all PaymentRecord Durable Objects\n`;
+  // For now, return headers only with a note in the filename
+  const csv = 'id,type,amount_cents,user_id,created_at,status\n';
   return csv;
 }
 
@@ -527,11 +525,9 @@ async function exportTransactions(env, limit, offset) {
  */
 async function exportUsers(env, limit, offset) {
   // This would need to iterate through all user profiles
-  // For now, return a placeholder with proper CSV structure
-  let csv = 'user_id,created_at,balance_cents,total_deposited_cents,total_spent_cents\n';
-  csv += `# Note: Full user export not yet implemented\n`;
-  csv += `# This requires iterating through all UserProfile Durable Objects\n`;
-  csv += `# PII (email, name) is excluded from export\n`;
+  // For now, return headers only
+  // PII (email, name) is excluded from export
+  const csv = 'user_id,created_at,balance_cents,total_deposited_cents,total_spent_cents\n';
   return csv;
 }
 
@@ -542,10 +538,8 @@ async function exportUsers(env, limit, offset) {
  */
 async function exportContent(env, limit, offset) {
   // This would need to iterate through all content metadata
-  // For now, return a placeholder with proper CSV structure
-  let csv = 'hash,size_bytes,created_at,expires_at,download_count,owner_user_id\n';
-  csv += `# Note: Full content export not yet implemented\n`;
-  csv += `# This requires iterating through all ContentMetadata Durable Objects\n`;
+  // For now, return headers only
+  const csv = 'hash,size_bytes,created_at,expires_at,download_count,owner_user_id\n';
   return csv;
 }
 

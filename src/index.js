@@ -89,6 +89,14 @@ const VALID_LOG_LEVELS = ['debug', 'info', 'warn', 'error'];
 const HEALTH_CHECK_ID = 'health-check';
 const GIT_SHA_PLACEHOLDER = 'unknown';
 
+// Anomaly detection thresholds
+const ANOMALY_DETECTION = {
+  DEPOSIT_VELOCITY_MULTIPLIER: 5,    // Alert if deposits > 5x normal rate
+  DEPOSIT_VELOCITY_ABSOLUTE: 20,     // Alert if deposits > 20 per hour
+  UPLOAD_VELOCITY_MULTIPLIER: 5,     // Alert if uploads > 5x normal rate
+  UPLOAD_VELOCITY_ABSOLUTE: 100      // Alert if uploads > 100 per hour
+};
+
 // Git SHA embedded at build time - replaced during deployment
 // This constant forces code changes on each deploy, ensuring wrangler uploads new code
 const BUNDLED_GIT_SHA = '__DEPLOY_GIT_SHA__';
@@ -309,7 +317,8 @@ export default {
       // 2. Check for unusual deposit velocity
       const depositRate = stats.financial?.deposits_last_hour || 0;
       const normalDepositRate = stats.financial?.avg_deposits_per_hour || 10;
-      if (depositRate > normalDepositRate * 5 || depositRate > 20) {
+      if (depositRate > normalDepositRate * ANOMALY_DETECTION.DEPOSIT_VELOCITY_MULTIPLIER || 
+          depositRate > ANOMALY_DETECTION.DEPOSIT_VELOCITY_ABSOLUTE) {
         await alertStoreStub.fetch(new Request('https://dummy/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -321,7 +330,7 @@ export default {
             metadata: {
               current_rate: depositRate,
               normal_rate: normalDepositRate,
-              threshold: normalDepositRate * 5
+              threshold: normalDepositRate * ANOMALY_DETECTION.DEPOSIT_VELOCITY_MULTIPLIER
             }
           })
         }));
@@ -330,7 +339,8 @@ export default {
       // 3. Check for unusual upload velocity
       const uploadRate = stats.content?.uploads_last_hour || 0;
       const normalUploadRate = stats.content?.avg_uploads_per_hour || 50;
-      if (uploadRate > normalUploadRate * 5 || uploadRate > 100) {
+      if (uploadRate > normalUploadRate * ANOMALY_DETECTION.UPLOAD_VELOCITY_MULTIPLIER || 
+          uploadRate > ANOMALY_DETECTION.UPLOAD_VELOCITY_ABSOLUTE) {
         await alertStoreStub.fetch(new Request('https://dummy/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -342,7 +352,7 @@ export default {
             metadata: {
               current_rate: uploadRate,
               normal_rate: normalUploadRate,
-              threshold: normalUploadRate * 5
+              threshold: normalUploadRate * ANOMALY_DETECTION.UPLOAD_VELOCITY_MULTIPLIER
             }
           })
         }));
@@ -738,7 +748,7 @@ async function handleHealth(env) {
       }
       
       // Auto-resolve alerts if all components are now healthy
-      if (allOperational) {
+      if (allOperational && !anyDown && !anyDegraded) {
         // Resolve health_degraded and health_unhealthy alerts
         const alertsResponse = await alertStoreStub.fetch(new Request('https://dummy/list'));
         const alertsData = await alertsResponse.json();
