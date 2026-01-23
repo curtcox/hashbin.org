@@ -150,7 +150,8 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 
 **Sub-Plans:**
 - `done/upload.md` - Upload implementation with 256t hash generation ✅
-- `todo/download.md` - Download implementation (mostly complete)
+- `done/download.md` - Download implementation ✅
+- `todo/download_remaining.md` - Remaining: info page, contested content handling, performance testing
 
 **No search/discovery features** - Hash-only access as per architectural decision #12
 
@@ -216,20 +217,22 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 
 ### Phase 5: Retention & Expiration Management
 **Goal:** Automate content lifecycle management
+**Status:** Foundation Complete - Planning Done, Implementation Pending
 
 **Deliverables:**
-- Scheduled job for expiration checks (Cloudflare Cron Triggers)
-- Content deletion process (R2 + Durable Objects cleanup)
-- Retention extension API endpoint
-- Retention payment tracking
-- Public deletion records
+- ✅ Retention extension API endpoint
+- ✅ Retention payment tracking
+- ⏳ Scheduled job for expiration checks (Cloudflare Cron Triggers)
+- ⏳ Content deletion process (R2 + Durable Objects cleanup)
+- ⏳ Public deletion records
 - **No grace period** - Immediate deletion when job runs (see Decision #8)
 - **No expiration notifications** - Users responsible for tracking
 
 **Sub-Plans:**
-- `todo/retention_system.md` - Content lifecycle management
+- `done/content_lifecycle.md` - Planning and foundation ✅
+- `todo/content_lifecycle_remaining.md` - Implementation of cron jobs, deletion, public records
 
-**Implementation:** Use Cloudflare Workers Cron Triggers (runs hourly or daily)
+**Implementation:** Use Cloudflare Workers Cron Triggers (runs daily at 2 AM UTC)
 
 ### Phase 6: Contestation System
 **Goal:** Implement transparent content dispute resolution
@@ -957,12 +960,18 @@ No blocking questions remain for beginning implementation.
    - Inline content support (≤64 bytes)
    - Upload UI with drag-and-drop
 
-3. **`todo/download.md`** - Download implementation (Phase 2) - MOSTLY COMPLETE
+3. **`done/download.md`** - Download implementation (Phase 2) ✅ COMPLETE
    - Content download API endpoint
    - Inline content extraction from CID
-   - MIME type handling
+   - MIME type handling (60+ extensions)
    - Caching and range request support
-   - Note: Contested content handling (451 status) pending contest system
+   - Download count tracking
+   - HEAD and Range request support
+
+3a. **`todo/download_remaining.md`** - Download remaining (Phase 2/6)
+   - Contested content handling (451 status) - requires contest system
+   - Info page (`/info/{cid}`) - UX enhancement
+   - Performance testing with large files - requires production
 
 4. **`done/user_authorization.md`** - Authentication system (Phase 3) ✅ COMPLETE
    - Clerk integration
@@ -1004,19 +1013,22 @@ Before creating sub-plans, set up local development tools:
 5. `done/stripe.md` - Stripe integration details ✅
 6. `done/deployment_validation.md` - Deployment smoke tests ✅
 7. `done/upload.md` - Content upload implementation (256t, inline content, UI) ✅
-8. `done/only_production.md` - Single production environment consolidation ✅
-9. `done/user_transaction_history.md` - Transaction history UI and backend ✅
-10. `done/key_management_backend.md` - API key usage tracking and name updates ✅
-11. `done/running_fully_local.md` - Local development environment setup ✅
+8. `done/download.md` - Content download implementation (MIME types, caching, range requests) ✅
+9. `done/clerk.md` - Clerk backend and monitoring implementation ✅
+10. `done/content_lifecycle.md` - Content lifecycle planning and foundation ✅
+11. `done/only_production.md` - Single production environment consolidation ✅
+12. `done/user_transaction_history.md` - Transaction history UI and backend ✅
+13. `done/key_management_backend.md` - API key usage tracking and name updates ✅
+14. `done/running_fully_local.md` - Local development environment setup ✅
 
 ### Pending Plans (todo/)
 
-1. `todo/download.md` - Download implementation (mostly complete, pending testing)
-2. `todo/content_lifecycle.md` - Content expiration and deletion (planning complete)
-3. `todo/clerk.md` - Clerk production setup (backend complete, deployment pending)
+1. `todo/download_remaining.md` - Download: info page, contested content, performance testing
+2. `todo/content_lifecycle_remaining.md` - Expiration automation: cron jobs, deletion, public records
+3. `todo/clerk_remaining.md` - Clerk production deployment and configuration
 4. `todo/deployment_setup.md` - Deployment configuration guide
 5. `todo/frontend_ui.md` - Web interface enhancements
-6. `todo/content_moderation.md` - Review and moderation tools
+6. `todo/content_moderation.md` - Review and moderation tools (Phase 6)
 7. `todo/balance_transfer.md` - Balance transfer between users
 8. `todo/account_management.md` - Account management features
 9. Other planning documents for future phases (see todo/ directory)
