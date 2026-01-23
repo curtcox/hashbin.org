@@ -41,6 +41,9 @@ jobs:
             sleep 2
           done
           echo "Server failed to start"
+          echo "⚠️ Checking server logs:"
+          # Try to get any error output from wrangler
+          ps aux | grep wrangler || echo "No wrangler process found"
           exit 1
 
       - name: Run API Tests

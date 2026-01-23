@@ -5,7 +5,7 @@
  * Single global instance stores all deletion records with pagination
  */
 
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 
 export class DeletionRecord {
   constructor(state, env) {
