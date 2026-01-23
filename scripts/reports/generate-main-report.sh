@@ -103,6 +103,108 @@ if [ "$QUALITY_EXISTS" == "available" ] && [ -f "build-reports/quality/summary.j
   LINT_WARNINGS=$(jq -r '.warnings // 0' build-reports/quality/summary.json 2>/dev/null || echo "0")
 fi
 
+# Determine status for each report (has-error, has-warning, or ok)
+# Treat unavailable reports as having errors
+
+# Coverage status
+COVERAGE_STATUS="ok"
+[ "$COVERAGE_EXISTS" == "unavailable" ] && COVERAGE_STATUS="has-error"
+
+# Security status
+SECURITY_STATUS="ok"
+if [ "$SECURITY_EXISTS" == "unavailable" ]; then
+  SECURITY_STATUS="has-error"
+elif [ "$SECURITY_EXISTS" == "available" ] && [ -f "build-reports/security/npm-audit.json" ]; then
+  VULN_TOTAL=$(jq -r '.metadata.vulnerabilities | add' build-reports/security/npm-audit.json 2>/dev/null || echo "0")
+  if [ "$VULN_TOTAL" != "0" ] && [ "$VULN_TOTAL" != "null" ]; then
+    SECURITY_STATUS="has-warning"
+  fi
+fi
+
+# Performance status
+PERFORMANCE_STATUS="ok"
+[ "$PERFORMANCE_EXISTS" == "unavailable" ] && PERFORMANCE_STATUS="has-error"
+
+# Unit tests status
+UNIT_TESTS_STATUS="ok"
+if [ "$UNIT_TESTS_EXISTS" == "unavailable" ]; then
+  UNIT_TESTS_STATUS="has-error"
+elif [ "$UNIT_TESTS_EXISTS" == "available" ] && [ -f "build-reports/unit-tests/data.json" ]; then
+  FAILED_TESTS=$(jq -r '.summary.failed_tests // 0' build-reports/unit-tests/data.json 2>/dev/null || echo "0")
+  if [ "$FAILED_TESTS" != "0" ] && [ "$FAILED_TESTS" != "null" ] && [ "$FAILED_TESTS" != "N/A" ]; then
+    UNIT_TESTS_STATUS="has-error"
+  fi
+fi
+
+# API tests status
+API_TESTS_STATUS="ok"
+if [ "$API_TESTS_EXISTS" == "unavailable" ]; then
+  API_TESTS_STATUS="has-error"
+elif [ "$API_TESTS_EXISTS" == "available" ] && [ -f "build-reports/api-tests/data.json" ]; then
+  FAILED_SUITES=$(jq -r '.summary.failed_suites // 0' build-reports/api-tests/data.json 2>/dev/null || echo "0")
+  if [ "$FAILED_SUITES" != "0" ] && [ "$FAILED_SUITES" != "null" ] && [ "$FAILED_SUITES" != "N/A" ]; then
+    API_TESTS_STATUS="has-error"
+  fi
+fi
+
+# Quality/Lint status
+QUALITY_STATUS="ok"
+if [ "$QUALITY_EXISTS" == "unavailable" ]; then
+  QUALITY_STATUS="has-error"
+elif [ "$QUALITY_EXISTS" == "available" ]; then
+  if [ "$LINT_ERRORS" != "N/A" ] && [ "$LINT_ERRORS" != "0" ] && [ "$LINT_ERRORS" != "null" ]; then
+    QUALITY_STATUS="has-error"
+  elif [ "$LINT_WARNINGS" != "N/A" ] && [ "$LINT_WARNINGS" != "0" ] && [ "$LINT_WARNINGS" != "null" ]; then
+    QUALITY_STATUS="has-warning"
+  fi
+fi
+
+# Complexity status
+COMPLEXITY_STATUS="ok"
+if [ "$COMPLEXITY_EXISTS" == "unavailable" ]; then
+  COMPLEXITY_STATUS="has-error"
+elif [ "$COMPLEXITY_EXISTS" == "available" ] && [ "$COMPLEXITY_COUNT" != "N/A" ] && [ "$COMPLEXITY_COUNT" != "0" ] && [ "$COMPLEXITY_COUNT" != "null" ]; then
+  COMPLEXITY_STATUS="has-warning"
+fi
+
+# Structure status
+STRUCTURE_STATUS="ok"
+if [ "$STRUCTURE_EXISTS" == "unavailable" ]; then
+  STRUCTURE_STATUS="has-error"
+elif [ "$STRUCTURE_EXISTS" == "available" ] && [ "$CIRCULAR_COUNT" != "N/A" ] && [ "$CIRCULAR_COUNT" != "0" ] && [ "$CIRCULAR_COUNT" != "null" ]; then
+  STRUCTURE_STATUS="has-warning"
+fi
+
+# Documentation status
+DOCUMENTATION_STATUS="ok"
+[ "$DOCUMENTATION_EXISTS" == "unavailable" ] && DOCUMENTATION_STATUS="has-error"
+
+# Visual regression status
+VISUAL_STATUS="ok"
+if [ "$VISUAL_EXISTS" == "unavailable" ]; then
+  VISUAL_STATUS="has-error"
+elif [ "$VISUAL_EXISTS" == "available" ] && [ "$VISUAL_CHANGED" != "N/A" ] && [ "$VISUAL_CHANGED" != "0" ] && [ "$VISUAL_CHANGED" != "null" ]; then
+  VISUAL_STATUS="has-warning"
+fi
+
+# Trends status
+TRENDS_STATUS="ok"
+[ "$TRENDS_EXISTS" == "unavailable" ] && TRENDS_STATUS="has-error"
+
+# Determine overall page status
+PAGE_STATUS="ok"
+if [[ "$COVERAGE_STATUS" == "has-error" || "$SECURITY_STATUS" == "has-error" || "$PERFORMANCE_STATUS" == "has-error" || \
+      "$UNIT_TESTS_STATUS" == "has-error" || "$API_TESTS_STATUS" == "has-error" || "$QUALITY_STATUS" == "has-error" || \
+      "$COMPLEXITY_STATUS" == "has-error" || "$STRUCTURE_STATUS" == "has-error" || "$DOCUMENTATION_STATUS" == "has-error" || \
+      "$VISUAL_STATUS" == "has-error" || "$TRENDS_STATUS" == "has-error" ]]; then
+  PAGE_STATUS="has-error"
+elif [[ "$COVERAGE_STATUS" == "has-warning" || "$SECURITY_STATUS" == "has-warning" || "$PERFORMANCE_STATUS" == "has-warning" || \
+        "$UNIT_TESTS_STATUS" == "has-warning" || "$API_TESTS_STATUS" == "has-warning" || "$QUALITY_STATUS" == "has-warning" || \
+        "$COMPLEXITY_STATUS" == "has-warning" || "$STRUCTURE_STATUS" == "has-warning" || "$DOCUMENTATION_STATUS" == "has-warning" || \
+        "$VISUAL_STATUS" == "has-warning" || "$TRENDS_STATUS" == "has-warning" ]]; then
+  PAGE_STATUS="has-warning"
+fi
+
 COMPLEXITY_COUNT="N/A"
 if [ "$COMPLEXITY_EXISTS" == "available" ] && [ -f "build-reports/complexity/summary.json" ]; then
   COMPLEXITY_COUNT=$(jq -r '.complexity_issues // 0' build-reports/complexity/summary.json 2>/dev/null || echo "0")
@@ -204,6 +306,18 @@ sed -e "s|{{REPO_URL}}|${REPO_URL}|g" \
     -e "s|{{DOCUMENTATION_EXISTS}}|${DOCUMENTATION_EXISTS}|g" \
     -e "s|{{VISUAL_EXISTS}}|${VISUAL_EXISTS}|g" \
     -e "s|{{TRENDS_EXISTS}}|${TRENDS_EXISTS}|g" \
+    -e "s|{{COVERAGE_STATUS}}|${COVERAGE_STATUS}|g" \
+    -e "s|{{SECURITY_STATUS}}|${SECURITY_STATUS}|g" \
+    -e "s|{{PERFORMANCE_STATUS}}|${PERFORMANCE_STATUS}|g" \
+    -e "s|{{UNIT_TESTS_STATUS}}|${UNIT_TESTS_STATUS}|g" \
+    -e "s|{{API_TESTS_STATUS}}|${API_TESTS_STATUS}|g" \
+    -e "s|{{QUALITY_STATUS}}|${QUALITY_STATUS}|g" \
+    -e "s|{{COMPLEXITY_STATUS}}|${COMPLEXITY_STATUS}|g" \
+    -e "s|{{STRUCTURE_STATUS}}|${STRUCTURE_STATUS}|g" \
+    -e "s|{{DOCUMENTATION_STATUS}}|${DOCUMENTATION_STATUS}|g" \
+    -e "s|{{VISUAL_STATUS}}|${VISUAL_STATUS}|g" \
+    -e "s|{{TRENDS_STATUS}}|${TRENDS_STATUS}|g" \
+    -e "s|{{PAGE_STATUS}}|${PAGE_STATUS}|g" \
     -e "s|{{COVERAGE_LINES}}|${COVERAGE_LINES}|g" \
     -e "s|{{SECURITY_VULNS}}|${SECURITY_VULNS}|g" \
     -e "s|{{PERF_AVG}}|${PERF_AVG}|g" \
