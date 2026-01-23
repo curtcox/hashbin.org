@@ -149,8 +149,8 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Maximum file size: 5TB (R2 single object limit for MVP)
 
 **Sub-Plans:**
-- `todo/content_operations.md` - Upload/download implementation
-- `todo/256t_integration.md` - Hash generation and validation
+- `done/upload.md` - Upload implementation with 256t hash generation ✅
+- `todo/download.md` - Download implementation (mostly complete)
 
 **No search/discovery features** - Hash-only access as per architectural decision #12
 
@@ -949,15 +949,20 @@ No blocking questions remain for beginning implementation.
    - GitHub Actions CI/CD
    - Backup strategy (deferred to Phase 2)
 
-2. **`todo/256t_integration.md`** - Hash generation library (Phase 2) - TO CREATE
-   - JavaScript implementation of 256t spec
+2. **`done/upload.md`** - Upload and 256t hash implementation (Phase 2) ✅ COMPLETE
+   - JavaScript implementation of 256t spec (client and server)
    - Hash generation and validation
-   - Testing with reference implementations
-
-3. **`todo/content_operations.md`** - Upload/download implementation (Phase 2) - TO CREATE
    - Content upload API endpoint
-   - Content download API endpoint
    - R2 storage integration
+   - Inline content support (≤64 bytes)
+   - Upload UI with drag-and-drop
+
+3. **`todo/download.md`** - Download implementation (Phase 2) - MOSTLY COMPLETE
+   - Content download API endpoint
+   - Inline content extraction from CID
+   - MIME type handling
+   - Caching and range request support
+   - Note: Contested content handling (451 status) pending contest system
 
 4. **`done/user_authorization.md`** - Authentication system (Phase 3) ✅ COMPLETE
    - Clerk integration
@@ -998,23 +1003,23 @@ Before creating sub-plans, set up local development tools:
 4. `done/payments.md` - Payment integration and processing ✅
 5. `done/stripe.md` - Stripe integration details ✅
 6. `done/deployment_validation.md` - Deployment smoke tests ✅
+7. `done/upload.md` - Content upload implementation (256t, inline content, UI) ✅
+8. `done/only_production.md` - Single production environment consolidation ✅
+9. `done/user_transaction_history.md` - Transaction history UI and backend ✅
+10. `done/key_management_backend.md` - API key usage tracking and name updates ✅
+11. `done/running_fully_local.md` - Local development environment setup ✅
 
 ### Pending Plans (todo/)
 
-1. `todo/content_operations.md` - Upload and download implementation
-2. `todo/256t_integration.md` - Hash generation and validation library
-3. `todo/pricing_model.md` - Storage pricing and calculations
-4. `todo/retention_system.md` - Content lifecycle and expiration
-5. `todo/contestation_system.md` - Dispute resolution workflow
+1. `todo/download.md` - Download implementation (mostly complete, pending testing)
+2. `todo/content_lifecycle.md` - Content expiration and deletion (planning complete)
+3. `todo/clerk.md` - Clerk production setup (backend complete, deployment pending)
+4. `todo/deployment_setup.md` - Deployment configuration guide
+5. `todo/frontend_ui.md` - Web interface enhancements
 6. `todo/content_moderation.md` - Review and moderation tools
-7. `todo/public_records.md` - Transparency and reporting
-8. `todo/frontend_ui.md` - Web interface implementation
-9. `todo/api_documentation.md` - Public API documentation
-10. `todo/testing_strategy.md` - Comprehensive testing plan
-11. `todo/security_audit.md` - Security review and hardening
-12. `todo/legal_compliance.md` - Terms of Service, Privacy Policy, DMCA
-13. `todo/operations.md` - Production operations and monitoring
-14. `todo/monitoring.md` - System monitoring and alerting
+7. `todo/balance_transfer.md` - Balance transfer between users
+8. `todo/account_management.md` - Account management features
+9. Other planning documents for future phases (see todo/ directory)
 
 ---
 
