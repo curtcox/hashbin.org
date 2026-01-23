@@ -89,6 +89,8 @@ import {
   handleGetDeletionStats
 } from './api/public-deletions.js';
 
+import { deleteContent, getContentMetadata } from './services/content-deletion.js';
+
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
 // Configuration constants
@@ -265,7 +267,15 @@ export default {
 
   /**
    * Process expired content
-   * Batch delete content that has expired
+   * 
+   * Batch processes content that has expired for the current date.
+   * Implements "extension wins" strategy: validates metadata before deletion
+   * to ensure content wasn't extended after being indexed for expiration.
+   * 
+   * Batch Limit: Maximum 5,000 deletions per run (Cloudflare Workers 30s CPU limit)
+   * Strategy: Check metadata expires_at before deletion; skip if extended
+   * 
+   * @param {Object} env - Environment bindings
    */
   async processExpiredContent(env) {
     try {
@@ -293,20 +303,14 @@ export default {
       for (const hash of expiredHashes.slice(0, BATCH_LIMIT)) {
         try {
           // Get current metadata to check for extension ("extension wins" strategy)
-          const metadataId = env.CONTENT_METADATA.idFromName(hash);
-          const metadataStub = env.CONTENT_METADATA.get(metadataId);
+          const metadata = await getContentMetadata(env, hash);
           
-          const metadataResponse = await metadataStub.fetch(
-            new Request('https://dummy/content', { method: 'GET' })
-          );
-          
-          if (metadataResponse.status === 404) {
+          if (!metadata) {
             // Already deleted
             skipped++;
             continue;
           }
           
-          const metadata = await metadataResponse.json();
           const expiresDate = metadata.expires_at.split('T')[0];
           
           // Check if content was extended after being indexed for expiration
@@ -316,40 +320,14 @@ export default {
             continue;
           }
           
-          // Delete content from R2
-          const isInline = metadata.size_bytes && metadata.size_bytes <= 64;
-          if (!isInline) {
-            try {
-              await env.CONTENT_BUCKET.delete(hash);
-            } catch (error) {
-              console.warn(`Failed to delete R2 object ${hash}:`, error.message);
-            }
+          // Use deletion service for consistent deletion logic
+          const result = await deleteContent(env, hash, metadata, 'expired');
+          
+          if (result.success) {
+            deleted++;
+          } else {
+            failed++;
           }
-          
-          // Delete metadata
-          await metadataStub.fetch(
-            new Request('https://dummy/content', { method: 'DELETE' })
-          );
-          
-          // Create deletion record
-          const deletionRecordId = env.DELETION_RECORD.idFromName('global');
-          const deletionRecordStub = env.DELETION_RECORD.get(deletionRecordId);
-          
-          await deletionRecordStub.fetch(
-            new Request('https://dummy/record', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({
-                hash_256t: hash,
-                reason: 'expired',
-                uploader_id: metadata.uploader_id,
-                size_bytes: metadata.size_bytes,
-                content_type: metadata.content_type
-              })
-            })
-          );
-          
-          deleted++;
         } catch (error) {
           failed++;
           console.error(`Failed to delete ${hash}:`, error);
