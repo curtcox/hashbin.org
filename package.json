@@ -14,7 +14,9 @@
     "verify:dev": "scripts/verify-deployment.sh production",
     "verify:prod": "scripts/verify-deployment.sh production",
     "verify:custom": "scripts/verify-deployment.sh https://hashbin.org",
-    "test": "bash scripts/test-grep-patterns.sh && bash scripts/test-user-balance.sh && bash scripts/test-auth-gate.sh && bash scripts/test-stripe-webhook.sh && bash scripts/test-api-keys.sh && bash scripts/test-upload-balance.sh && bash scripts/test-rate-limiting.sh && bash scripts/test-git-sha-injection.sh && bash scripts/test-transaction-history.sh && bash scripts/test-supplier-validation.sh && bash scripts/test-supplier-integration.sh",
+    "test": "npm run test:unit && bash scripts/test-grep-patterns.sh && bash scripts/test-user-balance.sh && bash scripts/test-auth-gate.sh && bash scripts/test-stripe-webhook.sh && bash scripts/test-api-keys.sh && bash scripts/test-upload-balance.sh && bash scripts/test-rate-limiting.sh && bash scripts/test-git-sha-injection.sh && bash scripts/test-transaction-history.sh && bash scripts/test-supplier-validation.sh && bash scripts/test-supplier-integration.sh",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
     "test:grep": "bash scripts/test-grep-patterns.sh",
     "test:balance": "bash scripts/test-user-balance.sh",
     "test:auth": "bash scripts/test-auth-system.sh",
@@ -48,6 +50,7 @@
   "author": "",
   "license": "MIT",
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.6",
     "c8": "^9.1.0",
     "eslint": "^8.57.0",
     "eslint-plugin-jsdoc": "^48.2.7",
@@ -63,6 +66,7 @@
     "pixelmatch": "^5.3.0",
     "playwright": "^1.47.2",
     "pngjs": "^7.0.0",
+    "vitest": "^3.2.4",
     "wrangler": "4.47.0"
   },
   "dependencies": {

@@ -4,9 +4,42 @@
 
 This document plans the implementation of tests that were designed in planning documents but never written, and the integration of existing tests into CI. Tests need to be checked for continued correctness and relevance.
 
-**Status:** Planning
+**Status:** In Progress
 **Created:** 2026-01-23
 **Updated:** 2026-01-23
+
+## Implementation Progress
+
+### Completed
+
+✅ **Phase 1: Vitest Infrastructure** (Complete)
+- Installed Vitest 3.2.4 with Node.js environment
+- Created vitest.config.js for standard Node testing
+- Created mock utilities for Clerk and Stripe in `test-utils/`
+- Added npm scripts: `test:unit` and `test:unit:watch`
+- Updated `.github/workflows/local-api-tests.yml` to run unit tests
+
+✅ **Phase 3: P0 Pricing Tests** (Complete - 20 tests)
+- Implemented all P0 pricing tests in `src/utils/pricing.test.js`
+- PRICE-19, PRICE-20, PRICE-21: Inline content and minimum cost tests
+- PRICE-01, PRICE-06, PRICE-15, PRICE-16: Core pricing calculations
+- Additional validation tests for edge cases
+- All tests passing ✅
+
+✅ **Phase 4: P0 Auth Tests** (Complete - 30 tests, 2 skipped)
+- Implemented P0 auth tests in `src/auth/utils.test.js`
+- KEYGEN-01-04: Key generation and hashing tests
+- KEYVAL-01-08: Key format validation tests
+- KEYGEN-06, 08-09, 11: Expiration and name validation tests
+- Found bug: Legacy prefix support not working (KEYVAL-09, 10 skipped)
+- 28 tests passing, 2 skipped with documentation ✅
+
+### Bugs Discovered
+
+🐛 **Legacy Prefix Bug** (`src/auth/utils.js:81-95`)
+- Tests KEYVAL-09 and KEYVAL-10 skipped
+- Issue: `validateApiKeyFormat` checks `hb_` first, which matches all keys including `hb_test_` and `hb_live_`
+- Fix needed: Check legacy prefixes before current prefix, or use non-overlapping logic
 
 ---
 
@@ -80,17 +113,17 @@ The following tests have specifications that may not match current implementatio
 
 ## Summary of Test Gaps
 
-### 1. Unit Tests (JavaScript) - NOT IMPLEMENTED
+### 1. Unit Tests (JavaScript) - PARTIALLY IMPLEMENTED
 
 Multiple planning documents specify JavaScript unit tests (`.test.js` files) that were never created. The project currently has only shell-based integration/API tests.
 
-**Missing Test Files:**
-- `src/auth/utils.test.js` - API key generation/validation unit tests
-- `src/api/auth.test.js` - Authentication endpoint integration tests
-- `src/auth/middleware.test.js` - Middleware authentication tests
-- `src/utils/pricing.test.js` - Pricing calculator tests
-- `src/durable-objects/key-registry.test.js` - KeyRegistry DO tests
-- `src/durable-objects/user-profile.test.js` - UserProfile DO tests
+**Test Files Status:**
+- ✅ `src/auth/utils.test.js` - API key generation/validation unit tests (30 tests, 28 passing, 2 skipped)
+- ✅ `src/utils/pricing.test.js` - Pricing calculator tests (20 tests, all passing)
+- ⏳ `src/api/auth.test.js` - Authentication endpoint integration tests (NOT IMPLEMENTED)
+- ⏳ `src/auth/middleware.test.js` - Middleware authentication tests (NOT IMPLEMENTED)
+- ⏳ `src/durable-objects/key-registry.test.js` - KeyRegistry DO tests (NOT IMPLEMENTED)
+- ⏳ `src/durable-objects/user-profile.test.js` - UserProfile DO tests (NOT IMPLEMENTED)
 
 ### 2. Shell-Based Tests - EXIST BUT NEED CI VERIFICATION
 
@@ -115,16 +148,43 @@ These were specified but never created as JavaScript test files.
 
 | Test ID | Test Name | Priority | Status | Drift? |
 |---------|-----------|----------|--------|--------|
-| KEYGEN-01 | Generate API key with correct production prefix | P0 | Not Implemented | OK |
-| KEYGEN-02 | Generated key has correct format (35 chars) | P0 | Not Implemented | **UPDATED** |
-| KEYGEN-03 | Generated key is unique (1000 keys test) | P1 | Not Implemented | OK |
-| KEYGEN-04 | Key generation stores hash, not plaintext | P0 | Not Implemented | OK |
+| KEYGEN-01 | Generate API key with correct production prefix | P0 | ✅ Implemented | OK |
+| KEYGEN-02 | Generated key has correct format (35 chars) | P0 | ✅ Implemented | **UPDATED** |
+| KEYGEN-03 | Generated key is unique (1000 keys test) | P1 | ✅ Implemented | OK |
+| KEYGEN-04 | Key generation stores hash, not plaintext | P0 | ✅ Implemented | OK |
 | KEYGEN-05 | Generate key with custom expiration | P1 | Not Implemented | OK |
-| KEYGEN-06 | Generate key defaults to 5 year expiration | P1 | Not Implemented | OK |
+| KEYGEN-06 | Generate key defaults to 5 year expiration | P1 | ✅ Implemented | OK |
 | KEYGEN-07 | Cannot generate key without authentication | P0 | Not Implemented | OK |
-| KEYGEN-08 | Empty key name uses smart default | P1 | Not Implemented | **UPDATED** |
-| KEYGEN-09 | Key name length validation (>255 chars) | P2 | Not Implemented | OK |
+| KEYGEN-08 | Empty key name uses smart default | P1 | ✅ Implemented | **UPDATED** |
+| KEYGEN-09 | Key name length validation (>255 chars) | P2 | ✅ Implemented | OK |
 | KEYGEN-10 | Maximum 25 keys per user enforced | P0 | Not Implemented | VERIFY |
+| KEYGEN-11 | Expiration beyond 5 years rejected | P1 | ✅ Implemented | OK |
+| KEYGEN-12 | Duplicate key names allowed | P2 | Not Implemented | OK |
+| KEYGEN-13 | Key 25 succeeds, key 26 fails | P1 | Not Implemented | VERIFY |
+| KEYVAL-01 | Valid API key is accepted | P0 | ✅ Implemented | OK |
+| KEYVAL-02 | Non-existent API key is rejected | P0 | ✅ Implemented | OK |
+| KEYVAL-03 | Revoked API key is rejected | P0 | Not Implemented | OK |
+| KEYVAL-04 | Expired API key is rejected | P0 | Not Implemented | OK |
+| KEYVAL-05 | API key for deleted user is rejected | P1 | Not Implemented | OK |
+| KEYVAL-06 | Malformed API key is rejected | P0 | ✅ Implemented | OK |
+| KEYVAL-07 | Empty API key is rejected | P0 | ✅ Implemented | OK |
+| KEYVAL-08 | API key with wrong prefix is rejected | P0 | ✅ Implemented | OK |
+| KEYVAL-09 | Legacy hb_test_ prefix handled | P0 | ⏭️ Skipped (Bug) | **BUG FOUND** |
+| KEYVAL-10 | Legacy hb_live_ prefix handled | P0 | ⏭️ Skipped (Bug) | **BUG FOUND** |
+| KEYVAL-11 | last_used_at updated on successful validation | P2 | Not Implemented | OK |
+| KEYMGMT-01 | List keys shows all user's keys | P0 | Not Implemented | OK |
+| KEYMGMT-02 | List keys does not show key values | P0 | Not Implemented | OK |
+| KEYMGMT-03 | List keys shows revoked keys | P1 | Not Implemented | OK |
+| KEYMGMT-04 | Revoke key marks it as revoked | P0 | Not Implemented | OK |
+| KEYMGMT-05 | Cannot revoke another user's key | P0 | Not Implemented | OK |
+| KEYMGMT-06 | Cannot revoke already-revoked key | P2 | Not Implemented | OK |
+| KEYMGMT-07 | Revoke non-existent key returns 404 | P1 | Not Implemented | OK |
+| KEYMGMT-08 | Revoked keys retained for 5 years | P2 | Not Implemented | OK |
+| ENCRYPT-01 | Encrypt API key with AES-256-GCM | P1 | Not Implemented | OK |
+| ENCRYPT-02 | Decrypt API key successfully | P1 | Not Implemented | OK |
+| ENCRYPT-03 | Decryption fails with wrong key | P1 | Not Implemented | OK |
+| ENCRYPT-04 | Each encryption uses unique IV | P1 | Not Implemented | OK |
+| ENCRYPT-05 | Encrypted output is base64 encoded | P1 | Not Implemented | OK |
 | KEYGEN-11 | Expiration beyond 5 years rejected | P1 | Not Implemented | OK |
 | KEYGEN-12 | Duplicate key names allowed | P2 | Not Implemented | OK |
 | KEYGEN-13 | Key 25 succeeds, key 26 fails | P1 | Not Implemented | VERIFY |
@@ -278,27 +338,27 @@ These were specified but never created as JavaScript test files.
 
 | Test ID | Test Name | Priority | Status | Drift? |
 |---------|-----------|----------|--------|--------|
-| PRICE-01 | Calculate cost for 1 GB for 1 month | P0 | Not Implemented | **UPDATED** |
-| PRICE-02 | Calculate cost for 10 GB for 1 month | P0 | Not Implemented | OK |
+| PRICE-01 | Calculate cost for 1 GB for 1 month | P0 | ✅ Implemented | **UPDATED** |
+| PRICE-02 | Calculate cost for 10 GB for 1 month | P0 | ✅ Implemented | OK |
 | PRICE-03 | Calculate cost for 1 GB for 12 months | P0 | Not Implemented | OK |
 | PRICE-04 | Calculate cost for 100 GB for 6 months ($18.00) | P0 | Not Implemented | OK |
-| PRICE-05 | Handle 500 MB for 1 month (minimum applies) | P1 | Not Implemented | **UPDATED** |
-| PRICE-06 | Calculate Stripe fee (2.9% + $0.30) | P0 | Not Implemented | OK |
-| PRICE-07 | Calculate net deposit after fees | P0 | Not Implemented | OK |
-| PRICE-08 | Handle $1.00 deposit fee calculation | P0 | Not Implemented | OK |
-| PRICE-09 | Handle 0 bytes (returns 0 - inline) | P1 | Not Implemented | **UPDATED** |
-| PRICE-10 | Handle negative size (error) | P1 | Not Implemented | OK |
+| PRICE-05 | Handle 500 MB for 1 month (minimum applies) | P1 | ✅ Implemented | **UPDATED** |
+| PRICE-06 | Calculate Stripe fee (2.9% + $0.30) | P0 | ✅ Implemented | OK |
+| PRICE-07 | Calculate net deposit after fees | P0 | ✅ Implemented | OK |
+| PRICE-08 | Handle $1.00 deposit fee calculation | P0 | ✅ Implemented | OK |
+| PRICE-09 | Handle 0 bytes (returns 0 - inline) | P1 | ✅ Implemented | **UPDATED** |
+| PRICE-10 | Handle negative size (error) | P1 | ✅ Implemented | OK |
 | PRICE-11 | Handle extremely large size (1 PB) | P2 | Not Implemented | OK |
-| PRICE-12 | Handle 0 months (error) | P1 | Not Implemented | OK |
-| PRICE-13 | Handle negative months (error) | P1 | Not Implemented | OK |
+| PRICE-12 | Handle 0 months (error) | P1 | ✅ Implemented | OK |
+| PRICE-13 | Handle negative months (error) | P1 | ✅ Implemented | OK |
 | PRICE-14 | Handle very long durations (100 years) | P2 | Not Implemented | OK |
-| PRICE-15 | Round final price to nearest cent | P0 | Not Implemented | OK |
-| PRICE-16 | Avoid floating point errors | P0 | Not Implemented | OK |
-| PRICE-17 | Use integer cents internally | P0 | Not Implemented | OK |
-| PRICE-18 | Calculate minimum cost for file size | P0 | Not Implemented | OK |
-| PRICE-19 | Inline content (≤64 bytes) returns cost of 0 | P0 | Not Implemented | **NEW** |
-| PRICE-20 | Content >64 bytes has minimum cost of $2.00 | P0 | Not Implemented | **NEW** |
-| PRICE-21 | Small content returns $2.00 minimum | P0 | Not Implemented | **NEW** |
+| PRICE-15 | Round final price to nearest cent | P0 | ✅ Implemented | OK |
+| PRICE-16 | Avoid floating point errors | P0 | ✅ Implemented | OK |
+| PRICE-17 | Use integer cents internally | P0 | ✅ Implemented | OK |
+| PRICE-18 | Calculate minimum cost for file size | P0 | ✅ Implemented | OK |
+| PRICE-19 | Inline content (≤64 bytes) returns cost of 0 | P0 | ✅ Implemented | **NEW** |
+| PRICE-20 | Content >64 bytes has minimum cost of $2.00 | P0 | ✅ Implemented | **NEW** |
+| PRICE-21 | Small content returns $2.00 minimum | P0 | ✅ Implemented | **NEW** |
 
 #### C2. Balance Operations Tests (12 tests)
 
@@ -555,13 +615,21 @@ Continue with remaining tests by priority.
 
 | Category | Planned | Updated | Implemented | Gap |
 |----------|---------|---------|-------------|-----|
-| JavaScript Unit Tests | ~180 | ~186 | 0 | 186 |
+| JavaScript Unit Tests | ~180 | ~186 | 50 (48 passing, 2 skipped) | 136 |
 | Shell API Tests | 137 | 137 | 137 | 0* |
 | Shell Validation Tests | 89 | 89 | 89 | 0* |
 | Standalone Test Scripts | ~10 | ~10 | ~10 | 0* |
-| **Total** | **~416** | **~422** | **~236** | **~186** |
+| **Total** | **~416** | **~422** | **~286** | **~136** |
 
 *Need verification that shell tests are all running in CI
+
+### JavaScript Unit Tests Breakdown
+
+| Test File | Tests | Status |
+|-----------|-------|--------|
+| `src/utils/pricing.test.js` | 20 | ✅ All passing |
+| `src/auth/utils.test.js` | 30 | ✅ 28 passing, 2 skipped (bug found) |
+| **Total Implemented** | **50** | **48 passing, 2 skipped** |
 
 ---
 
