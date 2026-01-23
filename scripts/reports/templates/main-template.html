@@ -6,6 +6,8 @@
   <title>Build Report - HashBin.org</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 20px; background: #f6f8fa; }
+    body.page-has-error { background: #ffe8e8; }
+    body.page-has-warning { background: #fff8dc; }
     .container { max-width: 1200px; margin: 0 auto; background: white; padding: 40px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     h1 { color: #24292f; margin: 0 0 10px 0; font-size: 32px; }
     .subtitle { color: #57606a; font-size: 16px; margin-bottom: 30px; }
@@ -20,6 +22,12 @@
     .report-card:hover { border-color: #0969da; box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
     .report-card.unavailable { opacity: 0.6; cursor: not-allowed; }
     .report-card.unavailable:hover { transform: none; border-color: #d0d7de; box-shadow: none; }
+    
+    /* Color coding for cards with errors and warnings */
+    .report-card.has-error { background: #ffe8e8; border-color: #d73a49; }
+    .report-card.has-error:hover { border-color: #cb2431; }
+    .report-card.has-warning { background: #fff8dc; border-color: #d4a72c; }
+    .report-card.has-warning:hover { border-color: #bf8700; }
     
     .report-icon { font-size: 36px; margin-bottom: 12px; }
     .report-title { font-size: 20px; font-weight: 600; color: #24292f; margin: 0 0 8px 0; }
@@ -47,7 +55,7 @@
     .note strong { color: #24292f; }
   </style>
 </head>
-<body>
+<body class="page-{{PAGE_STATUS}}">
   <div class="container">
     <h1>🔨 Build Report</h1>
     <p class="subtitle">Comprehensive build analysis with coverage, security, and performance metrics</p>
@@ -66,7 +74,7 @@
 
     <div class="reports-grid">
       <!-- Coverage Report Card -->
-      <div class="report-card {{COVERAGE_EXISTS}}">
+      <div class="report-card {{COVERAGE_EXISTS}} {{COVERAGE_STATUS}}">
         <span class="status-badge {{COVERAGE_EXISTS}}">
           {{COVERAGE_EXISTS}}
         </span>
@@ -89,7 +97,7 @@
       </div>
 
       <!-- Security Report Card -->
-      <div class="report-card {{SECURITY_EXISTS}}">
+      <div class="report-card {{SECURITY_EXISTS}} {{SECURITY_STATUS}}">
         <span class="status-badge {{SECURITY_EXISTS}}">
           {{SECURITY_EXISTS}}
         </span>
@@ -112,7 +120,7 @@
       </div>
 
       <!-- Performance Report Card -->
-      <div class="report-card {{PERFORMANCE_EXISTS}}">
+      <div class="report-card {{PERFORMANCE_EXISTS}} {{PERFORMANCE_STATUS}}">
         <span class="status-badge {{PERFORMANCE_EXISTS}}">
           {{PERFORMANCE_EXISTS}}
         </span>
@@ -135,7 +143,7 @@
       </div>
 
       <!-- Unit Tests Report Card -->
-      <div class="report-card {{UNIT_TESTS_EXISTS}}">
+      <div class="report-card {{UNIT_TESTS_EXISTS}} {{UNIT_TESTS_STATUS}}">
         <span class="status-badge {{UNIT_TESTS_EXISTS}}">
           {{UNIT_TESTS_EXISTS}}
         </span>
@@ -158,7 +166,7 @@
       </div>
 
       <!-- API Tests Report Card -->
-      <div class="report-card {{API_TESTS_EXISTS}}">
+      <div class="report-card {{API_TESTS_EXISTS}} {{API_TESTS_STATUS}}">
         <span class="status-badge {{API_TESTS_EXISTS}}">
           {{API_TESTS_EXISTS}}
         </span>
@@ -181,7 +189,7 @@
       </div>
 
       <!-- Lint Report Card -->
-      <div class="report-card {{QUALITY_EXISTS}}">
+      <div class="report-card {{QUALITY_EXISTS}} {{QUALITY_STATUS}}">
         <span class="status-badge {{QUALITY_EXISTS}}">
           {{QUALITY_EXISTS}}
         </span>
@@ -204,7 +212,7 @@
       </div>
 
       <!-- Complexity Report Card -->
-      <div class="report-card {{COMPLEXITY_EXISTS}}">
+      <div class="report-card {{COMPLEXITY_EXISTS}} {{COMPLEXITY_STATUS}}">
         <span class="status-badge {{COMPLEXITY_EXISTS}}">
           {{COMPLEXITY_EXISTS}}
         </span>
@@ -223,7 +231,7 @@
       </div>
 
       <!-- Structural Analysis Report Card -->
-      <div class="report-card {{STRUCTURE_EXISTS}}">
+      <div class="report-card {{STRUCTURE_EXISTS}} {{STRUCTURE_STATUS}}">
         <span class="status-badge {{STRUCTURE_EXISTS}}">
           {{STRUCTURE_EXISTS}}
         </span>
@@ -242,7 +250,7 @@
       </div>
 
       <!-- Documentation Report Card -->
-      <div class="report-card {{DOCUMENTATION_EXISTS}}">
+      <div class="report-card {{DOCUMENTATION_EXISTS}} {{DOCUMENTATION_STATUS}}">
         <span class="status-badge {{DOCUMENTATION_EXISTS}}">
           {{DOCUMENTATION_EXISTS}}
         </span>
@@ -261,7 +269,7 @@
       </div>
 
       <!-- Visual Regression Report Card -->
-      <div class="report-card {{VISUAL_EXISTS}}">
+      <div class="report-card {{VISUAL_EXISTS}} {{VISUAL_STATUS}}">
         <span class="status-badge {{VISUAL_EXISTS}}">
           {{VISUAL_EXISTS}}
         </span>
@@ -280,7 +288,7 @@
       </div>
 
       <!-- Trends Report Card -->
-      <div class="report-card {{TRENDS_EXISTS}}">
+      <div class="report-card {{TRENDS_EXISTS}} {{TRENDS_STATUS}}">
         <span class="status-badge {{TRENDS_EXISTS}}">
           {{TRENDS_EXISTS}}
         </span>
