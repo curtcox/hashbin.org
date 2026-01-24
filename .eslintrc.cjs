@@ -42,4 +42,14 @@ module.exports = {
     'no-console': 'off', // Console is acceptable in Workers
     'no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
   },
+  overrides: [
+    {
+      files: ['**/*.test.js'],
+      rules: {
+        'node/no-unpublished-import': 'off',
+        'node/no-unsupported-features/es-syntax': 'off',
+        'node/no-unsupported-features/node-builtins': 'off',
+      },
+    },
+  ],
 };

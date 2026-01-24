@@ -7,15 +7,12 @@ import { authenticate } from '../auth/middleware.js';
 import { 
   calculateRetentionCost, 
   generateInsufficientBalanceMessage,
-  checkBalanceSufficient,
-  formatCents
+  checkBalanceSufficient
 } from '../utils/pricing.js';
 import { 
   generate256tHash, 
   isInlineContent, 
-  verifyContent,
   validate256tCID,
-  getContentSize,
   extractInlineContent
 } from '../utils/hash256t.js';
 import { getMimeType } from '../utils/mime-types.js';

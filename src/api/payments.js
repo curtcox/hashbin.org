@@ -7,13 +7,12 @@ import Stripe from 'stripe';
 import { authenticate } from '../auth/middleware.js';
 import { handleLocalDepositUnavailable, handleLocalDonationUnavailable } from './local-payments.js';
 import { 
-  calculateStripeFees, 
   calculateTotalWithFees,
   formatCents, 
   calculateRetentionCost,
   BASE_RATE_PER_GB_PER_MONTH
 } from '../utils/pricing.js';
-import { recordDeposit, recordPayment, recordDispute } from '../utils/platform-stats.js';
+import { recordDeposit, recordDispute } from '../utils/platform-stats.js';
 
 /**
  * POST /api/balance/deposit

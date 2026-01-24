@@ -133,7 +133,7 @@ const STATIC_PATHS = [
  * Main Worker fetch handler
  */
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env, _ctx) {
     const url = new URL(request.url);
 
     // Stripe webhook endpoint (no rate limiting or auth required)
@@ -176,7 +176,7 @@ export default {
     }
 
     // If path contains invalid characters and isn't a static asset or CID, return 404
-    if (pathWithoutLeadingSlash && /[^A-Za-z0-9._\/-]/.test(pathWithoutLeadingSlash)) {
+    if (pathWithoutLeadingSlash && /[^A-Za-z0-9._/-]/.test(pathWithoutLeadingSlash)) {
       return new Response(
         JSON.stringify({
           error: 'Invalid path',
@@ -193,7 +193,7 @@ export default {
     if (env.ASSETS) {
       try {
         // Special handling for /dashboard/uploads/{cid}/ -> serve detail.html
-        if (url.pathname.match(/^\/dashboard\/uploads\/[^\/]+\/?$/)) {
+        if (url.pathname.match(/^\/dashboard\/uploads\/[^/]+\/?$/)) {
           const detailRequest = new Request(new URL('/dashboard/uploads/detail.html', url), request);
           const detailAsset = await env.ASSETS.fetch(detailRequest);
           if (detailAsset.status !== 404) {
@@ -202,7 +202,7 @@ export default {
         }
         
         // Special handling for /dashboard/suppliers/{supplier_id} -> serve detail.html
-        if (url.pathname.match(/^\/dashboard\/suppliers\/[^\/]+\/?$/)) {
+        if (url.pathname.match(/^\/dashboard\/suppliers\/[^/]+\/?$/)) {
           const detailRequest = new Request(new URL('/dashboard/suppliers/detail.html', url), request);
           const detailAsset = await env.ASSETS.fetch(detailRequest);
           if (detailAsset.status !== 404) {
@@ -243,7 +243,7 @@ export default {
    * - Audit log cleanup (1-year retention)
    * - Anomaly detection
    */
-  async scheduled(event, env, ctx) {
+  async scheduled(event, env, _ctx) {
     try {
       console.log('Scheduled job executed:', new Date().toISOString());
 

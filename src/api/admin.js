@@ -511,7 +511,7 @@ async function exportAuditLog(env, limit, offset) {
  * Note: This is a placeholder implementation
  * In a full implementation, this would iterate through PaymentRecord DOs
  */
-async function exportTransactions(env, limit, offset) {
+async function exportTransactions(_env, _limit, _offset) {
   // This would need to iterate through all payment records
   // For now, return headers only with a note in the filename
   const csv = 'id,type,amount_cents,user_id,created_at,status\n';
@@ -523,7 +523,7 @@ async function exportTransactions(env, limit, offset) {
  * Note: This is a placeholder implementation
  * In a full implementation, this would iterate through UserProfile DOs
  */
-async function exportUsers(env, limit, offset) {
+async function exportUsers(_env, _limit, _offset) {
   // This would need to iterate through all user profiles
   // For now, return headers only
   // PII (email, name) is excluded from export
@@ -536,7 +536,7 @@ async function exportUsers(env, limit, offset) {
  * Note: This is a placeholder implementation
  * In a full implementation, this would iterate through ContentMetadata DOs
  */
-async function exportContent(env, limit, offset) {
+async function exportContent(_env, _limit, _offset) {
   // This would need to iterate through all content metadata
   // For now, return headers only
   const csv = 'hash,size_bytes,created_at,expires_at,download_count,owner_user_id\n';

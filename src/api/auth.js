@@ -15,7 +15,7 @@ import { createClerkClient } from '@clerk/backend';
  * Clerk's frontend SDK and redirects. This endpoint provides a server-side
  * callback handler for custom OAuth flows or backend-only integrations.
  */
-export async function handleAuthCallback(request, env) {
+export async function handleAuthCallback(_request, _env) {
   try {
     // In a typical Clerk setup, the OAuth flow is handled by the Clerk frontend SDK
     // This endpoint is provided for completeness but may not be used in standard flows
@@ -432,11 +432,12 @@ export async function handleCreateApiKey(request, env) {
 
   // Return the API key (ONLY SHOWN ONCE!)
   return new Response(
-    JSON.stringify({
-      ...keyInfo,
-      api_key: apiKey,
-      warning: 'Save this API key securely. It will not be shown again.'
-    }),
+    JSON.stringify(
+      Object.assign({}, keyInfo, {
+        api_key: apiKey,
+        warning: 'Save this API key securely. It will not be shown again.'
+      })
+    ),
     {
       status: 201,
       headers: { 'content-type': 'application/json' }
