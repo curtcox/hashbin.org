@@ -153,6 +153,16 @@ export default {
       return handleApiRoutes(url, request, env);
     }
 
+    // Info page route: /info/{cid}
+    const infoMatch = url.pathname.match(/^\/info\/([A-Za-z0-9_-]{8,94})$/);
+    if (infoMatch && request.method === 'GET') {
+      const cid = infoMatch[1];
+      // Redirect to info.html with CID as query parameter
+      const redirectUrl = new URL('/info.html', url);
+      redirectUrl.searchParams.set('cid', cid);
+      return Response.redirect(redirectUrl.toString(), 302);
+    }
+
     // Content download routes: /{cid} or /{cid}.{ext}
     // Match CID pattern at root level (excluding known static paths)
     const pathWithoutLeadingSlash = url.pathname.substring(1);

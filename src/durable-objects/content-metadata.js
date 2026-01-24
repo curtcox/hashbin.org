@@ -83,6 +83,17 @@ export class ContentMetadata {
         return await this.deleteContent();
       }
 
+      // Mark content as contested (HTTP 451)
+      if (url.pathname === '/contested' && method === 'POST') {
+        const data = await request.json();
+        return await this.markContested(data);
+      }
+
+      // Unmark content as contested
+      if (url.pathname === '/contested' && method === 'DELETE') {
+        return await this.unmarkContested();
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -159,7 +170,10 @@ export class ContentMetadata {
         expires_at: new Date(created_at.getTime() + DEFAULT_RATE_LIMIT_MS).toISOString()
       },
       // Alternate suppliers
-      alternate_suppliers: []
+      alternate_suppliers: [],
+      // Contested content flag (HTTP 451)
+      contested: false,
+      contested_reason: null
     };
 
     await this.state.storage.put('content', content);
@@ -719,6 +733,74 @@ export class ContentMetadata {
 
     return new Response(
       JSON.stringify({ success: true }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Mark content as contested (HTTP 451 - Unavailable For Legal Reasons)
+   * This prevents content from being served while legal process is ongoing
+   */
+  async markContested(data) {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    content.contested = true;
+    content.contested_reason = data.reason || 'Content is subject to legal review';
+    content.contested_at = new Date().toISOString();
+    content.contested_by = data.admin_id || 'system';
+
+    await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({ success: true, contested: true }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Unmark content as contested (restore normal access)
+   */
+  async unmarkContested() {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({
+          error: 'Content not found'
+        }),
+        {
+          status: 404,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    content.contested = false;
+    content.contested_reason = null;
+    content.uncontested_at = new Date().toISOString();
+
+    await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({ success: true, contested: false }),
       {
         status: 200,
         headers: { 'content-type': 'application/json' }

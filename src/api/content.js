@@ -834,9 +834,23 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     // Rate limit check passed, get the rate limit info for headers
     const rateLimitData = await rateLimitResponse.json();
 
-    // TODO: Check if content is contested (451 status)
-    // This will be implemented when the contest system is added (Phase 5 of master plan)
-    // See: todo/master_plan.md - Phase 5: Contest System
+    // Check if content is contested (HTTP 451 - Unavailable For Legal Reasons)
+    if (metadata.contested === true) {
+      return new Response(
+        JSON.stringify({
+          error: 'unavailable_for_legal_reasons',
+          message: metadata.contested_reason || 'This content is unavailable due to legal reasons',
+          details: 'This content has been removed or restricted due to legal process.'
+        }),
+        {
+          status: 451,
+          headers: { 
+            'content-type': 'application/json',
+            'Link': '<https://hashbin.org/legal/contested>; rel="blocked-by"'
+          }
+        }
+      );
+    }
 
     // Fetch content from R2
     const rangeHeader = request.headers.get('Range');
