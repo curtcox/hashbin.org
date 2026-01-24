@@ -81,7 +81,7 @@ describe('ContentMetadata Rate Limit Tests', () => {
       });
 
       const response = await contentMetadata.fetch(request);
-      expect(response.status).toBe(201); // Content creation returns 201
+      expect(response.status).toBe(201); // createContent returns 201 for new content
 
       const data = await response.json();
       expect(data.default_rate_limit).toBeDefined();
@@ -108,7 +108,7 @@ describe('ContentMetadata Rate Limit Tests', () => {
       });
 
       const response = await contentMetadata.fetch(request);
-      expect(response.status).toBe(201); // Content creation returns 201
+      expect(response.status).toBe(201); // createContent returns 201 for new content
 
       const data = await response.json();
       expect(data.default_rate_limit).toBeNull();
@@ -430,7 +430,7 @@ describe('ContentMetadata Rate Limit Tests', () => {
       });
 
       const response = await contentMetadata.fetch(request);
-      expect(response.status).toBe(201); // Purchase returns 201
+      expect(response.status).toBe(201); // Rate limit purchase returns 201
 
       const data = await response.json();
       expect(data.record_id).toBe('rec_new');

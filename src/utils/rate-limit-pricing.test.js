@@ -20,7 +20,7 @@ describe('Rate Limit Pricing Tests', () => {
       
       const result = calculateRateLimitPrice(sizeBytes, mtbrMs, durationSeconds);
       
-      // Max requests = floor(2592000 / 1) = 2,592,000
+      // Max requests = floor(2592000 seconds / 1 second) = 2,592,000
       expect(result.maxRequests).toBe(2592000);
       
       // Max bytes = 1048576 × 2,592,000 (actual calculation from implementation)
@@ -104,7 +104,7 @@ describe('Rate Limit Pricing Tests', () => {
       
       const result = calculateRateLimitPrice(sizeBytes, mtbrMs, durationSeconds);
       
-      // Max requests = floor(86400 / 0.1) = 864,000
+      // Max requests = floor(86400 seconds / 0.1 seconds) = 864,000
       expect(result.maxRequests).toBe(864000);
       
       // Max bytes = 1GB × 864,000
