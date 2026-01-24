@@ -6,6 +6,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { deleteContent, getContentMetadata } from '../services/content-deletion.js';
 
+// Constants
+const BATCH_LIMIT = 5000; // Cloudflare Workers batch processing limit
+
 /**
  * Create mock Durable Object stub with multiple endpoints
  */
@@ -29,7 +32,9 @@ function createMockDurableObjectStub(responses) {
         if (key.includes('*')) {
           const [keyMethod, keyPattern] = key.split(':');
           if (keyMethod === method) {
-            const regex = new RegExp('^' + keyPattern.replace('*', '.*') + '$');
+            // Escape special regex characters and replace * with .*
+            const escapedPattern = keyPattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+            const regex = new RegExp('^' + escapedPattern + '$');
             if (regex.test(pathname)) {
               return typeof response === 'function' ? response(request) : response;
             }
@@ -95,10 +100,12 @@ function createMockEnv(options = {}) {
             if (!state.expirationIndex[date]) {
               state.expirationIndex[date] = [];
             }
-            state.expirationIndex[date].push(body.hash_256t);
+            if (!state.expirationIndex[date].includes(body.hash_256t)) {
+              state.expirationIndex[date].push(body.hash_256t);
+            }
             return new Response(JSON.stringify({ success: true }), {
               status: 200,
-              headers: { 'content-type': 'application/json' }
+              headers: { 'Content-Type': 'application/json' }
             });
           },
           'POST:/update': async (request) => {
@@ -117,11 +124,13 @@ function createMockEnv(options = {}) {
             if (!state.expirationIndex[newDate]) {
               state.expirationIndex[newDate] = [];
             }
-            state.expirationIndex[newDate].push(body.hash_256t);
+            if (!state.expirationIndex[newDate].includes(body.hash_256t)) {
+              state.expirationIndex[newDate].push(body.hash_256t);
+            }
             
             return new Response(JSON.stringify({ success: true }), {
               status: 200,
-              headers: { 'content-type': 'application/json' }
+              headers: { 'Content-Type': 'application/json' }
             });
           },
           'GET:*/expired*': (request) => {
@@ -414,7 +423,6 @@ describe('Content Lifecycle Integration Tests', () => {
         }
       });
 
-      const BATCH_LIMIT = 5000;
       const indexStub = env.EXPIRATION_INDEX.get(env.EXPIRATION_INDEX.idFromName('global'));
       const expiredResponse = await indexStub.fetch(
         new Request('http://internal/expired?date=2026-01-23', { method: 'GET' })
