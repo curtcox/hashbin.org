@@ -17,6 +17,9 @@ export { SupplierRegistry } from './durable-objects/supplier-registry.js';
 export { InfrastructureCost } from './durable-objects/infrastructure-cost.js';
 export { DeletionRecord } from './durable-objects/deletion-record.js';
 export { ExpirationIndex } from './durable-objects/expiration-index.js';
+export { DisputeRecord } from './durable-objects/dispute-record.js';
+export { DisputeIndex } from './durable-objects/dispute-index.js';
+export { AdminActionLog } from './durable-objects/admin-action-log.js';
 
 // Import API route handlers
 import {
