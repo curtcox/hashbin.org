@@ -562,26 +562,23 @@ export default {
       console.log('Cleaning up R2 pending deletion...');
       
       // Note: This requires an index or scanning mechanism to find content with pending_r2_deletion
-      // For now, we'll implement a basic approach that would need enhancement in production
+      // For this implementation, we document the requirements for production enhancement
       
-      // In a production system, we would:
-      // 1. Maintain an index of content pending R2 deletion in a Durable Object
-      // 2. Query that index here
-      // 3. Delete eligible content
+      // Production Requirements:
+      // 1. Create a DeletionPendingIndex Durable Object to track soft-deleted content
+      // 2. When softDeleteContent() is called, add the CID to DeletionPendingIndex with timestamp
+      // 3. This scheduled job queries DeletionPendingIndex for entries > 24 hours old
+      // 4. For each eligible entry: delete from R2, call markR2Deleted(), remove from index
       
-      // For this implementation, we'll document that content with pending_r2_deletion=true
-      // and deleted_at > 24 hours ago should be tracked separately
+      // Issue: Without a global index, we cannot efficiently find ContentMetadata objects
+      // with pending_r2_deletion=true. This must be implemented before production use.
       
-      // Since we don't have a global index of all ContentMetadata objects,
-      // this would require either:
-      // - A separate DeletionPendingIndex Durable Object
-      // - Storing pending deletions when soft delete is called
+      // TODO(GitHub Issue): Implement DeletionPendingIndex for efficient R2 cleanup
+      // Until implemented, R2 cleanup must be performed manually or via separate tooling
       
-      // TODO: Implement DeletionPendingIndex for efficient R2 cleanup
-      // For now, log that cleanup was attempted
-      
-      console.log('R2 cleanup: Requires DeletionPendingIndex implementation for production');
-      console.log('Manual cleanup: Query ContentMetadata objects with pending_r2_deletion=true and deleted_at > 24h');
+      console.log('R2 cleanup: Requires DeletionPendingIndex implementation (see TODO in code)');
+      console.log('Manual workaround: Query ContentMetadata objects with pending_r2_deletion=true and deleted_at > 24h');
+
       
     } catch (error) {
       console.error('Error cleaning up R2:', error);
