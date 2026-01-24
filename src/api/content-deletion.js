@@ -92,7 +92,8 @@ export async function handleDeleteContent(request, env, cid) {
 
     if (activeDisputeResponse.ok) {
       const disputeData = await activeDisputeResponse.json();
-      if (disputeData.dispute && disputeData.dispute.status === 'open') {
+      // Close dispute if it's open or under review
+      if (disputeData.dispute && (disputeData.dispute.status === 'open' || disputeData.dispute.status === 'under_review')) {
         disputeToClose = disputeData.dispute;
 
         // Update dispute status to closed_deleted

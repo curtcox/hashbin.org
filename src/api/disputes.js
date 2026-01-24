@@ -47,13 +47,8 @@ export async function handleCreateDispute(request, env) {
     const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
     const ipHash = await hashIP(clientIP);
 
-    // Check IP-based rate limit (10 disputes per hour)
-    const rateLimitKey = `dispute-rate-limit:${ipHash}`;
-    const rateLimitId = env.DISPUTE_INDEX.idFromName(rateLimitKey);
-    const rateLimitStub = env.DISPUTE_INDEX.get(rateLimitId);
-    
-    // TODO: Implement rate limiting logic
-    // For now, we'll skip the rate limit check
+    // TODO: Implement IP-based rate limiting (10 disputes per hour)
+    // For now, rate limiting is handled by re-dispute cooldown (30 days) in DisputeRecord
 
     // Get DisputeRecord for this CID
     const disputeId = env.DISPUTE_RECORD.idFromName(`dispute:${data.cid}`);

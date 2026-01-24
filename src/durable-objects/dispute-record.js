@@ -104,8 +104,24 @@ export class DisputeRecord {
       for (const url of data.evidence_urls) {
         try {
           const parsed = new URL(url);
+          // Only allow HTTPS URLs
           if (parsed.protocol !== 'https:') {
             return new Response(JSON.stringify({ error: 'INVALID_EVIDENCE_URL', details: 'Only HTTPS URLs allowed' }), {
+              status: 400,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
+          // Prevent internal network addresses and localhost
+          const hostname = parsed.hostname.toLowerCase();
+          if (hostname === 'localhost' || 
+              hostname === '127.0.0.1' || 
+              hostname === '0.0.0.0' ||
+              hostname.startsWith('192.168.') ||
+              hostname.startsWith('10.') ||
+              hostname.startsWith('172.16.') ||
+              hostname.startsWith('169.254.') ||
+              hostname === '::1') {
+            return new Response(JSON.stringify({ error: 'INVALID_EVIDENCE_URL', details: 'Internal URLs not allowed' }), {
               status: 400,
               headers: { 'Content-Type': 'application/json' }
             });
