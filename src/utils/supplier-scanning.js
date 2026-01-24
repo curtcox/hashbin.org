@@ -11,7 +11,7 @@ const MAX_SCAN_CIDS = 1000; // Maximum CIDs to scan from a group supplier (reduc
 // GitHub URL pattern for parsing raw URLs
 // Example: https://raw.githubusercontent.com/user/repo/refs/heads/main/cids
 // Captures: owner, repo, branch, path
-const GITHUB_URL_PATTERN = /github\.com\/([^\/]+)\/([^\/]+)\/(?:refs\/heads\/)?([^\/]+)(?:\/(.*))?/;
+const GITHUB_URL_PATTERN = /github\.com\/([^/]+)\/([^/]+)\/(?:refs\/heads\/)?([^/]+)(?:\/(.*))?/;
 
 /**
  * Scan a single CID supplier

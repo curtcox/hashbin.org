@@ -6,7 +6,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateRetentionCost,
-  calculateMinimumRetentionCost,
   calculateStripeFees,
   calculateTotalWithFees,
   checkBalanceSufficient,

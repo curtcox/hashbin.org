@@ -3,7 +3,7 @@
  * Handles session management, API key operations, and account management
  */
 
-import { authenticate, requireAuth, AUTH_ERROR_CODES } from '../auth/middleware.js';
+import { authenticate, requireAuth } from '../auth/middleware.js';
 import { generateApiKey, hashApiKey, generateKeyId, validateKeyName, validateExpiration, encryptApiKey, decryptApiKey, isSessionFresh } from '../auth/utils.js';
 import { createClerkClient } from '@clerk/backend';
 
