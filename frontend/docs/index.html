@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HashBin.org Documentation - Getting Started Guide">
+  <title>Documentation - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header"></header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <h1>Documentation</h1>
+      
+      <!-- Getting Started -->
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Getting Started</h2>
+        <p>HashBin.org is a content distribution platform using 256t hash-based addressing. Content is addressed by its cryptographic hash, making it content-addressable, verifiable, and permanent.</p>
+        
+        <h3 style="margin-top: 1.5rem;">Quick Start</h3>
+        <ol style="margin-left: 1.5rem;">
+          <li><strong>Sign up:</strong> Create an account using Google, Apple, Microsoft, or GitHub OAuth</li>
+          <li><strong>Add funds:</strong> Deposit funds to your wallet to pay for content retention</li>
+          <li><strong>Upload content:</strong> Upload files and pay for storage retention</li>
+          <li><strong>Share the hash:</strong> Share the 256t hash with anyone to provide access</li>
+          <li><strong>Retrieve content:</strong> Anyone can download content using the hash (no account required)</li>
+        </ol>
+      </section>
+
+      <!-- Core Concepts -->
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Core Concepts</h2>
+        
+        <h3>256t Hash</h3>
+        <p>Content is addressed using a 256t hash - a cryptographic identifier that uniquely represents your content. The hash is generated from the content itself using SHA-512 and encoded in Base64URL format.</p>
+        <ul style="margin-left: 1.5rem;">
+          <li><strong>Deterministic:</strong> Same content always produces the same hash</li>
+          <li><strong>Verifiable:</strong> Anyone can verify the hash matches the content</li>
+          <li><strong>URL-safe:</strong> Can be used directly in URLs</li>
+        </ul>
+
+        <h3 style="margin-top: 1.5rem;">Pay-to-Publish, Free-to-Download</h3>
+        <p>HashBin.org operates on a simple principle:</p>
+        <ul style="margin-left: 1.5rem;">
+          <li><strong>Uploaders pay:</strong> You pay for storage retention based on file size and duration</li>
+          <li><strong>Downloads are free:</strong> Anyone with the hash can download for free</li>
+          <li><strong>No hidden fees:</strong> Transparent pricing at $0.03 per GB per month</li>
+        </ul>
+
+        <h3 style="margin-top: 1.5rem;">Content Retention</h3>
+        <p>When you upload content, you specify how long it should be retained. Retention periods must be multiples of 30 days, with common presets:</p>
+        <ul style="margin-left: 1.5rem;">
+          <li>1 month (30 days)</li>
+          <li>1 year (365 days)</li>
+          <li>1 decade (3,650 days)</li>
+          <li>1 century (36,500 days)</li>
+        </ul>
+      </section>
+
+      <!-- Documentation Sections -->
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Documentation Sections</h2>
+        
+        <div class="grid grid-cols-2" style="gap: 1.5rem; margin-top: 1rem;">
+          <div>
+            <h3><a href="/docs/api.html">API Reference</a></h3>
+            <p>Complete API documentation for programmatic access, including authentication, content operations, and payment endpoints.</p>
+          </div>
+          
+          <div>
+            <h3><a href="/docs/pricing.html">Pricing Calculator</a></h3>
+            <p>Calculate storage costs for your use case with our interactive pricing calculator.</p>
+          </div>
+          
+          <div>
+            <h3><a href="/docs/faq.html">FAQ</a></h3>
+            <p>Frequently asked questions about HashBin.org, covering uploads, payments, security, and technical details.</p>
+          </div>
+          
+          <div>
+            <h3><a href="/terms.html">Terms of Service</a></h3>
+            <p>Legal terms and conditions for using HashBin.org services.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Support -->
+      <section class="card">
+        <h2>Need Help?</h2>
+        <p>If you can't find what you're looking for in our documentation, check out the <a href="/docs/faq.html">FAQ</a> or reach out through the support channels listed in the Terms of Service.</p>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> | 
+      <a href="/docs/index.html">Docs</a> | 
+      <a href="/docs/api.html">API</a> | 
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+  <script type="module">
+    import { initNavHeader } from '/js/nav-header.js';
+    initNavHeader();
+  </script>
+</body>
+</html>
