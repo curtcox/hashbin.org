@@ -92,6 +92,13 @@ import {
   handleGetDeletionStats
 } from './api/public-deletions.js';
 
+import {
+  handleCreateDispute,
+  handleListDisputes,
+  handleGetDispute,
+  handleGetContentDisputes
+} from './api/disputes.js';
+
 import { deleteContent, getContentMetadata } from './services/content-deletion.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
@@ -592,6 +599,29 @@ function handleApiRoutes(url, request, env) {
   // User API routes
   if (url.pathname === '/api/user/uploads' && request.method === 'GET') {
     return handleGetUserUploads(request, env);
+  }
+
+  // Dispute API routes
+  if (url.pathname === '/api/disputes' && request.method === 'POST') {
+    return handleCreateDispute(request, env);
+  }
+
+  if (url.pathname === '/api/disputes' && request.method === 'GET') {
+    return handleListDisputes(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/disputes\/[^\/]+$/) && request.method === 'GET') {
+    const disputeId = url.pathname.split('/')[3];
+    // Get user ID from request if authenticated
+    const userId = request.user?.userId || null;
+    return handleGetDispute(request, env, disputeId, userId);
+  }
+
+  if (url.pathname.match(/^\/api\/content\/[^\/]+\/disputes$/) && request.method === 'GET') {
+    const cid = url.pathname.split('/')[3];
+    // Get user ID from request if authenticated
+    const userId = request.user?.userId || null;
+    return handleGetContentDisputes(request, env, cid, userId);
   }
 
   // Supplier API routes
