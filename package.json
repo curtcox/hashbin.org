@@ -67,7 +67,7 @@
     "playwright": "^1.47.2",
     "pngjs": "^7.0.0",
     "vitest": "^3.2.4",
-    "wrangler": "4.47.0"
+    "wrangler": "4.59.1"
   },
   "dependencies": {
     "@clerk/backend": "^2.29.2",
