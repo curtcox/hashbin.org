@@ -94,6 +94,21 @@ name = "EXPIRATION_INDEX"
 class_name = "ExpirationIndex"
 script_name = "hashbin-worker-prod"
 
+[[durable_objects.bindings]]
+name = "DISPUTE_RECORD"
+class_name = "DisputeRecord"
+script_name = "hashbin-worker-prod"
+
+[[durable_objects.bindings]]
+name = "DISPUTE_INDEX"
+class_name = "DisputeIndex"
+script_name = "hashbin-worker-prod"
+
+[[durable_objects.bindings]]
+name = "ADMIN_ACTION_LOG"
+class_name = "AdminActionLog"
+script_name = "hashbin-worker-prod"
+
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -131,6 +146,10 @@ new_sqlite_classes = ["DeletionRecord"]
 [[migrations]]
 tag = "v7"
 new_sqlite_classes = ["ExpirationIndex"]
+
+[[migrations]]
+tag = "v8"
+new_sqlite_classes = ["DisputeRecord", "DisputeIndex", "AdminActionLog"]
 
 # Scheduled jobs (cron triggers)
 [triggers]

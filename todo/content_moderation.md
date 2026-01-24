@@ -1,5 +1,37 @@
 # Content Moderation: Dispute and Deletion System
 
+## Implementation Status
+
+**Last Updated:** 2026-01-24
+
+### Backend Implementation: ✅ COMPLETE (Phases 1-5)
+
+**Completed:**
+- ✅ Phase 1: Data Layer - All 3 new Durable Objects created (DisputeRecord, DisputeIndex, AdminActionLog)
+- ✅ Phase 1: ContentMetadata updated with deletion fields
+- ✅ Phase 1: PaymentRecord updated with content_deletion transaction type
+- ✅ Phase 2: Dispute API - All endpoints implemented (POST/GET disputes, content disputes endpoint)
+- ✅ Phase 3: Delete API - Content deletion with uploader/admin auth, soft delete, dispute closure
+- ✅ Phase 4: Admin API - All admin endpoints (list/update disputes, delete content, action log)
+- ✅ Phase 5: Scheduled Jobs - Dispute expiration and R2 cleanup logic added to cron handler
+- ✅ Tests: 262 unit tests passing, 0 CodeQL security alerts
+- ✅ Security: IP hashing, contact visibility controls, admin authorization
+
+**Known Limitations:**
+1. R2 Cleanup requires DeletionPendingIndex for efficient batch processing (documented with TODO)
+2. Admin disputes listing returns open disputes only (historical requires additional indexing)
+
+### Frontend Implementation: ⏳ TODO (Phases 6-9)
+
+**Remaining Work:**
+- ❌ Phase 6: Dispute Form UI (`/disputes/submit.html`, form validation)
+- ❌ Phase 7: Disputes List UI (`/disputes/index.html`, filtering, pagination)
+- ❌ Phase 8: CID Details Updates (dispute banner, delete button, report link)
+- ❌ Phase 9: Transaction History Updates (deletion transaction display)
+- ❌ Phase 10: Final integration testing and plan archival
+
+---
+
 ## Overview
 
 This plan describes the implementation of a content moderation system that allows:

@@ -17,6 +17,9 @@ export { SupplierRegistry } from './durable-objects/supplier-registry.js';
 export { InfrastructureCost } from './durable-objects/infrastructure-cost.js';
 export { DeletionRecord } from './durable-objects/deletion-record.js';
 export { ExpirationIndex } from './durable-objects/expiration-index.js';
+export { DisputeRecord } from './durable-objects/dispute-record.js';
+export { DisputeIndex } from './durable-objects/dispute-index.js';
+export { AdminActionLog } from './durable-objects/admin-action-log.js';
 
 // Import API route handlers
 import {
@@ -88,6 +91,24 @@ import {
   handleGetDeletion,
   handleGetDeletionStats
 } from './api/public-deletions.js';
+
+import {
+  handleCreateDispute,
+  handleListDisputes,
+  handleGetDispute,
+  handleGetContentDisputes
+} from './api/disputes.js';
+
+import { 
+  handleDeleteContent, 
+  handleAdminDeleteContent 
+} from './api/content-deletion.js';
+
+import {
+  handleAdminListDisputes,
+  handleAdminUpdateDispute,
+  handleGetAdminActions
+} from './api/admin-disputes.js';
 
 import { deleteContent, getContentMetadata } from './services/content-deletion.js';
 
@@ -268,6 +289,12 @@ export default {
 
       // 4. Run anomaly detection
       await this.runAnomalyDetection(env);
+
+      // 5. Process expired disputes
+      await this.processExpiredDisputes(env);
+
+      // 6. Cleanup R2 objects pending deletion
+      await this.cleanupR2PendingDeletion(env);
 
       console.log('Scheduled tasks completed');
     } catch (error) {
@@ -461,7 +488,102 @@ export default {
     } catch (error) {
       console.error('Error running anomaly detection:', error);
     }
-  }
+  },
+
+  /**
+   * Process expired disputes
+   * Updates disputes that are past their expires_at date to closed_expired
+   */
+  async processExpiredDisputes(env) {
+    try {
+      console.log('Processing expired disputes...');
+      
+      const indexId = env.DISPUTE_INDEX.idFromName('dispute-index:global');
+      const indexStub = env.DISPUTE_INDEX.get(indexId);
+      
+      // Get all open disputes
+      const listResponse = await indexStub.fetch(
+        new Request('http://internal/list?limit=1000')
+      );
+      const listData = await listResponse.json();
+      
+      const now = new Date();
+      let expired = 0;
+      
+      // Check each dispute for expiration
+      for (const dispute of listData.disputes || []) {
+        const expiresAt = new Date(dispute.expires_at);
+        
+        if (expiresAt <= now) {
+          try {
+            // Update dispute status to closed_expired
+            const disputeRecordId = env.DISPUTE_RECORD.idFromName(`dispute:${dispute.cid}`);
+            const disputeRecordStub = env.DISPUTE_RECORD.get(disputeRecordId);
+            
+            await disputeRecordStub.fetch(new Request('http://internal/dispute', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                status: 'closed_expired',
+                resolution: 'expired',
+                resolution_reason: 'Dispute expired after 30 days without resolution',
+                resolved_by: 'system'
+              })
+            }));
+            
+            // Remove from DisputeIndex
+            await indexStub.fetch(new Request('http://internal/remove', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                dispute_id: dispute.dispute_id
+              })
+            }));
+            
+            expired++;
+          } catch (error) {
+            console.error(`Error expiring dispute ${dispute.dispute_id}:`, error);
+          }
+        }
+      }
+      
+      console.log(`Expired disputes processed: ${expired} disputes closed`);
+    } catch (error) {
+      console.error('Error processing expired disputes:', error);
+    }
+  },
+
+  /**
+   * Cleanup R2 objects pending deletion
+   * Deletes R2 objects for content that has been soft-deleted for >24 hours
+   */
+  async cleanupR2PendingDeletion(env) {
+    try {
+      console.log('Cleaning up R2 pending deletion...');
+      
+      // Note: This requires an index or scanning mechanism to find content with pending_r2_deletion
+      // For this implementation, we document the requirements for production enhancement
+      
+      // Production Requirements:
+      // 1. Create a DeletionPendingIndex Durable Object to track soft-deleted content
+      // 2. When softDeleteContent() is called, add the CID to DeletionPendingIndex with timestamp
+      // 3. This scheduled job queries DeletionPendingIndex for entries > 24 hours old
+      // 4. For each eligible entry: delete from R2, call markR2Deleted(), remove from index
+      
+      // Issue: Without a global index, we cannot efficiently find ContentMetadata objects
+      // with pending_r2_deletion=true. This must be implemented before production use.
+      
+      // TODO(GitHub Issue): Implement DeletionPendingIndex for efficient R2 cleanup
+      // Until implemented, R2 cleanup must be performed manually or via separate tooling
+      
+      console.log('R2 cleanup: Requires DeletionPendingIndex implementation (see TODO in code)');
+      console.log('Manual workaround: Query ContentMetadata objects with pending_r2_deletion=true and deleted_at > 24h');
+
+      
+    } catch (error) {
+      console.error('Error cleaning up R2:', error);
+    }
+  },
 };
 
 /**
@@ -589,6 +711,54 @@ function handleApiRoutes(url, request, env) {
   // User API routes
   if (url.pathname === '/api/user/uploads' && request.method === 'GET') {
     return handleGetUserUploads(request, env);
+  }
+
+  // Dispute API routes
+  if (url.pathname === '/api/disputes' && request.method === 'POST') {
+    return handleCreateDispute(request, env);
+  }
+
+  if (url.pathname === '/api/disputes' && request.method === 'GET') {
+    return handleListDisputes(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/disputes\/[^\/]+$/) && request.method === 'GET') {
+    const disputeId = url.pathname.split('/')[3];
+    // Get user ID from request if authenticated
+    const userId = request.user?.userId || null;
+    return handleGetDispute(request, env, disputeId, userId);
+  }
+
+  if (url.pathname.match(/^\/api\/content\/[^\/]+\/disputes$/) && request.method === 'GET') {
+    const cid = url.pathname.split('/')[3];
+    // Get user ID from request if authenticated
+    const userId = request.user?.userId || null;
+    return handleGetContentDisputes(request, env, cid, userId);
+  }
+
+  // Content deletion API routes
+  if (url.pathname.match(/^\/api\/content\/[^\/]+$/) && request.method === 'DELETE') {
+    const cid = url.pathname.split('/')[3];
+    return handleDeleteContent(request, env, cid);
+  }
+
+  // Admin API routes
+  if (url.pathname === '/api/admin/disputes' && request.method === 'GET') {
+    return handleAdminListDisputes(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/admin\/disputes\/[^\/]+$/) && request.method === 'PATCH') {
+    const cid = url.pathname.split('/')[4];
+    return handleAdminUpdateDispute(request, env, cid);
+  }
+
+  if (url.pathname.match(/^\/api\/admin\/content\/[^\/]+\/delete$/) && request.method === 'POST') {
+    const cid = url.pathname.split('/')[4];
+    return handleAdminDeleteContent(request, env, cid);
+  }
+
+  if (url.pathname === '/api/admin/actions' && request.method === 'GET') {
+    return handleGetAdminActions(request, env);
   }
 
   // Supplier API routes
