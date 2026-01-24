@@ -2,9 +2,12 @@
 
 ## Implementation Status
 
-**Status:** Planning complete + foundation implemented
-**Completed:** 2026-01-17
+**Status:** ✅ FULLY IMPLEMENTED + TESTED  
+**Planning Completed:** 2026-01-17  
+**Implementation Completed:** 2026-01-23  
 **Phase:** Phase 5 - Retention & Expiration Management
+
+> **📄 See `content_lifecycle_complete.md` for full implementation details, test results, and production readiness checklist.**
 
 ---
 
@@ -23,6 +26,16 @@
 - ✅ Expiration validation on download (404 for expired content)
 - ✅ Retention extension API (`POST /api/content/{cid}/extend`)
 - ✅ ContentMetadata Durable Object storage
+
+### Full Implementation ✅ (2026-01-23)
+- ✅ DeletionRecord Durable Object with public API
+- ✅ Content deletion service with R2 and metadata cleanup
+- ✅ ExpirationIndex Durable Object for efficient expiration tracking
+- ✅ Scheduled cron job (daily at 2 AM UTC)
+- ✅ Integration with upload, extend, and donate APIs
+- ✅ "Extension wins" strategy implemented
+- ✅ 38 comprehensive tests (28 unit + 10 integration)
+- ✅ All 175 tests passing
 
 ---
 
