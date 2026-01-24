@@ -759,6 +759,20 @@ export class ContentMetadata {
       );
     }
 
+    // Validate input
+    if (!data || typeof data !== 'object') {
+      return new Response(
+        JSON.stringify({
+          error: 'Invalid request',
+          message: 'Request body must be a valid JSON object'
+        }),
+        {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
     content.contested = true;
     content.contested_reason = data.reason || 'Content is subject to legal review';
     content.contested_at = new Date().toISOString();

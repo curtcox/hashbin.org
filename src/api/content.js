@@ -835,7 +835,7 @@ export async function handleDownloadContent(request, env, cid, extension = null)
     const rateLimitData = await rateLimitResponse.json();
 
     // Check if content is contested (HTTP 451 - Unavailable For Legal Reasons)
-    if (metadata.contested === true) {
+    if (metadata.contested) {
       return new Response(
         JSON.stringify({
           error: 'unavailable_for_legal_reasons',
