@@ -807,7 +807,7 @@ export async function handleDownloadContent(request, env, cid, extension = null)
         });
       }
 
-      // Return inline content (no rate limit check)
+      // Return inline content immediately - no rate limit applies to inline content
       return new Response(contentBytes, {
         status: 200,
         headers: headers

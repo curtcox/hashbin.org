@@ -148,7 +148,7 @@ fi
 log_test "Inline content exemption implemented"
 
 # Check that inline content is served without rate limit check
-if grep -A 10 "if (isInlineContent(cid))" src/api/content.js | grep -q "no rate limit"; then
+if grep "Inline content has no rate limit" src/api/content.js; then
   log_pass "Inline content explicitly marked as no rate limit"
 else
   log_fail "Inline content exemption comment not clear"
