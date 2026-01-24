@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HashBin.org Pricing Calculator">
+  <title>Pricing Calculator - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .calculator {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 2rem;
+    }
+    .result-box {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 2rem;
+      border-radius: 8px;
+      text-align: center;
+      margin-top: 2rem;
+    }
+    .result-amount {
+      font-size: 3rem;
+      font-weight: 700;
+      margin: 1rem 0;
+    }
+    .preset-buttons {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .preset-button {
+      padding: 0.5rem;
+      border: 1px solid var(--color-border);
+      background: var(--color-surface);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .preset-button:hover {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+    .preset-button.active {
+      background: var(--color-primary);
+      color: white;
+      border-color: var(--color-primary);
+    }
+    .breakdown-table {
+      width: 100%;
+      margin-top: 1.5rem;
+    }
+    .breakdown-table td {
+      padding: 0.75rem;
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+    }
+    .breakdown-table td:first-child {
+      text-align: left;
+    }
+    .breakdown-table td:last-child {
+      text-align: right;
+      font-weight: 600;
+    }
+    .breakdown-table tr:last-child td {
+      border-bottom: none;
+      font-size: 1.125rem;
+      padding-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header"></header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <h1>Pricing Calculator</h1>
+      
+      <div class="card" style="margin-bottom: 2rem;">
+        <h2>Storage Cost Calculator</h2>
+        <p style="color: var(--color-text-light);">Calculate the cost to store your content on HashBin.org. Pricing is simple: $0.03 per GB per month.</p>
+      </div>
+
+      <div class="calculator">
+        <!-- File Size Input -->
+        <div class="form-group">
+          <label for="file-size" class="form-label">File Size</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input 
+              type="number" 
+              id="file-size" 
+              class="form-input" 
+              placeholder="Enter size"
+              value="100"
+              min="0"
+              step="0.01"
+            >
+            <select id="size-unit" class="form-input" style="flex: 0 0 120px;">
+              <option value="bytes">Bytes</option>
+              <option value="kb">KB</option>
+              <option value="mb" selected>MB</option>
+              <option value="gb">GB</option>
+            </select>
+          </div>
+          <div class="preset-buttons">
+            <button class="preset-button" data-size="1" data-unit="mb">1 MB</button>
+            <button class="preset-button" data-size="10" data-unit="mb">10 MB</button>
+            <button class="preset-button active" data-size="100" data-unit="mb">100 MB</button>
+            <button class="preset-button" data-size="1" data-unit="gb">1 GB</button>
+            <button class="preset-button" data-size="5" data-unit="gb">5 GB</button>
+          </div>
+        </div>
+
+        <!-- Duration Input -->
+        <div class="form-group" style="margin-top: 2rem;">
+          <label for="duration" class="form-label">Retention Duration</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input 
+              type="number" 
+              id="duration" 
+              class="form-input" 
+              placeholder="Enter duration"
+              value="365"
+              min="30"
+              step="30"
+            >
+            <select id="duration-unit" class="form-input" style="flex: 0 0 120px;">
+              <option value="days" selected>Days</option>
+              <option value="months">Months</option>
+              <option value="years">Years</option>
+            </select>
+          </div>
+          <div class="preset-buttons">
+            <button class="preset-button" data-duration="30" data-duration-unit="days">1 Month</button>
+            <button class="preset-button active" data-duration="365" data-duration-unit="days">1 Year</button>
+            <button class="preset-button" data-duration="3650" data-duration-unit="days">1 Decade</button>
+            <button class="preset-button" data-duration="36500" data-duration-unit="days">1 Century</button>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div class="result-box" id="result">
+          <div style="font-size: 1.25rem; opacity: 0.9;">Total Storage Cost</div>
+          <div class="result-amount" id="total-cost">$0.00</div>
+          
+          <table class="breakdown-table">
+            <tbody>
+              <tr>
+                <td>File Size:</td>
+                <td id="result-size">0 GB</td>
+              </tr>
+              <tr>
+                <td>Duration:</td>
+                <td id="result-duration">0 days</td>
+              </tr>
+              <tr>
+                <td>Rate:</td>
+                <td>$0.03 per GB/month</td>
+              </tr>
+              <tr>
+                <td><strong>Total Cost:</strong></td>
+                <td><strong id="result-total">$0.00</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pricing Details -->
+      <section class="card" style="margin-top: 2rem;">
+        <h2>Pricing Details</h2>
+        
+        <div style="margin-top: 1rem;">
+          <h3>Base Rate</h3>
+          <p>$0.03 per GB per month (30 days)</p>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+          <h3>How It Works</h3>
+          <ul style="margin-left: 1.5rem; color: var(--color-text-light);">
+            <li>Storage is charged based on file size and retention duration</li>
+            <li>Retention must be in multiples of 30 days (1 month minimum)</li>
+            <li>Cost is calculated upfront and deducted from your wallet balance</li>
+            <li>No recurring charges - you pay once per upload</li>
+            <li>You can extend retention later for an additional fee</li>
+          </ul>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+          <h3>Examples</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--color-border);">
+                <th style="text-align: left; padding: 0.75rem;">File Size</th>
+                <th style="text-align: left; padding: 0.75rem;">Duration</th>
+                <th style="text-align: right; padding: 0.75rem;">Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 0.75rem;">1 MB</td>
+                <td style="padding: 0.75rem;">1 month</td>
+                <td style="text-align: right; padding: 0.75rem;">$0.00</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 0.75rem;">100 MB</td>
+                <td style="padding: 0.75rem;">1 year</td>
+                <td style="text-align: right; padding: 0.75rem;">$0.36</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 0.75rem;">1 GB</td>
+                <td style="padding: 0.75rem;">1 month</td>
+                <td style="text-align: right; padding: 0.75rem;">$0.03</td>
+              </tr>
+              <tr style="border-bottom: 1px solid var(--color-border);">
+                <td style="padding: 0.75rem;">1 GB</td>
+                <td style="padding: 0.75rem;">1 year</td>
+                <td style="text-align: right; padding: 0.75rem;">$0.36</td>
+              </tr>
+              <tr>
+                <td style="padding: 0.75rem;">5 GB</td>
+                <td style="padding: 0.75rem;">1 decade</td>
+                <td style="text-align: right; padding: 0.75rem;">$18.00</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div style="margin-top: 1.5rem;">
+          <h3>Payment Processing</h3>
+          <p style="color: var(--color-text-light);">When adding funds to your wallet, Stripe charges standard payment processing fees (2.9% + $0.30 per transaction). These fees are shown before you complete your deposit.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> | 
+      <a href="/docs/index.html">Docs</a> | 
+      <a href="/docs/api.html">API</a> | 
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+  <script type="module">
+    import { initNavHeader } from '/js/nav-header.js';
+    initNavHeader();
+
+    // Pricing calculator logic
+    const RATE_PER_GB_PER_MONTH = 0.03;
+    const BYTES_PER_GB = 1024 * 1024 * 1024;
+    const DAYS_PER_MONTH = 30;
+
+    const fileSizeInput = document.getElementById('file-size');
+    const sizeUnitSelect = document.getElementById('size-unit');
+    const durationInput = document.getElementById('duration');
+    const durationUnitSelect = document.getElementById('duration-unit');
+
+    function getSizeInBytes() {
+      const size = parseFloat(fileSizeInput.value) || 0;
+      const unit = sizeUnitSelect.value;
+      
+      switch(unit) {
+        case 'bytes': return size;
+        case 'kb': return size * 1024;
+        case 'mb': return size * 1024 * 1024;
+        case 'gb': return size * 1024 * 1024 * 1024;
+        default: return size;
+      }
+    }
+
+    function getDurationInDays() {
+      const duration = parseFloat(durationInput.value) || 0;
+      const unit = durationUnitSelect.value;
+      
+      switch(unit) {
+        case 'days': return duration;
+        case 'months': return duration * 30;
+        case 'years': return duration * 365;
+        default: return duration;
+      }
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 Bytes';
+      if (bytes < 1024) return bytes.toFixed(2) + ' Bytes';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+      if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+      return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
+    function calculateCost() {
+      const sizeInBytes = getSizeInBytes();
+      const sizeInGB = sizeInBytes / BYTES_PER_GB;
+      const durationInDays = getDurationInDays();
+      const durationInMonths = durationInDays / DAYS_PER_MONTH;
+      
+      const totalCost = sizeInGB * durationInMonths * RATE_PER_GB_PER_MONTH;
+      
+      // Update display
+      document.getElementById('total-cost').textContent = '$' + totalCost.toFixed(2);
+      document.getElementById('result-total').textContent = '$' + totalCost.toFixed(2);
+      document.getElementById('result-size').textContent = formatBytes(sizeInBytes);
+      document.getElementById('result-duration').textContent = Math.round(durationInDays) + ' days';
+    }
+
+    // Event listeners
+    fileSizeInput.addEventListener('input', calculateCost);
+    sizeUnitSelect.addEventListener('change', calculateCost);
+    durationInput.addEventListener('input', calculateCost);
+    durationUnitSelect.addEventListener('change', calculateCost);
+
+    // Preset buttons
+    document.querySelectorAll('.preset-button[data-size]').forEach(button => {
+      button.addEventListener('click', () => {
+        // Remove active class from all size preset buttons
+        document.querySelectorAll('.preset-button[data-size]').forEach(b => b.classList.remove('active'));
+        button.classList.add('active');
+        
+        fileSizeInput.value = button.dataset.size;
+        sizeUnitSelect.value = button.dataset.unit;
+        calculateCost();
+      });
+    });
+
+    document.querySelectorAll('.preset-button[data-duration]').forEach(button => {
+      button.addEventListener('click', () => {
+        // Remove active class from all duration preset buttons
+        document.querySelectorAll('.preset-button[data-duration]').forEach(b => b.classList.remove('active'));
+        button.classList.add('active');
+        
+        durationInput.value = button.dataset.duration;
+        durationUnitSelect.value = button.dataset.durationUnit;
+        calculateCost();
+      });
+    });
+
+    // Initial calculation
+    calculateCost();
+  </script>
+</body>
+</html>

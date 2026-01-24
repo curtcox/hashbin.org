@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HashBin.org Frequently Asked Questions">
+  <title>FAQ - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .faq-section {
+      margin-bottom: 3rem;
+    }
+    .faq-item {
+      border-bottom: 1px solid var(--color-border);
+      padding: 1.5rem 0;
+    }
+    .faq-item:last-child {
+      border-bottom: none;
+    }
+    .faq-question {
+      font-weight: 600;
+      font-size: 1.125rem;
+      margin-bottom: 0.75rem;
+      color: var(--color-text);
+    }
+    .faq-answer {
+      color: var(--color-text-light);
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header"></header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <h1>Frequently Asked Questions</h1>
+      
+      <!-- General -->
+      <section class="card faq-section">
+        <h2>General</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">What is HashBin.org?</div>
+          <div class="faq-answer">
+            HashBin.org is a content distribution platform that uses 256t hash-based addressing. Content is identified and accessed using cryptographic hashes, making it content-addressable, verifiable, and permanent. We operate on a "pay-to-publish, free-to-download" model.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">What is a 256t hash?</div>
+          <div class="faq-answer">
+            A 256t hash is a cryptographic identifier generated from your content using SHA-512 and encoded in Base64URL format. It's deterministic (same content always produces the same hash), verifiable (anyone can confirm the hash matches the content), and URL-safe.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Do I need an account to download content?</div>
+          <div class="faq-answer">
+            No! Downloads are completely free and require no account. Anyone with a 256t hash can retrieve the associated content. You only need an account if you want to upload content.
+          </div>
+        </div>
+      </section>
+
+      <!-- Uploads -->
+      <section class="card faq-section">
+        <h2>Uploads</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">What file types can I upload?</div>
+          <div class="faq-answer">
+            You can upload any file type. HashBin.org treats all content as binary data and doesn't inspect or process file contents. The maximum file size is 5GB.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">What happens if I upload duplicate content?</div>
+          <div class="faq-answer">
+            If content with the same hash already exists, we'll show you a message and offer the option to extend its retention period by at least 30 days. You won't be charged for duplicate storage.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">How long is content retained?</div>
+          <div class="faq-answer">
+            When uploading, you choose a retention duration in multiples of 30 days. Common presets include 1 month, 1 year, 1 decade, and 1 century. You can also specify a custom duration. Content will be deleted after expiration unless retention is extended.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Can I extend retention after uploading?</div>
+          <div class="faq-answer">
+            Yes, you can extend retention for any content you've uploaded from your dashboard. Extensions must be in multiples of 30 days and will be charged based on the file size and additional duration.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Can I delete content before expiration?</div>
+          <div class="faq-answer">
+            Content cannot be deleted before its expiration date. This ensures reliability for anyone who has the hash. If you need content removed, you can file a dispute through the appropriate channels as outlined in the Terms of Service.
+          </div>
+        </div>
+      </section>
+
+      <!-- Payments -->
+      <section class="card faq-section">
+        <h2>Payments & Pricing</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">How much does storage cost?</div>
+          <div class="faq-answer">
+            Storage costs $0.03 per GB per month. For example, storing a 100MB file for 1 year would cost approximately $0.036. Use our <a href="/docs/pricing.html">pricing calculator</a> to estimate costs for your use case.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">How do I add funds to my wallet?</div>
+          <div class="faq-answer">
+            Click "Add Funds" from your dashboard or the upload page. You'll be redirected to Stripe Checkout to securely add funds using a credit card or other payment methods. The minimum deposit is $1.00.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">What payment methods do you accept?</div>
+          <div class="faq-answer">
+            We accept all major credit cards, Apple Pay, and Google Pay through Stripe. All payments are processed securely, and we never store your payment information.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Are there any additional fees?</div>
+          <div class="faq-answer">
+            No hidden fees! You only pay the storage cost ($0.03 per GB per month). Stripe charges standard payment processing fees (2.9% + $0.30) which are clearly shown before you complete a deposit.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Can I get a refund?</div>
+          <div class="faq-answer">
+            Deposits are non-refundable once added to your wallet. However, funds remain in your wallet indefinitely and can be used for future uploads or retention extensions.
+          </div>
+        </div>
+      </section>
+
+      <!-- Security & Privacy -->
+      <section class="card faq-section">
+        <h2>Security & Privacy</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">Is my content secure?</div>
+          <div class="faq-answer">
+            Content is stored securely on Cloudflare R2 with encryption at rest. However, anyone with the 256t hash can download the content - treat the hash like a password. Don't share hashes for sensitive content publicly.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Do you scan or inspect uploaded content?</div>
+          <div class="faq-answer">
+            No. We treat all content as opaque binary data. We don't scan, inspect, or process file contents. Content is identified solely by its cryptographic hash.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">What authentication methods do you support?</div>
+          <div class="faq-answer">
+            We use Clerk for OAuth authentication, supporting Google, Apple, Microsoft, and GitHub accounts. We don't handle passwords directly - authentication is managed securely through these trusted providers.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Can I use API keys?</div>
+          <div class="faq-answer">
+            Yes! You can create API keys from your dashboard for programmatic access. Keys can be set to expire after a specified duration and can be revoked at any time. See our <a href="/docs/api.html">API documentation</a> for details.
+          </div>
+        </div>
+      </section>
+
+      <!-- Technical -->
+      <section class="card faq-section">
+        <h2>Technical</h2>
+        
+        <div class="faq-item">
+          <div class="faq-question">How is the 256t hash computed?</div>
+          <div class="faq-answer">
+            For content larger than 64 bytes, we compute a SHA-512 hash and encode it in Base64URL format. For content 64 bytes or smaller, we use direct Base64URL encoding. The hash includes an 8-character length prefix.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Where is my content stored?</div>
+          <div class="faq-answer">
+            Content is stored on Cloudflare R2, a globally distributed object storage service. This ensures low-latency access from anywhere in the world.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">What happens if HashBin.org goes offline?</div>
+          <div class="faq-answer">
+            Our infrastructure runs on Cloudflare's edge network with high availability guarantees. Content is stored redundantly across multiple data centers. In the unlikely event of extended downtime, you can contact support for data export options.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Is there an upload size limit?</div>
+          <div class="faq-answer">
+            The maximum file size is 5GB, which is the limit for Cloudflare R2 single uploads. There are no limits on the total amount of content you can store.
+          </div>
+        </div>
+        
+        <div class="faq-item">
+          <div class="faq-question">Do you have an API?</div>
+          <div class="faq-answer">
+            Yes! We provide a comprehensive REST API for content upload, retrieval, and account management. See our <a href="/docs/api.html">API reference</a> for complete documentation.
+          </div>
+        </div>
+      </section>
+
+      <!-- Still Have Questions? -->
+      <section class="card">
+        <h2>Still Have Questions?</h2>
+        <p>If you can't find the answer you're looking for, please refer to our <a href="/terms.html">Terms of Service</a> for detailed information about policies and procedures, or reach out through the support channels listed there.</p>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> | 
+      <a href="/docs/index.html">Docs</a> | 
+      <a href="/docs/api.html">API</a> | 
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+  <script type="module">
+    import { initNavHeader } from '/js/nav-header.js';
+    initNavHeader();
+  </script>
+</body>
+</html>

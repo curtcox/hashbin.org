@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HashBin.org Public Records - Transparent content and contest records">
+  <title>Public Records - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  
+  <style>
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--color-primary);
+      margin: 0.5rem 0;
+    }
+    .stat-label {
+      color: var(--color-text-light);
+      font-size: 0.875rem;
+    }
+    .records-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    .records-table th {
+      text-align: left;
+      padding: 0.75rem;
+      background: var(--color-surface);
+      border-bottom: 2px solid var(--color-border);
+      font-weight: 600;
+    }
+    .records-table td {
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .records-table tr:hover {
+      background: var(--color-surface);
+    }
+    .hash-display {
+      font-family: monospace;
+      font-size: 0.875rem;
+      color: var(--color-primary);
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .status-active { background: #10b981; color: white; }
+    .status-expired { background: #6b7280; color: white; }
+    .status-contested { background: #f59e0b; color: white; }
+    .filter-bar {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .filter-bar input,
+    .filter-bar select {
+      flex: 1;
+      min-width: 200px;
+    }
+    .loading {
+      text-align: center;
+      padding: 3rem;
+      color: var(--color-text-light);
+    }
+  </style>
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header"></header>
+
+  <!-- Main Content -->
+  <main>
+    <div class="container">
+      <h1>Public Records</h1>
+      
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Transparency & Accountability</h2>
+        <p>HashBin.org maintains public records of all content and contests for transparency. All data is publicly accessible and verifiable.</p>
+      </section>
+
+      <!-- Statistics -->
+      <section class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Content Items</div>
+          <div class="stat-value" id="stat-total">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Storage Used</div>
+          <div class="stat-value" id="stat-storage">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Active Content</div>
+          <div class="stat-value" id="stat-active">-</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Contests</div>
+          <div class="stat-value" id="stat-contests">-</div>
+        </div>
+      </section>
+
+      <!-- Content Records -->
+      <section class="card">
+        <h2>Content Records</h2>
+        
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <input 
+            type="text" 
+            id="search-hash" 
+            class="form-input" 
+            placeholder="Search by hash..."
+          >
+          <select id="filter-status" class="form-input">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="expired">Expired</option>
+            <option value="contested">Contested</option>
+          </select>
+          <button class="btn btn-secondary" id="export-button">Export Data</button>
+        </div>
+
+        <!-- Records Table -->
+        <div id="records-container">
+          <div class="loading">
+            Loading public records...
+          </div>
+        </div>
+      </section>
+
+      <!-- Contest Records (if any) -->
+      <section class="card" style="margin-top: 2rem; display: none;" id="contests-section">
+        <h2>Contest Records</h2>
+        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
+          Records of content disputes and their resolutions.
+        </p>
+        <div id="contests-container">
+          <p style="color: var(--color-text-light);">No contests filed.</p>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> | 
+      <a href="/docs/index.html">Docs</a> | 
+      <a href="/docs/api.html">API</a> | 
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+  <script type="module">
+    import { initNavHeader } from '/js/nav-header.js';
+    import { formatFileSize } from '/js/utils.js';
+    
+    initNavHeader();
+
+    let allRecords = [];
+
+    function formatDate(dateString) {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+
+    function truncateHash(hash) {
+      if (!hash || hash.length <= 16) return hash;
+      return hash.substring(0, 8) + '...' + hash.substring(hash.length - 8);
+    }
+
+    function getStatusBadge(status) {
+      const statusLower = (status || 'unknown').toLowerCase();
+      let className = 'status-badge';
+      
+      if (statusLower.includes('active')) className += ' status-active';
+      else if (statusLower.includes('expired')) className += ' status-expired';
+      else if (statusLower.includes('contest')) className += ' status-contested';
+      
+      return `<span class="${className}">${status || 'Unknown'}</span>`;
+    }
+
+    function renderRecordsTable(records) {
+      const container = document.getElementById('records-container');
+      
+      if (!records || records.length === 0) {
+        container.innerHTML = '<p style="color: var(--color-text-light); padding: 2rem; text-align: center;">No records found.</p>';
+        return;
+      }
+
+      let html = `
+        <table class="records-table">
+          <thead>
+            <tr>
+              <th>Hash</th>
+              <th>Size</th>
+              <th>Uploaded</th>
+              <th>Expires</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      records.forEach(record => {
+        html += `
+          <tr>
+            <td><span class="hash-display" title="${record.cid || ''}">${truncateHash(record.cid)}</span></td>
+            <td>${formatFileSize(record.size || 0)}</td>
+            <td>${formatDate(record.uploaded)}</td>
+            <td>${formatDate(record.expires)}</td>
+            <td>${getStatusBadge(record.status)}</td>
+          </tr>
+        `;
+      });
+
+      html += '</tbody></table>';
+      container.innerHTML = html;
+    }
+
+    function updateStatistics(records) {
+      // Calculate statistics
+      const total = records.length;
+      const totalStorage = records.reduce((sum, r) => sum + (r.size || 0), 0);
+      const active = records.filter(r => 
+        r.status && r.status.toLowerCase().includes('active')
+      ).length;
+
+      // Update display
+      document.getElementById('stat-total').textContent = total.toLocaleString();
+      document.getElementById('stat-storage').textContent = formatFileSize(totalStorage);
+      document.getElementById('stat-active').textContent = active.toLocaleString();
+      document.getElementById('stat-contests').textContent = '0'; // TODO: Implement contests
+    }
+
+    function filterRecords() {
+      const searchTerm = document.getElementById('search-hash').value.toLowerCase();
+      const statusFilter = document.getElementById('filter-status').value.toLowerCase();
+
+      let filtered = allRecords;
+
+      // Apply search filter
+      if (searchTerm) {
+        filtered = filtered.filter(r => 
+          (r.cid || '').toLowerCase().includes(searchTerm)
+        );
+      }
+
+      // Apply status filter
+      if (statusFilter) {
+        filtered = filtered.filter(r => 
+          (r.status || '').toLowerCase().includes(statusFilter)
+        );
+      }
+
+      renderRecordsTable(filtered);
+    }
+
+    function exportData() {
+      const dataStr = JSON.stringify(allRecords, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `hashbin-records-${new Date().toISOString().split('T')[0]}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    async function loadPublicRecords() {
+      try {
+        // Fetch public records from API
+        const response = await fetch('/api/records');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        allRecords = data.records || [];
+
+        // Update UI
+        renderRecordsTable(allRecords);
+        updateStatistics(allRecords);
+
+      } catch (error) {
+        console.error('Failed to load public records:', error);
+        document.getElementById('records-container').innerHTML = `
+          <div style="padding: 2rem; text-align: center; color: var(--color-text-light);">
+            <p>Unable to load public records at this time.</p>
+            <p style="margin-top: 0.5rem; font-size: 0.875rem;">
+              ${error.message}
+            </p>
+          </div>
+        `;
+        
+        // Set stats to zero
+        document.getElementById('stat-total').textContent = '0';
+        document.getElementById('stat-storage').textContent = '0 B';
+        document.getElementById('stat-active').textContent = '0';
+        document.getElementById('stat-contests').textContent = '0';
+      }
+    }
+
+    // Event listeners
+    document.getElementById('search-hash').addEventListener('input', filterRecords);
+    document.getElementById('filter-status').addEventListener('change', filterRecords);
+    document.getElementById('export-button').addEventListener('click', exportData);
+
+    // Load records on page load
+    loadPublicRecords();
+  </script>
+</body>
+</html>
