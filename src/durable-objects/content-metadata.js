@@ -83,6 +83,17 @@ export class ContentMetadata {
         return await this.deleteContent();
       }
 
+      // Soft delete content
+      if (url.pathname === '/soft-delete' && method === 'POST') {
+        const data = await request.json();
+        return await this.softDeleteContent(data);
+      }
+
+      // Mark R2 deletion complete
+      if (url.pathname === '/r2-deleted' && method === 'POST') {
+        return await this.markR2Deleted();
+      }
+
       // Mark content as contested (HTTP 451)
       if (url.pathname === '/contested' && method === 'POST') {
         const data = await request.json();
@@ -173,7 +184,13 @@ export class ContentMetadata {
       alternate_suppliers: [],
       // Contested content flag (HTTP 451)
       contested: false,
-      contested_reason: null
+      contested_reason: null,
+      
+      // Deletion fields (for soft delete)
+      deleted_at: null,
+      deleted_by: null,
+      deletion_reason: null,
+      pending_r2_deletion: false
     };
 
     await this.state.storage.put('content', content);
@@ -815,6 +832,70 @@ export class ContentMetadata {
 
     return new Response(
       JSON.stringify({ success: true, contested: false }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Soft delete content
+   * Marks content as deleted but doesn't remove R2 data immediately
+   */
+  async softDeleteContent(data) {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({ error: 'Content not found' }),
+        { status: 404, headers: { 'content-type': 'application/json' } }
+      );
+    }
+
+    if (content.deleted_at) {
+      return new Response(
+        JSON.stringify({ error: 'Content already deleted' }),
+        { status: 409, headers: { 'content-type': 'application/json' } }
+      );
+    }
+
+    // Mark as deleted
+    content.deleted_at = new Date().toISOString();
+    content.deleted_by = data.deleted_by || 'unknown';
+    content.deletion_reason = data.deletion_reason || 'user_request';
+    content.pending_r2_deletion = true;
+
+    await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({ success: true, deleted: true }),
+      {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
+  }
+
+  /**
+   * Mark R2 deletion as complete
+   */
+  async markR2Deleted() {
+    const content = await this.state.storage.get('content');
+
+    if (!content) {
+      return new Response(
+        JSON.stringify({ error: 'Content not found' }),
+        { status: 404, headers: { 'content-type': 'application/json' } }
+      );
+    }
+
+    content.pending_r2_deletion = false;
+
+    await this.state.storage.put('content', content);
+
+    return new Response(
+      JSON.stringify({ success: true }),
       {
         status: 200,
         headers: { 'content-type': 'application/json' }
