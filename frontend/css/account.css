@@ -1,0 +1,109 @@
+.account-page-intro {
+  color: var(--color-text-light);
+  max-width: 48rem;
+  margin-bottom: 1.5rem;
+}
+
+.account-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.account-panel-copy {
+  color: var(--color-text-light);
+  margin-bottom: 0;
+}
+
+.account-retention-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.account-retention-row {
+  display: flex;
+  gap: 0.85rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.account-retention-row select {
+  min-width: 220px;
+}
+
+.account-status {
+  min-height: 1.5rem;
+  color: var(--color-text-light);
+}
+
+.account-authorizations-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.account-authorization-card {
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  padding: 1rem 1rem 1.1rem;
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
+
+.account-authorization-card h3 {
+  margin-bottom: 0.35rem;
+}
+
+.account-authorization-card p {
+  color: var(--color-text-light);
+  margin-bottom: 0.65rem;
+}
+
+.account-authorization-list {
+  display: grid;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+}
+
+.account-authorization-list li {
+  color: var(--color-text-light);
+  font-size: 0.95rem;
+}
+
+.account-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(79, 70, 229, 0.08);
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.account-empty-state {
+  color: var(--color-text-light);
+  padding: 1rem 0;
+}
+
+@media (max-width: 768px) {
+  .account-panel-header {
+    flex-direction: column;
+  }
+
+  .account-retention-row {
+    align-items: stretch;
+  }
+
+  .account-retention-row select,
+  .account-retention-row button {
+    width: 100%;
+  }
+}

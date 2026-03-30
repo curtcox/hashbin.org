@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Account settings and third-party authorizations for HashBin.org">
+  <title>Account Settings - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/account.css">
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <div class="container">
+      <div class="dashboard-layout">
+        <aside class="dashboard-sidebar">
+          <nav>
+            <a href="/dashboard.html">
+              <span class="nav-icon">📊</span>
+              <span>Overview</span>
+            </a>
+            <a href="/api-keys.html">
+              <span class="nav-icon">🔑</span>
+              <span>API Keys</span>
+            </a>
+            <a href="/dashboard/uploads/">
+              <span class="nav-icon">📦</span>
+              <span>My Uploads</span>
+            </a>
+            <a href="/dashboard/suppliers/">
+              <span class="nav-icon">🔗</span>
+              <span>Suppliers</span>
+            </a>
+            <a href="/deposit.html">
+              <span class="nav-icon">💰</span>
+              <span>Add Funds</span>
+            </a>
+            <a href="/transactions.html">
+              <span class="nav-icon">💳</span>
+              <span>Transactions</span>
+            </a>
+            <a href="/account.html" class="nav-active">
+              <span class="nav-icon">⚙️</span>
+              <span>Account Settings</span>
+            </a>
+            <a href="/developers">
+              <span class="nav-icon">🧩</span>
+              <span>Developers</span>
+            </a>
+            <a href="/terms.html">
+              <span class="nav-icon">📄</span>
+              <span>Terms of Service</span>
+            </a>
+          </nav>
+        </aside>
+
+        <div class="dashboard-content">
+          <h1>Account Settings</h1>
+          <p class="account-page-intro">
+            Choose the default retention used by third-party publishing apps, and revoke any application that should no longer publish with your account.
+          </p>
+
+          <section class="card">
+            <div class="account-panel-header">
+              <div>
+                <h2 class="card-title">Default third-party retention</h2>
+                <p class="account-panel-copy">This is the retention period applied when an authorized app publishes content on your behalf.</p>
+              </div>
+            </div>
+
+            <form id="retention-form" class="account-retention-form">
+              <label class="form-label" for="default-retention-months">Retention period</label>
+              <div class="account-retention-row">
+                <select id="default-retention-months" class="form-select">
+                  <option value="1">1 month</option>
+                  <option value="3">3 months</option>
+                  <option value="6">6 months</option>
+                  <option value="12">12 months</option>
+                </select>
+                <button type="submit" class="btn btn-primary">Save default</button>
+              </div>
+              <div id="retention-status" class="account-status" aria-live="polite"></div>
+            </form>
+          </section>
+
+          <section class="card" style="margin-top: 2rem;">
+            <div class="account-panel-header">
+              <div>
+                <h2 class="card-title">Authorized publishing apps</h2>
+                <p class="account-panel-copy">These apps can publish immutable content with the scopes you approved.</p>
+              </div>
+              <button id="refresh-authorizations" class="btn btn-secondary" type="button">Refresh</button>
+            </div>
+
+            <div id="authorizations-list" class="account-authorizations-loading">
+              <div style="display: flex; align-items: center; gap: 1rem;">
+                <div class="spinner"></div>
+                <span>Loading authorized apps...</span>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <p>&copy; 2026 HashBin.org |
+      <a href="/docs/">Documentation</a> |
+      <a href="/developers">Developers</a>
+    </p>
+  </footer>
+  <script type="module" src="/js/account.js"></script>
+</body>
+</html>

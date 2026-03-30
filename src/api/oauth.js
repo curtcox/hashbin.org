@@ -662,7 +662,24 @@ export async function handleListAuthorizations(request, env) {
 
   const profileId = env.USER_PROFILES.idFromName(authResult.user.userId);
   const profileStub = env.USER_PROFILES.get(profileId);
-  return profileStub.fetch(new Request('http://internal/oauth/grants'));
+  const grantsResponse = await profileStub.fetch(new Request('http://internal/oauth/grants'));
+  if (!grantsResponse.ok) {
+    return grantsResponse;
+  }
+
+  const grantsData = await grantsResponse.json();
+  const authorizations = await Promise.all((grantsData.authorizations || []).map(async (authorization) => {
+    const app = await getApplication(env, authorization.app_id);
+    return {
+      ...authorization,
+      app_name: app?.app_name || authorization.app_id,
+      redirect_uris: app?.redirect_uris || [],
+      website_url: app?.website_url || null,
+      logo_url: app?.logo_url || null
+    };
+  }));
+
+  return jsonResponse({ authorizations });
 }
 
 export async function handleRevokeAuthorization(request, env, appId) {

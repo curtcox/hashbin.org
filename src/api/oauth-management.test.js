@@ -173,6 +173,7 @@ describe('OAuth management API', () => {
     const listed = await listResponse.json();
     expect(listed.authorizations).toHaveLength(1);
     expect(listed.authorizations[0].app_id).toBe(app.app_id);
+    expect(listed.authorizations[0].app_name).toBe('Managed App');
 
     const revokeResponse = await handleRevokeAuthorization(new Request(`https://hashbin.test/api/account/authorizations/${app.app_id}`, {
       method: 'DELETE',
