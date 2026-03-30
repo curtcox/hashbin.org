@@ -163,6 +163,7 @@ const STATIC_PATHS = [
   'js/',
   'img/',
   'docs/',
+  'sdk/',
   'api-keys'
 ];
 

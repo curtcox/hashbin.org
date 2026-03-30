@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HashBin browser SDK guide for third-party publishing">
+  <title>SDK Guide - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <style>
+    .sdk-doc pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    .sdk-doc code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <div class="container sdk-doc">
+      <h1>Browser SDK</h1>
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Load the hosted SDK</h2>
+        <pre><code>&lt;script type="module"&gt;
+  import "https://hashbin.org/sdk/hashbin.js";
+
+  hashbin.configure({
+    clientId: "app_123",
+    redirectUri: "https://your-app.example/hashbin/callback"
+  });
+&lt;/script&gt;</code></pre>
+      </section>
+
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Start authorization</h2>
+        <pre><code>await hashbin.authorize({
+  scopes: ["content:write", "balance:read"],
+  mode: "redirect"
+});</code></pre>
+        <p>For popup flows, call <code>mode: "popup"</code> and let your callback page call <code>hashbin.handleCallback({ postMessageToOpener: true, closeWindow: true })</code>.</p>
+      </section>
+
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Complete the callback</h2>
+        <pre><code>import "https://hashbin.org/sdk/hashbin.js";
+
+hashbin.configure({
+  clientId: "app_123",
+  redirectUri: "https://your-app.example/hashbin/callback"
+});
+
+await hashbin.handleCallback();</code></pre>
+      </section>
+
+      <section class="card">
+        <h2>Publish and read balance</h2>
+        <pre><code>const balance = await hashbin.getBalance();
+console.log(balance.balance_cents);
+
+const result = await hashbin.publish("hello world", {
+  contentType: "text/plain"
+});
+
+console.log(result.cid);</code></pre>
+      </section>
+    </div>
+  </main>
+  <footer>
+    <p>&copy; 2026 HashBin.org |
+      <a href="/docs/">Documentation</a> |
+      <a href="/developers">Developers</a>
+    </p>
+  </footer>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

@@ -30,6 +30,25 @@
       </div>
     </section>
 
+    <section class="developers-panel" style="margin-bottom: 1.5rem;">
+      <h2>Quick start</h2>
+      <p>Load the hosted SDK, configure your client, and redirect users into the OAuth consent screen.</p>
+      <pre class="developers-code"><code>&lt;script type="module"&gt;
+  import "https://hashbin.org/sdk/hashbin.js";
+
+  hashbin.configure({
+    clientId: "app_123",
+    redirectUri: "https://your-app.example/hashbin/callback"
+  });
+
+  await hashbin.authorize({
+    scopes: ["content:write", "balance:read"],
+    mode: "redirect"
+  });
+&lt;/script&gt;</code></pre>
+      <p><a href="/docs/sdk.html">Read the full SDK guide</a></p>
+    </section>
+
     <section class="developers-grid">
       <div class="developers-panel">
         <h2>Register an app</h2>
