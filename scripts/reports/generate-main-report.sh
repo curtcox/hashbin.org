@@ -9,6 +9,7 @@ REPO_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}"
 COMMIT_SHA="${GITHUB_SHA}"
 TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
 BUILD_URL="${GITHUB_SERVER_URL:-https://github.com}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+mkdir -p build-reports
 
 # Report availability
 COVERAGE_EXISTS="unavailable"
@@ -337,3 +338,233 @@ sed -e "s|{{REPO_URL}}|${REPO_URL}|g" \
     "$TEMPLATE" > "$OUTPUT"
 
 echo "Main build report generated: $OUTPUT"
+
+# Generate GitHub Pages upload helper page
+cat > build-reports/upload.html << 'UPLOAD_EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload to HashBin.org</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f6f8fa;
+      color: #24292f;
+    }
+    .container {
+      max-width: 780px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 28px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 30px;
+    }
+    p {
+      line-height: 1.5;
+    }
+    form {
+      margin-top: 20px;
+      display: grid;
+      gap: 14px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      font-weight: 600;
+    }
+    input,
+    select,
+    button {
+      font: inherit;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+    }
+    input:focus,
+    select:focus {
+      outline: 2px solid #0969da;
+      outline-offset: 1px;
+    }
+    button {
+      background: #0969da;
+      color: #ffffff;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .muted {
+      color: #57606a;
+      font-size: 14px;
+    }
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      white-space: pre-wrap;
+    }
+    .status.error {
+      background: #ffebe9;
+      border-color: #ff8182;
+    }
+    .status.success {
+      background: #dafbe1;
+      border-color: #4ac26b;
+    }
+    .links {
+      margin-top: 18px;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .links a {
+      color: #0969da;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .links a:hover {
+      text-decoration: underline;
+    }
+    code {
+      background: #f6f8fa;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Upload to HashBin.org</h1>
+    <p class="muted">
+      This helper page runs on GitHub Pages and uploads to <code>https://hashbin.org</code> using your API key.
+      Your key is only used in your browser for this request.
+    </p>
+
+    <form id="upload-form">
+      <label for="api-key">
+        API key
+        <input id="api-key" name="api-key" type="password" autocomplete="off" required placeholder="hb_live_...">
+      </label>
+
+      <label for="retention-months">
+        Retention period
+        <select id="retention-months" name="retention-months">
+          <option value="1">1 month</option>
+          <option value="3">3 months</option>
+          <option value="6">6 months</option>
+          <option value="12">12 months</option>
+          <option value="60">60 months (5 years)</option>
+          <option value="120">120 months (10 years)</option>
+        </select>
+      </label>
+
+      <label for="content-file">
+        File to upload
+        <input id="content-file" name="content-file" type="file" required>
+      </label>
+
+      <button id="submit-button" type="submit">Upload to HashBin.org</button>
+    </form>
+
+    <div id="status" class="status" aria-live="polite">Choose a file and submit an upload.</div>
+
+    <div class="links">
+      <a href="index.html">Back to Build Report</a>
+      <a href="https://hashbin.org/developers" target="_blank" rel="noopener noreferrer">HashBin Developer Page</a>
+      <a href="https://hashbin.org/upload.html" target="_blank" rel="noopener noreferrer">HashBin Native Upload Page</a>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = 'https://hashbin.org';
+    const form = document.getElementById('upload-form');
+    const statusEl = document.getElementById('status');
+    const submitButton = document.getElementById('submit-button');
+
+    function setStatus(message, type) {
+      statusEl.className = `status${type ? ` ${type}` : ''}`;
+      statusEl.textContent = message;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const apiKey = document.getElementById('api-key').value.trim();
+      const retentionMonths = document.getElementById('retention-months').value;
+      const fileInput = document.getElementById('content-file');
+      const file = fileInput.files && fileInput.files[0];
+
+      if (!apiKey) {
+        setStatus('An API key is required.', 'error');
+        return;
+      }
+
+      if (!file) {
+        setStatus('Choose a file to upload.', 'error');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('content', file, file.name || 'upload.bin');
+      formData.append('retention_months', retentionMonths);
+
+      submitButton.disabled = true;
+      setStatus(`Uploading ${file.name}...`, '');
+
+      try {
+        const response = await fetch(`${API_BASE}/api/content?retention_months=${encodeURIComponent(retentionMonths)}`, {
+          method: 'POST',
+          headers: {
+            Authorization: `ApiKey ${apiKey}`
+          },
+          body: formData
+        });
+
+        const raw = await response.text();
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          data = { message: raw };
+        }
+
+        if (!response.ok) {
+          const message = data.message || data.error || `Upload failed (${response.status})`;
+          throw new Error(message);
+        }
+
+        const cid = data.cid || '(unknown CID)';
+        const expires = data.expires_at ? `\nExpires: ${new Date(data.expires_at).toISOString()}` : '';
+        const cost = typeof data.cost_cents === 'number' ? `\nCost: $${(data.cost_cents / 100).toFixed(2)}` : '';
+
+        setStatus(
+          `Upload complete.\nCID: ${cid}${expires}${cost}\n\nView content: ${API_BASE}/${cid}\nInspect metadata: ${API_BASE}/info/${cid}`,
+          'success'
+        );
+      } catch (error) {
+        setStatus(`Upload failed: ${error.message}`, 'error');
+      } finally {
+        submitButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
+UPLOAD_EOF
+
+echo "GitHub Pages upload helper generated: build-reports/upload.html"

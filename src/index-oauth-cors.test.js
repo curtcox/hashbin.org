@@ -97,6 +97,22 @@ describe('OAuth CORS handling', () => {
     expect(response.headers.get('Access-Control-Allow-Headers')).toContain('authorization');
   });
 
+  it('allows preflight for trusted GitHub Pages origin', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(new Request('https://hashbin.test/api/content', {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://curtcox.github.io',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization,content-type'
+      }
+    }), env, {});
+
+    expect(response.status).toBe(204);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://curtcox.github.io');
+  });
+
   it('rejects preflight for unknown origins', async () => {
     const env = createEnv();
     await registerApp(env, 'https://publisher.example');
@@ -125,6 +141,21 @@ describe('OAuth CORS handling', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://publisher.example');
+    expect(response.headers.get('Vary')).toContain('Origin');
+  });
+
+  it('adds CORS headers to API responses for trusted GitHub Pages origin', async () => {
+    const env = createEnv();
+
+    const response = await worker.fetch(new Request('https://hashbin.test/api/balance', {
+      headers: {
+        Origin: 'https://curtcox.github.io',
+        Authorization: 'LocalDev cors_user'
+      }
+    }), env, {});
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://curtcox.github.io');
     expect(response.headers.get('Vary')).toContain('Origin');
   });
 });

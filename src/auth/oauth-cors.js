@@ -1,5 +1,6 @@
 const ALLOWED_CORS_HEADERS = 'authorization, content-type';
 const ALLOWED_CORS_METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
+const ALWAYS_ALLOWED_ORIGINS = new Set(['https://curtcox.github.io']);
 
 function appendVary(existingValue, token) {
   if (!existingValue) {
@@ -13,8 +14,39 @@ function appendVary(existingValue, token) {
   return `${existingValue}, ${token}`;
 }
 
+function getTrustedOriginsFromEnv(env) {
+  if (!env || typeof env.TRUSTED_CORS_ORIGINS !== 'string') {
+    return [];
+  }
+
+  return env.TRUSTED_CORS_ORIGINS
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+function isTrustedOrigin(origin, env) {
+  if (!origin) {
+    return false;
+  }
+
+  if (ALWAYS_ALLOWED_ORIGINS.has(origin)) {
+    return true;
+  }
+
+  return getTrustedOriginsFromEnv(env).includes(origin);
+}
+
 async function isRegisteredOrigin(origin, env) {
-  if (!origin || !env.APPLICATION_REGISTRY) {
+  if (!origin) {
+    return false;
+  }
+
+  if (isTrustedOrigin(origin, env)) {
+    return true;
+  }
+
+  if (!env.APPLICATION_REGISTRY) {
     return false;
   }
 
