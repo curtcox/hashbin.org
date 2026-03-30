@@ -189,14 +189,124 @@ default_retention_months  INTEGER  -- user's default retention period for third-
 
 ## Implementation Order
 
-1. Application Registry (DO + API + developer UI at `/developers`)
-2. OAuth authorization + token endpoints (signed JWT codes, PKCE)
-3. Token validation in auth middleware (verify JWT access tokens)
-4. Default retention period (user settings + upload integration)
-5. Spending controls (per-app tracking in UserProfile)
-6. CORS for registered apps
-7. Dashboard: manage authorized apps + settings
-8. JavaScript SDK (npm + hosted)
+### Done
+
+1. Application Registry
+   - `ApplicationRegistry` Durable Object added
+   - `POST /api/developers/apps` and `GET /api/developers/apps` implemented
+   - `/developers` UI implemented for app registration and listing
+2. OAuth authorization server
+   - `GET /oauth/authorize` consent page implemented
+   - `POST /oauth/authorize` implemented
+   - `POST /oauth/token` implemented for authorization code and refresh token grants
+   - `POST /oauth/revoke` implemented
+3. Token validation
+   - OAuth access token verification added to auth middleware
+   - Grant revocation now invalidates previously issued access tokens
+4. Default retention
+   - `default_retention_months` added to `UserProfile`
+   - `GET /api/account/settings` and `PATCH /api/account/settings` implemented
+   - OAuth-driven uploads now use the user default retention
+5. Spending controls
+   - Per-app grant records added to `UserProfile`
+   - Spending limits and monthly spend tracking enforced during OAuth publishing
+6. CORS and browser integration
+   - Registered-origin CORS preflight and response headers implemented
+   - OAuth tokens are now fenced to the intended endpoints and scopes
+7. Dashboard/account management
+   - `GET /api/account/authorizations` and `DELETE /api/account/authorizations/{app_id}` implemented
+   - `account.html` implemented for retention defaults and authorization revocation
+8. Hosted SDK
+   - Browser SDK implemented and served from `/sdk/hashbin.js`
+   - Supports configure, authorize, callback handling, refresh, publish, and getBalance
 9. Developer documentation
+   - `/developers` quick start added
+   - `/docs/sdk.html` added
+   - `/docs/index.html` and `/docs/api.html` updated
+
+### Remaining
+
+1. npm distribution for `hashbin-sdk`
+   - Package metadata, packaging flow, and publish process are not implemented yet
+2. Developer app lifecycle management
+   - `PATCH /api/developers/apps/{app_id}` and `DELETE /api/developers/apps/{app_id}` are still planned, not implemented
+3. Dashboard polish and consistency
+   - More dashboard surfaces should link to or surface authorization state consistently
+   - Manual browser QA is still needed for the new pages and consent flow
+4. Example integrations
+   - No sample third-party app repo or example callback page has been added yet
+
+## Current Status Summary
+
+The end-to-end core path is now implemented:
+
+1. A developer can register an app at `/developers`
+2. A browser client can start OAuth with PKCE
+3. The user can approve the request on `/oauth/authorize`
+4. The client can exchange the authorization code at `/oauth/token`
+5. The hosted SDK at `/sdk/hashbin.js` can persist tokens, refresh them, publish content, and fetch balance
+6. The account page can manage default retention and revoke authorized apps
+
+The remaining work is mostly packaging, polish, and production validation rather than core feature development.
+
+## Production Deployment Verification
+
+Before deployment:
+
+1. Confirm `wrangler.toml` includes the `APPLICATION_REGISTRY` Durable Object binding and `v9` migration
+2. Confirm production secrets include `OAUTH_SIGNING_KEY`
+3. Run `npm run test:unit`
+4. Optionally run the relevant browser/manual checks locally with `wrangler dev`
+
+After deployment to production:
+
+1. Verify the worker version is live
+   - Check `/health`
+   - Check the deployed app serves `/developers`, `/account.html`, `/docs/sdk.html`, and `/sdk/hashbin.js`
+2. Verify OAuth pages and browser assets
+   - Load `/oauth/authorize` with a valid query string and confirm the consent page renders
+   - Confirm `/sdk/hashbin.js` returns JavaScript with a 200 status
+3. Verify API routes
+   - Create a developer app through `/api/developers/apps`
+   - List apps through `/api/developers/apps`
+   - Read and update `/api/account/settings`
+   - List and revoke `/api/account/authorizations`
+4. Verify OAuth flow end to end
+   - Start auth from a registered redirect URI
+   - Approve the app
+   - Exchange the code at `/oauth/token`
+   - Refresh the token
+   - Revoke the token at `/oauth/revoke`
+5. Verify publishing behavior
+   - Publish content through `/api/content` using an OAuth access token with `content:write`
+   - Confirm the user default retention is applied
+   - Confirm a token without `content:write` is rejected
+   - Confirm a token without `balance:read` is rejected by `/api/balance`
+6. Verify revocation behavior
+   - Revoke an app from `/account.html`
+   - Confirm previously issued access tokens stop working
+   - Revoke a refresh token and confirm it cannot be reused
+7. Verify CORS
+   - Send preflight requests from a registered origin and an unregistered origin
+   - Confirm only registered origins receive `Access-Control-Allow-Origin`
+
+Suggested production smoke test sequence:
+
+1. Register app
+2. Approve app
+3. Exchange code
+4. Call `/api/balance`
+5. Publish content
+6. Refresh token
+7. Revoke authorization
+8. Confirm token failure after revocation
+
+Suggested production sign-off:
+
+1. Capture the registered app ID used for testing
+2. Save one successful OAuth token exchange response
+3. Save one successful publish response
+4. Save one failed post-revocation API response
+5. Record the deployed worker version / git SHA used for the verification
 
 ## All Questions Resolved
