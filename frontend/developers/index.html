@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Register and manage third-party publishing apps for HashBin.org">
+  <title>Developers - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/developers.css">
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main class="developers-main">
+    <section class="developers-hero">
+      <div class="developers-hero-copy">
+        <p class="developers-kicker">Developer Console</p>
+        <h1>Build publishing flows that feel native to your app.</h1>
+        <p>
+          Register redirect URIs, issue OAuth consent requests, and let users publish immutable 256t content without hand-copying API keys.
+        </p>
+      </div>
+      <div class="developers-hero-note">
+        <strong>Included in this first release</strong>
+        <span>Application registration, OAuth + PKCE, refresh rotation, per-app authorizations, and browser CORS for registered origins.</span>
+      </div>
+    </section>
+
+    <section class="developers-grid">
+      <div class="developers-panel">
+        <h2>Register an app</h2>
+        <form id="app-registration-form" class="developers-form">
+          <label>
+            <span>Application name</span>
+            <input id="app-name" name="app_name" type="text" maxlength="120" placeholder="Example Publisher" required>
+          </label>
+          <label>
+            <span>Redirect URIs</span>
+            <textarea id="redirect-uris" name="redirect_uris" rows="5" placeholder="https://example.com/oauth/callback" required></textarea>
+            <small>One absolute URI per line.</small>
+          </label>
+          <button type="submit" class="btn btn-primary">Create application</button>
+        </form>
+        <div id="registration-status" class="developers-status" aria-live="polite"></div>
+        <div id="new-app-output" class="developers-secret hidden"></div>
+      </div>
+
+      <div class="developers-panel">
+        <div class="developers-panel-header">
+          <h2>Your applications</h2>
+          <button id="refresh-apps" class="btn btn-secondary" type="button">Refresh</button>
+        </div>
+        <div id="apps-list" class="developers-list-state">Loading applications...</div>
+      </div>
+    </section>
+  </main>
+  <footer>
+    <p>&copy; 2026 HashBin.org |
+      <a href="/docs/">Documentation</a> |
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+  <script type="module" src="/js/developers.js"></script>
+</body>
+</html>

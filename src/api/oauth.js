@@ -11,6 +11,11 @@ const ALLOWED_SCOPES = new Set(['content:write', 'content:read', 'balance:read']
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;
 const REFRESH_TOKEN_TTL_DAYS = 30;
+const SCOPE_DESCRIPTIONS = {
+  'content:write': 'Publish immutable content using your account balance and default retention.',
+  'content:read': 'Check whether content exists and inspect metadata.',
+  'balance:read': 'Read your current account balance before publishing.'
+};
 
 function createRefreshToken(userId) {
   return `hbr_${userId}.${generateOAuthSecret('')}`;
@@ -40,6 +45,24 @@ function jsonResponse(body, status = 200, extraHeaders = {}) {
   });
 }
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function htmlResponse(html, status = 200) {
+  return new Response(html, {
+    status,
+    headers: {
+      'content-type': 'text/html; charset=utf-8'
+    }
+  });
+}
+
 async function getApplication(env, clientId) {
   const id = env.APPLICATION_REGISTRY.idFromName('global');
   const stub = env.APPLICATION_REGISTRY.get(id);
@@ -59,6 +82,31 @@ function parseScopes(scopeString) {
     return null;
   }
   return Array.from(new Set(scopes));
+}
+
+function validateAuthorizeRequest(data, app) {
+  if (!app || app.status !== 'active') {
+    return { valid: false, error: 'invalid_client', message: 'The requested application could not be found.' };
+  }
+
+  if (data.response_type !== 'code') {
+    return { valid: false, error: 'unsupported_response_type', message: 'Only authorization code flow is supported.' };
+  }
+
+  if (!app.redirect_uris.includes(data.redirect_uri)) {
+    return { valid: false, error: 'invalid_redirect_uri', message: 'The redirect URI is not registered for this application.' };
+  }
+
+  if (!data.code_challenge || data.code_challenge_method !== 'S256') {
+    return { valid: false, error: 'invalid_request', message: 'PKCE with S256 is required.' };
+  }
+
+  const scopes = parseScopes(data.scope);
+  if (scopes === null || scopes.length === 0) {
+    return { valid: false, error: 'invalid_scope', message: 'At least one supported scope is required.' };
+  }
+
+  return { valid: true, scopes };
 }
 
 async function upsertGrant(env, userId, grantData) {
@@ -144,26 +192,11 @@ export async function handleOAuthAuthorize(request, env) {
 
   const data = await request.json();
   const app = await getApplication(env, data.client_id);
-  if (!app || app.status !== 'active') {
-    return jsonResponse({ error: 'invalid_client' }, 400);
+  const validation = validateAuthorizeRequest(data, app);
+  if (!validation.valid) {
+    return jsonResponse({ error: validation.error, message: validation.message }, 400);
   }
-
-  if (data.response_type !== 'code') {
-    return jsonResponse({ error: 'unsupported_response_type' }, 400);
-  }
-
-  if (!app.redirect_uris.includes(data.redirect_uri)) {
-    return jsonResponse({ error: 'invalid_redirect_uri' }, 400);
-  }
-
-  if (!data.code_challenge || data.code_challenge_method !== 'S256') {
-    return jsonResponse({ error: 'invalid_request', message: 'PKCE with S256 is required' }, 400);
-  }
-
-  const scopes = parseScopes(data.scope);
-  if (scopes === null || scopes.length === 0) {
-    return jsonResponse({ error: 'invalid_scope' }, 400);
-  }
+  const scopes = validation.scopes;
 
   const grant = await upsertGrant(env, authResult.user.userId, {
     app_id: app.app_id,
@@ -193,6 +226,312 @@ export async function handleOAuthAuthorize(request, env) {
   }
 
   return Response.redirect(redirectUrl.toString(), 302);
+}
+
+export async function handleGetOAuthAuthorizePage(request, env) {
+  const url = new URL(request.url);
+  const app = await getApplication(env, url.searchParams.get('client_id'));
+  const requestData = {
+    client_id: url.searchParams.get('client_id'),
+    redirect_uri: url.searchParams.get('redirect_uri'),
+    response_type: url.searchParams.get('response_type'),
+    scope: url.searchParams.get('scope') || '',
+    state: url.searchParams.get('state') || '',
+    code_challenge: url.searchParams.get('code_challenge'),
+    code_challenge_method: url.searchParams.get('code_challenge_method')
+  };
+  const validation = validateAuthorizeRequest(requestData, app);
+
+  if (!validation.valid) {
+    return htmlResponse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unable to Continue - HashBin.org</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #f6f7fb; color: #1f2937; margin: 0; padding: 2rem; }
+    .shell { max-width: 720px; margin: 4rem auto; background: white; border-radius: 18px; padding: 2rem; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08); }
+    .eyebrow { color: #b91c1c; text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8rem; font-weight: 700; }
+    h1 { margin: 0.75rem 0 1rem; font-size: 2rem; }
+    p { color: #4b5563; line-height: 1.6; }
+    code { background: #f3f4f6; padding: 0.15rem 0.35rem; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="eyebrow">Authorization Error</div>
+    <h1>Unable to Continue</h1>
+    <p>${escapeHtml(validation.message)}</p>
+    <p>Error code: <code>${escapeHtml(validation.error)}</code></p>
+  </div>
+</body>
+</html>`, 400);
+  }
+
+  const scopesHtml = validation.scopes.map((scope) => `
+      <li>
+        <strong>${escapeHtml(scope)}</strong>
+        <span>${escapeHtml(SCOPE_DESCRIPTIONS[scope] || 'Requested access.')}</span>
+      </li>`).join('');
+
+  return htmlResponse(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorize ${escapeHtml(app.app_name)} - HashBin.org</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #13233a;
+      --muted: #5f6f87;
+      --paper: #ffffff;
+      --sky: #edf6ff;
+      --accent: #0f766e;
+      --accent-2: #f59e0b;
+      --line: #d8e4f2;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(245,158,11,0.20), transparent 28%),
+        radial-gradient(circle at top right, rgba(15,118,110,0.18), transparent 30%),
+        linear-gradient(180deg, #f6fbff, #eef4fb 46%, #f8f4eb 100%);
+      padding: 2rem;
+    }
+    .sheet {
+      max-width: 880px;
+      margin: 2rem auto;
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(216,228,242,0.9);
+      border-radius: 28px;
+      box-shadow: 0 30px 80px rgba(19,35,58,0.12);
+      overflow: hidden;
+    }
+    .hero {
+      padding: 2rem 2rem 1rem;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(237,246,255,0.95));
+    }
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      font-size: 0.78rem;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(2rem, 5vw, 3.25rem);
+      line-height: 1.05;
+    }
+    .hero p {
+      max-width: 44rem;
+      color: var(--muted);
+      font-size: 1.02rem;
+      line-height: 1.7;
+      margin: 1rem 0 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 0;
+    }
+    .panel {
+      padding: 2rem;
+    }
+    .panel + .panel {
+      border-left: 1px solid var(--line);
+      background: linear-gradient(180deg, rgba(248,250,252,0.7), rgba(237,246,255,0.55));
+    }
+    h2 {
+      margin: 0 0 1rem;
+      font-size: 1.15rem;
+      letter-spacing: 0.01em;
+    }
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.9rem;
+    }
+    li {
+      padding: 1rem 1rem 0.95rem;
+      border-radius: 18px;
+      background: white;
+      border: 1px solid var(--line);
+      box-shadow: 0 10px 24px rgba(19,35,58,0.05);
+    }
+    li strong {
+      display: block;
+      font-size: 1rem;
+      margin-bottom: 0.35rem;
+    }
+    li span {
+      display: block;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 0.95rem;
+    }
+    dl { margin: 0; display: grid; gap: 1rem; }
+    dt { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 0.25rem; }
+    dd { margin: 0; font-size: 1rem; line-height: 1.55; word-break: break-word; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.9rem;
+      margin-top: 1.5rem;
+    }
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 0.95rem 1.4rem;
+      font-size: 0.98rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .approve { background: var(--ink); color: white; }
+    .deny { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    .status {
+      margin-top: 1rem;
+      min-height: 1.5rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+    @media (max-width: 860px) {
+      body { padding: 1rem; }
+      .grid { grid-template-columns: 1fr; }
+      .panel + .panel { border-left: none; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <section class="hero">
+      <div class="eyebrow">Third-Party Publishing</div>
+      <h1>${escapeHtml(app.app_name)} wants to use your HashBin account.</h1>
+      <p>
+        Review the requested access below. Approving will let this app publish content with your balance using your current default retention settings.
+      </p>
+    </section>
+    <div class="grid">
+      <section class="panel">
+        <h2>Requested permissions</h2>
+        <ul>${scopesHtml}</ul>
+      </section>
+      <aside class="panel">
+        <h2>App details</h2>
+        <dl>
+          <div>
+            <dt>Application</dt>
+            <dd>${escapeHtml(app.app_name)}</dd>
+          </div>
+          <div>
+            <dt>Redirect URI</dt>
+            <dd>${escapeHtml(requestData.redirect_uri)}</dd>
+          </div>
+          <div>
+            <dt>State</dt>
+            <dd>${escapeHtml(requestData.state || '(none)')}</dd>
+          </div>
+        </dl>
+        <div class="actions">
+          <button class="approve" id="approve-button">Approve access</button>
+          <button class="deny" id="deny-button">Deny</button>
+        </div>
+        <div class="status" id="status-message">Sign in to HashBin if prompted, then approve to continue.</div>
+      </aside>
+    </div>
+  </div>
+  <script type="module">
+    import { initializeAuth, getAuthHeaders, signIn } from '/js/auth-loader.js';
+
+    const authorizePayload = ${JSON.stringify(requestData)};
+    const statusMessage = document.getElementById('status-message');
+    const approveButton = document.getElementById('approve-button');
+    const denyButton = document.getElementById('deny-button');
+
+    function redirectDenied() {
+      const deniedUrl = new URL(authorizePayload.redirect_uri);
+      deniedUrl.searchParams.set('error', 'access_denied');
+      if (authorizePayload.state) {
+        deniedUrl.searchParams.set('state', authorizePayload.state);
+      }
+      window.location.href = deniedUrl.toString();
+    }
+
+    denyButton.addEventListener('click', () => {
+      redirectDenied();
+    });
+
+    approveButton.addEventListener('click', async () => {
+      approveButton.disabled = true;
+      statusMessage.textContent = 'Checking your session...';
+
+      try {
+        await initializeAuth();
+        let authHeaders = await getAuthHeaders();
+
+        if (!authHeaders) {
+          statusMessage.textContent = 'Sign-in is required before you can approve this request.';
+          await signIn();
+          authHeaders = await getAuthHeaders();
+        }
+
+        if (!authHeaders) {
+          approveButton.disabled = false;
+          return;
+        }
+
+        statusMessage.textContent = 'Authorizing application...';
+        const response = await fetch('/oauth/authorize', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...authHeaders
+          },
+          body: JSON.stringify(authorizePayload)
+        });
+
+        if (response.redirected) {
+          window.location.href = response.url;
+          return;
+        }
+
+        if (response.status === 302) {
+          const location = response.headers.get('location');
+          if (location) {
+            window.location.href = location;
+            return;
+          }
+        }
+
+        let errorMessage = 'Authorization failed.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (_error) {
+          // Ignore JSON parsing errors for non-JSON responses.
+        }
+
+        statusMessage.textContent = errorMessage;
+        approveButton.disabled = false;
+      } catch (error) {
+        statusMessage.textContent = error.message || 'Authorization failed.';
+        approveButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>`);
 }
 
 async function issueTokenPair(env, codePayload) {

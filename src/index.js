@@ -115,6 +115,7 @@ import { deleteContent, getContentMetadata } from './services/content-deletion.j
 import {
   handleCreateDeveloperApp,
   handleListDeveloperApps,
+  handleGetOAuthAuthorizePage,
   handleOAuthAuthorize,
   handleOAuthToken,
   handleOAuthRevoke,
@@ -150,6 +151,8 @@ const BUNDLED_GIT_SHA = '__DEPLOY_GIT_SHA__';
 // Note: In a larger application, consider moving this to a configuration file
 const STATIC_PATHS = [
   'index.html',
+  'developers',
+  'developers/',
   'upload.html',
   'retrieve.html',
   'dashboard.html',
@@ -256,6 +259,15 @@ export default {
           const detailAsset = await env.ASSETS.fetch(detailRequest);
           if (detailAsset.status !== 404) {
             return withGitShaComment(detailAsset, env);
+          }
+        }
+
+        // Special handling for /developers -> serve developers/index.html
+        if (url.pathname === '/developers' || url.pathname === '/developers/') {
+          const developersRequest = new Request(new URL('/developers/index.html', url), request);
+          const developersAsset = await env.ASSETS.fetch(developersRequest);
+          if (developersAsset.status !== 404) {
+            return withGitShaComment(developersAsset, env);
           }
         }
         
@@ -676,6 +688,10 @@ function handleApiRoutes(url, request, env) {
 
   if (url.pathname === '/oauth/authorize' && request.method === 'POST') {
     return handleOAuthAuthorize(request, env);
+  }
+
+  if (url.pathname === '/oauth/authorize' && request.method === 'GET') {
+    return handleGetOAuthAuthorizePage(request, env);
   }
 
   if (url.pathname === '/oauth/token' && request.method === 'POST') {
