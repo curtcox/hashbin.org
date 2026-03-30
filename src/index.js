@@ -117,9 +117,11 @@ import {
   handleListDeveloperApps,
   handleOAuthAuthorize,
   handleOAuthToken,
+  handleOAuthRevoke,
   handleGetAccountSettings,
   handleUpdateAccountSettings,
-  handleListAuthorizations
+  handleListAuthorizations,
+  handleRevokeAuthorization
 } from './api/oauth.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
@@ -674,6 +676,10 @@ function handleApiRoutes(url, request, env) {
     return handleOAuthToken(request, env);
   }
 
+  if (url.pathname === '/oauth/revoke' && request.method === 'POST') {
+    return handleOAuthRevoke(request, env);
+  }
+
   if (url.pathname === '/api/account/settings' && request.method === 'GET') {
     return handleGetAccountSettings(request, env);
   }
@@ -684,6 +690,11 @@ function handleApiRoutes(url, request, env) {
 
   if (url.pathname === '/api/account/authorizations' && request.method === 'GET') {
     return handleListAuthorizations(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/account\/authorizations\/[^\/]+$/) && request.method === 'DELETE') {
+    const appId = url.pathname.split('/')[4];
+    return handleRevokeAuthorization(request, env, appId);
   }
 
   // Balance API routes

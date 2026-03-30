@@ -325,3 +325,51 @@ export async function handleListAuthorizations(request, env) {
   const profileStub = env.USER_PROFILES.get(profileId);
   return profileStub.fetch(new Request('http://internal/oauth/grants'));
 }
+
+export async function handleRevokeAuthorization(request, env, appId) {
+  const authResult = await authenticate(request, env);
+  const authError = requireAuth(authResult);
+  if (authError) return authError;
+
+  const profileId = env.USER_PROFILES.idFromName(authResult.user.userId);
+  const profileStub = env.USER_PROFILES.get(profileId);
+  return profileStub.fetch(new Request(`http://internal/oauth/grants/${appId}`, {
+    method: 'DELETE'
+  }));
+}
+
+export async function handleOAuthRevoke(request, env) {
+  const data = await request.json();
+  const token = data.token;
+
+  if (data.token_type_hint === 'refresh_token') {
+    const userId = extractRefreshTokenUserId(token);
+    if (!userId) {
+      return new Response(null, { status: 200 });
+    }
+
+    const profileId = env.USER_PROFILES.idFromName(userId);
+    const profileStub = env.USER_PROFILES.get(profileId);
+    await profileStub.fetch(new Request('http://internal/oauth/refresh-tokens/revoke', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        token_hash: await sha256Hex(token)
+      })
+    }));
+    return new Response(null, { status: 200 });
+  }
+
+  try {
+    const payload = await verifyOAuthJwt(token, env.OAUTH_SIGNING_KEY);
+    const profileId = env.USER_PROFILES.idFromName(payload.user_id);
+    const profileStub = env.USER_PROFILES.get(profileId);
+    await profileStub.fetch(new Request(`http://internal/oauth/grants-by-id/${payload.grant_id}`, {
+      method: 'POST'
+    }));
+  } catch (_error) {
+    // OAuth revocation is intentionally idempotent and quiet.
+  }
+
+  return new Response(null, { status: 200 });
+}

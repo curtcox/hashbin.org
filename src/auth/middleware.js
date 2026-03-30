@@ -286,12 +286,32 @@ async function validateOAuthAccessToken(token, env) {
       };
     }
 
+    const grantResponse = await userProfileStub.fetch(new Request(`http://internal/oauth/grants/${payload.grant_id}`, {
+      method: 'GET'
+    }));
+    if (!grantResponse.ok) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+        message: 'OAuth grant not found'
+      };
+    }
+
+    const grant = await grantResponse.json();
+    if (grant.revoked_at || grant.app_id !== payload.app_id) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+        message: 'OAuth grant revoked'
+      };
+    }
+
     return {
       valid: true,
       userId: payload.user_id,
       appId: payload.app_id,
       grantId: payload.grant_id,
-      scopes: payload.scopes || [],
+      scopes: grant.scopes || payload.scopes || [],
       profile
     };
   } catch (error) {

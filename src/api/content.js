@@ -4,6 +4,7 @@
  */
 
 import { authenticate } from '../auth/middleware.js';
+import { hasOAuthScope, insufficientScopeResponse, isOAuthAuth, oauthNotAllowedResponse } from '../auth/oauth-access.js';
 import { 
   calculateRetentionCost, 
   generateInsufficientBalanceMessage,
@@ -42,19 +43,9 @@ export async function handleUploadContent(request, env) {
   try {
     const url = new URL(request.url);
     const requestContentType = request.headers.get('content-type') || '';
-    const isOAuthPublish = authResult.user?.authMethod === 'oauth';
-    const oauthScopes = authResult.user?.oauth?.scopes || [];
-    if (isOAuthPublish && !oauthScopes.includes('content:write')) {
-      return new Response(
-        JSON.stringify({
-          error: 'insufficient_scope',
-          message: 'OAuth token is missing content:write scope'
-        }),
-        {
-          status: 403,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+    const isOAuthPublish = isOAuthAuth(authResult);
+    if (isOAuthPublish && !hasOAuthScope(authResult, 'content:write')) {
+      return insufficientScopeResponse('content:write');
     }
 
     let retention_months = isOAuthPublish
@@ -507,6 +498,10 @@ export async function handleExtendContent(request, env, cid) {
         headers: { 'content-type': 'application/json' }
       }
     );
+  }
+
+  if (isOAuthAuth(authResult)) {
+    return oauthNotAllowedResponse();
   }
 
   try {

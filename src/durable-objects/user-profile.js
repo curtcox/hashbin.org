@@ -112,6 +112,21 @@ export class UserProfile {
         return await this.upsertOAuthGrant(data);
       }
 
+      if (url.pathname.startsWith('/oauth/grants/') && method === 'GET') {
+        const grantId = url.pathname.split('/')[3];
+        return await this.getOAuthGrant(grantId);
+      }
+
+      if (url.pathname.startsWith('/oauth/grants/') && method === 'DELETE') {
+        const appId = url.pathname.split('/')[3];
+        return await this.revokeOAuthGrantByApp(appId);
+      }
+
+      if (url.pathname.startsWith('/oauth/grants-by-id/') && method === 'POST') {
+        const grantId = url.pathname.split('/')[3];
+        return await this.revokeOAuthGrantById(grantId);
+      }
+
       if (url.pathname === '/oauth/refresh-tokens' && method === 'POST') {
         const data = await request.json();
         return await this.storeOAuthRefreshToken(data);
@@ -120,6 +135,11 @@ export class UserProfile {
       if (url.pathname === '/oauth/refresh-tokens/rotate' && method === 'POST') {
         const data = await request.json();
         return await this.rotateOAuthRefreshToken(data);
+      }
+
+      if (url.pathname === '/oauth/refresh-tokens/revoke' && method === 'POST') {
+        const data = await request.json();
+        return await this.revokeOAuthRefreshToken(data);
       }
 
       if (url.pathname === '/suppliers/add' && method === 'POST') {
@@ -1026,6 +1046,89 @@ export class UserProfile {
     });
   }
 
+  async getOAuthGrant(grantId) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    this.normalizeOAuthCollections(profile);
+    const grant = profile.oauth_grants.find((entry) => entry.grant_id === grantId);
+    if (!grant) {
+      return new Response(JSON.stringify({ error: 'Grant not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    return new Response(JSON.stringify(grant), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  async revokeOAuthGrantByApp(appId) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    this.normalizeOAuthCollections(profile);
+    const grant = profile.oauth_grants.find((entry) => entry.app_id === appId && !entry.revoked_at);
+    if (!grant) {
+      return new Response(JSON.stringify({ error: 'Grant not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    grant.revoked_at = new Date().toISOString();
+    for (const token of profile.oauth_refresh_tokens) {
+      if (token.grant_id === grant.grant_id && !token.revoked_at) {
+        token.revoked_at = grant.revoked_at;
+      }
+    }
+    profile.updated_at = new Date().toISOString();
+    await this.state.storage.put('profile', profile);
+
+    return new Response(JSON.stringify({
+      success: true,
+      app_id: appId,
+      revoked_at: grant.revoked_at
+    }), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  async revokeOAuthGrantById(grantId) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    this.normalizeOAuthCollections(profile);
+    const grant = profile.oauth_grants.find((entry) => entry.grant_id === grantId && !entry.revoked_at);
+    if (!grant) {
+      return new Response(JSON.stringify({ error: 'Grant not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    return this.revokeOAuthGrantByApp(grant.app_id);
+  }
+
   async storeOAuthRefreshToken(data) {
     const profile = await this.state.storage.get('profile');
 
@@ -1099,6 +1202,33 @@ export class UserProfile {
       user_id: profile.user_id,
       scopes: grant?.scopes || []
     }), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  async revokeOAuthRefreshToken(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    this.normalizeOAuthCollections(profile);
+    const token = profile.oauth_refresh_tokens.find((entry) => entry.token_hash === data.token_hash && !entry.revoked_at);
+    if (!token) {
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    token.revoked_at = new Date().toISOString();
+    profile.updated_at = new Date().toISOString();
+    await this.state.storage.put('profile', profile);
+
+    return new Response(JSON.stringify({ success: true }), {
       headers: { 'content-type': 'application/json' }
     });
   }

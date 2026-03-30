@@ -4,6 +4,7 @@
  */
 
 import { authenticate } from '../auth/middleware.js';
+import { isOAuthAuth, oauthNotAllowedResponse } from '../auth/oauth-access.js';
 import { isInlineContent } from '../utils/hash256t.js';
 
 /**
@@ -24,6 +25,10 @@ export async function handleGetUserUploads(request, env) {
         headers: { 'content-type': 'application/json' }
       }
     );
+  }
+
+  if (isOAuthAuth(authResult)) {
+    return oauthNotAllowedResponse();
   }
 
   try {
