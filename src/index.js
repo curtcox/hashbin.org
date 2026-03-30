@@ -20,6 +20,7 @@ export { ExpirationIndex } from './durable-objects/expiration-index.js';
 export { DisputeRecord } from './durable-objects/dispute-record.js';
 export { DisputeIndex } from './durable-objects/dispute-index.js';
 export { AdminActionLog } from './durable-objects/admin-action-log.js';
+export { ApplicationRegistry } from './durable-objects/application-registry.js';
 
 // Import API route handlers
 import {
@@ -111,6 +112,15 @@ import {
 } from './api/admin-disputes.js';
 
 import { deleteContent, getContentMetadata } from './services/content-deletion.js';
+import {
+  handleCreateDeveloperApp,
+  handleListDeveloperApps,
+  handleOAuthAuthorize,
+  handleOAuthToken,
+  handleGetAccountSettings,
+  handleUpdateAccountSettings,
+  handleListAuthorizations
+} from './api/oauth.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 
@@ -646,6 +656,34 @@ function handleApiRoutes(url, request, env) {
 
   if (url.pathname === '/api/auth/account' && request.method === 'DELETE') {
     return handleDeleteAccount(request, env);
+  }
+
+  if (url.pathname === '/api/developers/apps' && request.method === 'POST') {
+    return handleCreateDeveloperApp(request, env);
+  }
+
+  if (url.pathname === '/api/developers/apps' && request.method === 'GET') {
+    return handleListDeveloperApps(request, env);
+  }
+
+  if (url.pathname === '/oauth/authorize' && request.method === 'POST') {
+    return handleOAuthAuthorize(request, env);
+  }
+
+  if (url.pathname === '/oauth/token' && request.method === 'POST') {
+    return handleOAuthToken(request, env);
+  }
+
+  if (url.pathname === '/api/account/settings' && request.method === 'GET') {
+    return handleGetAccountSettings(request, env);
+  }
+
+  if (url.pathname === '/api/account/settings' && request.method === 'PATCH') {
+    return handleUpdateAccountSettings(request, env);
+  }
+
+  if (url.pathname === '/api/account/authorizations' && request.method === 'GET') {
+    return handleListAuthorizations(request, env);
   }
 
   // Balance API routes

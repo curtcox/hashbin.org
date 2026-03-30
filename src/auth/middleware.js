@@ -6,6 +6,7 @@
 import { verifyToken } from '@clerk/backend';
 import { hashApiKey, validateApiKeyFormat } from './utils.js';
 import { getOrCreateLocalProfile, validateLocalUserId } from './local-auth.js';
+import { verifyOAuthJwt } from './oauth.js';
 
 // Error codes for authentication failures
 export const AUTH_ERROR_CODES = {
@@ -243,6 +244,65 @@ async function validateApiKey(apiKey, env) {
   }
 }
 
+async function validateOAuthAccessToken(token, env) {
+  if (!env.OAUTH_SIGNING_KEY) {
+    return {
+      valid: false,
+      error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+      message: 'OAuth signing key not configured'
+    };
+  }
+
+  try {
+    const payload = await verifyOAuthJwt(token, env.OAUTH_SIGNING_KEY);
+    if (payload.token_type !== 'access' || !payload.user_id || !payload.app_id || !payload.grant_id) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+        message: 'Invalid oauth token'
+      };
+    }
+
+    const userProfileId = env.USER_PROFILES.idFromName(payload.user_id);
+    const userProfileStub = env.USER_PROFILES.get(userProfileId);
+    const response = await userProfileStub.fetch(new Request('http://internal/profile', {
+      method: 'GET'
+    }));
+
+    if (!response.ok) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+        message: 'User profile not found'
+      };
+    }
+
+    const profile = await response.json();
+    if (profile.deleted_at) {
+      return {
+        valid: false,
+        error: AUTH_ERROR_CODES.AUTH_USER_DELETED,
+        message: 'User account has been deleted'
+      };
+    }
+
+    return {
+      valid: true,
+      userId: payload.user_id,
+      appId: payload.app_id,
+      grantId: payload.grant_id,
+      scopes: payload.scopes || [],
+      profile
+    };
+  } catch (error) {
+    return {
+      valid: false,
+      error: error.code === 'expired' ? AUTH_ERROR_CODES.AUTH_EXPIRED : AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+      message: error.message
+    };
+  }
+}
+
 /**
  * Check rate limits for a given identifier
  */
@@ -356,86 +416,103 @@ export async function authenticate(request, env) {
 
   // Clerk JWT token
   if (auth.type === 'clerk') {
-    if (isLocalMode) {
-      return {
-        authenticated: false,
-        user: null,
-        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
-      };
-    }
+    if (!isLocalMode) {
+      const validation = await validateClerkToken(auth.value, env);
+      if (validation.valid) {
+        // Fetch user profile from UserProfile DO
+        const userId = validation.userId;
+        const userProfileId = env.USER_PROFILES.idFromName(userId);
+        const userProfileStub = env.USER_PROFILES.get(userProfileId);
 
-    const validation = await validateClerkToken(auth.value, env);
-    if (!validation.valid) {
-      return {
-        authenticated: false,
-        user: null,
-        error: validation.error
-      };
-    }
+        try {
+          const response = await userProfileStub.fetch(
+            new Request('http://internal/profile', {
+              method: 'GET'
+            })
+          );
 
-    // Fetch user profile from UserProfile DO
-    const userId = validation.userId;
-    const userProfileId = env.USER_PROFILES.idFromName(userId);
-    const userProfileStub = env.USER_PROFILES.get(userProfileId);
+          if (!response.ok) {
+            if (response.status === 404) {
+              return {
+                authenticated: true,
+                user: {
+                  userId,
+                  sessionId: validation.sessionId,
+                  authMethod: 'clerk',
+                  profileExists: false
+                },
+                error: null
+              };
+            }
 
-    try {
-      const response = await userProfileStub.fetch(
-        new Request('http://internal/profile', {
-          method: 'GET'
-        })
-      );
+            return {
+              authenticated: false,
+              user: null,
+              error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
+            };
+          }
 
-      if (!response.ok) {
-        if (response.status === 404) {
-          // User profile doesn't exist yet, create it
-          // This happens on first login after Clerk webhook
+          const profile = await response.json();
+
+          if (profile.deleted_at) {
+            return {
+              authenticated: false,
+              user: null,
+              error: AUTH_ERROR_CODES.AUTH_USER_DELETED
+            };
+          }
+
           return {
             authenticated: true,
             user: {
-              userId,
+              userId: profile.user_id,
               sessionId: validation.sessionId,
               authMethod: 'clerk',
-              profileExists: false
+              profile
             },
             error: null
           };
+        } catch (error) {
+          return {
+            authenticated: false,
+            user: null,
+            error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
+          };
         }
+      }
 
+      if (validation.error === AUTH_ERROR_CODES.AUTH_EXPIRED) {
         return {
           authenticated: false,
           user: null,
-          error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
+          error: validation.error
         };
       }
+    }
 
-      const profile = await response.json();
-
-      // Check if user is deleted
-      if (profile.deleted_at) {
-        return {
-          authenticated: false,
-          user: null,
-          error: AUTH_ERROR_CODES.AUTH_USER_DELETED
-        };
-      }
-
-      return {
-        authenticated: true,
-        user: {
-          userId: profile.user_id,
-          sessionId: validation.sessionId,
-          authMethod: 'clerk',
-          profile
-        },
-        error: null
-      };
-    } catch (error) {
+    const oauthValidation = await validateOAuthAccessToken(auth.value, env);
+    if (!oauthValidation.valid) {
       return {
         authenticated: false,
         user: null,
-        error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT
+        error: oauthValidation.error
       };
     }
+
+    return {
+      authenticated: true,
+      user: {
+        userId: oauthValidation.userId,
+        authMethod: 'oauth',
+        profile: oauthValidation.profile,
+        oauth: {
+          appId: oauthValidation.appId,
+          grantId: oauthValidation.grantId,
+          scopes: oauthValidation.scopes
+        }
+      },
+      error: null
+    };
   }
 
   // API Key authentication

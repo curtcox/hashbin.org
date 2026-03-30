@@ -42,7 +42,24 @@ export async function handleUploadContent(request, env) {
   try {
     const url = new URL(request.url);
     const requestContentType = request.headers.get('content-type') || '';
-    let retention_months = parseInt(url.searchParams.get('retention_months') || '1');
+    const isOAuthPublish = authResult.user?.authMethod === 'oauth';
+    const oauthScopes = authResult.user?.oauth?.scopes || [];
+    if (isOAuthPublish && !oauthScopes.includes('content:write')) {
+      return new Response(
+        JSON.stringify({
+          error: 'insufficient_scope',
+          message: 'OAuth token is missing content:write scope'
+        }),
+        {
+          status: 403,
+          headers: { 'content-type': 'application/json' }
+        }
+      );
+    }
+
+    let retention_months = isOAuthPublish
+      ? parseInt(authResult.user.profile?.default_retention_months || '1')
+      : parseInt(url.searchParams.get('retention_months') || '1');
     let contentData;
     let size_bytes;
     let contentType = requestContentType.split(';')[0] || 'application/octet-stream';
@@ -50,7 +67,9 @@ export async function handleUploadContent(request, env) {
     if (requestContentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       const file = formData.get('content');
-      retention_months = parseInt(formData.get('retention_months') || retention_months.toString());
+      if (!isOAuthPublish) {
+        retention_months = parseInt(formData.get('retention_months') || retention_months.toString());
+      }
 
       if (!file) {
         return new Response(
@@ -275,7 +294,10 @@ export async function handleUploadContent(request, env) {
         new Request('http://internal/balance/debit', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ amount_cents: cost_cents })
+          body: JSON.stringify({
+            amount_cents: cost_cents,
+            oauth_grant_id: isOAuthPublish ? authResult.user.oauth?.grantId : undefined
+          })
         })
       );
 

@@ -32,6 +32,15 @@ export class UserProfile {
         return await this.updateProfile(data);
       }
 
+      if (url.pathname === '/settings' && method === 'GET') {
+        return await this.getSettings();
+      }
+
+      if (url.pathname === '/settings' && method === 'PATCH') {
+        const data = await request.json();
+        return await this.updateSettings(data);
+      }
+
       if (url.pathname === '/profile' && method === 'DELETE') {
         return await this.deleteProfile();
       }
@@ -92,6 +101,25 @@ export class UserProfile {
       if (url.pathname === '/balance/debit' && method === 'POST') {
         const data = await request.json();
         return await this.debitBalance(data);
+      }
+
+      if (url.pathname === '/oauth/grants' && method === 'GET') {
+        return await this.listOAuthGrants();
+      }
+
+      if (url.pathname === '/oauth/grants' && method === 'POST') {
+        const data = await request.json();
+        return await this.upsertOAuthGrant(data);
+      }
+
+      if (url.pathname === '/oauth/refresh-tokens' && method === 'POST') {
+        const data = await request.json();
+        return await this.storeOAuthRefreshToken(data);
+      }
+
+      if (url.pathname === '/oauth/refresh-tokens/rotate' && method === 'POST') {
+        const data = await request.json();
+        return await this.rotateOAuthRefreshToken(data);
       }
 
       if (url.pathname === '/suppliers/add' && method === 'POST') {
@@ -177,7 +205,10 @@ export class UserProfile {
       total_deposited_cents: initialBalance,
       total_spent_cents: 0,
       supplier_ids: [],
-      supplier_count: 0
+      supplier_count: 0,
+      default_retention_months: Number.isInteger(data.default_retention_months) ? data.default_retention_months : null,
+      oauth_grants: [],
+      oauth_refresh_tokens: []
     };
 
     await this.state.storage.put('profile', profile);
@@ -209,6 +240,10 @@ export class UserProfile {
     // Update allowed fields
     if (data.providers) {
       profile.providers = data.providers;
+    }
+
+    if (data.default_retention_months !== undefined) {
+      profile.default_retention_months = data.default_retention_months;
     }
 
     profile.updated_at = new Date().toISOString();
@@ -866,6 +901,208 @@ export class UserProfile {
     );
   }
 
+  normalizeOAuthCollections(profile) {
+    if (!profile.oauth_grants) {
+      profile.oauth_grants = [];
+    }
+    if (!profile.oauth_refresh_tokens) {
+      profile.oauth_refresh_tokens = [];
+    }
+  }
+
+  async getSettings() {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    return new Response(JSON.stringify({
+      default_retention_months: profile.default_retention_months || null
+    }), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  async updateSettings(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    const value = data.default_retention_months;
+    if (!Number.isInteger(value) || value < 1) {
+      return new Response(JSON.stringify({
+        error: 'invalid_settings',
+        message: 'default_retention_months must be an integer >= 1'
+      }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    profile.default_retention_months = value;
+    profile.updated_at = new Date().toISOString();
+    await this.state.storage.put('profile', profile);
+
+    return new Response(JSON.stringify({
+      default_retention_months: profile.default_retention_months
+    }), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  nextMonthlyReset(fromDate = new Date()) {
+    const next = new Date(fromDate);
+    next.setMonth(next.getMonth() + 1);
+    return next.toISOString();
+  }
+
+  async upsertOAuthGrant(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    this.normalizeOAuthCollections(profile);
+    let grant = profile.oauth_grants.find((entry) => entry.app_id === data.app_id && !entry.revoked_at);
+
+    if (!grant) {
+      grant = {
+        grant_id: `grant_${crypto.randomUUID()}`,
+        user_id: profile.user_id,
+        app_id: data.app_id,
+        scopes: data.scopes || [],
+        spending_limit: data.spending_limit ?? null,
+        spending_used: 0,
+        spending_reset: this.nextMonthlyReset(),
+        created_at: new Date().toISOString(),
+        revoked_at: null
+      };
+      profile.oauth_grants.push(grant);
+    } else {
+      grant.scopes = data.scopes || grant.scopes;
+      grant.spending_limit = data.spending_limit ?? grant.spending_limit ?? null;
+      if (!grant.spending_reset) {
+        grant.spending_reset = this.nextMonthlyReset();
+      }
+    }
+
+    profile.updated_at = new Date().toISOString();
+    await this.state.storage.put('profile', profile);
+
+    return new Response(JSON.stringify(grant), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  async listOAuthGrants() {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    this.normalizeOAuthCollections(profile);
+
+    return new Response(JSON.stringify({
+      authorizations: profile.oauth_grants.filter((grant) => !grant.revoked_at)
+    }), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  async storeOAuthRefreshToken(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    this.normalizeOAuthCollections(profile);
+
+    const refreshToken = {
+      token_hash: data.token_hash,
+      grant_id: data.grant_id,
+      app_id: data.app_id,
+      user_id: profile.user_id,
+      expires_at: data.expires_at,
+      created_at: new Date().toISOString(),
+      revoked_at: null
+    };
+    profile.oauth_refresh_tokens.push(refreshToken);
+    profile.updated_at = new Date().toISOString();
+
+    await this.state.storage.put('profile', profile);
+
+    return new Response(JSON.stringify(refreshToken), {
+      status: 201,
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  async rotateOAuthRefreshToken(data) {
+    const profile = await this.state.storage.get('profile');
+
+    if (!profile) {
+      return new Response(JSON.stringify({ error: 'Profile not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    this.normalizeOAuthCollections(profile);
+    const token = profile.oauth_refresh_tokens.find((entry) => entry.token_hash === data.current_token_hash && !entry.revoked_at);
+    if (!token || new Date(token.expires_at) <= new Date()) {
+      return new Response(JSON.stringify({ error: 'Refresh token not found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    token.revoked_at = new Date().toISOString();
+    const grant = profile.oauth_grants.find((entry) => entry.grant_id === token.grant_id && !entry.revoked_at);
+    const replacement = {
+      token_hash: data.new_token_hash,
+      grant_id: token.grant_id,
+      app_id: token.app_id,
+      user_id: profile.user_id,
+      expires_at: data.new_expires_at,
+      created_at: new Date().toISOString(),
+      revoked_at: null
+    };
+    profile.oauth_refresh_tokens.push(replacement);
+    profile.updated_at = new Date().toISOString();
+
+    await this.state.storage.put('profile', profile);
+
+    return new Response(JSON.stringify({
+      grant_id: token.grant_id,
+      app_id: token.app_id,
+      user_id: profile.user_id,
+      scopes: grant?.scopes || []
+    }), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
   /**
    * Deposit to balance (credit)
    * This should only be called after successful Stripe payment
@@ -940,6 +1177,7 @@ export class UserProfile {
       );
     }
 
+    this.normalizeOAuthCollections(profile);
     const amount_cents = data.amount_cents;
     if (!amount_cents || amount_cents <= 0) {
       return new Response(
@@ -952,6 +1190,37 @@ export class UserProfile {
           headers: { 'content-type': 'application/json' }
         }
       );
+    }
+
+    if (data.oauth_grant_id) {
+      const grant = profile.oauth_grants.find((entry) => entry.grant_id === data.oauth_grant_id && !entry.revoked_at);
+      if (!grant) {
+        return new Response(JSON.stringify({
+          error: 'invalid_grant',
+          message: 'OAuth grant not found'
+        }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+
+      if (grant.spending_reset && new Date(grant.spending_reset) <= new Date()) {
+        grant.spending_used = 0;
+        grant.spending_reset = this.nextMonthlyReset();
+      }
+
+      if (grant.spending_limit !== null && grant.spending_limit !== undefined) {
+        const proposedSpend = (grant.spending_used || 0) + (amount_cents / 100);
+        if (proposedSpend > grant.spending_limit) {
+          return new Response(JSON.stringify({
+            error: 'spending_limit_exceeded',
+            message: 'This app would exceed its monthly spending limit'
+          }), {
+            status: 400,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+      }
     }
 
     const balance_before = profile.balance_cents || 0;
@@ -977,6 +1246,12 @@ export class UserProfile {
 
     profile.balance_cents = balance_after;
     profile.total_spent_cents = (profile.total_spent_cents || 0) + amount_cents;
+    if (data.oauth_grant_id) {
+      const grant = profile.oauth_grants.find((entry) => entry.grant_id === data.oauth_grant_id && !entry.revoked_at);
+      if (grant) {
+        grant.spending_used = (grant.spending_used || 0) + (amount_cents / 100);
+      }
+    }
     profile.updated_at = new Date().toISOString();
 
     await this.state.storage.put('profile', profile);

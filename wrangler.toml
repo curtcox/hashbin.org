@@ -109,6 +109,11 @@ name = "ADMIN_ACTION_LOG"
 class_name = "AdminActionLog"
 script_name = "hashbin-worker-prod"
 
+[[durable_objects.bindings]]
+name = "APPLICATION_REGISTRY"
+class_name = "ApplicationRegistry"
+script_name = "hashbin-worker-prod"
+
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -150,6 +155,10 @@ new_sqlite_classes = ["ExpirationIndex"]
 [[migrations]]
 tag = "v8"
 new_sqlite_classes = ["DisputeRecord", "DisputeIndex", "AdminActionLog"]
+
+[[migrations]]
+tag = "v9"
+new_sqlite_classes = ["ApplicationRegistry"]
 
 # Scheduled jobs (cron triggers)
 [triggers]

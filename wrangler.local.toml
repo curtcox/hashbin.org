@@ -97,6 +97,11 @@ name = "ADMIN_ACTION_LOG"
 class_name = "AdminActionLog"
 script_name = "hashbin-worker-local"
 
+[[durable_objects.bindings]]
+name = "APPLICATION_REGISTRY"
+class_name = "ApplicationRegistry"
+script_name = "hashbin-worker-local"
+
 # R2 bucket bindings (local emulation)
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -138,3 +143,7 @@ new_sqlite_classes = ["ExpirationIndex"]
 [[migrations]]
 tag = "v8"
 new_sqlite_classes = ["DisputeRecord", "DisputeIndex", "AdminActionLog"]
+
+[[migrations]]
+tag = "v9"
+new_sqlite_classes = ["ApplicationRegistry"]
