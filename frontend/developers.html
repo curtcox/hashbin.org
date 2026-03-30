@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Register your app to publish content to HashBin.org via OAuth 2.0">
+  <title>Developers - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/developers.css">
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header"></header>
+
+  <!-- Main Content -->
+  <main class="developers-main">
+
+    <!-- Hero -->
+    <section class="developers-hero">
+      <div>
+        <p class="developers-kicker">Developer Platform</p>
+        <h1>Publish to HashBin from your app</h1>
+        <p>
+          Let your users store 256t content on HashBin.org directly from your web app.
+          Users authorize your app via OAuth 2.0, and uploads are billed to their HashBin balance.
+        </p>
+      </div>
+      <div class="developers-hero-note">
+        <strong>How it works</strong>
+        <span>
+          Register your app, get a client ID, and redirect users through a standard
+          OAuth consent flow. Once authorized, your app can publish content on their behalf.
+        </span>
+      </div>
+    </section>
+
+    <!-- Why register -->
+    <section style="margin-bottom: 2rem;">
+      <h2 style="margin-bottom: 1.5rem;">Why register your app?</h2>
+      <div class="grid grid-cols-3" style="gap: 1.5rem;">
+        <div class="card">
+          <h3>Security</h3>
+          <p>
+            Redirect URI validation prevents authorization codes from being intercepted.
+            Only your registered origins receive tokens.
+          </p>
+        </div>
+        <div class="card">
+          <h3>User trust</h3>
+          <p>
+            The consent screen shows your app name so users know exactly who is requesting access
+            to their balance.
+          </p>
+        </div>
+        <div class="card">
+          <h3>Spending controls</h3>
+          <p>
+            Users can set per-app monthly spending limits. Revocation and rate limiting
+            are tracked per app.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section style="margin-bottom: 2rem;">
+      <h2 style="margin-bottom: 1.5rem;">Integration overview</h2>
+      <div class="card" style="max-width: 48rem;">
+        <ol style="line-height: 1.8; padding-left: 1.25rem;">
+          <li><strong>Register your app</strong> below to get a <code>client_id</code> and <code>client_secret</code>.</li>
+          <li><strong>Redirect</strong> users to <code>/oauth/authorize</code> with PKCE parameters.</li>
+          <li>The user <strong>signs in</strong> (via their existing HashBin account) and <strong>approves</strong> your app.</li>
+          <li>HashBin redirects back to your <code>redirect_uri</code> with an authorization <strong>code</strong>.</li>
+          <li>Exchange the code at <code>/oauth/token</code> for an <strong>access token</strong> (1 hr) and <strong>refresh token</strong> (30 days).</li>
+          <li>Use the access token to <strong>publish content</strong> via <code>POST /api/content</code>. Uploads use the user's default retention period and are billed to their balance.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- GitHub Pages instructions -->
+    <section style="margin-bottom: 2rem;">
+      <h2 style="margin-bottom: 1.5rem;">Example: app served from GitHub Pages</h2>
+      <div class="card" style="max-width: 48rem;">
+        <p style="margin-bottom: 1rem;">
+          If your app is hosted on GitHub Pages, use your Pages URL as the redirect URI
+          when registering. For example:
+        </p>
+        <div class="developers-code"><code>https://your-username.github.io/your-repo/callback.html</code></div>
+        <p style="margin-bottom: 1rem;">
+          Your callback page receives the authorization code and exchanges it for tokens.
+          A minimal implementation using the hosted SDK:
+        </p>
+        <div class="developers-code"><code><pre>&lt;!-- callback.html served from GitHub Pages --&gt;
+&lt;script type="module"&gt;
+  import HashBin from 'https://hashbin.org/sdk/hashbin.js';
+
+  const hb = HashBin.configure({
+    clientId: 'YOUR_CLIENT_ID'
+  });
+
+  // Completes the OAuth flow using the code in the URL
+  await hb.handleCallback();
+
+  // Now you can publish content
+  const cid = await hb.publish(new Blob(['Hello, HashBin!']));
+  console.log('Published:', cid);
+&lt;/script&gt;</pre></code></div>
+        <p style="margin-bottom: 0.5rem;">
+          Or install via npm:
+        </p>
+        <div class="developers-code"><code>npm install hashbin-sdk</code></div>
+        <p style="margin-top: 1rem;">
+          See the <a href="/docs/sdk.html">SDK documentation</a> for the full API reference.
+        </p>
+      </div>
+    </section>
+
+    <!-- Available scopes -->
+    <section style="margin-bottom: 2rem;">
+      <h2 style="margin-bottom: 1.5rem;">Available scopes</h2>
+      <div class="card" style="max-width: 48rem;">
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr>
+              <th style="text-align: left; padding: 0.5rem 1rem 0.5rem 0; border-bottom: 1px solid var(--color-border);">Scope</th>
+              <th style="text-align: left; padding: 0.5rem 0; border-bottom: 1px solid var(--color-border);">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>content:write</code></td>
+              <td style="padding: 0.5rem 0;">Publish content, billed to the user's balance using their default retention period</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>content:read</code></td>
+              <td style="padding: 0.5rem 0;">Check whether content exists and read its metadata</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>balance:read</code></td>
+              <td style="padding: 0.5rem 0;">View the user's current balance (useful for pre-flight checks)</td>
+            </tr>
+          </tbody>
+        </table>
+        <p style="margin-top: 1rem; color: var(--color-text-light);">
+          Third-party apps can only publish. Deletion, retention extension, and account management are not available through OAuth tokens.
+        </p>
+      </div>
+    </section>
+
+    <!-- Registration form + app list -->
+    <section class="developers-grid">
+      <div class="developers-panel">
+        <h2>Register an application</h2>
+        <form id="app-registration-form" class="developers-form">
+          <label>
+            <span>Application name</span>
+            <input type="text" id="app-name" required placeholder="My App">
+          </label>
+          <label>
+            <span>Redirect URIs</span>
+            <textarea id="redirect-uris" required placeholder="https://your-username.github.io/your-repo/callback.html"></textarea>
+            <small>One URI per line. Must be HTTPS. These are the URLs HashBin will redirect to after the user approves your app.</small>
+          </label>
+          <button type="submit" class="btn btn-primary">Register</button>
+          <p id="registration-status" class="developers-status"></p>
+          <div id="new-app-output" class="developers-secret hidden"></div>
+        </form>
+      </div>
+
+      <div class="developers-panel">
+        <div class="developers-panel-header">
+          <h2>Your applications</h2>
+          <button id="refresh-apps" class="btn btn-secondary btn-small">Refresh</button>
+        </div>
+        <div id="apps-list"></div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source |
+      <a href="/docs/">Documentation</a> |
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a> |
+      <a href="/sitemap.html">Site Map</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/banner.js"></script>
+  <script type="module" src="/js/developers.js"></script>
+</body>
+</html>
