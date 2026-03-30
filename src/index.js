@@ -125,6 +125,7 @@ import {
 } from './api/oauth.js';
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
+import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
 
 // Configuration constants
 const VALID_ENVIRONMENTS = ['development', 'production', 'local'];
@@ -169,6 +170,10 @@ export default {
   async fetch(request, env, _ctx) {
     const url = new URL(request.url);
 
+    if (request.method === 'OPTIONS' && (url.pathname.startsWith('/api/') || url.pathname.startsWith('/oauth/'))) {
+      return handleOAuthCorsPreflight(request, env);
+    }
+
     // Stripe webhook endpoint (no rate limiting or auth required)
     // Verified by Stripe signature instead
     if (url.pathname === '/api/payments/webhook' && request.method === 'POST') {
@@ -180,10 +185,11 @@ export default {
     const rateLimitError = applyRateLimit(request, authResult);
     if (rateLimitError) return rateLimitError;
 
-    // API routes (all paths starting with /api or /health)
-    if (url.pathname.startsWith('/api/') || url.pathname === '/health') {
+    // API and OAuth routes
+    if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/oauth/') || url.pathname === '/health') {
       // Handle API routes (existing logic below)
-      return handleApiRoutes(url, request, env);
+      const response = await handleApiRoutes(url, request, env);
+      return withOAuthCors(request, env, response);
     }
 
     // Info page route: /info/{cid}

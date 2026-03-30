@@ -21,6 +21,10 @@ export class ApplicationRegistry {
       return this.getApplication(url.pathname.split('/')[2]);
     }
 
+    if (url.pathname === '/origins/check' && request.method === 'GET') {
+      return this.checkOrigin(url.searchParams.get('origin'));
+    }
+
     return new Response('Not Found', { status: 404 });
   }
 
@@ -106,6 +110,34 @@ export class ApplicationRegistry {
     }
 
     return new Response(JSON.stringify(app), {
+      headers: { 'content-type': 'application/json' }
+    });
+  }
+
+  async checkOrigin(origin) {
+    if (!origin) {
+      return new Response(JSON.stringify({ allowed: false }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' }
+      });
+    }
+
+    const apps = await this.loadApplications();
+    const allowed = apps.some((app) => {
+      if (app.status !== 'active') {
+        return false;
+      }
+
+      return app.redirect_uris.some((redirectUri) => {
+        try {
+          return new URL(redirectUri).origin === origin;
+        } catch (_error) {
+          return false;
+        }
+      });
+    });
+
+    return new Response(JSON.stringify({ allowed }), {
       headers: { 'content-type': 'application/json' }
     });
   }
