@@ -584,6 +584,10 @@ UPLOAD_API_KEY_EOF
 
 echo "GitHub Pages API key upload helper generated: build-reports/upload-via-api-key.html"
 
+# Bundle the browser SDK alongside generated GitHub Pages helpers so module imports stay same-origin.
+mkdir -p build-reports/sdk
+cp frontend/sdk/hashbin.js build-reports/sdk/hashbin.js
+
 # Generate GitHub Pages upload helper page (registered app OAuth flow)
 cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF'
 <!DOCTYPE html>
@@ -769,7 +773,7 @@ cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF
   </div>
 
   <script type="module">
-    import { hashbin } from 'https://hashbin.org/sdk/hashbin.js';
+    import { hashbin } from './sdk/hashbin.js';
 
     const HASHBIN_BASE = 'https://hashbin.org';
     const CLIENT_ID_KEY = 'hashbin:ghpages:registered-app-client-id';
