@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hashbin Markdown Editor (SFWA Example)</title>
+<style>
+:root {
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --toolbar: #1f2a37;
+  --toolbar-accent: #3b82f6;
+  --toolbar-button: #334155;
+  --text: #111827;
+  --muted: #4b5563;
+  --border: #d1d5db;
+  --success-bg: #ecfdf5;
+  --success-text: #065f46;
+  --error-bg: #fef2f2;
+  --error-text: #991b1b;
+  --info-bg: #eff6ff;
+  --info-text: #1e3a8a;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at top right, #e0ecff 0%, var(--bg) 45%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(90deg, #111827 0%, #1f2937 60%, #1f2a37 100%);
+  color: #ffffff;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid #0f172a;
+}
+
+.toolbar-left,
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.toolbar button {
+  border: 1px solid transparent;
+  background: var(--toolbar-button);
+  color: #ffffff;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.toolbar button:hover {
+  background: #475569;
+}
+
+.toolbar button.active {
+  background: var(--toolbar-accent);
+}
+
+.toolbar button.save {
+  background: #059669;
+}
+
+.toolbar button.save:hover {
+  background: #047857;
+}
+
+.toolbar button:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.toolbar-note {
+  font-size: 0.85rem;
+  color: #bfdbfe;
+}
+
+.status {
+  margin: 0.75rem 1rem 0;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  padding: 0.75rem;
+}
+
+.status.success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: #a7f3d0;
+}
+
+.status.error {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: #fecaca;
+}
+
+.status.info {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border-color: #bfdbfe;
+}
+
+.status .message {
+  font-weight: 600;
+}
+
+.status details {
+  margin-top: 0.6rem;
+}
+
+.status pre {
+  margin-top: 0.5rem;
+  padding: 0.65rem;
+  border-radius: 0.4rem;
+  background: #0f172a;
+  color: #e2e8f0;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.last-saved {
+  margin: 0.6rem 1rem 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.last-saved a {
+  color: #1d4ed8;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.last-saved a:hover {
+  text-decoration: underline;
+}
+
+.content {
+  flex: 1;
+  display: flex;
+  gap: 0;
+  min-height: 0;
+  margin-top: 0.75rem;
+}
+
+.editor-pane,
+.preview-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+.editor-pane {
+  border-right: 1px solid var(--border);
+}
+
+textarea {
+  width: 100%;
+  height: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  padding: 1rem;
+  font-family: Consolas, Menlo, Monaco, "Courier New", monospace;
+  font-size: 14px;
+  line-height: 1.55;
+  background: #ffffff;
+  color: #111827;
+}
+
+.preview {
+  height: 100%;
+  overflow-y: auto;
+  padding: 1rem;
+  line-height: 1.6;
+}
+
+.preview h1,
+.preview h2,
+.preview h3,
+.preview h4,
+.preview h5,
+.preview h6 {
+  margin: 0.8em 0 0.45em;
+  line-height: 1.2;
+}
+
+.preview h1,
+.preview h2 {
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 0.25rem;
+}
+
+.preview p {
+  margin: 0.75em 0;
+}
+
+.preview ul,
+.preview ol {
+  margin: 0.75em 0;
+  padding-left: 1.35rem;
+}
+
+.preview li {
+  margin: 0.35em 0;
+}
+
+.preview blockquote {
+  border-left: 3px solid #93c5fd;
+  color: #334155;
+  margin: 0.8em 0;
+  padding-left: 0.8rem;
+}
+
+.preview code {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.3rem;
+  padding: 0.08rem 0.3rem;
+  font-family: Consolas, Menlo, Monaco, "Courier New", monospace;
+}
+
+.preview pre {
+  background: #111827;
+  color: #e5e7eb;
+  border-radius: 0.45rem;
+  padding: 0.85rem;
+  overflow-x: auto;
+}
+
+.preview pre code {
+  background: transparent;
+  border: none;
+  color: inherit;
+  padding: 0;
+}
+
+.preview a {
+  color: #1d4ed8;
+}
+
+.preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0;
+}
+
+.preview th,
+.preview td {
+  border: 1px solid #d1d5db;
+  padding: 0.45rem;
+  text-align: left;
+}
+
+.preview th {
+  background: #f3f4f6;
+}
+
+.hidden {
+  display: none;
+}
+
+@media (max-width: 880px) {
+  .content.split {
+    flex-direction: column;
+  }
+
+  .editor-pane {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .toolbar-note {
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <div class="toolbar-left">
+    <button id="btnEdit" class="mode-btn" type="button">Edit</button>
+    <button id="btnPreview" class="mode-btn" type="button">Preview</button>
+    <button id="btnSplit" class="mode-btn" type="button">Split</button>
+  </div>
+  <div class="toolbar-right">
+    <button id="btnSave" class="save" type="button">Save</button>
+    <span class="toolbar-note">This is an immutable-storage SFWA example on hashbin.org.</span>
+  </div>
+</div>
+
+<div id="status" class="status info" role="status" aria-live="polite">
+  <div id="statusMessage" class="message"></div>
+  <details id="statusDetails" class="hidden">
+    <summary>Diagnostics</summary>
+    <pre id="statusDiagnostics"></pre>
+  </details>
+</div>
+
+<div id="lastSaved" class="last-saved hidden">
+  Last saved version:
+  <a id="lastSavedLink" href="#" target="_self" rel="noopener">none</a>
+</div>
+
+<div id="content" class="content split">
+  <div id="editorPane" class="editor-pane">
+    <textarea id="editor" placeholder="Type Markdown here, then click Save."></textarea>
+  </div>
+  <div id="previewPane" class="preview-pane">
+    <div id="preview" class="preview"></div>
+  </div>
+</div>
+
+<script>
+const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024;
+const modeStorageKey = 'sfwa-markdown-mode';
+
+const editor = document.getElementById('editor');
+const preview = document.getElementById('preview');
+const content = document.getElementById('content');
+const editorPane = document.getElementById('editorPane');
+const previewPane = document.getElementById('previewPane');
+const btnEdit = document.getElementById('btnEdit');
+const btnPreview = document.getElementById('btnPreview');
+const btnSplit = document.getElementById('btnSplit');
+const btnSave = document.getElementById('btnSave');
+const status = document.getElementById('status');
+const statusMessage = document.getElementById('statusMessage');
+const statusDetails = document.getElementById('statusDetails');
+const statusDiagnostics = document.getElementById('statusDiagnostics');
+const lastSaved = document.getElementById('lastSaved');
+const lastSavedLink = document.getElementById('lastSavedLink');
+
+let activeCid = null;
+let suppressHashLoad = false;
+
+function setStatus(type, message, diagnostics = null) {
+  status.className = `status ${type}`;
+  statusMessage.textContent = message;
+
+  if (diagnostics) {
+    statusDetails.classList.remove('hidden');
+    statusDiagnostics.textContent = JSON.stringify(diagnostics, null, 2);
+  } else {
+    statusDetails.classList.add('hidden');
+    statusDiagnostics.textContent = '';
+  }
+}
+
+function updateLastSavedLink(cid) {
+  if (!cid) return;
+  const href = `${window.location.pathname}${window.location.search}#${cid}`;
+  lastSavedLink.href = href;
+  lastSavedLink.textContent = cid;
+  lastSaved.classList.remove('hidden');
+}
+
+function base64UrlDecode(str) {
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4 !== 0) {
+    base64 += '=';
+  }
+
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function decodeLengthPrefix(prefix) {
+  if (prefix.length !== 8) {
+    throw new Error('Length prefix must be exactly 8 characters.');
+  }
+
+  const bytes = base64UrlDecode(prefix);
+  const view = new DataView(bytes.buffer);
+  const high = view.getUint16(0, false);
+  const low = view.getUint32(2, false);
+  return high * 0x100000000 + low;
+}
+
+function validate256tCID(cid) {
+  if (!cid || cid.length < 8 || cid.length > 94) {
+    return false;
+  }
+
+  if (!/^[A-Za-z0-9_-]+$/.test(cid)) {
+    return false;
+  }
+
+  try {
+    const size = decodeLengthPrefix(cid.slice(0, 8));
+    return size >= 0 && size <= MAX_FILE_SIZE;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function escapeHtml(value) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function sanitizeUrl(rawUrl) {
+  try {
+    const parsed = new URL(rawUrl, window.location.origin);
+    const allowedProtocols = ['http:', 'https:', 'mailto:'];
+    if (!allowedProtocols.includes(parsed.protocol)) {
+      return '#';
+    }
+    return parsed.href;
+  } catch (_error) {
+    if (rawUrl.startsWith('/') || rawUrl.startsWith('#')) {
+      return rawUrl;
+    }
+    return '#';
+  }
+}
+
+function parseMarkdown(markdown) {
+  let html = escapeHtml(markdown);
+
+  html = html.replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>');
+  html = html.replace(/^###### (.*)$/gm, '<h6>$1</h6>');
+  html = html.replace(/^##### (.*)$/gm, '<h5>$1</h5>');
+  html = html.replace(/^#### (.*)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.*)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.*)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.*)$/gm, '<h1>$1</h1>');
+
+  html = html.replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+  html = html.replace(/^> (.*)$/gm, '<blockquote>$1</blockquote>');
+  html = html.replace(/^---$/gm, '<hr>');
+  html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+  html = html.replace(/!\[([^\]]*)\]\(([^\)]+)\)/g, (_match, alt, src) => {
+    const safeSrc = sanitizeUrl(src);
+    return `<img src="${safeSrc}" alt="${alt}">`;
+  });
+
+  html = html.replace(/\[([^\]]+)\]\(([^\)]+)\)/g, (_match, label, href) => {
+    const safeHref = sanitizeUrl(href);
+    return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+  });
+
+  const lines = html.split('\n');
+  const out = [];
+  let inList = false;
+  let listType = '';
+
+  for (const line of lines) {
+    const unordered = line.match(/^[\*-] (.+)$/);
+    const ordered = line.match(/^\d+\. (.+)$/);
+
+    if (unordered) {
+      if (!inList || listType !== 'ul') {
+        if (inList) out.push(`</${listType}>`);
+        out.push('<ul>');
+        inList = true;
+        listType = 'ul';
+      }
+      out.push(`<li>${unordered[1]}</li>`);
+      continue;
+    }
+
+    if (ordered) {
+      if (!inList || listType !== 'ol') {
+        if (inList) out.push(`</${listType}>`);
+        out.push('<ol>');
+        inList = true;
+        listType = 'ol';
+      }
+      out.push(`<li>${ordered[1]}</li>`);
+      continue;
+    }
+
+    if (inList) {
+      out.push(`</${listType}>`);
+      inList = false;
+      listType = '';
+    }
+
+    out.push(line);
+  }
+
+  if (inList) {
+    out.push(`</${listType}>`);
+  }
+
+  html = out.join('\n');
+  html = html.replace(/^(?!<(h\d|ul|ol|li|pre|blockquote|hr|img|table|tr|td|th|\/))(.*\S.*)$/gm, '<p>$2</p>');
+
+  return html;
+}
+
+function updatePreview() {
+  preview.innerHTML = parseMarkdown(editor.value);
+}
+
+function setMode(mode) {
+  const normalized = mode === 'edit' || mode === 'preview' ? mode : 'split';
+
+  content.className = `content ${normalized}`;
+  btnEdit.classList.remove('active');
+  btnPreview.classList.remove('active');
+  btnSplit.classList.remove('active');
+
+  if (normalized === 'edit') {
+    editorPane.classList.remove('hidden');
+    previewPane.classList.add('hidden');
+    btnEdit.classList.add('active');
+  } else if (normalized === 'preview') {
+    editorPane.classList.add('hidden');
+    previewPane.classList.remove('hidden');
+    btnPreview.classList.add('active');
+  } else {
+    editorPane.classList.remove('hidden');
+    previewPane.classList.remove('hidden');
+    btnSplit.classList.add('active');
+  }
+
+  localStorage.setItem(modeStorageKey, normalized);
+}
+
+function readFragmentCid() {
+  const raw = window.location.hash.startsWith('#') ? window.location.hash.slice(1).trim() : '';
+  return validate256tCID(raw) ? raw : null;
+}
+
+async function parseResponsePayload(response) {
+  const contentType = response.headers.get('content-type') || '';
+  const rawBody = await response.text();
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(rawBody);
+    } catch (_error) {
+      return { parse_error: 'Failed to parse JSON response.', raw_body: rawBody };
+    }
+  }
+
+  return rawBody;
+}
+
+async function loadFromCid(cid) {
+  const startedAt = Date.now();
+
+  try {
+    setStatus('info', `Loading content for ${cid}...`);
+
+    const response = await fetch(`/${cid}`, {
+      method: 'GET',
+      cache: 'no-store'
+    });
+
+    const payload = await parseResponsePayload(response);
+
+    if (!response.ok) {
+      throw {
+        message: `Failed to load content from ${cid}.`,
+        diagnostics: {
+          request: {
+            method: 'GET',
+            url: `/${cid}`
+          },
+          response: {
+            status: response.status,
+            status_text: response.statusText,
+            content_type: response.headers.get('content-type') || null,
+            cf_ray: response.headers.get('cf-ray') || null,
+            x_request_id: response.headers.get('x-request-id') || null
+          },
+          payload
+        }
+      };
+    }
+
+    const text = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+    editor.value = text;
+    updatePreview();
+
+    activeCid = cid;
+    updateLastSavedLink(cid);
+
+    if (window.location.hash.slice(1) !== cid) {
+      suppressHashLoad = true;
+      history.replaceState(null, '', `#${cid}`);
+      suppressHashLoad = false;
+    }
+
+    setStatus('success', `Loaded document from CID ${cid}.`, {
+      loaded_cid: cid,
+      bytes: new TextEncoder().encode(text).length,
+      elapsed_ms: Date.now() - startedAt
+    });
+  } catch (error) {
+    setStatus('error', error.message || `Failed to load content from ${cid}.`, error.diagnostics || {
+      error_name: error.name || 'Error',
+      error_message: error.message || String(error),
+      elapsed_ms: Date.now() - startedAt
+    });
+  }
+}
+
+async function saveDocument() {
+  const contentText = editor.value;
+  const contentBytes = new TextEncoder().encode(contentText).length;
+  const requestUrl = '/api/content?retention_months=1';
+  const startedAt = Date.now();
+
+  if (contentBytes === 0) {
+    setStatus('error', 'Cannot save an empty document.', {
+      request: { method: 'POST', url: requestUrl, bytes: 0 },
+      hint: 'Enter markdown text before saving.'
+    });
+    return;
+  }
+
+  btnSave.disabled = true;
+  btnSave.textContent = 'Saving...';
+
+  try {
+    const response = await fetch(requestUrl, {
+      method: 'POST',
+      headers: {
+        'content-type': 'text/markdown; charset=utf-8'
+      },
+      body: contentText
+    });
+
+    const payload = await parseResponsePayload(response);
+
+    if (!response.ok) {
+      throw {
+        message: 'Save failed. See diagnostics for details.',
+        diagnostics: {
+          request: {
+            method: 'POST',
+            url: requestUrl,
+            bytes: contentBytes
+          },
+          response: {
+            status: response.status,
+            status_text: response.statusText,
+            content_type: response.headers.get('content-type') || null,
+            cf_ray: response.headers.get('cf-ray') || null,
+            x_request_id: response.headers.get('x-request-id') || null,
+            elapsed_ms: Date.now() - startedAt
+          },
+          payload
+        }
+      };
+    }
+
+    const cid = payload && typeof payload === 'object' ? payload.cid : null;
+    if (!validate256tCID(cid || '')) {
+      throw {
+        message: 'Upload succeeded but no valid 256t CID was returned.',
+        diagnostics: {
+          request: { method: 'POST', url: requestUrl, bytes: contentBytes },
+          response: {
+            status: response.status,
+            status_text: response.statusText,
+            content_type: response.headers.get('content-type') || null,
+            elapsed_ms: Date.now() - startedAt
+          },
+          payload
+        }
+      };
+    }
+
+    activeCid = cid;
+
+    suppressHashLoad = true;
+    history.replaceState(null, '', `#${cid}`);
+    suppressHashLoad = false;
+
+    updateLastSavedLink(cid);
+
+    setStatus('success', `Saved successfully. CID ${cid} is now in the URL fragment.`, {
+      request: {
+        method: 'POST',
+        url: requestUrl,
+        bytes: contentBytes
+      },
+      response: {
+        status: response.status,
+        status_text: response.statusText,
+        elapsed_ms: Date.now() - startedAt
+      },
+      payload
+    });
+  } catch (error) {
+    setStatus('error', error.message || 'Save failed due to an unexpected error.', error.diagnostics || {
+      request: {
+        method: 'POST',
+        url: requestUrl,
+        bytes: contentBytes
+      },
+      error_name: error.name || 'Error',
+      error_message: error.message || String(error),
+      elapsed_ms: Date.now() - startedAt
+    });
+  } finally {
+    btnSave.disabled = false;
+    btnSave.textContent = 'Save';
+  }
+}
+
+btnEdit.addEventListener('click', () => setMode('edit'));
+btnPreview.addEventListener('click', () => setMode('preview'));
+btnSplit.addEventListener('click', () => setMode('split'));
+btnSave.addEventListener('click', saveDocument);
+
+editor.addEventListener('input', updatePreview);
+
+document.addEventListener('keydown', (event) => {
+  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault();
+    saveDocument();
+  }
+});
+
+window.addEventListener('hashchange', async () => {
+  if (suppressHashLoad) return;
+
+  const cid = readFragmentCid();
+  if (!cid) return;
+  if (cid === activeCid) return;
+
+  await loadFromCid(cid);
+});
+
+async function init() {
+  setMode(localStorage.getItem(modeStorageKey) || 'split');
+
+  editor.value = '# Hashbin SFWA Markdown Editor\n\nThis page stores versions as immutable 256t content IDs.\n\n- Edit this text\n- Click Save\n- Share the URL fragment';
+  updatePreview();
+
+  const cid = readFragmentCid();
+  if (cid) {
+    await loadFromCid(cid);
+    return;
+  }
+
+  setStatus('info', 'Ready. Add markdown and click Save to upload a new immutable version.', {
+    hint: 'If the location fragment is a valid 256t hash, this page will load that version automatically.'
+  });
+}
+
+init();
+</script>
+</body>
+</html>
