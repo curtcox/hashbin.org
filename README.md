@@ -226,7 +226,7 @@ See [todo/user_authorization.md#production-deployment-checklist](todo/user_autho
 
 Quick summary:
 1. Configure OAuth providers in Clerk Dashboard
-2. Add secrets to Cloudflare: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`
+2. Add secrets to Cloudflare: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `OAUTH_SIGNING_KEY`
 3. Deploy: `npm run deploy:prod`
 4. Verify: `npm run verify:prod`
 

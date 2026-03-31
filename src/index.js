@@ -1189,8 +1189,9 @@ async function checkEnvironment(env) {
     
     const envValid = VALID_ENVIRONMENTS.includes(envName);
     const logLevelValid = VALID_LOG_LEVELS.includes(logLevel);
+    const oauthSigningKeyConfigured = envName === 'local' ? true : !!env.OAUTH_SIGNING_KEY;
     
-    const allValid = envValid && logLevelValid;
+    const allValid = envValid && logLevelValid && oauthSigningKeyConfigured;
     
     return {
       status: allValid ? 'operational' : 'degraded',
@@ -1199,7 +1200,8 @@ async function checkEnvironment(env) {
         environment: envName,
         environmentValid: envValid,
         logLevel: logLevel,
-        logLevelValid: logLevelValid
+        logLevelValid: logLevelValid,
+        oauthSigningKeyConfigured
       }
     };
   } catch (error) {
@@ -1331,23 +1333,32 @@ async function checkClerk(env) {
 
   const checks = {
     secretKeyConfigured: false,
-    publishableKeyConfigured: false
+    publishableKeyConfigured: false,
+    usingTestKeysInProduction: false
   };
 
   try {
     // Check required secrets are configured
     checks.secretKeyConfigured = !!env.CLERK_SECRET_KEY;
     checks.publishableKeyConfigured = !!env.CLERK_PUBLISHABLE_KEY;
+    checks.usingTestKeysInProduction = env.ENVIRONMENT === 'production' && (
+      (env.CLERK_SECRET_KEY || '').startsWith('sk_test_') ||
+      (env.CLERK_PUBLISHABLE_KEY || '').startsWith('pk_test_')
+    );
 
     const allConfigured = checks.secretKeyConfigured &&
                           checks.publishableKeyConfigured;
     const someConfigured = checks.secretKeyConfigured ||
                            checks.publishableKeyConfigured;
+    const healthy = allConfigured && !checks.usingTestKeysInProduction;
 
     return {
-      status: allConfigured ? 'operational' : (someConfigured ? 'degraded' : 'down'),
-      message: allConfigured ? 'Clerk secrets configured' :
-               (someConfigured ? 'Some Clerk secrets missing' : 'Clerk not configured'),
+      status: healthy ? 'operational' : (someConfigured ? 'degraded' : 'down'),
+      message: healthy
+        ? 'Clerk secrets configured'
+        : (checks.usingTestKeysInProduction
+            ? 'Clerk is using test keys in production'
+            : (someConfigured ? 'Some Clerk secrets missing' : 'Clerk not configured')),
       details: checks
     };
   } catch (error) {

@@ -113,18 +113,21 @@ if command -v jq >/dev/null 2>&1; then
   # Use jq for reliable JSON parsing
   WORKER_STATUS=$(echo "$BODY" | jq -r '.checks.worker.status // "unknown"')
   ENV_STATUS=$(echo "$BODY" | jq -r '.checks.environment.status // "unknown"')
+  OAUTH_SIGNING_KEY_CONFIGURED=$(echo "$BODY" | jq -r '.checks.environment.details.oauthSigningKeyConfigured // "false"')
   DO_STATUS=$(echo "$BODY" | jq -r '.checks.durableObjects.status // "unknown"')
   R2_STATUS=$(echo "$BODY" | jq -r '.checks.r2.status // "unknown"')
 else
   # Fallback to grep for systems without jq
   WORKER_STATUS=$(echo "$BODY" | grep -o '"worker"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
   ENV_STATUS=$(echo "$BODY" | grep -o '"environment"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
+  OAUTH_SIGNING_KEY_CONFIGURED=$(echo "$BODY" | grep -q '"oauthSigningKeyConfigured"[[:space:]]*:[[:space:]]*true' && echo "true" || echo "false")
   DO_STATUS=$(echo "$BODY" | grep -o '"durableObjects"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
   R2_STATUS=$(echo "$BODY" | grep -o '"r2"[^}]*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | cut -d'"' -f4 | head -1)
 fi
 
 echo "Worker: $WORKER_STATUS"
 echo "Environment: $ENV_STATUS"
+echo "OAuth signing key configured: $OAUTH_SIGNING_KEY_CONFIGURED"
 echo "Durable Objects: $DO_STATUS"
 echo "R2: $R2_STATUS"
 
@@ -141,6 +144,11 @@ fi
 
 if [ "$R2_STATUS" = "down" ]; then
   echo "❌ FAILED: R2 is down"
+  exit 1
+fi
+
+if [ "$OAUTH_SIGNING_KEY_CONFIGURED" != "true" ]; then
+  echo "❌ FAILED: OAUTH_SIGNING_KEY is not configured"
   exit 1
 fi
 
@@ -191,6 +199,7 @@ echo ""
 echo "Services verified:"
 echo "  - Cloudflare Workers: $WORKER_STATUS"
 echo "  - Environment Config: $ENV_STATUS"
+echo "  - OAuth Signing Key: $OAUTH_SIGNING_KEY_CONFIGURED"
 echo "  - Durable Objects (5 types): $DO_STATUS"
 echo "  - R2 Storage (2 buckets): $R2_STATUS"
 echo ""

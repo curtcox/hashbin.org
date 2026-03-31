@@ -217,6 +217,24 @@ Update your domain's nameservers at your domain registrar:
    - Format: `abc123def456ghi789...` (variable length)
    - Save this securely
 
+### 3.6: Configure Worker Secrets
+
+At minimum, production must include these Worker secrets:
+
+- `CLERK_SECRET_KEY`
+- `CLERK_PUBLISHABLE_KEY`
+- `OAUTH_SIGNING_KEY`
+
+Set them with Wrangler:
+
+```bash
+wrangler secret put CLERK_SECRET_KEY
+wrangler secret put CLERK_PUBLISHABLE_KEY
+wrangler secret put OAUTH_SIGNING_KEY
+```
+
+For `OAUTH_SIGNING_KEY`, use a high-entropy random value (for example, 32+ bytes).
+
 ## Step 4: Configure GitHub Secrets
 
 GitHub Secrets store sensitive credentials securely.

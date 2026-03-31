@@ -140,6 +140,28 @@ jobs:
           echo "::notice::Auth endpoint correctly returns 401 for unauthenticated requests"
 
       # ============================================
+      # OAuth Integration Tests
+      # ============================================
+      - name: Test - OAuth Signing Key Health
+        run: |
+          BODY=$(printf '%s' '${{ steps.health.outputs.body_b64 }}' | base64 --decode)
+          TARGET_ENV="${{ steps.env.outputs.target }}"
+
+          OAUTH_CONFIGURED=$(echo "$BODY" | jq -r '.checks.environment.details.oauthSigningKeyConfigured // "false"')
+          echo "oauthSigningKeyConfigured: $OAUTH_CONFIGURED"
+
+          if [ "$TARGET_ENV" == "production" ] && [ "$OAUTH_CONFIGURED" != "true" ]; then
+            echo "::error::OAuth signing key is not configured in production"
+            exit 1
+          fi
+
+          if [ "$TARGET_ENV" != "production" ] && [ "$OAUTH_CONFIGURED" != "true" ]; then
+            echo "::warning::OAuth signing key is not configured in non-production environment"
+          else
+            echo "::notice::OAuth signing key health check passed"
+          fi
+
+      # ============================================
       # Stripe Integration Tests
       # ============================================
       - name: Test - Stripe Integration Health

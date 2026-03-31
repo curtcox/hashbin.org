@@ -27,6 +27,7 @@ workers_dev = true
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
 # API_KEY_ENCRYPTION_KEY (required for API key reveal - 256-bit AES key in base64)
 # ADMIN_SECRET_TOKEN (required for admin endpoints - 64-character hex string)
+# OAUTH_SIGNING_KEY (required for OAuth authorize/token/revoke flow)
 
 # Durable Objects bindings
 [[durable_objects.bindings]]

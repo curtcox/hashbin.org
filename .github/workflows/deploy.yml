@@ -151,6 +151,10 @@ jobs:
           if [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
             MISSING_SECRETS="$MISSING_SECRETS STRIPE_WEBHOOK_SECRET"
           fi
+
+          if [ -z "$OAUTH_SIGNING_KEY" ]; then
+            MISSING_SECRETS="$MISSING_SECRETS OAUTH_SIGNING_KEY"
+          fi
           
           if [ -n "$MISSING_SECRETS" ]; then
             echo "❌ ERROR: The following required secrets are missing:$MISSING_SECRETS"
@@ -171,6 +175,7 @@ jobs:
           API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          OAUTH_SIGNING_KEY: ${{ secrets.OAUTH_SIGNING_KEY }}
 
       - name: Configure Clerk secrets
         run: |
@@ -205,6 +210,16 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           API_KEY_ENCRYPTION_KEY: ${{ secrets.API_KEY_ENCRYPTION_KEY }}
+
+      - name: Configure OAuth signing secret
+        run: |
+          echo "Configuring OAuth signing secret..."
+          echo "$OAUTH_SIGNING_KEY" | npx wrangler secret put OAUTH_SIGNING_KEY
+          echo "✅ OAuth signing secret configured"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          OAUTH_SIGNING_KEY: ${{ secrets.OAUTH_SIGNING_KEY }}
 
       - name: Verify wrangler.toml for binding conflicts
         run: |
