@@ -339,14 +339,14 @@ sed -e "s|{{REPO_URL}}|${REPO_URL}|g" \
 
 echo "Main build report generated: $OUTPUT"
 
-# Generate GitHub Pages upload helper page
-cat > build-reports/upload.html << 'UPLOAD_EOF'
+# Generate GitHub Pages upload helper page (API key flow)
+cat > build-reports/upload-via-api-key.html << 'UPLOAD_API_KEY_EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Upload to HashBin.org</title>
+  <title>Upload via API Key - HashBin.org</title>
   <style>
     body {
       margin: 0;
@@ -356,7 +356,7 @@ cat > build-reports/upload.html << 'UPLOAD_EOF'
       color: #24292f;
     }
     .container {
-      max-width: 780px;
+      max-width: 820px;
       margin: 0 auto;
       background: #ffffff;
       border: 1px solid #d0d7de;
@@ -370,6 +370,18 @@ cat > build-reports/upload.html << 'UPLOAD_EOF'
     }
     p {
       line-height: 1.5;
+    }
+    .muted {
+      color: #57606a;
+      font-size: 14px;
+    }
+    .compare {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #f6f8fa;
+      font-size: 14px;
     }
     form {
       margin-top: 20px;
@@ -404,10 +416,6 @@ cat > build-reports/upload.html << 'UPLOAD_EOF'
     button[disabled] {
       opacity: 0.6;
       cursor: not-allowed;
-    }
-    .muted {
-      color: #57606a;
-      font-size: 14px;
     }
     .status {
       margin-top: 16px;
@@ -449,11 +457,17 @@ cat > build-reports/upload.html << 'UPLOAD_EOF'
 </head>
 <body>
   <div class="container">
-    <h1>Upload to HashBin.org</h1>
+    <h1>Upload via API Key</h1>
     <p class="muted">
-      This helper page runs on GitHub Pages and uploads to <code>https://hashbin.org</code> using your API key.
-      Your key is only used in your browser for this request.
+      This page runs on GitHub Pages and uploads directly to <code>https://hashbin.org</code> using an API key.
+      Your key is used only in your browser for this request.
     </p>
+
+    <div class="compare">
+      <strong>Difference vs registered app flow:</strong> API key uploads are quick and support custom retention per upload,
+      but they require handling a long-lived API key. If you want OAuth with no API key sharing, use
+      <a href="upload-via-registered-app.html">Upload via Registered App</a>.
+    </div>
 
     <form id="upload-form">
       <label for="api-key">
@@ -485,6 +499,7 @@ cat > build-reports/upload.html << 'UPLOAD_EOF'
 
     <div class="links">
       <a href="index.html">Back to Build Report</a>
+      <a href="upload-via-registered-app.html">Upload via Registered App</a>
       <a href="https://hashbin.org/developers" target="_blank" rel="noopener noreferrer">HashBin Developer Page</a>
       <a href="https://hashbin.org/upload.html" target="_blank" rel="noopener noreferrer">HashBin Native Upload Page</a>
     </div>
@@ -565,6 +580,350 @@ cat > build-reports/upload.html << 'UPLOAD_EOF'
   </script>
 </body>
 </html>
-UPLOAD_EOF
+UPLOAD_API_KEY_EOF
 
-echo "GitHub Pages upload helper generated: build-reports/upload.html"
+echo "GitHub Pages API key upload helper generated: build-reports/upload-via-api-key.html"
+
+# Generate GitHub Pages upload helper page (registered app OAuth flow)
+cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Upload via Registered App - HashBin.org</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f6f8fa;
+      color: #24292f;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 28px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 30px;
+    }
+    p {
+      line-height: 1.5;
+    }
+    .muted {
+      color: #57606a;
+      font-size: 14px;
+    }
+    .compare {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid #d0d7de;
+      border-radius: 6px;
+      background: #f6f8fa;
+      font-size: 14px;
+    }
+    .card {
+      margin-top: 18px;
+      padding: 16px;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+    .card h2 {
+      margin: 0 0 12px 0;
+      font-size: 20px;
+    }
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    input,
+    button {
+      font: inherit;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+    }
+    input:focus {
+      outline: 2px solid #0969da;
+      outline-offset: 1px;
+    }
+    button {
+      background: #0969da;
+      color: #ffffff;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: #57606a;
+    }
+    button[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #d0d7de;
+      background: #f6f8fa;
+      white-space: pre-wrap;
+    }
+    .status.error {
+      background: #ffebe9;
+      border-color: #ff8182;
+    }
+    .status.success {
+      background: #dafbe1;
+      border-color: #4ac26b;
+    }
+    .status.info {
+      background: #ddf4ff;
+      border-color: #54aeff;
+    }
+    code {
+      background: #f6f8fa;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .links {
+      margin-top: 18px;
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .links a {
+      color: #0969da;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .links a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Upload via Registered App (OAuth)</h1>
+    <p class="muted">
+      This flow uses a registered HashBin app and OAuth. Users authorize the app; no API key is shared with this page.
+      The app must include this page URL as a redirect URI.
+    </p>
+
+    <div class="compare">
+      <strong>Difference vs API key flow:</strong> Registered-app uploads are safer for end users because access is scoped and revocable,
+      but require app registration and OAuth setup. This flow uses the account default retention period for OAuth publishing.
+      If you want a quick manual upload with a custom retention slider, use
+      <a href="upload-via-api-key.html">Upload via API Key</a>.
+    </div>
+
+    <div class="card">
+      <h2>1) Configure app</h2>
+      <label for="client-id">
+        Client ID
+        <input id="client-id" type="text" placeholder="app_123" autocomplete="off">
+      </label>
+      <p class="muted" id="redirect-uri-note"></p>
+      <div class="row">
+        <button id="save-client-id" type="button" class="secondary">Save client ID</button>
+        <button id="connect-button" type="button">Connect with HashBin OAuth</button>
+        <button id="clear-session" type="button" class="secondary">Clear local session</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>2) Upload file</h2>
+      <label for="content-file">
+        File
+        <input id="content-file" type="file">
+      </label>
+      <div class="row">
+        <button id="upload-button" type="button">Upload via OAuth app</button>
+      </div>
+    </div>
+
+    <div id="status" class="status info" aria-live="polite">Enter a client ID, connect, and upload.</div>
+
+    <div class="links">
+      <a href="index.html">Back to Build Report</a>
+      <a href="upload-via-api-key.html">Upload via API Key</a>
+      <a href="https://hashbin.org/developers" target="_blank" rel="noopener noreferrer">HashBin Developer Page</a>
+      <a href="https://hashbin.org/docs/sdk.html" target="_blank" rel="noopener noreferrer">HashBin SDK Docs</a>
+    </div>
+  </div>
+
+  <script type="module">
+    import { hashbin } from 'https://hashbin.org/sdk/hashbin.js';
+
+    const HASHBIN_BASE = 'https://hashbin.org';
+    const CLIENT_ID_KEY = 'hashbin:ghpages:registered-app-client-id';
+
+    const clientIdInput = document.getElementById('client-id');
+    const saveClientIdButton = document.getElementById('save-client-id');
+    const connectButton = document.getElementById('connect-button');
+    const clearSessionButton = document.getElementById('clear-session');
+    const uploadButton = document.getElementById('upload-button');
+    const fileInput = document.getElementById('content-file');
+    const statusEl = document.getElementById('status');
+    const redirectUriNote = document.getElementById('redirect-uri-note');
+
+    function getRedirectUri() {
+      return `${window.location.origin}${window.location.pathname}`;
+    }
+
+    function setStatus(message, type = 'info') {
+      statusEl.className = `status ${type}`;
+      statusEl.textContent = message;
+    }
+
+    function getClientId() {
+      return clientIdInput.value.trim();
+    }
+
+    function saveClientId() {
+      const clientId = getClientId();
+      if (!clientId) {
+        setStatus('Client ID is required.', 'error');
+        return false;
+      }
+      localStorage.setItem(CLIENT_ID_KEY, clientId);
+      setStatus('Client ID saved.', 'success');
+      return true;
+    }
+
+    function configureClient() {
+      const clientId = getClientId();
+      if (!clientId) {
+        setStatus('Enter a client ID first.', 'error');
+        return null;
+      }
+
+      localStorage.setItem(CLIENT_ID_KEY, clientId);
+      return hashbin.configure({
+        clientId,
+        redirectUri: getRedirectUri(),
+        baseUrl: HASHBIN_BASE
+      });
+    }
+
+    async function maybeHandleOAuthCallback() {
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get('code') || !params.get('state')) {
+        return;
+      }
+
+      const clientId = getClientId();
+      if (!clientId) {
+        setStatus('OAuth callback detected. Enter client ID and retry once.', 'error');
+        return;
+      }
+
+      try {
+        configureClient();
+        await hashbin.handleCallback();
+        window.history.replaceState({}, document.title, getRedirectUri());
+        setStatus('OAuth connected. You can upload now.', 'success');
+      } catch (error) {
+        setStatus(`OAuth callback failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function connectOAuth() {
+      try {
+        const client = configureClient();
+        if (!client) {
+          return;
+        }
+        setStatus('Redirecting to HashBin OAuth...', 'info');
+        await client.authorize({
+          scopes: ['content:write', 'balance:read'],
+          mode: 'redirect'
+        });
+      } catch (error) {
+        setStatus(`OAuth start failed: ${error.message}`, 'error');
+      }
+    }
+
+    async function uploadViaOAuth() {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) {
+        setStatus('Choose a file to upload.', 'error');
+        return;
+      }
+
+      const client = configureClient();
+      if (!client) {
+        return;
+      }
+
+      const tokens = hashbin.getTokens();
+      if (!tokens || !tokens.accessToken) {
+        setStatus('No OAuth session found. Click Connect with HashBin OAuth first.', 'error');
+        return;
+      }
+
+      uploadButton.disabled = true;
+      setStatus(`Uploading ${file.name} via registered app...`, 'info');
+
+      try {
+        const result = await hashbin.publish(file, {
+          contentType: file.type || 'application/octet-stream'
+        });
+
+        const cid = result.cid || '(unknown CID)';
+        const expires = result.expires_at ? `\nExpires: ${new Date(result.expires_at).toISOString()}` : '';
+        setStatus(
+          `Upload complete.\nCID: ${cid}${expires}\n\nView content: ${HASHBIN_BASE}/${cid}\nInspect metadata: ${HASHBIN_BASE}/info/${cid}`,
+          'success'
+        );
+      } catch (error) {
+        setStatus(`Upload failed: ${error.message}`, 'error');
+      } finally {
+        uploadButton.disabled = false;
+      }
+    }
+
+    function clearSession() {
+      try {
+        hashbin.clearTokens();
+      } catch (_error) {
+        // Ignore.
+      }
+      setStatus('Local OAuth session cleared.', 'info');
+    }
+
+    const storedClientId = localStorage.getItem(CLIENT_ID_KEY);
+    if (storedClientId) {
+      clientIdInput.value = storedClientId;
+    }
+
+    redirectUriNote.textContent = `Register this exact redirect URI in your app: ${getRedirectUri()}`;
+
+    saveClientIdButton.addEventListener('click', saveClientId);
+    connectButton.addEventListener('click', connectOAuth);
+    clearSessionButton.addEventListener('click', clearSession);
+    uploadButton.addEventListener('click', uploadViaOAuth);
+
+    await maybeHandleOAuthCallback();
+  </script>
+</body>
+</html>
+UPLOAD_REGISTERED_APP_EOF
+
+echo "GitHub Pages registered-app upload helper generated: build-reports/upload-via-registered-app.html"
