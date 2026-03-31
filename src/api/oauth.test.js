@@ -297,4 +297,46 @@ describe('OAuth API', () => {
     const reuseError = await reuseResponse.json();
     expect(reuseError.error).toBe('invalid_grant');
   });
+
+  it('returns a structured 500 when oauth signing key is missing', async () => {
+    const registerResponse = await handleCreateDeveloperApp(new Request('https://hashbin.test/api/developers/apps', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'LocalDev developer_user'
+      },
+      body: JSON.stringify({
+        app_name: 'Missing Key App',
+        redirect_uris: ['https://missing-key.example/callback']
+      })
+    }), env);
+    const app = await registerResponse.json();
+
+    const envWithoutSigningKey = {
+      ...env,
+      OAUTH_SIGNING_KEY: ''
+    };
+
+    const authorizeResponse = await handleOAuthAuthorize(new Request('https://hashbin.test/oauth/authorize', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: 'LocalDev keyless_user'
+      },
+      body: JSON.stringify({
+        client_id: app.client_id,
+        redirect_uri: 'https://missing-key.example/callback',
+        response_type: 'code',
+        scope: 'content:write',
+        code_challenge: await createPkceChallenge('missing-key-verifier'),
+        code_challenge_method: 'S256'
+      })
+    }), envWithoutSigningKey);
+
+    expect(authorizeResponse.status).toBe(500);
+    const error = await authorizeResponse.json();
+    expect(error.error).toBe('server_misconfigured');
+    expect(error.message).toContain('OAuth signing key');
+    expect(typeof error.request_id).toBe('string');
+  });
 });

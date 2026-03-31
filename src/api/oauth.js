@@ -132,11 +132,27 @@ async function upsertGrant(env, userId, grantData) {
 
     if (createProfileResponse.ok || createProfileResponse.status === 409) {
       response = await profileStub.fetch(grantRequest());
+    } else {
+      let details = `status=${createProfileResponse.status}`;
+      try {
+        const data = await createProfileResponse.json();
+        details = `${details}, error=${data.error || 'unknown'}, message=${data.message || 'unknown'}`;
+      } catch (_error) {
+        // Ignore non-JSON bodies.
+      }
+      throw new Error(`Failed to create oauth profile: ${details}`);
     }
   }
 
   if (!response.ok) {
-    throw new Error('Failed to persist oauth grant');
+    let details = `status=${response.status}`;
+    try {
+      const data = await response.json();
+      details = `${details}, error=${data.error || 'unknown'}, message=${data.message || 'unknown'}`;
+    } catch (_error) {
+      // Ignore non-JSON bodies.
+    }
+    throw new Error(`Failed to persist oauth grant: ${details}`);
   }
 
   return response.json();
@@ -203,46 +219,79 @@ export async function handleListDeveloperApps(request, env) {
 }
 
 export async function handleOAuthAuthorize(request, env) {
-  const authResult = await authenticate(request, env);
-  const authError = requireAuth(authResult);
-  if (authError) return authError;
+  const requestId = crypto.randomUUID();
 
-  const data = await request.json();
-  const app = await getApplication(env, data.client_id);
-  const validation = validateAuthorizeRequest(data, app);
-  if (!validation.valid) {
-    return jsonResponse({ error: validation.error, message: validation.message }, 400);
+  try {
+    const authResult = await authenticate(request, env);
+    const authError = requireAuth(authResult);
+    if (authError) return authError;
+
+    if (!env.OAUTH_SIGNING_KEY) {
+      return jsonResponse({
+        error: 'server_misconfigured',
+        message: 'OAuth signing key is not configured on the server.',
+        request_id: requestId
+      }, 500);
+    }
+
+    if (!env.USER_PROFILES || !env.APPLICATION_REGISTRY) {
+      return jsonResponse({
+        error: 'server_misconfigured',
+        message: 'Required OAuth bindings are not configured on the server.',
+        request_id: requestId
+      }, 500);
+    }
+
+    const data = await request.json();
+    const app = await getApplication(env, data.client_id);
+    const validation = validateAuthorizeRequest(data, app);
+    if (!validation.valid) {
+      return jsonResponse({ error: validation.error, message: validation.message }, 400);
+    }
+    const scopes = validation.scopes;
+
+    const grant = await upsertGrant(env, authResult.user.userId, {
+      app_id: app.app_id,
+      scopes,
+      spending_limit: data.spending_limit ?? null
+    });
+
+    const now = Math.floor(Date.now() / 1000);
+    const code = await signOAuthJwt({
+      token_type: 'authorization_code',
+      app_id: app.app_id,
+      grant_id: grant.grant_id,
+      user_id: authResult.user.userId,
+      redirect_uri: data.redirect_uri,
+      scopes,
+      code_challenge: data.code_challenge,
+      code_challenge_method: 'S256',
+      spending_limit: grant.spending_limit ?? null,
+      iat: now,
+      exp: now + AUTHORIZATION_CODE_TTL_SECONDS
+    }, env.OAUTH_SIGNING_KEY);
+
+    const redirectUrl = new URL(data.redirect_uri);
+    redirectUrl.searchParams.set('code', code);
+    if (data.state) {
+      redirectUrl.searchParams.set('state', data.state);
+    }
+
+    return Response.redirect(redirectUrl.toString(), 302);
+  } catch (error) {
+    console.error('OAuth authorize failed', {
+      requestId,
+      message: error?.message || 'Unknown error',
+      stack: error?.stack || null
+    });
+
+    return jsonResponse({
+      error: 'authorization_failed',
+      message: 'OAuth authorization failed on the server.',
+      details: error?.message || 'Unknown error',
+      request_id: requestId
+    }, 500);
   }
-  const scopes = validation.scopes;
-
-  const grant = await upsertGrant(env, authResult.user.userId, {
-    app_id: app.app_id,
-    scopes,
-    spending_limit: data.spending_limit ?? null
-  });
-
-  const now = Math.floor(Date.now() / 1000);
-  const code = await signOAuthJwt({
-    token_type: 'authorization_code',
-    app_id: app.app_id,
-    grant_id: grant.grant_id,
-    user_id: authResult.user.userId,
-    redirect_uri: data.redirect_uri,
-    scopes,
-    code_challenge: data.code_challenge,
-    code_challenge_method: 'S256',
-    spending_limit: grant.spending_limit ?? null,
-    iat: now,
-    exp: now + AUTHORIZATION_CODE_TTL_SECONDS
-  }, env.OAUTH_SIGNING_KEY);
-
-  const redirectUrl = new URL(data.redirect_uri);
-  redirectUrl.searchParams.set('code', code);
-  if (data.state) {
-    redirectUrl.searchParams.set('state', data.state);
-  }
-
-  return Response.redirect(redirectUrl.toString(), 302);
 }
 
 export async function handleGetOAuthAuthorizePage(request, env) {
@@ -534,9 +583,13 @@ export async function handleGetOAuthAuthorizePage(request, env) {
         let errorMessage = 'Authorization failed.';
         try {
           const errorData = await response.json();
-          errorMessage = errorData.message || errorData.error || errorMessage;
+          const statusLabel = response.status ? ('HTTP ' + response.status) : 'HTTP error';
+          const primary = errorData.message || errorData.error || errorMessage;
+          const details = errorData.details ? (' Details: ' + errorData.details) : '';
+          const requestId = errorData.request_id ? (' Request ID: ' + errorData.request_id) : '';
+          errorMessage = primary + ' (' + statusLabel + ').' + details + requestId;
         } catch (_error) {
-          // Ignore JSON parsing errors for non-JSON responses.
+          errorMessage = 'Authorization failed (HTTP ' + response.status + '). The server returned a non-JSON error response.';
         }
 
         statusMessage.textContent = errorMessage;
