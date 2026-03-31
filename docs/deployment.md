@@ -225,7 +225,16 @@ At minimum, production must include these Worker secrets:
 - `CLERK_PUBLISHABLE_KEY`
 - `OAUTH_SIGNING_KEY`
 
-Set them with Wrangler:
+Generate the OAuth signing key value:
+
+```bash
+./scripts/generate-oauth-signing-key.sh
+```
+
+Copy the generated value and store it as a GitHub repository secret named `OAUTH_SIGNING_KEY`.
+The deployment pipeline will automatically publish it to Cloudflare Worker secrets.
+
+If you need to set secrets manually with Wrangler:
 
 ```bash
 wrangler secret put CLERK_SECRET_KEY
@@ -234,6 +243,7 @@ wrangler secret put OAUTH_SIGNING_KEY
 ```
 
 For `OAUTH_SIGNING_KEY`, use a high-entropy random value (for example, 32+ bytes).
+Do not commit this value to source control.
 
 ## Step 4: Configure GitHub Secrets
 

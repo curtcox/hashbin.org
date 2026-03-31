@@ -2,6 +2,29 @@
 
 This directory contains scripts for verifying deployments and testing the HashBin.org infrastructure.
 
+## generate-oauth-signing-key.sh
+
+Generates a strong random value for `OAUTH_SIGNING_KEY`, used by OAuth token/code signing.
+
+### Usage
+
+```bash
+./scripts/generate-oauth-signing-key.sh
+```
+
+### What it prints
+
+1. A generated key value (base64 encoded random bytes)
+2. Instructions for adding it as a GitHub Actions secret:
+   - Name: `OAUTH_SIGNING_KEY`
+3. Optional manual Wrangler command for direct Cloudflare secret configuration
+
+### Important
+
+- Treat the generated value like a credential.
+- Do not commit it to source control.
+- Rotating this key invalidates existing OAuth tokens and authorization codes.
+
 ## test-user-balance.sh
 
 Tests that verify user profile creation with zero balance.
@@ -878,4 +901,3 @@ build-reports/
 - **Coverage**: Lines ≥80%, Branches ≥70%
 - **Performance**: Average ≤1000ms, Max ≤5000ms
 - **Security**: All vulnerabilities reported, none blocking
-
