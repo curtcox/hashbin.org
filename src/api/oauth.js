@@ -112,11 +112,28 @@ function validateAuthorizeRequest(data, app) {
 async function upsertGrant(env, userId, grantData) {
   const profileId = env.USER_PROFILES.idFromName(userId);
   const profileStub = env.USER_PROFILES.get(profileId);
-  const response = await profileStub.fetch(new Request('http://internal/oauth/grants', {
+  const grantRequest = () => new Request('http://internal/oauth/grants', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(grantData)
-  }));
+  });
+
+  let response = await profileStub.fetch(grantRequest());
+  if (response.status === 404) {
+    // Some Clerk-authenticated users can reach OAuth authorize before profile provisioning completes.
+    const createProfileResponse = await profileStub.fetch(new Request('http://internal/profile', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        user_id: userId,
+        providers: []
+      })
+    }));
+
+    if (createProfileResponse.ok || createProfileResponse.status === 409) {
+      response = await profileStub.fetch(grantRequest());
+    }
+  }
 
   if (!response.ok) {
     throw new Error('Failed to persist oauth grant');
