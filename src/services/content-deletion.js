@@ -43,6 +43,9 @@ export async function deleteContent(env, hash_256t, metadata = null, reason = 'e
     if (!isInline) {
       try {
         await env.CONTENT_BUCKET.delete(hash_256t);
+        await env.CONTENT_BUCKET.delete(`${hash_256t}.meta`);
+        await env.CONTENT_BUCKET.delete(`${hash_256t}.disputed`);
+        await env.CONTENT_BUCKET.delete(`${hash_256t}.deleted`);
         console.log(`Deleted R2 object: ${hash_256t}`);
       } catch (error) {
         // Log but don't fail - content might already be deleted from R2

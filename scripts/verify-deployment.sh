@@ -168,6 +168,24 @@ fi
 echo "✅ PASSED"
 echo ""
 
+# Test 3b: Dedicated content domain health
+echo "Test 3b: Dedicated content domain"
+echo "--------------------"
+CONTENT_RESPONSE=$(curl -s -w "\n%{http_code}" "https://256t.us/health")
+CONTENT_HTTP_CODE=$(echo "$CONTENT_RESPONSE" | tail -n1)
+CONTENT_BODY=$(echo "$CONTENT_RESPONSE" | sed '$d')
+
+echo "HTTP Status: $CONTENT_HTTP_CODE"
+echo "Response: $CONTENT_BODY"
+
+if [ "$CONTENT_HTTP_CODE" != "200" ]; then
+  echo "❌ FAILED: Expected HTTP 200 from https://256t.us/health, got $CONTENT_HTTP_CODE"
+  exit 1
+fi
+
+echo "✅ PASSED"
+echo ""
+
 # Test 4: 404 handling
 echo "Test 4: 404 handling"
 echo "--------------------"
@@ -194,6 +212,7 @@ echo ""
 echo "Endpoints tested:"
 echo "  - GET / (root)"
 echo "  - GET /health (comprehensive)"
+echo "  - GET https://256t.us/health"
 echo "  - GET /nonexistent (404)"
 echo ""
 echo "Services verified:"

@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<!-- git-sha: 7fb28c1efd569fd715c040eeb16bcb007d999dd8 -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Why HashBin serves uploads from 256t.us">
+  <title>Content Security - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <div class="container">
+      <h1>Content Security</h1>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <h2>What changed</h2>
+        <p>Uploaded files are served from <code>https://256t.us/{cid}</code>. The UI, API, auth flows, dashboard, and SDK stay on <code>https://hashbin.org</code>.</p>
+      </div>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <h2>Why this matters</h2>
+        <p>Because <code>256t.us</code> is a different browser origin, uploaded HTML, SVG, and JavaScript cannot read HashBin cookies, make authenticated API requests as the user, spoof the dashboard, or register service workers for the main application.</p>
+        <p>This is the same same-origin isolation pattern used by GitHub, Google Drive, and Discord for untrusted user files.</p>
+      </div>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <h2>What 256t.us is</h2>
+        <p><code>256t.us</code> is run by the same operator as HashBin. It is a dedicated content sandbox that only serves raw uploaded files with strict response headers.</p>
+      </div>
+      <div class="card">
+        <h2>What this means for you</h2>
+        <p>Use <code>https://hashbin.org/api/</code> for API calls and <code>https://256t.us/{cid}</code> for file retrieval. Upload and metadata responses now include the content URL directly.</p>
+      </div>
+    </div>
+  </main>
+  <footer>
+    <p>&copy; 2026 HashBin.org |
+      <a href="/docs/">Documentation</a> |
+      <a href="/developers">Developers</a>
+    </p>
+  </footer>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

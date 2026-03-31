@@ -86,16 +86,17 @@
       
       <section class="card" style="margin-bottom: 2rem;">
         <h2>Overview</h2>
-        <p>The HashBin.org API provides programmatic access to content upload, retrieval, and account management. All API requests must be made over HTTPS.</p>
+        <p>The HashBin.org API provides programmatic access to content upload, metadata, and account management. All API requests must be made over HTTPS.</p>
         
         <h3 style="margin-top: 1.5rem;">Base URL</h3>
-        <div class="code-block">https://hashbin.org/api</div>
+        <div class="code-block">API: https://hashbin.org/api
+Content: https://256t.us/{cid}</div>
         
         <h3 style="margin-top: 1.5rem;">Authentication</h3>
         <p>Most endpoints require authentication using an API key. Include your API key in the Authorization header:</p>
         <div class="code-block">Authorization: Bearer YOUR_API_KEY</div>
         <p>API keys can be created and managed from your <a href="/api-keys.html">dashboard</a>.</p>
-        <p style="margin-top: 1rem;">For third-party browser integrations, use the hosted SDK at <code>https://hashbin.org/sdk/hashbin.js</code> and follow the <a href="/docs/sdk.html">SDK Guide</a>.</p>
+        <p style="margin-top: 1rem;">For third-party browser integrations, use the hosted SDK at <code>https://hashbin.org/sdk/hashbin.js</code> and follow the <a href="/docs/sdk.html">SDK Guide</a>. Raw files are served from <code>256t.us</code>; see <a href="/docs/content-security.html">content security</a>.</p>
       </section>
 
       <!-- Authentication Endpoints -->
@@ -227,9 +228,10 @@
           <h4 style="margin-top: 1rem;">Response</h4>
           <div class="code-block">{
   "cid": "00000123...",
-  "size": 1024,
+  "size_bytes": 1024,
   "cost_cents": 1,
-  "expiration": "2027-01-24T00:00:00Z"
+  "expires_at": "2027-01-24T00:00:00Z",
+  "url": "https://256t.us/00000123..."
 }</div>
         </div>
 
@@ -238,7 +240,7 @@
             <span class="endpoint-method method-get">GET</span>
             <span class="endpoint-path">/api/content/:cid</span>
           </div>
-          <p style="margin-top: 0.5rem; color: var(--color-text-light);">Download content by hash</p>
+          <p style="margin-top: 0.5rem; color: var(--color-text-light);">Get content metadata, including the dedicated content URL</p>
           
           <h4 style="margin-top: 1rem;">Parameters</h4>
           <table class="param-table">
@@ -259,24 +261,24 @@
           </table>
           
           <h4 style="margin-top: 1rem;">Response</h4>
-          <p>Binary content with appropriate Content-Type header</p>
+          <div class="code-block">{
+  "hash_256t": "00000123...",
+  "size_bytes": 1024,
+  "expires_at": "2027-01-01T00:00:00Z",
+  "url": "https://256t.us/00000123...",
+  "download_domain": "256t.us"
+}</div>
         </div>
 
         <div class="endpoint">
           <div>
             <span class="endpoint-method method-get">GET</span>
-            <span class="endpoint-path">/api/content/:cid/metadata</span>
+            <span class="endpoint-path">https://256t.us/:cid</span>
           </div>
-          <p style="margin-top: 0.5rem; color: var(--color-text-light);">Get content metadata</p>
+          <p style="margin-top: 0.5rem; color: var(--color-text-light);">Download raw content from the isolated content domain</p>
           
           <h4 style="margin-top: 1rem;">Response</h4>
-          <div class="code-block">{
-  "cid": "00000123...",
-  "size": 1024,
-  "uploaded": "2026-01-01T00:00:00Z",
-  "expires": "2027-01-01T00:00:00Z",
-  "status": "active"
-}</div>
+          <p>Binary content with the original content type and restrictive headers such as <code>Content-Security-Policy: default-src 'none'; sandbox</code>.</p>
         </div>
 
         <div class="endpoint">

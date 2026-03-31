@@ -59,6 +59,7 @@ export class HashBinClient {
     clientId,
     redirectUri,
     baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://hashbin.org',
+    contentBaseUrl = 'https://256t.us',
     storage,
     transactionStorage,
     fetch: fetchImpl
@@ -73,6 +74,7 @@ export class HashBinClient {
     this.clientId = clientId;
     this.redirectUri = redirectUri;
     this.baseUrl = baseUrl.replace(/\/$/, '');
+    this.contentBaseUrl = contentBaseUrl.replace(/\/$/, '');
     this.storage = storage || (typeof window !== 'undefined' ? window.localStorage : null);
     this.transactionStorage = transactionStorage || (typeof window !== 'undefined' ? window.sessionStorage : null);
     this.fetch = fetchImpl || (typeof fetch === 'function' ? fetch.bind(globalThis) : null);
@@ -361,6 +363,28 @@ export class HashBinClient {
 
     return response.json();
   }
+
+  getContentUrl(cid, { extension = null, download = false } = {}) {
+    const suffix = extension ? `.${String(extension).replace(/^\./, '')}` : '';
+    const url = new URL(`${this.contentBaseUrl}/${cid}${suffix}`);
+    if (download) {
+      url.searchParams.set('download', 'true');
+    }
+    return url.toString();
+  }
+
+  async retrieve(cid, options = {}) {
+    if (!this.fetch) {
+      throw new Error('fetch is unavailable.');
+    }
+
+    const response = await this.fetch(this.getContentUrl(cid, options));
+    if (!response.ok) {
+      throw new Error(`Failed to retrieve content (${response.status}).`);
+    }
+
+    return response;
+  }
 }
 
 let defaultClient = null;
@@ -397,6 +421,14 @@ export async function publish(content, options) {
   return getDefaultClient().publish(content, options);
 }
 
+export function getContentUrl(cid, options) {
+  return getDefaultClient().getContentUrl(cid, options);
+}
+
+export async function retrieve(cid, options) {
+  return getDefaultClient().retrieve(cid, options);
+}
+
 export function getTokens() {
   return getDefaultClient().getTokens();
 }
@@ -413,6 +445,8 @@ export const hashbin = {
   handleCallback,
   getBalance,
   publish,
+  getContentUrl,
+  retrieve,
   getTokens,
   clearTokens
 };

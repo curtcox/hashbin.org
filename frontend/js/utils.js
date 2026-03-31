@@ -3,6 +3,8 @@
  * Shared helper functions for the frontend
  */
 
+let appConfigPromise = null;
+
 /**
  * Format balance from cents to dollars
  * @param {number} cents Balance in cents
@@ -35,6 +37,34 @@ export async function authenticatedFetch(url, options = {}) {
   };
 
   return fetch(url, { ...options, headers });
+}
+
+export async function getAppConfig() {
+  if (!appConfigPromise) {
+    appConfigPromise = fetch('/api/config')
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Config request failed with ${response.status}`);
+        }
+        return response.json();
+      })
+      .catch((error) => {
+        console.warn('Falling back to default app config.', error);
+        return {
+          content_domain: '256t.us'
+        };
+      });
+  }
+
+  return appConfigPromise;
+}
+
+export async function contentUrl(cid, ext = null) {
+  const config = await getAppConfig();
+  const domain = config.content_domain || '256t.us';
+  const baseUrl = /^https?:\/\//i.test(domain) ? domain.replace(/\/$/, '') : `https://${domain}`;
+  const suffix = ext ? `.${String(ext).replace(/^\./, '')}` : '';
+  return `${baseUrl}/${cid}${suffix}`;
 }
 
 /**

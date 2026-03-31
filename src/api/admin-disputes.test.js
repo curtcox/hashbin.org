@@ -114,6 +114,10 @@ function createMockEnv(isAdmin = true) {
           return new Response('Not Found', { status: 404 });
         })
       }))
+    },
+    CONTENT_BUCKET: {
+      put: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined)
     }
   };
 }

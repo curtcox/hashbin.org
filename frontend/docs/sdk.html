@@ -39,7 +39,8 @@
 
   hashbin.configure({
     clientId: "app_123",
-    redirectUri: "https://your-app.example/hashbin/callback"
+    redirectUri: "https://your-app.example/hashbin/callback",
+    contentBaseUrl: "https://256t.us"
   });
 &lt;/script&gt;</code></pre>
       </section>
@@ -59,14 +60,15 @@
 
 hashbin.configure({
   clientId: "app_123",
-  redirectUri: "https://your-app.example/hashbin/callback"
+  redirectUri: "https://your-app.example/hashbin/callback",
+  contentBaseUrl: "https://256t.us"
 });
 
 await hashbin.handleCallback();</code></pre>
       </section>
 
       <section class="card">
-        <h2>Publish and read balance</h2>
+        <h2>Publish, retrieve, and read balance</h2>
         <pre><code>const balance = await hashbin.getBalance();
 console.log(balance.balance_cents);
 
@@ -74,7 +76,10 @@ const result = await hashbin.publish("hello world", {
   contentType: "text/plain"
 });
 
-console.log(result.cid);</code></pre>
+console.log(result.cid, result.url);
+
+const contentUrl = hashbin.getContentUrl(result.cid, { download: true });
+const response = await hashbin.retrieve(result.cid);</code></pre>
       </section>
     </div>
   </main>

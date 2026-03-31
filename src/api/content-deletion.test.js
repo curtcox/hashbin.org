@@ -96,6 +96,10 @@ function createMockEnv() {
           return new Response(JSON.stringify({ success: true }), { status: 201 });
         })
       }))
+    },
+    CONTENT_BUCKET: {
+      put: vi.fn(async () => undefined),
+      delete: vi.fn(async () => undefined)
     }
   };
 }

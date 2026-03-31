@@ -4,7 +4,7 @@
  */
 
 import { requireAuth } from './auth-gate.js';
-import { authenticatedFetch, handleApiError, formatBalance } from './utils.js';
+import { authenticatedFetch, handleApiError, formatBalance, contentUrl } from './utils.js';
 import { formatFileSize, validate256tCID } from './hash256t.js';
 import {
   formatMTBR,
@@ -103,8 +103,9 @@ async function loadContentData(cid) {
     document.getElementById('content-downloads').textContent = formatNumber(contentData.download_count || 0);
     
     // Set links
-    document.getElementById('view-link').href = `/${cid}`;
-    document.getElementById('download-link').href = `/${cid}`;
+    const resolvedUrl = contentData.url || await contentUrl(cid);
+    document.getElementById('view-link').href = resolvedUrl;
+    document.getElementById('download-link').href = resolvedUrl;
     
     // Calculate max duration based on content expiration
     maxDuration = getRemainingRetention(contentData.expires_at);

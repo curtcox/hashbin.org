@@ -117,6 +117,19 @@ export async function handleCreateDispute(request, env) {
       })
     }));
 
+    try {
+      await env.CONTENT_BUCKET.put(`${data.cid}.disputed`, JSON.stringify({
+        dispute_id: disputeData.dispute.dispute_id,
+        created_at: disputeData.dispute.created_at
+      }), {
+        httpMetadata: {
+          contentType: 'application/json'
+        }
+      });
+    } catch (markerError) {
+      console.error('Error writing dispute marker:', markerError);
+    }
+
     return new Response(JSON.stringify(disputeData), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }

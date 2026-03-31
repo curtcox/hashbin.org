@@ -3,10 +3,15 @@
 ## Overview
 
 The HashBin.org API is built on Cloudflare Workers and provides RESTful endpoints for content management, authentication, and account operations.
+Uploads are served from a dedicated content domain so user-controlled files do not share an origin with auth cookies, the dashboard, or API routes.
 
 **Base URL**: 
 - Development: `http://localhost:8787`
 - Production: `https://hashbin.org`
+
+**Content URL Base**:
+- Production: `https://256t.us/{cid}`
+- Upload and metadata responses include a `url` field and metadata responses include `download_domain`.
 
 ## Authentication
 

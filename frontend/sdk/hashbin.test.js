@@ -80,4 +80,18 @@ describe('HashBin browser SDK', () => {
     expect(client.getTokens().refreshToken).toBe('refresh_123');
     expect(transactionStorage.getItem('hashbin:pkce:app_123:state_123')).toBeNull();
   });
+
+  it('builds content urls from the dedicated content domain', () => {
+    const client = new HashBinClient({
+      clientId: 'app_123',
+      redirectUri: 'https://example.com/callback',
+      baseUrl: 'https://hashbin.test',
+      contentBaseUrl: 'https://256t.us',
+      storage: createMemoryStorage(),
+      transactionStorage: createMemoryStorage()
+    });
+
+    expect(client.getContentUrl('cid_123')).toBe('https://256t.us/cid_123');
+    expect(client.getContentUrl('cid_123', { extension: 'txt', download: true })).toBe('https://256t.us/cid_123.txt?download=true');
+  });
 });

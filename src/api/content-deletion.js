@@ -82,6 +82,21 @@ export async function handleDeleteContent(request, env, cid) {
       });
     }
 
+    try {
+      await env.CONTENT_BUCKET.put(`${cid}.deleted`, JSON.stringify({
+        deleted_at: new Date().toISOString(),
+        deleted_by: deletedBy,
+        reason
+      }), {
+        httpMetadata: {
+          contentType: 'application/json'
+        }
+      });
+      await env.CONTENT_BUCKET.delete(`${cid}.disputed`);
+    } catch (markerError) {
+      console.error('Error writing deletion marker:', markerError);
+    }
+
     // 2. Close any open disputes for this CID
     const disputeId = env.DISPUTE_RECORD.idFromName(`dispute:${cid}`);
     const disputeStub = env.DISPUTE_RECORD.get(disputeId);

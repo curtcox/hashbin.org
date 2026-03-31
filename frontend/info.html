@@ -217,6 +217,7 @@
   <script type="module" src="/js/app.js"></script>
   <script type="module">
     import { getContentSize, formatFileSize } from './js/hash256t.js';
+    import { contentUrl } from './js/utils.js';
     import { 
       formatMTBR, 
       getRateLimitBadge, 
@@ -258,7 +259,7 @@
         document.getElementById('expires-exact').textContent = new Date(data.expires_at).toLocaleString();
         
         // Set download link
-        document.getElementById('download-link').href = `/${cid}`;
+        document.getElementById('download-link').href = data.url || await contentUrl(cid);
         
         // Show content
         document.getElementById('loading').style.display = 'none';

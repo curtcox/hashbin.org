@@ -19,6 +19,15 @@ import {
 import { getMimeType } from '../utils/mime-types.js';
 import { recordContentUpload, recordContentDownload, recordPayment } from '../utils/platform-stats.js';
 import { tryAlternateSuppliers } from '../utils/supplier-fallback.js';
+import { buildContentUrl, getContentDomain } from '../utils/content-domain.js';
+
+async function writeContentMeta(env, cid, metadata = {}) {
+  await env.CONTENT_BUCKET.put(`${cid}.meta`, JSON.stringify(metadata), {
+    httpMetadata: {
+      contentType: 'application/json'
+    }
+  });
+}
 
 /**
  * POST /api/content
@@ -212,7 +221,7 @@ export async function handleUploadContent(request, env) {
 
       // Extend retention
       const transactionId = crypto.randomUUID();
-      await contentMetadataStub.fetch(
+      const extendResponse = await contentMetadataStub.fetch(
         new Request('http://internal/extend', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
@@ -224,6 +233,13 @@ export async function handleUploadContent(request, env) {
           })
         })
       );
+      const extendData = await extendResponse.json();
+
+      if (!isInline && extendData.expires_at) {
+        await writeContentMeta(env, hash_256t, {
+          expires_at: extendData.expires_at
+        });
+      }
 
       // Record transaction (only if cost > 0)
       if (!isInline && extensionCost > 0) {
@@ -265,9 +281,10 @@ export async function handleUploadContent(request, env) {
         JSON.stringify({
           cid: hash_256t,
           size_bytes: size_bytes,
-          expires_at: existsData.expires_at,
+          expires_at: extendData.expires_at || existsData.expires_at,
           cost_cents: extensionCost,
           new_balance_cents: debitData.balance_after_cents,
+          url: buildContentUrl(env, hash_256t, null, request),
           message: `Retention extended for ${minRetention} month(s). You can add more at /content/${hash_256t}`
         }),
         {
@@ -332,6 +349,12 @@ export async function handleUploadContent(request, env) {
     );
 
     const metadata = await metadataResponse.json();
+
+    if (!isInline && metadata.expires_at) {
+      await writeContentMeta(env, hash_256t, {
+        expires_at: metadata.expires_at
+      });
+    }
 
     // Record transaction (only if cost > 0)
     if (!isInline && cost_cents > 0) {
@@ -403,7 +426,8 @@ export async function handleUploadContent(request, env) {
         size_bytes: size_bytes,
         expires_at: metadata.expires_at,
         cost_cents: cost_cents,
-        new_balance_cents: debitData.balance_after_cents
+        new_balance_cents: debitData.balance_after_cents,
+        url: buildContentUrl(env, hash_256t, null, request)
       }),
       {
         status: 201,
@@ -437,7 +461,23 @@ export async function handleGetContent(request, env, cid) {
       new Request('http://internal/content')
     );
     
-    return response;
+    if (!response.ok) {
+      return response;
+    }
+
+    const data = await response.json();
+
+    return new Response(
+      JSON.stringify({
+        ...data,
+        url: buildContentUrl(env, cid, null, request),
+        download_domain: getContentDomain(env, request)
+      }),
+      {
+        status: response.status,
+        headers: { 'content-type': 'application/json' }
+      }
+    );
   } catch (error) {
     return new Response(
       JSON.stringify({
@@ -626,6 +666,12 @@ export async function handleExtendContent(request, env, cid) {
 
     const extendData = await extendResponse.json();
 
+    if (extendData.expires_at && content.size_bytes > 64) {
+      await writeContentMeta(env, cid, {
+        expires_at: extendData.expires_at
+      });
+    }
+
     // Update ExpirationIndex with new expiration date
     if (content.expires_at && extendData.expires_at) {
       try {
@@ -676,7 +722,8 @@ export async function handleExtendContent(request, env, cid) {
         expires_at: extendData.expires_at,
         months_added: months_to_add,
         cost_cents: cost_cents,
-        new_balance_cents: debitData.balance_after_cents
+        new_balance_cents: debitData.balance_after_cents,
+        url: buildContentUrl(env, cid, null, request)
       }),
       {
         status: 200,

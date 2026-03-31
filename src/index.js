@@ -112,6 +112,7 @@ import {
 } from './api/admin-disputes.js';
 
 import { deleteContent, getContentMetadata } from './services/content-deletion.js';
+import { getContentDomain } from './utils/content-domain.js';
 import {
   handleCreateDeveloperApp,
   handleListDeveloperApps,
@@ -145,27 +146,6 @@ const ANOMALY_DETECTION = {
 // Git SHA embedded at build time - replaced during deployment
 // This constant forces code changes on each deploy, ensuring wrangler uploads new code
 const BUNDLED_GIT_SHA = '__DEPLOY_GIT_SHA__';
-
-// Static paths that should not be matched as CIDs
-// These paths are served by the ASSETS binding (frontend files)
-// Note: In a larger application, consider moving this to a configuration file
-const STATIC_PATHS = [
-  'index.html',
-  'developers',
-  'developers/',
-  'upload.html',
-  'retrieve.html',
-  'dashboard.html',
-  'dashboard/',
-  'deposit.html',
-  'info.html',
-  'css/',
-  'js/',
-  'img/',
-  'docs/',
-  'sdk/',
-  'api-keys'
-];
 
 /**
  * Main Worker fetch handler
@@ -206,25 +186,12 @@ export default {
       return Response.redirect(redirectUrl.toString(), 302);
     }
 
-    // Content download routes: /{cid} or /{cid}.{ext}
-    // Match CID pattern at root level (excluding known static paths)
     const pathWithoutLeadingSlash = url.pathname.substring(1);
-    
-    // Skip if it's a known static path
-    const isStaticPath = STATIC_PATHS.some(path => pathWithoutLeadingSlash.startsWith(path));
-    
-    if (!isStaticPath && pathWithoutLeadingSlash) {
-      // Check if this looks like a CID (256t format)
+
+    if (env.ENVIRONMENT === 'local' && pathWithoutLeadingSlash) {
       const cidMatch = pathWithoutLeadingSlash.match(/^([A-Za-z0-9_-]{8,94})(?:\.([a-zA-Z0-9]+))?$/);
-      
-      if (cidMatch) {
-        const cid = cidMatch[1];
-        const extension = cidMatch[2] || null;
-        
-        // Only handle GET and HEAD methods for download
-        if (request.method === 'GET' || request.method === 'HEAD') {
-          return handleDownloadContent(request, env, cid, extension);
-        }
+      if (cidMatch && (request.method === 'GET' || request.method === 'HEAD')) {
+        return handleDownloadContent(request, env, cidMatch[1], cidMatch[2] || null);
       }
     }
 
@@ -1023,7 +990,8 @@ function handleConfig(env) {
   const config = {
     clerkPublishableKey: isLocalMode ? null : (env.CLERK_PUBLISHABLE_KEY || null),
     isLocalMode,
-    authMode: isLocalMode ? 'local' : 'clerk'
+    authMode: isLocalMode ? 'local' : 'clerk',
+    content_domain: getContentDomain(env)
   };
 
   return new Response(JSON.stringify(config), {

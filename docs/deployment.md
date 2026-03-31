@@ -40,7 +40,8 @@ The platform supports two environments:
    - Worker: `hashbin-worker-prod`
    - URL: `https://hashbin-worker-prod.<account-id>.workers.dev`
    - Custom Domain: `https://yourdomain.com`
-   - R2 Buckets: `hashbin-content-prod`, `hashbin-backups-prod`
+   - R2 Buckets: `hashbin-content-256t-prod`, `hashbin-backups-prod`
+   - Content Domain: `https://256t.us`
 
 ## Prerequisites
 
@@ -355,7 +356,7 @@ git push origin main
 The workflow will:
 1. Run tests
 2. Install dependencies
-3. Create R2 buckets (`hashbin-content-prod`, `hashbin-backups-prod`)
+3. Create R2 buckets (`hashbin-content-256t-prod`, `hashbin-backups-prod`)
 4. Deploy Worker to production environment
 5. Verify deployment on workers.dev URL
 6. Attempt to verify custom domain (may fail initially)
@@ -645,7 +646,7 @@ Your deployment creates these resources:
 #### R2 Buckets
 - **hashbin-content-dev**: Development content storage
 - **hashbin-backups-dev**: Development backup storage
-- **hashbin-content-prod**: Production content storage
+- **hashbin-content-256t-prod**: Production content storage
 - **hashbin-backups-prod**: Production backup storage
 
 ### API Endpoints

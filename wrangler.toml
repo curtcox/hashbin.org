@@ -12,6 +12,7 @@ binding = "ASSETS"
 [vars]
 ENVIRONMENT = "production"
 LOG_LEVEL = "warn"
+CONTENT_DOMAIN = "256t.us"
 
 # Production routes
 routes = [
@@ -118,7 +119,7 @@ script_name = "hashbin-worker-prod"
 # R2 bucket bindings
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
-bucket_name = "hashbin-content-prod"
+bucket_name = "hashbin-content-256t-prod"
 
 [[r2_buckets]]
 binding = "BACKUP_BUCKET"

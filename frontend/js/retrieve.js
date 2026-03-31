@@ -4,6 +4,7 @@
  */
 
 import { validate256tCID, isInlineContent, getContentSize, formatFileSize } from './hash256t.js';
+import { contentUrl } from './utils.js';
 
 /**
  * Initialize retrieve page
@@ -37,7 +38,7 @@ export function initRetrievePage() {
       if (isInline) {
         // For inline content, we can show info immediately
         const size = getContentSize(cid);
-        showInlineContentInfo(cid, size);
+        await showInlineContentInfo(cid, size);
       } else {
         // For regular content, fetch metadata
         await fetchAndShowContentInfo(cid);
@@ -51,8 +52,9 @@ export function initRetrievePage() {
 /**
  * Show inline content information
  */
-function showInlineContentInfo(cid, size) {
+async function showInlineContentInfo(cid, size) {
   const resultDiv = document.getElementById('retrieve-result');
+  const downloadHref = await contentUrl(cid);
   
   resultDiv.innerHTML = `
     <div class="card">
@@ -81,7 +83,7 @@ function showInlineContentInfo(cid, size) {
       </div>
 
       <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <a href="/${cid}" class="btn btn-primary" download>
+        <a href="${downloadHref}" class="btn btn-primary" download>
           Download Content
         </a>
         
@@ -96,7 +98,7 @@ function showInlineContentInfo(cid, size) {
   const extPickerBtn = resultDiv.querySelector('.show-ext-picker');
   if (extPickerBtn) {
     extPickerBtn.addEventListener('click', () => {
-      showExtensionPicker(extPickerBtn.dataset.cid);
+      void showExtensionPicker(extPickerBtn.dataset.cid);
     });
   }
 }
@@ -119,6 +121,7 @@ async function fetchAndShowContentInfo(cid) {
     }
 
     const data = await response.json();
+    const downloadHref = data.url || await contentUrl(cid);
     
     // Check if expired
     const expiresAt = new Date(data.expires_at);
@@ -163,7 +166,7 @@ async function fetchAndShowContentInfo(cid) {
         </div>
 
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-          <a href="/${cid}" class="btn btn-primary" download>
+          <a href="${downloadHref}" class="btn btn-primary" download>
             Download Content
           </a>
           
@@ -178,7 +181,7 @@ async function fetchAndShowContentInfo(cid) {
     const extPickerBtn = resultDiv.querySelector('.show-ext-picker');
     if (extPickerBtn) {
       extPickerBtn.addEventListener('click', () => {
-        showExtensionPicker(extPickerBtn.dataset.cid);
+        void showExtensionPicker(extPickerBtn.dataset.cid);
       });
     }
   } catch (error) {
@@ -189,7 +192,7 @@ async function fetchAndShowContentInfo(cid) {
 /**
  * Show extension picker modal
  */
-function showExtensionPicker(cid) {
+async function showExtensionPicker(cid) {
   const resultDiv = document.getElementById('retrieve-result');
   
   const commonExtensions = [
@@ -204,11 +207,11 @@ function showExtensionPicker(cid) {
     { ext: 'zip', name: 'ZIP Archive' }
   ];
 
-  const extensionButtons = commonExtensions.map(({ ext, name }) => `
-    <a href="/${cid}.${ext}" class="btn btn-secondary" download style="width: 100%;">
+  const extensionButtons = (await Promise.all(commonExtensions.map(async ({ ext, name }) => `
+    <a href="${await contentUrl(cid, ext)}" class="btn btn-secondary" download style="width: 100%;">
       ${name} (.${ext})
     </a>
-  `).join('');
+  `))).join('');
 
   const existingCard = resultDiv.querySelector('.card');
   existingCard.insertAdjacentHTML('afterend', `
@@ -251,7 +254,7 @@ function showExtensionPicker(cid) {
 /**
  * Download with custom extension
  */
-function downloadWithCustomExtension() {
+async function downloadWithCustomExtension() {
   const input = document.getElementById('custom-extension');
   const cid = input.dataset.cid;
   const ext = input.value.trim().replace(/^\./, '');
@@ -276,7 +279,7 @@ function downloadWithCustomExtension() {
     return;
   }
   
-  window.location.href = `/${cid}.${ext}`;
+  window.location.href = await contentUrl(cid, ext);
 }
 
 /**

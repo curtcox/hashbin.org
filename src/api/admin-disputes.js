@@ -189,6 +189,24 @@ export async function handleAdminUpdateDispute(request, env, cid) {
       }));
     }
 
+    try {
+      if (data.status === 'open' || data.status === 'under_review') {
+        await env.CONTENT_BUCKET.put(`${cid}.disputed`, JSON.stringify({
+          dispute_id: currentDispute.dispute.dispute_id,
+          status: data.status,
+          updated_at: new Date().toISOString()
+        }), {
+          httpMetadata: {
+            contentType: 'application/json'
+          }
+        });
+      } else {
+        await env.CONTENT_BUCKET.delete(`${cid}.disputed`);
+      }
+    } catch (markerError) {
+      console.error('Error updating dispute marker:', markerError);
+    }
+
     // Log admin action
     const adminLogId = env.ADMIN_ACTION_LOG.idFromName('admin-action-log:global');
     const adminLogStub = env.ADMIN_ACTION_LOG.get(adminLogId);

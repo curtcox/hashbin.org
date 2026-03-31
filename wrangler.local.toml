@@ -12,6 +12,7 @@ binding = "ASSETS"
 [vars]
 ENVIRONMENT = "local"
 LOG_LEVEL = "debug"
+CONTENT_DOMAIN = "http://localhost:8787"
 
 # Local dev does not bind to production routes
 workers_dev = true

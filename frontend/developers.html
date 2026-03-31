@@ -79,7 +79,7 @@
           <li>The user <strong>signs in</strong> (via their existing HashBin account) and <strong>approves</strong> your app.</li>
           <li>HashBin redirects back to your <code>redirect_uri</code> with an authorization <strong>code</strong>.</li>
           <li>Exchange the code at <code>/oauth/token</code> for an <strong>access token</strong> (1 hr) and <strong>refresh token</strong> (30 days).</li>
-          <li>Use the access token to <strong>publish content</strong> via <code>POST /api/content</code>. Uploads use the user's default retention period and are billed to their balance.</li>
+          <li>Use the access token to <strong>publish content</strong> via <code>POST /api/content</code>. Uploads use the user's default retention period, are billed to their balance, and return a content URL on <code>https://256t.us/{cid}</code>.</li>
         </ol>
       </div>
     </section>
@@ -102,15 +102,17 @@
   import HashBin from 'https://hashbin.org/sdk/hashbin.js';
 
   const hb = HashBin.configure({
-    clientId: 'YOUR_CLIENT_ID'
+    clientId: 'YOUR_CLIENT_ID',
+    redirectUri: 'https://your-username.github.io/your-repo/callback.html',
+    contentBaseUrl: 'https://256t.us'
   });
 
   // Completes the OAuth flow using the code in the URL
   await hb.handleCallback();
 
   // Now you can publish content
-  const cid = await hb.publish(new Blob(['Hello, HashBin!']));
-  console.log('Published:', cid);
+  const result = await hb.publish(new Blob(['Hello, HashBin!']));
+  console.log('Published:', result.cid, result.url);
 &lt;/script&gt;</pre></code></div>
         <p style="margin-bottom: 0.5rem;">
           Or install via npm:
