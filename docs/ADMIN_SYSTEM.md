@@ -250,6 +250,19 @@ CSV file download with appropriate headers.
 
 **Rate Limit:** 1 export per minute (to be implemented)
 
+## Alert Notifications
+
+New alerts (stale or failed backups, repeat infringers, unusual deposit/upload rates) are pushed
+to `ALERT_WEBHOOK_URL` when that secret is set (GitHub secret of the same name; CI publishes
+it). The JSON body has `text` (Slack), `content` (Discord), and the full `alert`, so a Slack or
+Discord incoming-webhook URL works as is; any other endpoint receives the same JSON. Duplicate
+alerts of the same type within an hour aren't re-sent.
+
+```bash
+# Send a test notification
+curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/alerts/test
+```
+
 ## Backups
 
 Snapshot status, on-demand runs, and restores: see [backup-and-restore.md](backup-and-restore.md).

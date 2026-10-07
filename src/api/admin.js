@@ -4,6 +4,7 @@
  */
 
 import { requireAdmin } from '../auth/admin.js';
+import { deliverAlert } from '../durable-objects/alert-store.js';
 
 /**
  * Get aggregate platform statistics
@@ -757,4 +758,25 @@ export async function handleRecordCost(request, env) {
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
+}
+
+/**
+ * Send a test notification to ALERT_WEBHOOK_URL
+ * POST /api/admin/alerts/test
+ */
+export async function handleTestAlertWebhook(request, env) {
+  const authError = requireAdmin(request, env);
+  if (authError) return authError;
+
+  if (!env.ALERT_WEBHOOK_URL) {
+    return Response.json({ delivered: false, error: 'ALERT_WEBHOOK_URL is not configured' }, { status: 400 });
+  }
+  const delivered = await deliverAlert(env, {
+    type: 'test',
+    severity: 'info',
+    title: 'Test alert',
+    message: 'Alert delivery from hashbin.org is working.',
+    created_at: new Date().toISOString()
+  });
+  return Response.json({ delivered }, { status: delivered ? 200 : 502 });
 }

@@ -235,6 +235,20 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
 
+      - name: Configure alert webhook
+        run: |
+          # Optional: push operator alerts to Slack/Discord/ntfy or any JSON webhook
+          if [ -n "$ALERT_WEBHOOK_URL" ]; then
+            echo "$ALERT_WEBHOOK_URL" | npx wrangler secret put ALERT_WEBHOOK_URL
+            echo "✅ ALERT_WEBHOOK_URL configured"
+          else
+            echo "ℹ️ ALERT_WEBHOOK_URL not set; alerts are only visible at /api/admin/alerts"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+
       - name: Configure admin secrets
         run: |
           # Admin moderation (dispute resolution, takedowns) needs ADMIN_SECRET_TOKEN

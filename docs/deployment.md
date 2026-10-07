@@ -234,6 +234,8 @@ Also set, from GitHub secrets of the same name (the deploy workflow publishes th
 - `CLERK_WEBHOOK_SECRET`: Clerk webhook signing secret. In the Clerk dashboard add the endpoint
   `https://hashbin.org/api/webhooks/clerk` with events `user.created`, `user.updated`, `user.deleted`.
   Deleting a user in Clerk then deletes their HashBin profile and disables their API keys.
+- `ALERT_WEBHOOK_URL`: where operator alerts are pushed (a Slack or Discord incoming webhook works
+  directly). Test with `POST /api/admin/alerts/test`.
 
 Generate the OAuth signing key value:
 

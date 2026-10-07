@@ -85,7 +85,8 @@ import {
   handleGetCosts,
   handleGetCostsByService,
   handleGetProfitability,
-  handleRecordCost
+  handleRecordCost,
+  handleTestAlertWebhook
 } from './api/admin.js';
 
 import {
@@ -938,6 +939,10 @@ function handleApiRoutes(url, request, env) {
 
   if (url.pathname === '/api/admin/health' && request.method === 'GET') {
     return handleGetAdminHealth(request, env);
+  }
+
+  if (url.pathname === '/api/admin/alerts/test' && request.method === 'POST') {
+    return handleTestAlertWebhook(request, env);
   }
 
   if (url.pathname === '/api/admin/alerts' && request.method === 'GET') {

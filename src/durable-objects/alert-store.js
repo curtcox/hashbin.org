@@ -1,6 +1,30 @@
 import { handleBackupRequest } from '../utils/backup.js';
 
 /**
+ * Push a new alert to the operator's webhook (ALERT_WEBHOOK_URL), if configured.
+ * The body works with Slack (`text`) and Discord (`content`) incoming webhooks and
+ * also carries the structured alert for anything else. Never throws.
+ * @returns {Promise<boolean>} True if the webhook accepted it
+ */
+export async function deliverAlert(env, alert) {
+  if (!env?.ALERT_WEBHOOK_URL) return false;
+  const summary = `[HashBin ${String(alert.severity).toUpperCase()}] ${alert.title}: ${alert.message}`;
+  try {
+    const response = await fetch(env.ALERT_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ text: summary, content: summary.slice(0, 2000), alert }),
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!response.ok) console.error(`Alert webhook returned HTTP ${response.status}`);
+    return response.ok;
+  } catch (error) {
+    console.error('Alert webhook delivery failed:', error);
+    return false;
+  }
+}
+
+/**
  * AlertStore Durable Object
  * Stores and manages system alerts with deduplication
  */
@@ -98,9 +122,10 @@ export class AlertStore {
     };
 
     await this.state.storage.put(alertId, alert);
+    const delivered = await deliverAlert(this.env, alert);
 
     return new Response(
-      JSON.stringify({ alert, duplicate: false }),
+      JSON.stringify({ alert, duplicate: false, delivered }),
       { status: 201, headers: { 'Content-Type': 'application/json' } }
     );
   }

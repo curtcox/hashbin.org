@@ -67,7 +67,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 |----|------|-------|--------|-------------------|
 | S1 | R2 cleanup of soft-deleted content | code | ✅ | Deletions queue the CID in the DeletionRecord; the daily cron removes the bytes after 24h (200 per run; the `.deleted` marker stays). Also fixed: re-uploading, extending, or donating to deleted content charged the user while the content stayed deleted. These now return 410 before charging. Content soft-deleted before this change isn't queued; any such bytes can be removed by hand. |
 | S2 | Clerk webhook endpoint `POST /api/webhooks/clerk` | code | ✅ | Svix-signature verified; `user.deleted` soft-deletes the profile, which also disables the user's API keys (they bypass Clerk); `user.created`/`updated` ensure a profile exists. Verified end to end in workerd. **Ops:** add the `CLERK_WEBHOOK_SECRET` GitHub secret and the endpoint in the Clerk dashboard (`docs/deployment.md` §3.6). |
-| S3 | Operator alert delivery (email/webhook) | code | ⬜ | Anomaly alerts are only stored in `AlertStore`. Someone has to poll `/api/admin/alerts`. |
+| S3 | Operator alert delivery (email/webhook) | code | ✅ | **Decision (2026-10-07): generic webhook.** New alerts POST to `ALERT_WEBHOOK_URL` (Slack/Discord-compatible JSON); `POST /api/admin/alerts/test` checks delivery. Verified from workerd. **Ops:** create a Slack/Discord incoming webhook and set the `ALERT_WEBHOOK_URL` GitHub secret. |
 | S4 | Admin dispute review UI | code | ⬜ | Today admins use the API with `ADMIN_SECRET_TOKEN`. |
 | S5 | Deletion transactions shown in transaction history | code | ✅ | "Content Deletion" rows with reason and closed dispute, plus a filter option. Also fixed: CID links in the history pointed to a nonexistent `/content/{cid}` route (now `/info.html?cid=`), and the detail text is now HTML-escaped. |
 | S6 | Developer app update/delete (`PATCH`/`DELETE /api/developers/apps/{id}`) | code | ✅ | Owner-only (others get 404), with Edit/Delete in the `/developers` console; delete is a soft delete. Redirect URIs are now validated (https or localhost, no fragment). **Security fix:** the account page rendered third-party app names as raw HTML, so a malicious app could run script against users who authorized it; this and the developer console are now escaped. OAuth tokens can no longer manage developer apps. |
@@ -98,7 +98,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-359 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+362 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |
