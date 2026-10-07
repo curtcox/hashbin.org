@@ -206,6 +206,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
         continue-on-error: true
+        # A hung apt or browser download once blocked Pages for hours; give up and skip visual tests instead
+        timeout-minutes: 10
 
       - name: Run visual regression tests
         run: bash scripts/visual-regression/run-visual-regression.sh
