@@ -226,6 +226,15 @@ At minimum, production must include these Worker secrets:
 - `CLERK_PUBLISHABLE_KEY`
 - `OAUTH_SIGNING_KEY`
 
+Also set, from GitHub secrets of the same name (the deploy workflow publishes them when present):
+
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: payments (Stripe Tax must be activated; checkouts use automatic tax)
+- `API_KEY_ENCRYPTION_KEY`: API key reveal
+- `ADMIN_SECRET_TOKEN`: admin API, dispute moderation, backups (`ADMIN_USER_ID` is optional)
+- `CLERK_WEBHOOK_SECRET`: Clerk webhook signing secret. In the Clerk dashboard add the endpoint
+  `https://hashbin.org/api/webhooks/clerk` with events `user.created`, `user.updated`, `user.deleted`.
+  Deleting a user in Clerk then deletes their HashBin profile and disables their API keys.
+
 Generate the OAuth signing key value:
 
 ```bash

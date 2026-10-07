@@ -30,6 +30,7 @@ workers_dev = true
 # ADMIN_SECRET_TOKEN (required for admin endpoints, including dispute moderation - 64-character hex string)
 # ADMIN_USER_ID (optional - Clerk user ID that may moderate disputes while signed in)
 # OAUTH_SIGNING_KEY (required for OAuth authorize/token/revoke flow)
+# CLERK_WEBHOOK_SECRET (optional - enables POST /api/webhooks/clerk)
 
 # Durable Objects bindings
 [[durable_objects.bindings]]

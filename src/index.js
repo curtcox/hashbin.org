@@ -143,6 +143,7 @@ import {
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
 import { isOAuthAuth } from './auth/oauth-access.js';
+import { handleClerkWebhook } from './api/clerk-webhook.js';
 
 // Configuration constants
 const VALID_ENVIRONMENTS = ['development', 'production', 'local'];
@@ -177,6 +178,11 @@ export default {
     // Verified by Stripe signature instead
     if (url.pathname === '/api/payments/webhook' && request.method === 'POST') {
       return handleStripeWebhook(request, env);
+    }
+
+    // Clerk webhook endpoint, verified by its Svix signature
+    if (url.pathname === '/api/webhooks/clerk' && request.method === 'POST') {
+      return handleClerkWebhook(request, env);
     }
 
     // Apply rate limiting to all other requests
