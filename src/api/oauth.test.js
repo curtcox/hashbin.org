@@ -7,7 +7,7 @@ import {
 } from './oauth.js';
 import { ApplicationRegistry } from '../durable-objects/application-registry.js';
 import { UserProfile } from '../durable-objects/user-profile.js';
-import { createPkceChallenge } from '../auth/oauth.js';
+import { createPkceChallenge, verifyOAuthJwt } from '../auth/oauth.js';
 
 function createMockState(initialData = {}) {
   const storage = new Map();
@@ -172,6 +172,71 @@ describe('OAuth API', () => {
     expect(tokenData.access_token).toBeTruthy();
     expect(tokenData.refresh_token).toBeTruthy();
     expect(tokenData.expires_in).toBe(3600);
+  });
+
+  it('returns the redirect as JSON when the caller asks for JSON', async () => {
+    const app = await (await handleCreateDeveloperApp(new Request('https://hashbin.test/api/developers/apps', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'LocalDev developer_user' },
+      body: JSON.stringify({ app_name: 'Json App', redirect_uris: ['https://json.example/callback'] })
+    }), env)).json();
+
+    const authorizeResponse = await handleOAuthAuthorize(new Request('https://hashbin.test/oauth/authorize', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json',
+        authorization: 'LocalDev user_authorizing'
+      },
+      body: JSON.stringify({
+        client_id: app.client_id,
+        redirect_uri: 'https://json.example/callback',
+        response_type: 'code',
+        scope: 'content:write',
+        state: 'json-state',
+        code_challenge: await createPkceChallenge('verifier-value-for-tests-1234567890'),
+        code_challenge_method: 'S256'
+      })
+    }), env);
+
+    expect(authorizeResponse.status).toBe(200);
+    const body = await authorizeResponse.json();
+    const redirectUrl = new URL(body.redirect_to);
+    expect(redirectUrl.origin + redirectUrl.pathname).toBe('https://json.example/callback');
+    expect(redirectUrl.searchParams.get('state')).toBe('json-state');
+    expect(redirectUrl.searchParams.get('code')).toBeTruthy();
+  });
+
+  it('stores a requested spending limit on the grant and rejects invalid ones', async () => {
+    const app = await (await handleCreateDeveloperApp(new Request('https://hashbin.test/api/developers/apps', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'LocalDev developer_user' },
+      body: JSON.stringify({ app_name: 'Limit App', redirect_uris: ['https://limit.example/callback'] })
+    }), env)).json();
+    const challenge = await createPkceChallenge('verifier-value-for-tests-1234567890');
+    const authorize = (spendingLimit) => handleOAuthAuthorize(new Request('https://hashbin.test/oauth/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'LocalDev limit_user' },
+      body: JSON.stringify({
+        client_id: app.client_id,
+        redirect_uri: 'https://limit.example/callback',
+        response_type: 'code',
+        scope: 'content:write',
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+        spending_limit: spendingLimit
+      })
+    }), env);
+
+    const invalid = await authorize('lots');
+    expect(invalid.status).toBe(400);
+    expect((await invalid.json()).error).toBe('invalid_request');
+
+    const approved = await authorize('7.25');
+    expect(approved.status).toBe(302);
+    const code = new URL(approved.headers.get('location')).searchParams.get('code');
+    const payload = await verifyOAuthJwt(code, env.OAUTH_SIGNING_KEY);
+    expect(payload.spending_limit).toBe(7.25);
   });
 
   it('rejects token exchange when the PKCE verifier does not match', async () => {

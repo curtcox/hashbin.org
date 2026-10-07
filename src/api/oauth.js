@@ -12,6 +12,7 @@ const ALLOWED_SCOPES = new Set(['content:write', 'content:read', 'balance:read']
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;
 const REFRESH_TOKEN_TTL_DAYS = 30;
+const MAX_SPENDING_LIMIT_USD = 1000000;
 const SCOPE_DESCRIPTIONS = {
   'content:write': 'Publish immutable content using your account balance and default retention.',
   'content:read': 'Check whether content exists and inspect metadata.',
@@ -55,6 +56,15 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// JSON for embedding in an inline <script>; escaping < keeps a value such as
+// "</script>" in the state parameter from closing the script element.
+function scriptJson(value) {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
 function htmlResponse(html, status = 200) {
   return new Response(html, {
     status,
@@ -85,6 +95,23 @@ function parseScopes(scopeString) {
   return Array.from(new Set(scopes));
 }
 
+// Monthly spending limit in USD. Returns null when no limit was requested and
+// undefined when the value is not a usable amount.
+function parseSpendingLimit(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const amount = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isFinite(amount) || amount <= 0 || amount > MAX_SPENDING_LIMIT_USD) {
+    return undefined;
+  }
+  return Math.round(amount * 100) / 100;
+}
+
+function wantsJson(request) {
+  return (request.headers.get('accept') || '').includes('application/json');
+}
+
 function validateAuthorizeRequest(data, app) {
   if (!app || app.status !== 'active') {
     return { valid: false, error: 'invalid_client', message: 'The requested application could not be found.' };
@@ -107,7 +134,12 @@ function validateAuthorizeRequest(data, app) {
     return { valid: false, error: 'invalid_scope', message: 'At least one supported scope is required.' };
   }
 
-  return { valid: true, scopes };
+  const spendingLimit = parseSpendingLimit(data.spending_limit);
+  if (spendingLimit === undefined || spendingLimit === 0) {
+    return { valid: false, error: 'invalid_request', message: 'The spending limit must be a positive amount in US dollars.' };
+  }
+
+  return { valid: true, scopes, spendingLimit };
 }
 
 async function upsertGrant(env, userId, grantData) {
@@ -284,7 +316,7 @@ export async function handleOAuthAuthorize(request, env) {
     const grant = await upsertGrant(env, authResult.user.userId, {
       app_id: app.app_id,
       scopes,
-      spending_limit: data.spending_limit ?? null
+      spending_limit: validation.spendingLimit
     });
 
     const now = Math.floor(Date.now() / 1000);
@@ -308,6 +340,12 @@ export async function handleOAuthAuthorize(request, env) {
       redirectUrl.searchParams.set('state', data.state);
     }
 
+    // The consent page calls this with fetch, which would follow a 302 to the
+    // app's redirect URI and fail unless that host allows CORS. It asks for
+    // JSON instead and navigates itself.
+    if (wantsJson(request)) {
+      return jsonResponse({ redirect_to: redirectUrl.toString() });
+    }
     return Response.redirect(redirectUrl.toString(), 302);
   } catch (error) {
     console.error('OAuth authorize failed', {
@@ -335,7 +373,8 @@ export async function handleGetOAuthAuthorizePage(request, env) {
     scope: url.searchParams.get('scope') || '',
     state: url.searchParams.get('state') || '',
     code_challenge: url.searchParams.get('code_challenge'),
-    code_challenge_method: url.searchParams.get('code_challenge_method')
+    code_challenge_method: url.searchParams.get('code_challenge_method'),
+    spending_limit: url.searchParams.get('spending_limit')
   };
   const validation = validateAuthorizeRequest(requestData, app);
 
@@ -365,6 +404,13 @@ export async function handleGetOAuthAuthorizePage(request, env) {
 </body>
 </html>`, 400);
   }
+
+  requestData.spending_limit = validation.spendingLimit;
+  const spendingLimitHtml = validation.spendingLimit === null ? '' : `
+          <div>
+            <dt>Monthly spending limit</dt>
+            <dd>$${validation.spendingLimit.toFixed(2)} per month</dd>
+          </div>`;
 
   const scopesHtml = validation.scopes.map((scope) => `
       <li>
@@ -534,7 +580,7 @@ export async function handleGetOAuthAuthorizePage(request, env) {
           <div>
             <dt>Redirect URI</dt>
             <dd>${escapeHtml(requestData.redirect_uri)}</dd>
-          </div>
+          </div>${spendingLimitHtml}
           <div>
             <dt>State</dt>
             <dd>${escapeHtml(requestData.state || '(none)')}</dd>
@@ -551,7 +597,7 @@ export async function handleGetOAuthAuthorizePage(request, env) {
   <script type="module">
     import { initializeAuth, getAuthHeaders, signIn } from '/js/auth-loader.js';
 
-    const authorizePayload = ${JSON.stringify(requestData)};
+    const authorizePayload = ${scriptJson(requestData)};
     const statusMessage = document.getElementById('status-message');
     const approveButton = document.getElementById('approve-button');
     const denyButton = document.getElementById('deny-button');
@@ -593,20 +639,16 @@ export async function handleGetOAuthAuthorizePage(request, env) {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
+            accept: 'application/json',
             ...authHeaders
           },
           body: JSON.stringify(authorizePayload)
         });
 
-        if (response.redirected) {
-          window.location.href = response.url;
-          return;
-        }
-
-        if (response.status === 302) {
-          const location = response.headers.get('location');
-          if (location) {
-            window.location.href = location;
+        if (response.ok) {
+          const result = await response.json();
+          if (result.redirect_to) {
+            window.location.href = result.redirect_to;
             return;
           }
         }
