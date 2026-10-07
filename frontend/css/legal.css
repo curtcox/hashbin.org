@@ -1,0 +1,64 @@
+/* Terms, Privacy, and DMCA pages */
+
+.legal {
+  max-width: 760px;
+  margin: 2rem auto 4rem;
+  line-height: 1.65;
+}
+
+.legal h1 {
+  margin-bottom: 0.25rem;
+}
+
+.legal h2 {
+  margin-top: 2rem;
+  font-size: 1.25rem;
+}
+
+.legal ul,
+.legal ol {
+  margin-left: 1.5rem;
+}
+
+.legal li {
+  margin-bottom: 0.5rem;
+}
+
+.legal-meta {
+  color: var(--color-text-light);
+  font-size: 0.9rem;
+}
+
+.legal-draft {
+  margin-bottom: 1.5rem;
+}
+
+.legal table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.95rem;
+}
+
+.legal th,
+.legal td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+@media (max-width: 600px) {
+  .legal table,
+  .legal tbody,
+  .legal tr,
+  .legal td,
+  .legal th {
+    display: block;
+    width: 100%;
+  }
+
+  .legal thead {
+    display: none;
+  }
+}

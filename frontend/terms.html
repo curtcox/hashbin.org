@@ -3,35 +3,151 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HashBin.org Terms of Service">
   <title>Terms of Service - HashBin.org</title>
   <link rel="icon" href="/img/hashbin-logo.png">
   <link rel="stylesheet" href="/css/base.css">
   <link rel="stylesheet" href="/css/layout.css">
   <link rel="stylesheet" href="/css/banner.css">
   <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/legal.css">
 </head>
 <body>
   <header class="nav-header"></header>
   <main>
-    <div class="container" style="max-width: 600px; margin: 4rem auto;">
-      <h1>Terms of Service</h1>
-      <div class="card" style="padding: 2rem;">
-        <p>This site is in beta. You should not use it. Go read the banner. How did you miss it?</p>
-        <p>You might think I mean the sort of beta where you can't use it. I don't.</p>
-        <p>But I do mean the sort of beta where you can't use it.</p>
-        <p>So don't use it.</p>
-        <p>Think of it as more of a dangerously immature pre-pre-pre-alpha if that helps discourage you from using it.</p>
+    <article class="container legal">
+      <div class="alert alert-warning legal-draft" role="note">
+        <strong>DRAFT, not yet in effect.</strong> This document is pending legal review. Text in
+        [BRACKETS] is a placeholder. It is not legal advice.
       </div>
-    </div>
+
+      <h1>Terms of Service</h1>
+      <p class="legal-meta">Effective date: [EFFECTIVE DATE] · Last updated: [DATE]</p>
+
+      <p>
+        These Terms govern your use of HashBin.org, 256t.us, the HashBin API, and related services
+        (the "Service"), operated by [LEGAL ENTITY NAME] ("we", "us"). By creating an account,
+        uploading content, or using the API, you agree to these Terms and to our
+        <a href="/privacy.html">Privacy Policy</a>. If you don't agree, don't use the Service.
+      </p>
+
+      <h2>1. What the Service does</h2>
+      <p>
+        HashBin stores files you pay for and makes them available to <strong>anyone</strong> who has
+        the file's content identifier (CID), a 256t hash. Downloads are free and need no account.
+        Content is served from the separate domain 256t.us. There is no search or browsing: content is
+        reachable only by its CID, but anyone who learns a CID can download that content.
+        <strong>Do not upload anything you aren't willing to make public.</strong>
+      </p>
+
+      <h2>2. Accounts</h2>
+      <ul>
+        <li>You sign in through a third-party identity provider (Google, Apple, Microsoft, or GitHub) via our authentication provider. You are responsible for activity on your account, your API keys, and the third-party apps you authorize.</li>
+        <li>You must be at least [MINIMUM AGE, e.g. 18] years old, or the age of majority where you live, to create an account or make payments.</li>
+        <li>API keys and authorized apps act on your behalf. Third-party apps you authorize can publish content and spend your balance up to the limit you set; you can revoke them at any time from your account page.</li>
+      </ul>
+
+      <h2>3. Balance, pricing, and payments</h2>
+      <ul>
+        <li>You add funds to a prepaid balance through Stripe. The card processing fee is shown and added at checkout; your balance is credited with the amount you chose.</li>
+        <li>Storage costs $0.03 per gigabyte per month of retention, charged from your balance when you upload or extend, rounded up to the next cent. There is no minimum charge. Files of 64 bytes or less are encoded in the CID itself and are free. Current prices are on the <a href="/docs/pricing.html">pricing page</a>; price changes apply only to purchases made after the change.</li>
+        <li><strong>All payments are final. We do not offer refunds</strong>, including for content you delete early, content removed under Section 6, or unused balance. We may, at our discretion, correct charges caused by errors on our side. Unused balance does not expire while your account is open, has no cash value, and can't be withdrawn or transferred.</li>
+        <li>If a payment is reversed or charged back, we may deduct the amount from your balance, suspend your account, or remove content paid for with it.</li>
+      </ul>
+
+      <h2>4. Retention and deletion</h2>
+      <ul>
+        <li>Content stays available until its paid retention period ends. <strong>When retention ends, the content is deleted with no grace period and no reminder.</strong> You are responsible for extending retention in time. Anyone can extend retention for any content.</li>
+        <li>You can delete content you uploaded at any time. Deletion is permanent and not refundable.</li>
+        <li>Every deletion is recorded publicly (CID, time, reason, size, content type), as described in our Privacy Policy.</li>
+        <li>Copies others have downloaded, or content stored elsewhere under the same CID, are outside our control.</li>
+      </ul>
+
+      <h2>5. Your content and acceptable use</h2>
+      <p>
+        You keep all rights to content you upload. You grant us a worldwide, non-exclusive, royalty-free
+        license to store, copy, and serve it to anyone who requests it by CID for as long as its
+        retention lasts, and to keep the records described in our Privacy Policy. You confirm you have
+        the rights needed to grant this license.
+      </p>
+      <p>You may not use the Service to store or distribute:</p>
+      <ul>
+        <li>content that infringes someone else's copyright, trademark, or other rights;</li>
+        <li>child sexual abuse material, which we report to the relevant authorities, or any other content that is illegal where we operate;</li>
+        <li>malware, phishing pages, or content designed to compromise systems or deceive users;</li>
+        <li>personal data about others published without a lawful basis, or content that harasses, threatens, or doxxes a person.</li>
+      </ul>
+      <p>
+        You also may not interfere with the Service, bypass rate limits or payments, or access accounts
+        or data that aren't yours. We don't monitor content in advance, but we act on reports.
+      </p>
+
+      <h2>6. Reports, disputes, and takedowns</h2>
+      <ul>
+        <li>Anyone can report content using the <a href="/disputes/submit.html">report form</a>. Reported content is blocked (HTTP 451) while the report is open.</li>
+        <li>Reports, including the reporter's explanation and links, are published on the <a href="/disputes/index.html">disputes page</a>. A report is closed when we remove the content, when we deny it (the content becomes available again), or automatically after 30 days.</li>
+        <li>Copyright notices and counter-notices under the U.S. Digital Millennium Copyright Act follow our <a href="/dmca.html">DMCA Policy</a>, including our repeat-infringer policy.</li>
+        <li>We may remove content or suspend accounts that violate these Terms or the law, or when we are legally required to.</li>
+      </ul>
+
+      <h2>7. Ending your account</h2>
+      <p>
+        You can delete your account at any time (two-factor confirmation is required). Deleting your
+        account revokes your API keys and authorized apps, and <strong>forfeits any remaining
+        balance</strong>. Content you uploaded stays available until its retention ends unless you
+        delete it first. We may suspend or close accounts that violate these Terms; if we close your
+        account without cause, we will [REFUND / CREDIT POLICY FOR REMAINING BALANCE].
+      </p>
+
+      <h2>8. Disclaimers</h2>
+      <p>
+        THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR
+        IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. We
+        don't guarantee uninterrupted availability or that content will never be lost. Keep your own
+        copies of anything important.
+      </p>
+
+      <h2>9. Limitation of liability</h2>
+      <p>
+        TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE ARE NOT LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL,
+        CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR LOST PROFITS, DATA, OR GOODWILL. OUR TOTAL LIABILITY
+        FOR ANY CLAIM RELATING TO THE SERVICE IS LIMITED TO THE GREATER OF THE AMOUNT YOU PAID US IN THE
+        12 MONTHS BEFORE THE CLAIM OR [AMOUNT, e.g. US$50].
+      </p>
+
+      <h2>10. Indemnity</h2>
+      <p>
+        You will indemnify us against claims, losses, and expenses (including reasonable legal fees)
+        arising from content you upload or your violation of these Terms or the law.
+      </p>
+
+      <h2>11. Changes</h2>
+      <p>
+        We may update these Terms. We'll post the new version here with a new "Last updated" date and,
+        for material changes, give at least [NOTICE PERIOD, e.g. 30 days] notice on the site before
+        they take effect. Continuing to use the Service after that means you accept the changes.
+      </p>
+
+      <h2>12. Governing law</h2>
+      <p>
+        These Terms are governed by the laws of [JURISDICTION], excluding its conflict-of-law rules.
+        Disputes will be resolved in the courts of [VENUE], except where the law gives you the right to
+        bring a claim where you live.
+      </p>
+
+      <h2>13. Contact</h2>
+      <p>[LEGAL ENTITY NAME], [POSTAL ADDRESS]. Email: [CONTACT EMAIL].</p>
+    </article>
   </main>
   <footer>
-    <p>&copy; 2026 HashBin.org | Open Source | 
-      <a href="/docs/">Documentation</a> | 
+    <p>&copy; 2026 HashBin.org | Open Source |
+      <a href="/docs/">Documentation</a> |
+      <a href="/privacy.html">Privacy</a> |
+      <a href="/dmca.html">DMCA</a> |
       <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a> |
       <a href="/sitemap.html">Site Map</a>
     </p>
   </footer>
   <script type="module" src="/js/app.js"></script>
-  <script type="module" src="/js/banner.js"></script>
 </body>
 </html>

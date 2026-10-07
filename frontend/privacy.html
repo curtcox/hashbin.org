@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HashBin.org Privacy Policy">
+  <title>Privacy Policy - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/legal.css">
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <article class="container legal">
+      <div class="alert alert-warning legal-draft" role="note">
+        <strong>DRAFT, not yet in effect.</strong> This document is pending legal review. Text in
+        [BRACKETS] is a placeholder. It is not legal advice.
+      </div>
+
+      <h1>Privacy Policy</h1>
+      <p class="legal-meta">Effective date: [EFFECTIVE DATE] · Last updated: [DATE]</p>
+
+      <p>
+        This policy explains what [LEGAL ENTITY NAME] ("we") collects when you use HashBin.org and
+        256t.us, why, and who can see it. We collect as little as we can: we don't run advertising or
+        behavioral analytics, and we don't sell personal data.
+      </p>
+
+      <h2>1. Content you upload is public</h2>
+      <p>
+        Anything you upload can be downloaded by anyone who has its content identifier (CID). We don't
+        publish a list of stored content, but CIDs are shared freely and can't be revoked. Don't upload
+        personal information you don't want to be public.
+      </p>
+
+      <h2>2. What we collect</h2>
+      <table>
+        <thead>
+          <tr><th>Data</th><th>Why</th><th>How long</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Account identity</strong>: an account ID from our authentication provider and the sign-in methods you link (Google, Apple, Microsoft, GitHub). Your email and profile details are held by the authentication provider.</td>
+            <td>To sign you in and secure your account</td>
+            <td>Until you delete your account; afterward a deleted-account marker is kept so payment records stay attributable</td>
+          </tr>
+          <tr>
+            <td><strong>Balance and transactions</strong>: deposits, uploads, extensions, rate-limit purchases, donations, deletions</td>
+            <td>To provide the paid service and keep financial records</td>
+            <td>Kept after account deletion, for accounting and legal obligations</td>
+          </tr>
+          <tr>
+            <td><strong>Uploads</strong>: CID, size, content type, upload and expiration times, download count, and which account uploaded it</td>
+            <td>To store, serve, bill for, and expire content</td>
+            <td>Until the content is deleted; your upload list is cleared when you delete your account</td>
+          </tr>
+          <tr>
+            <td><strong>API keys and authorized apps</strong>: a hash and an encrypted copy of each key (so you can reveal it again), names, usage counts, last use; apps you authorized and their spending limits</td>
+            <td>To authenticate API use and enforce limits you set</td>
+            <td>Revoked keys are kept for up to 5 years as a security audit trail</td>
+          </tr>
+          <tr>
+            <td><strong>Reports you file</strong>: the CID, reason, your explanation and links (public); your contact email or URL (not public, see Section 3); a one-way hash of your IP address</td>
+            <td>To review reports and prevent abuse</td>
+            <td>Kept indefinitely as part of the public dispute record</td>
+          </tr>
+          <tr>
+            <td><strong>IP addresses</strong></td>
+            <td>Processed transiently for rate limiting and abuse prevention. Stored only as a one-way hash with reports.</td>
+            <td>Not stored in identifiable form by us; see Cloudflare below</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>
+        We don't collect payment card details; Stripe processes payments and gives us only the result
+        and a transaction reference.
+      </p>
+
+      <h2>3. Who can see what</h2>
+      <ul>
+        <li><strong>Everyone</strong> can see stored content (by CID), public deletion records (CID, time, reason, size, content type, and a one-way hash of the uploader's account ID), and reports (CID, reason, explanation, links, status, and resolution).</li>
+        <li><strong>Reporter contact details</strong> are visible to administrators and to signed-in HashBin users, not to anonymous visitors. [CONFIRM: limit to administrators and the content's uploader?]</li>
+        <li><strong>Administrators</strong> can see account, transaction, and report data to operate the Service and resolve disputes.</li>
+        <li>We disclose data when the law requires it, for example in response to a valid court order, and to report child sexual abuse material to the relevant authorities.</li>
+      </ul>
+
+      <h2>4. Service providers</h2>
+      <ul>
+        <li><strong>Cloudflare</strong> hosts the Service and stores content and data (Workers, Durable Objects, R2). Cloudflare processes request data, including IP addresses, to deliver and protect the Service.</li>
+        <li><strong>Clerk</strong> provides sign-in and holds your email and linked sign-in accounts.</li>
+        <li><strong>Stripe</strong> processes payments.</li>
+      </ul>
+      <p>These providers process data on our behalf under their own security and privacy terms. Data may be processed in the United States and other countries where they operate.</p>
+
+      <h2>5. Cookies and local storage</h2>
+      <p>
+        We use only what's needed to keep you signed in: cookies and browser storage set by our
+        authentication provider. We don't use advertising or analytics cookies. Content served from
+        256t.us never sets cookies.
+      </p>
+
+      <h2>6. Backups</h2>
+      <p>
+        Account, transaction, and content records are backed up nightly. Backups are kept for 30 days,
+        so deleted data can persist in backups for up to 30 days.
+      </p>
+
+      <h2>7. Your choices and rights</h2>
+      <ul>
+        <li>You can delete content you uploaded, revoke API keys and authorized apps, and delete your account from your account page.</li>
+        <li>Depending on where you live (for example under the GDPR or CCPA), you may have the right to access, correct, delete, or export your personal data, and to object to or restrict processing. Email [PRIVACY EMAIL] to make a request. Records we must keep for legal or financial reasons, public dispute and deletion records, and content others hold copies of may be exempt.</li>
+        <li>[IF APPLICABLE: name of EU/UK representative, and the right to complain to a supervisory authority.]</li>
+      </ul>
+
+      <h2>8. Children</h2>
+      <p>The Service is not directed to children under [AGE, e.g. 13 / 16], and we don't knowingly collect their personal data.</p>
+
+      <h2>9. Changes</h2>
+      <p>We'll post any changes here with a new "Last updated" date, and give notice on the site for material changes.</p>
+
+      <h2>10. Contact</h2>
+      <p>[LEGAL ENTITY NAME], [POSTAL ADDRESS]. Privacy questions: [PRIVACY EMAIL].</p>
+    </article>
+  </main>
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source |
+      <a href="/docs/">Documentation</a> |
+      <a href="/terms.html">Terms</a> |
+      <a href="/dmca.html">DMCA</a> |
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a> |
+      <a href="/sitemap.html">Site Map</a>
+    </p>
+  </footer>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>
