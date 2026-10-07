@@ -13,7 +13,7 @@ import {
 // Mock Stripe module
 vi.mock('stripe', () => {
   return {
-    default: vi.fn().mockImplementation((apiKey, options) => {
+    default: vi.fn().mockImplementation(function StripeMock(_apiKey, _options) {
       return {
         webhooks: {
           constructEventAsync: async (body, signature, secret) => {

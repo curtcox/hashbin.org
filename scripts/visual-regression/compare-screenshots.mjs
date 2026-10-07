@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import fg from 'fast-glob';
+import { glob } from 'tinyglobby';
 import { chromium } from 'playwright';
 import pixelmatch from 'pixelmatch';
 import { PNG } from 'pngjs';
@@ -15,7 +15,7 @@ fs.mkdirSync(baselineDir, { recursive: true });
 fs.mkdirSync(currentDir, { recursive: true });
 fs.mkdirSync(diffDir, { recursive: true });
 
-const htmlFiles = await fg(['frontend/**/*.html'], { dot: false });
+const htmlFiles = await glob(['frontend/**/*.html'], { dot: false });
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });

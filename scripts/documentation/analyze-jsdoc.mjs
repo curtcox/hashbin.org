@@ -1,11 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import fg from 'fast-glob';
-import espree from 'espree';
+import { glob } from 'tinyglobby';
+import * as espree from 'espree';
 import estraverse from 'estraverse';
 
 const rootDir = process.cwd();
-const sourceFiles = await fg(['src/**/*.js'], { dot: false });
+const sourceFiles = await glob(['src/**/*.js'], { dot: false });
 
 const results = {
   summary: {
