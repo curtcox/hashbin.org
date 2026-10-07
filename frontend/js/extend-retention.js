@@ -134,7 +134,7 @@ async function init() {
   }
 
   // Inline content (≤64 bytes) lives in the CID itself and costs nothing to keep
-  if (!content.expires_at || content.size_bytes <= 64) return;
+  if (!content.expires_at || content.size_bytes <= 64 || content.deleted_at) return;
 
   card.style.display = 'block';
   monthsSelect.addEventListener('change', updateQuote);

@@ -31,6 +31,28 @@ async function writeContentMeta(env, cid, metadata = {}) {
 }
 
 /**
+ * Content metadata as shown to anyone: no uploader or payer identities
+ * (Decision #9), and no internal bookkeeping fields
+ * @param {Object} content - Stored ContentMetadata record
+ * @returns {Object} Public fields
+ */
+export function publicContentView(content) {
+  const {
+    uploader_id: _uploaderId,
+    retention_payments: retentionPayments = [],
+    rate_limit_records: rateLimitRecords = [],
+    pending_r2_deletion: _pendingR2Deletion,
+    deletion_reason: _deletionReason,
+    ...rest
+  } = content;
+  return {
+    ...rest,
+    retention_payment_count: retentionPayments.length,
+    rate_limit_records: rateLimitRecords.map(({ payer_id: _payerId, ...record }) => record)
+  };
+}
+
+/**
  * 410 for uploads, extensions, or donations targeting deleted content
  */
 export function contentDeletedResponse() {
@@ -501,7 +523,8 @@ export async function handleGetContent(request, env, cid) {
 
     return new Response(
       JSON.stringify({
-        ...data,
+        ...publicContentView(data),
+        is_owner: Boolean(request.user?.userId && request.user.userId === data.uploader_id),
         url: buildContentUrl(env, cid, null, request),
         download_domain: getContentDomain(env, request)
       }),

@@ -364,6 +364,23 @@
               <div id="extend-message" class="alert hidden" role="status" style="margin-top: 1rem;"></div>
             </div>
 
+            <!-- Delete (uploader only) -->
+            <div class="info-card" id="delete-card" style="display: none;">
+              <h3 style="margin-bottom: 0.5rem;">🗑️ Delete Content</h3>
+              <p class="form-help" style="margin-bottom: 1rem;">
+                You uploaded this content. Deleting it stops it from being served right away and removes the
+                stored file within a day. Deletion is permanent, isn't refunded, and is listed in the public records.
+              </p>
+              <form id="delete-form" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 220px;">
+                  <label class="form-label" for="delete-reason">Reason (optional)</label>
+                  <input type="text" id="delete-reason" class="form-input" maxlength="200" placeholder="e.g. no longer needed">
+                </div>
+                <button type="submit" id="delete-btn" class="btn btn-secondary" style="color: #b91c1c; border-color: #b91c1c;">Delete permanently</button>
+              </form>
+              <div id="delete-message" class="alert hidden" role="status" style="margin-top: 1rem;"></div>
+            </div>
+
             <!-- Current Rate Limit Status -->
             <div class="info-card">
               <h3 style="margin-bottom: 1rem;">Current Rate Limit Status</h3>
@@ -574,5 +591,6 @@
   <script type="module" src="/js/app.js"></script>
   <script type="module" src="/js/rate-limit-purchase.js"></script>
   <script type="module" src="/js/extend-retention.js"></script>
+  <script type="module" src="/js/content-delete.js"></script>
 </body>
 </html>
