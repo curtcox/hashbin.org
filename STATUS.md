@@ -98,7 +98,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-362 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+362 passing, 2 skipped; plus 25 Playwright E2E tests and 11 local API suites, as of 2026-10-07). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |
