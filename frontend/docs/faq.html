@@ -108,7 +108,14 @@
         <div class="faq-item">
           <div class="faq-question">Can I delete content before expiration?</div>
           <div class="faq-answer">
-            Content cannot be deleted before its expiration date. This ensures reliability for anyone who has the hash. If you need content removed, you can file a dispute through the appropriate channels as outlined in the Terms of Service.
+            Yes. The account that uploaded content can delete it at any time with <code>DELETE /api/content/{cid}</code>. Deletion is permanent, is not refunded, and is recorded on the <a href="/public-records.html">public records</a> page.
+          </div>
+        </div>
+
+        <div class="faq-item">
+          <div class="faq-question">How do I report content that infringes my rights or breaks the law?</div>
+          <div class="faq-answer">
+            Use the <a href="/disputes/submit.html">report form</a>, or the "Report this content" link on any content's info page. Reported content is blocked (HTTP 451) while an administrator reviews the report. The report and its evidence are public on the <a href="/disputes/index.html">disputes page</a>; your contact details are not. Unresolved reports expire after 30 days.
           </div>
         </div>
       </section>
@@ -247,9 +254,5 @@
 
   <!-- Scripts -->
   <script type="module" src="/js/app.js"></script>
-  <script type="module">
-    import { initNavHeader } from '/js/nav-header.js';
-    initNavHeader();
-  </script>
 </body>
 </html>

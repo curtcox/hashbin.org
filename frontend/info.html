@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/css/layout.css">
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/disputes.css">
   
   <style>
     .info-card {
@@ -142,7 +143,7 @@
       </div>
       
       <div id="content" style="display: none;">
-        <div class="success-banner">
+        <div class="success-banner" style="display: none;">
           <h2>✓ Upload Successful!</h2>
           <p>Your content has been stored and is now accessible.</p>
         </div>
@@ -174,6 +175,13 @@
           </div>
         </div>
         
+        <!-- Dispute notice (shown when the content has an open dispute) -->
+        <div class="alert alert-warning dispute-banner hidden" id="dispute-banner" role="status">
+          <strong>This content has an open dispute.</strong>
+          <p>It is blocked (HTTP 451) until an administrator reviews the report.
+            <a id="dispute-banner-link" href="#">View dispute</a></p>
+        </div>
+
         <!-- Rate Limit Status Card -->
         <div class="info-card" id="rate-limit-card">
           <h3 style="margin-bottom: 1rem;">Rate Limit Status</h3>
@@ -189,6 +197,9 @@
           <a href="/upload.html" class="btn btn-secondary">
             Upload Another File
           </a>
+          <p style="margin-top: 1.5rem;">
+            <a id="report-link" class="link" href="/disputes/submit.html">Report this content</a>
+          </p>
         </div>
       </div>
       
@@ -235,6 +246,11 @@
     } else {
       loadContentInfo(cid);
       loadRateLimitStatus(cid);
+      loadDisputeStatus(cid);
+
+      if (params.get('uploaded') === '1') {
+        document.querySelector('.success-banner').style.display = 'block';
+      }
       
       // Show purchase success banner if redirected from purchase
       if (purchaseSuccess === '1' && purchaseId) {
@@ -270,6 +286,27 @@
       }
     }
     
+    async function loadDisputeStatus(cid) {
+      const disputeUrl = `/disputes/view.html?cid=${encodeURIComponent(cid)}`;
+      const reportLink = document.getElementById('report-link');
+      reportLink.href = `/disputes/submit.html?cid=${encodeURIComponent(cid)}`;
+
+      try {
+        const response = await fetch(`/api/content/${encodeURIComponent(cid)}/disputes`);
+        if (!response.ok) return;
+        const data = await response.json();
+        const active = (data.disputes || []).some(d => d.status === 'open' || d.status === 'under_review');
+        if (active) {
+          document.getElementById('dispute-banner-link').href = disputeUrl;
+          document.getElementById('dispute-banner').classList.remove('hidden');
+          reportLink.textContent = 'View dispute';
+          reportLink.href = disputeUrl;
+        }
+      } catch (error) {
+        console.error('Failed to load dispute status:', error);
+      }
+    }
+
     async function loadRateLimitStatus(cid) {
       const rateLimitContent = document.getElementById('rate-limit-content');
       
@@ -363,6 +400,7 @@
     function showPurchaseSuccess(purchaseId) {
       // Add success message at the top
       const successBanner = document.querySelector('.success-banner');
+      successBanner.style.display = 'block';
       successBanner.querySelector('h2').textContent = '✓ Rate Limit Purchase Successful!';
       successBanner.querySelector('p').textContent = `Your bandwidth purchase has been completed. The content now has updated rate limits.`;
     }

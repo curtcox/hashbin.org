@@ -237,8 +237,8 @@
   </main>
 
   <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
   <script type="module">
-    import { loadNavHeader } from '/js/nav-header.js';
     import { 
       getSupplier, 
       formatSupplierType, 
@@ -258,8 +258,6 @@
 
     // Initialize page
     async function init() {
-      await loadNavHeader();
-      
       if (!supplierId) {
         showError('No supplier ID provided');
         return;

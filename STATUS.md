@@ -50,7 +50,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | L5 | Real Terms of Service | legal | ⬜ | **Decision (2026-10-07): Claude drafts it with placeholders; the owner fills them in and gets it reviewed.** `frontend/terms.html` is placeholder text. Must cover: no refunds (Decision #13), no grace period on expiry (#8), content responsibility, dispute process, liability, governing law. |
 | L6 | Privacy Policy | legal | ⬜ | No page exists. Must cover: Clerk/Stripe as processors, hashed IPs, public records, account deletion and data retention. |
 | L7 | DMCA designated agent registered, with contact info on the site | legal/ops | ⬜ | Required for DMCA safe harbor (17 U.S.C. §512(c)(2)). |
-| L8 | Public UI for reporting content (dispute submission + open disputes list) | code | ⬜ | The backend API is done (`POST/GET /api/disputes`). The UI is missing: `todo/content_moderation.md` Phases 6–8. |
+| L8 | Public UI for reporting content (dispute submission + open disputes list) | code | ✅ | `/disputes/submit.html`, `/disputes/index.html`, `/disputes/view.html?cid=`, a dispute notice and "Report this content" link on `/info.html`, and links from the FAQ, footer, and sitemap. Verified in a browser against local dev; the 256t.us worker returns 451 for disputed and 404 for deleted content. `/public-records.html` (previously broken: it called a nonexistent `/api/records`) now shows real deletion records. |
 | L9 | Upload size limit matches reality | code | ✅ | **Decision (2026-10-07): cap at 90 MB.** Enforced server-side (`src/utils/upload-limits.js`, 413 before buffering) and in the upload UI and docs; published as `max_upload_bytes` in `/api/config`. Larger files are B6. L11 should include an upload near 90 MB to confirm it fits in Worker memory. |
 | L10 | Metadata backups: daily snapshots | code | ⬜ | **Decision (2026-10-07): nightly JSON snapshots to `BACKUP_BUCKET` plus a documented restore procedure (RPO 24h).** The per-write event log from Decision #15 is deferred (B8). |
 | L11 | End-to-end production test: real OAuth login, real deposit, upload, download from 256t.us, dispute, deletion | ops | ⬜ | Blocked by L1, L2, L4. Checklist: `todo/manual_testing_guide.md`. |
@@ -71,6 +71,9 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S6 | Developer app update/delete (`PATCH`/`DELETE /api/developers/apps/{id}`) | code | ⬜ | `done/third_party_publishing.md` "Remaining". |
 | S8 | Donation UI for content | code | ⬜ | API exists (`POST /api/donate/cid/{cid}`), no UI. |
 | S9 | Dev-dependency vulnerabilities (wrangler, playwright, sharp, eslint plugins) | code | ⬜ | `npm audit` reports 29 (2 critical) in dev tooling only; not shipped to production. Fixing needs major-version upgrades. |
+| S10 | Per-IP rate limit on dispute submission (10/hour per plan) | code | ⬜ | `src/api/disputes.js` TODO. Today only the global anonymous rate limit and one open dispute per CID apply. |
+| S11 | Delete button for uploaders on the upload detail page | code | ⬜ | The API works (L15); the UI is `todo/content_moderation.md` Phase 8. |
+| S12 | Make the Playwright E2E suite runnable and run it in CI | code | ⬜ | `@playwright/test` isn't a dependency and no workflow runs `frontend/tests/`. Run locally with a shim on 2026-10-07: 17 pass, 7 fail on stale expectations (protected pages now redirect to sign-in, ambiguous locators, a RegExp typo). |
 | S7 | Production OAuth third-party publishing smoke test | ops | ⬜ | `done/third_party_publishing.md` "Production Deployment Verification". |
 
 ## Backlog (not needed for launch)
@@ -91,7 +94,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-313 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+324 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

@@ -808,6 +808,23 @@ export async function handleDownloadContent(request, env, cid, extension = null)
 
     const metadata = await metadataResponse.json();
 
+    // Mirror the 256t.us content worker: deleted content is gone, disputed content is blocked
+    if (metadata.deleted_at) {
+      return new Response(
+        JSON.stringify({ error: 'not_found', message: 'Content not found' }),
+        { status: 404, headers: { 'content-type': 'application/json' } }
+      );
+    }
+    if (env.CONTENT_BUCKET && await env.CONTENT_BUCKET.head(`${cid}.disputed`)) {
+      return new Response(
+        JSON.stringify({
+          error: 'unavailable_for_legal_reasons',
+          message: 'This content is blocked while a dispute is reviewed'
+        }),
+        { status: 451, headers: { 'content-type': 'application/json' } }
+      );
+    }
+
     // Check if content is expired
     const expiresAt = new Date(metadata.expires_at);
     if (expiresAt < new Date()) {

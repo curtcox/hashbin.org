@@ -192,21 +192,39 @@ test.describe('Public Records Page', () => {
     await expect(page.locator('h1')).toContainText('Public Records');
     
     // Check statistics section
-    await expect(page.locator('#stat-total')).toBeVisible();
-    await expect(page.locator('#stat-storage')).toBeVisible();
+    await expect(page.locator('#stat-deletions')).toBeVisible();
+    await expect(page.locator('#stat-disputes')).toBeVisible();
   });
 
   test('should have filter and export controls', async ({ page }) => {
     await page.goto(`${BASE_URL}/public-records.html`);
     
-    // Check search input
-    await expect(page.locator('#search-hash')).toBeVisible();
-    
-    // Check status filter
-    await expect(page.locator('#filter-status')).toBeVisible();
+    // Check reason filter
+    await expect(page.locator('#filter-reason')).toBeVisible();
     
     // Check export button
     await expect(page.locator('#export-button')).toBeVisible();
+  });
+});
+
+test.describe('Dispute Pages', () => {
+  test('should show validation errors on an empty report', async ({ page }) => {
+    await page.goto(`${BASE_URL}/disputes/submit.html`);
+    await expect(page.locator('h1')).toContainText('Report Content');
+    await page.click('#submit-button');
+    await expect(page.locator('#form-error')).toBeVisible();
+    await expect(page.locator('#form-error')).toContainText('valid content ID');
+  });
+
+  test('should prefill the CID from the query string', async ({ page }) => {
+    await page.goto(`${BASE_URL}/disputes/submit.html?cid=AAAAAAAAabcdefgh`);
+    await expect(page.locator('#cid')).toHaveValue('AAAAAAAAabcdefgh');
+  });
+
+  test('should load the open disputes list', async ({ page }) => {
+    await page.goto(`${BASE_URL}/disputes/index.html`);
+    await expect(page.locator('h1')).toContainText('Open Disputes');
+    await expect(page.locator('#dispute-list')).not.toContainText('Loading');
   });
 });
 

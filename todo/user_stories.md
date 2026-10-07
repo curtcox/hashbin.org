@@ -236,12 +236,12 @@ This document contains user stories for the HashBin.org platform, organized by u
 ## Content Contesters
 
 ### Contest Submission
-- [UI: 📋 | API: ✅] **As a contester**, I would like to submit a contest for copyrighted content so that I can protect my intellectual property.
-  - _Paths: UI: `/disputes/submit.html` (planned, STATUS L8) | API: `POST /api/disputes`_
-- [UI: 📋 | API: ✅] **As a contester**, I would like to submit a contest for illegal content so that harmful material can be removed.
-  - _Paths: UI: `/disputes/submit.html` (planned, STATUS L8) | API: `POST /api/disputes`_
-- [UI: 📋 | API: ✅] **As a contester**, I would like to submit a contest for abusive content so that policy violations are addressed.
-  - _Paths: UI: `/disputes/submit.html` (planned, STATUS L8) | API: `POST /api/disputes`_
+- [UI: ✅ | API: ✅] **As a contester**, I would like to submit a contest for copyrighted content so that I can protect my intellectual property.
+  - _Paths: UI: `/disputes/submit.html` | API: `POST /api/disputes`_
+- [UI: ✅ | API: ✅] **As a contester**, I would like to submit a contest for illegal content so that harmful material can be removed.
+  - _Paths: UI: `/disputes/submit.html` | API: `POST /api/disputes`_
+- [UI: ✅ | API: ✅] **As a contester**, I would like to submit a contest for abusive content so that policy violations are addressed.
+  - _Paths: UI: `/disputes/submit.html` | API: `POST /api/disputes`_
 - [UI: 📋 | API: ✅] **As a contester**, I would like to upload evidence documents so that my claim is properly supported.
   - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/disputes` (evidence as text + URLs; no file upload)_
 - [UI: 📋 | API: ✅] **As a contester**, I would like my evidence immediately visible to moderators and payers so that disputes can be resolved quickly.
@@ -262,8 +262,8 @@ This document contains user stories for the HashBin.org platform, organized by u
   - _Paths: UI: N/A | API: Contest validation rules (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like manual review for nuanced cases so that fair decisions are made.
   - _Paths: UI: `/admin/contests/:id` (planned) | API: Contest review workflow (planned)_
-- [UI: 📋 | API: ✅] **As a contester**, I would like to see contest status updates so that I know the progress of my claim.
-  - _Paths: UI: `/contest/:id` (planned) | API: `GET /api/disputes/{id}`_
+- [UI: ✅ | API: ✅] **As a contester**, I would like to see contest status updates so that I know the progress of my claim.
+  - _Paths: UI: `/disputes/view.html?cid=` | API: `GET /api/content/{cid}/disputes`_
 - [UI: 📋 | API: 📋] **As a contester**, I would like to appeal decisions so that incorrect rulings can be challenged.
   - _Paths: UI: `/contest/:id/appeal` (planned) | API: `POST /api/contest/:id/appeal` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like DMCA-compliant 24-48 hour response times so that legal requirements are met.

@@ -386,7 +386,7 @@ async function handleUpload(event) {
       const data = await response.json();
       
       // Redirect to info page
-      window.location.href = `/info.html?cid=${data.cid}`;
+      window.location.href = `/info.html?cid=${data.cid}&uploaded=1`;
     } else {
       const error = await response.json();
       hideUploadProgress();

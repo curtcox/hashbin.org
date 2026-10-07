@@ -21,14 +21,15 @@
 1. R2 Cleanup requires DeletionPendingIndex for efficient batch processing (documented with TODO)
 2. Admin disputes listing returns open disputes only (historical requires additional indexing)
 
-### Frontend Implementation: ⏳ TODO (Phases 6-9)
+### Frontend Implementation: 🚧 MOSTLY DONE (2026-10-07)
 
-**Remaining Work:**
-- ❌ Phase 6: Dispute Form UI (`/disputes/submit.html`, form validation)
-- ❌ Phase 7: Disputes List UI (`/disputes/index.html`, filtering, pagination)
-- ❌ Phase 8: CID Details Updates (dispute banner, delete button, report link)
-- ❌ Phase 9: Transaction History Updates (deletion transaction display)
-- ❌ Phase 10: Final integration testing and plan archival
+- ✅ Phase 6: Dispute Form UI (`/disputes/submit.html`, form validation)
+- ✅ Phase 7: Disputes List UI (`/disputes/index.html`, filtering, pagination)
+- ✅ Phase 8 (partial): dispute banner + report link on `/info.html`; per-CID dispute page `/disputes/view.html?cid=` (replaces `GET /api/disputes/{id}`, which is not implemented). Uploader delete button not done (STATUS.md S11)
+- ❌ Phase 9: Transaction History Updates (STATUS.md S5)
+- ❌ Phase 10: Final integration testing and plan archival (STATUS.md L11)
+
+**Fixed 2026-10-07 (STATUS.md L15):** the deletion and admin endpoints were unreachable (`request.user` never set) and crashed once reachable. Admin endpoints now also accept `X-Admin-Token`.
 
 ---
 

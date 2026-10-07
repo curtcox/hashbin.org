@@ -1,0 +1,120 @@
+/* Dispute pages: list, detail, and banners on content pages */
+
+.dispute-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin: 1.5rem 0 1rem;
+}
+
+.filter-bar .form-label {
+  margin: 0;
+}
+
+.filter-bar select {
+  max-width: 240px;
+}
+
+.dispute-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.dispute-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-secondary);
+}
+
+.dispute-item .dispute-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.875rem;
+  color: var(--color-text-light);
+}
+
+.dispute-cid {
+  font-family: 'Courier New', monospace;
+  word-break: break-all;
+}
+
+.dispute-empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--color-text-light);
+}
+
+.dispute-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.dispute-badge.status-open,
+.dispute-badge.status-under_review {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff;
+}
+
+.dispute-badge.status-closed_deleted {
+  background: #ef4444;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.dispute-badge.status-closed_denied {
+  background: #10b981;
+  border-color: #10b981;
+  color: #fff;
+}
+
+.dispute-evidence {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--color-bg-secondary);
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+.dispute-detail dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.5rem 1.5rem;
+  margin: 1rem 0;
+}
+
+.dispute-detail dt {
+  color: var(--color-text-light);
+}
+
+.dispute-detail dd {
+  margin: 0;
+}
+
+.dispute-banner {
+  border-left: 4px solid #f59e0b;
+}

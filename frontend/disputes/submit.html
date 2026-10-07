@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Report content on HashBin.org">
+  <title>Report Content - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/disputes.css">
+
+  <style>
+    .url-row {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .url-row input {
+      flex: 1;
+    }
+    .char-count {
+      text-align: right;
+      font-size: 0.875rem;
+      color: var(--color-text-light);
+    }
+    .char-count.invalid {
+      color: #ef4444;
+    }
+    .radio-group {
+      display: flex;
+      gap: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    .cid-input {
+      font-family: 'Courier New', monospace;
+    }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+
+  <main>
+    <div class="container" style="max-width: 720px;">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a> <span>/</span>
+        <a href="/disputes/index.html">Disputes</a> <span>/</span>
+        <span>Report Content</span>
+      </nav>
+
+      <h1>Report Content</h1>
+      <p>
+        Use this form to report content hosted on HashBin.org: copyright infringement, illegal
+        content, privacy violations, harassment, or malware. While a report is open, the content
+        is blocked (HTTP 451) until an administrator reviews it. Reports that aren't resolved
+        expire after 30 days.
+      </p>
+      <p class="form-text">
+        Everything you submit except your contact details is public.
+        See <a href="/docs/faq.html">the FAQ</a> for how disputes are handled.
+      </p>
+
+      <div id="form-error" class="alert alert-error hidden" role="alert"></div>
+
+      <form id="dispute-form" class="card" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="cid">Content ID (CID)</label>
+          <input type="text" id="cid" name="cid" class="form-input cid-input" required
+                 pattern="[A-Za-z0-9_-]{8,94}" autocomplete="off" spellcheck="false">
+          <p class="form-text">The 256t identifier from the content URL, e.g. <code>https://256t.us/<em>CID</em></code>.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="claim_type">Reason</label>
+          <select id="claim_type" name="claim_type" class="form-select form-input" required>
+            <option value="">Select a reason…</option>
+            <option value="copyright">Copyright infringement</option>
+            <option value="illegal">Illegal content</option>
+            <option value="privacy">Privacy violation</option>
+            <option value="harassment">Harassment</option>
+            <option value="malware">Malware</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="evidence">Explanation and evidence</label>
+          <textarea id="evidence" name="evidence" class="form-textarea form-input" rows="8"
+                    minlength="50" maxlength="10000" required></textarea>
+          <div class="char-count" id="evidence-count">0 / 10,000 (minimum 50)</div>
+          <p class="form-text">
+            For copyright claims, identify the original work, explain how this content infringes it,
+            and state whether you are the rights holder or authorized to act for them.
+          </p>
+        </div>
+
+        <div class="form-group">
+          <span class="form-label">Supporting links (optional, HTTPS, up to 10)</span>
+          <div id="url-list"></div>
+          <button type="button" id="add-url" class="btn btn-secondary btn-sm">Add link</button>
+        </div>
+
+        <div class="form-group">
+          <span class="form-label">How can we contact you? (not shown publicly)</span>
+          <div class="radio-group">
+            <label><input type="radio" name="contact_type" value="email" checked> Email</label>
+            <label><input type="radio" name="contact_type" value="url"> Web address (HTTPS)</label>
+          </div>
+          <input type="text" id="contact_value" name="contact_value" class="form-input" required
+                 autocomplete="email" placeholder="you@example.com">
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="good_faith" required>
+            I confirm this report is made in good faith and the information in it is accurate.
+          </label>
+        </div>
+
+        <button type="submit" id="submit-button" class="btn btn-primary">Submit report</button>
+      </form>
+
+      <div id="success" class="card hidden">
+        <div class="alert alert-success" role="status">
+          <strong>Report submitted.</strong>
+          <p>Reference: <code id="success-id"></code></p>
+          <p>The content is now blocked pending review. This report expires on <span id="success-expires"></span> if it isn't resolved.</p>
+        </div>
+        <p>
+          <a id="success-view" class="btn btn-primary" href="#">View dispute</a>
+          <a class="btn btn-secondary" href="/disputes/index.html">All open disputes</a>
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source |
+      <a href="/docs/">Documentation</a> |
+      <a href="/disputes/index.html">Disputes</a> |
+      <a href="/terms.html">Terms</a> |
+      <a href="/sitemap.html">Site Map</a>
+    </p>
+  </footer>
+
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/dispute-submit.js"></script>
+</body>
+</html>

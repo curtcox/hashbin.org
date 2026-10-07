@@ -238,7 +238,8 @@ export async function handleGetContentDisputes(request, env, cid, userId = null)
     // Filter contact info based on authentication
     const disputes = historyData.disputes.map(dispute => {
       const filtered = { ...dispute };
-      
+      delete filtered.submitter_ip_hash;
+
       // Only show contact info to authenticated users
       if (!userId) {
         delete filtered.submitter_contact;

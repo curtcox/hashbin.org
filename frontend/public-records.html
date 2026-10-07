@@ -102,67 +102,63 @@
       
       <section class="card" style="margin-bottom: 2rem;">
         <h2>Transparency & Accountability</h2>
-        <p>HashBin.org maintains public records of all content and contests for transparency. All data is publicly accessible and verifiable.</p>
+        <p>HashBin.org publishes a permanent record of every content deletion and every dispute. Content is only reachable by its hash, so there is no public index of stored content.</p>
       </section>
 
       <!-- Statistics -->
       <section class="stats-grid">
         <div class="stat-card">
-          <div class="stat-label">Total Content Items</div>
-          <div class="stat-value" id="stat-total">-</div>
+          <div class="stat-label">Total Deletions</div>
+          <div class="stat-value" id="stat-deletions">-</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Total Storage Used</div>
-          <div class="stat-value" id="stat-storage">-</div>
+          <div class="stat-label">Expired</div>
+          <div class="stat-value" id="stat-expired">-</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Active Content</div>
-          <div class="stat-value" id="stat-active">-</div>
+          <div class="stat-label">Removed (admin or uploader)</div>
+          <div class="stat-value" id="stat-removed">-</div>
         </div>
         <div class="stat-card">
-          <div class="stat-label">Total Contests</div>
-          <div class="stat-value" id="stat-contests">-</div>
+          <div class="stat-label">Open Disputes</div>
+          <div class="stat-value"><a id="stat-disputes" href="/disputes/index.html">-</a></div>
         </div>
       </section>
 
-      <!-- Content Records -->
+      <!-- Deletion Records -->
       <section class="card">
-        <h2>Content Records</h2>
-        
-        <!-- Filter Bar -->
+        <h2>Deletion Records</h2>
+        <p style="color: var(--color-text-light);">
+          Every deletion is recorded permanently: the content hash, when it was deleted, and why.
+          Uploader identities are not published.
+        </p>
+
         <div class="filter-bar">
-          <input 
-            type="text" 
-            id="search-hash" 
-            class="form-input" 
-            placeholder="Search by hash..."
-          >
-          <select id="filter-status" class="form-input">
-            <option value="">All Statuses</option>
-            <option value="active">Active</option>
+          <select id="filter-reason" class="form-input">
+            <option value="">All reasons</option>
             <option value="expired">Expired</option>
-            <option value="contested">Contested</option>
+            <option value="user_request">Deleted by uploader</option>
+            <option value="admin_action">Removed by admin</option>
           </select>
-          <button class="btn btn-secondary" id="export-button">Export Data</button>
+          <button class="btn btn-secondary" id="export-button">Export loaded records (JSON)</button>
         </div>
 
-        <!-- Records Table -->
         <div id="records-container">
-          <div class="loading">
-            Loading public records...
-          </div>
+          <div class="loading">Loading public records...</div>
+        </div>
+        <div style="text-align: center; margin-top: 1rem;">
+          <button class="btn btn-secondary hidden" id="load-more">Load more</button>
         </div>
       </section>
 
-      <!-- Contest Records (if any) -->
-      <section class="card" style="margin-top: 2rem; display: none;" id="contests-section">
-        <h2>Contest Records</h2>
-        <p style="color: var(--color-text-light); margin-bottom: 1rem;">
-          Records of content disputes and their resolutions.
+      <section class="card" style="margin-top: 2rem;">
+        <h2>Disputes</h2>
+        <p>
+          Open content disputes, and the evidence submitted with them, are listed on the
+          <a href="/disputes/index.html">disputes page</a>. Raw data is also available from the API:
+          <code>GET /api/public/deletions</code>, <code>GET /api/public/deletions/stats</code>, and
+          <code>GET /api/disputes</code>.
         </p>
-        <div id="contests-container">
-          <p style="color: var(--color-text-light);">No contests filed.</p>
-        </div>
       </section>
     </div>
   </main>
@@ -174,6 +170,7 @@
       <a href="/">Home</a> | 
       <a href="/docs/index.html">Docs</a> | 
       <a href="/docs/api.html">API</a> | 
+      <a href="/disputes/index.html">Disputes</a> | 
       <a href="/terms.html">Terms</a>
     </p>
   </footer>
@@ -181,168 +178,111 @@
   <!-- Scripts -->
   <script type="module" src="/js/app.js"></script>
   <script type="module">
-    import { initNavHeader } from '/js/nav-header.js';
-    import { formatFileSize } from '/js/utils.js';
-    
-    initNavHeader();
+    import { formatFileSize } from '/js/hash256t.js';
+    import { escapeHtml, formatDisputeDate, truncateCid } from '/js/disputes.js';
 
-    let allRecords = [];
+    const PAGE_SIZE = 50;
+    const REASON_LABELS = {
+      expired: 'Expired',
+      user_request: 'Deleted by uploader',
+      admin_action: 'Removed by admin',
+      contested: 'Removed after dispute'
+    };
 
-    function formatDate(dateString) {
-      if (!dateString) return 'N/A';
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'short', 
-        day: 'numeric' 
-      });
+    let loadedRecords = [];
+    let offset = 0;
+
+    function renderRows(records) {
+      return records.map(record => `
+        <tr>
+          <td><span class="hash-display" title="${escapeHtml(record.hash_256t)}">${escapeHtml(truncateCid(record.hash_256t))}</span></td>
+          <td>${record.size_bytes ? escapeHtml(formatFileSize(record.size_bytes)) : '—'}</td>
+          <td>${escapeHtml(formatDisputeDate(record.deleted_at))}</td>
+          <td>${escapeHtml(REASON_LABELS[record.reason] || record.reason || 'Unknown')}</td>
+        </tr>
+      `).join('');
     }
 
-    function truncateHash(hash) {
-      if (!hash || hash.length <= 16) return hash;
-      return hash.substring(0, 8) + '...' + hash.substring(hash.length - 8);
-    }
-
-    function getStatusBadge(status) {
-      const statusLower = (status || 'unknown').toLowerCase();
-      let className = 'status-badge';
-      
-      if (statusLower.includes('active')) className += ' status-active';
-      else if (statusLower.includes('expired')) className += ' status-expired';
-      else if (statusLower.includes('contest')) className += ' status-contested';
-      
-      return `<span class="${className}">${status || 'Unknown'}</span>`;
-    }
-
-    function renderRecordsTable(records) {
+    async function loadDeletions(reset) {
       const container = document.getElementById('records-container');
-      
-      if (!records || records.length === 0) {
-        container.innerHTML = '<p style="color: var(--color-text-light); padding: 2rem; text-align: center;">No records found.</p>';
-        return;
+      const loadMore = document.getElementById('load-more');
+      const reason = document.getElementById('filter-reason').value;
+      if (reset) {
+        offset = 0;
+        loadedRecords = [];
+        container.innerHTML = '<div class="loading">Loading public records...</div>';
       }
 
-      let html = `
-        <table class="records-table">
-          <thead>
-            <tr>
-              <th>Hash</th>
-              <th>Size</th>
-              <th>Uploaded</th>
-              <th>Expires</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+      if (reason) params.set('reason', reason);
 
-      records.forEach(record => {
-        html += `
-          <tr>
-            <td><span class="hash-display" title="${record.cid || ''}">${truncateHash(record.cid)}</span></td>
-            <td>${formatFileSize(record.size || 0)}</td>
-            <td>${formatDate(record.uploaded)}</td>
-            <td>${formatDate(record.expires)}</td>
-            <td>${getStatusBadge(record.status)}</td>
-          </tr>
-        `;
-      });
+      try {
+        const response = await fetch(`/api/public/deletions?${params}`);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        const records = data.deletions || [];
+        loadedRecords = loadedRecords.concat(records);
+        // The API pages over all deletions, then filters by reason
+        offset += PAGE_SIZE;
 
-      html += '</tbody></table>';
-      container.innerHTML = html;
+        if (loadedRecords.length === 0 && offset >= (data.total || 0)) {
+          container.innerHTML = '<p style="color: var(--color-text-light); padding: 2rem; text-align: center;">No deletion records yet.</p>';
+        } else {
+          container.innerHTML = `
+            <table class="records-table">
+              <thead><tr><th>Hash</th><th>Size</th><th>Deleted</th><th>Reason</th></tr></thead>
+              <tbody>${renderRows(loadedRecords)}</tbody>
+            </table>`;
+        }
+        loadMore.classList.toggle('hidden', offset >= (data.total || 0));
+      } catch (error) {
+        console.error('Failed to load deletion records:', error);
+        container.innerHTML = '<p style="padding: 2rem; text-align: center; color: var(--color-text-light);">Unable to load public records at this time.</p>';
+      }
     }
 
-    function updateStatistics(records) {
-      // Calculate statistics
-      const total = records.length;
-      const totalStorage = records.reduce((sum, r) => sum + (r.size || 0), 0);
-      const active = records.filter(r => 
-        r.status && r.status.toLowerCase().includes('active')
-      ).length;
-
-      // Update display
-      document.getElementById('stat-total').textContent = total.toLocaleString();
-      document.getElementById('stat-storage').textContent = formatFileSize(totalStorage);
-      document.getElementById('stat-active').textContent = active.toLocaleString();
-      document.getElementById('stat-contests').textContent = '0'; // TODO: Implement contests
-    }
-
-    function filterRecords() {
-      const searchTerm = document.getElementById('search-hash').value.toLowerCase();
-      const statusFilter = document.getElementById('filter-status').value.toLowerCase();
-
-      let filtered = allRecords;
-
-      // Apply search filter
-      if (searchTerm) {
-        filtered = filtered.filter(r => 
-          (r.cid || '').toLowerCase().includes(searchTerm)
-        );
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/public/deletions/stats');
+        if (response.ok) {
+          const stats = await response.json();
+          const byReason = stats.by_reason || {};
+          document.getElementById('stat-deletions').textContent = (stats.total_deletions || 0).toLocaleString();
+          document.getElementById('stat-expired').textContent = (byReason.expired || 0).toLocaleString();
+          const removed = (byReason.user_request || 0) + (byReason.admin_action || 0) + (byReason.contested || 0);
+          document.getElementById('stat-removed').textContent = removed.toLocaleString();
+        }
+      } catch (error) {
+        console.error('Failed to load deletion stats:', error);
       }
 
-      // Apply status filter
-      if (statusFilter) {
-        filtered = filtered.filter(r => 
-          (r.status || '').toLowerCase().includes(statusFilter)
-        );
+      try {
+        const response = await fetch('/api/disputes?limit=1');
+        if (response.ok) {
+          const data = await response.json();
+          document.getElementById('stat-disputes').textContent = (data.total || 0).toLocaleString();
+        }
+      } catch (error) {
+        console.error('Failed to load dispute count:', error);
       }
-
-      renderRecordsTable(filtered);
     }
 
     function exportData() {
-      const dataStr = JSON.stringify(allRecords, null, 2);
-      const blob = new Blob([dataStr], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(loadedRecords, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `hashbin-records-${new Date().toISOString().split('T')[0]}.json`;
+      link.download = `hashbin-deletions-${new Date().toISOString().split('T')[0]}.json`;
       link.click();
       URL.revokeObjectURL(url);
     }
 
-    async function loadPublicRecords() {
-      try {
-        // Fetch public records from API
-        const response = await fetch('/api/records');
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-
-        const data = await response.json();
-        allRecords = data.records || [];
-
-        // Update UI
-        renderRecordsTable(allRecords);
-        updateStatistics(allRecords);
-
-      } catch (error) {
-        console.error('Failed to load public records:', error);
-        document.getElementById('records-container').innerHTML = `
-          <div style="padding: 2rem; text-align: center; color: var(--color-text-light);">
-            <p>Unable to load public records at this time.</p>
-            <p style="margin-top: 0.5rem; font-size: 0.875rem;">
-              ${error.message}
-            </p>
-          </div>
-        `;
-        
-        // Set stats to zero
-        document.getElementById('stat-total').textContent = '0';
-        document.getElementById('stat-storage').textContent = '0 B';
-        document.getElementById('stat-active').textContent = '0';
-        document.getElementById('stat-contests').textContent = '0';
-      }
-    }
-
-    // Event listeners
-    document.getElementById('search-hash').addEventListener('input', filterRecords);
-    document.getElementById('filter-status').addEventListener('change', filterRecords);
+    document.getElementById('filter-reason').addEventListener('change', () => loadDeletions(true));
+    document.getElementById('load-more').addEventListener('click', () => loadDeletions(false));
     document.getElementById('export-button').addEventListener('click', exportData);
 
-    // Load records on page load
-    loadPublicRecords();
+    loadStats();
+    loadDeletions(true);
   </script>
 </body>
 </html>
