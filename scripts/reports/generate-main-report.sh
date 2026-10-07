@@ -589,6 +589,8 @@ cp scripts/reports/pages/verify-upload-and-extend.html build-reports/verify-uplo
 echo "GitHub Pages upload-and-extend verification page copied: build-reports/verify-upload-and-extend.html"
 cp scripts/reports/pages/diagram.html build-reports/diagram.html
 echo "GitHub Pages diagram editor copied: build-reports/diagram.html"
+cp scripts/reports/pages/diagram-oauth.html build-reports/diagram-oauth.html
+echo "GitHub Pages sign-in diagram editor copied: build-reports/diagram-oauth.html (uses build-reports/sdk)"
 
 # Bundle the browser SDK alongside generated GitHub Pages helpers so module imports stay same-origin.
 mkdir -p build-reports/sdk
