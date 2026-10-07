@@ -2,16 +2,16 @@ name = "256t-content-prod"
 main = "src/index.js"
 compatibility_date = "2024-12-01"
 
-[[r2_buckets]]
-binding = "CONTENT_BUCKET"
-bucket_name = "hashbin-content-256t-prod"
-
 # Custom domains: Cloudflare creates the DNS records and certificates on deploy.
-# (Plain routes need a proxied DNS record to exist first, and 256t.us had none.)
+# Must stay above the first [[table]] header, or TOML attaches it to that table.
 routes = [
   { pattern = "256t.us", custom_domain = true },
   { pattern = "www.256t.us", custom_domain = true }
 ]
+
+[[r2_buckets]]
+binding = "CONTENT_BUCKET"
+bucket_name = "hashbin-content-256t-prod"
 
 [vars]
 ENVIRONMENT = "production"
