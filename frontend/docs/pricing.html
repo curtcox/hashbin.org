@@ -193,7 +193,9 @@
           <h3>How It Works</h3>
           <ul style="margin-left: 1.5rem; color: var(--color-text-light);">
             <li>Storage is charged based on file size and retention duration</li>
-            <li>Retention must be in multiples of 30 days (1 month minimum)</li>
+            <li>Retention is bought in whole months (1 month minimum)</li>
+            <li>No minimum charge: the cost is rounded up to the next cent</li>
+            <li>Files of 64 bytes or less are stored inside the hash itself and are free</li>
             <li>Cost is calculated upfront and deducted from your wallet balance</li>
             <li>No recurring charges - you pay once per upload</li>
             <li>You can extend retention later for an additional fee</li>
@@ -312,7 +314,9 @@
       const durationInDays = getDurationInDays();
       const durationInMonths = durationInDays / DAYS_PER_MONTH;
       
-      const totalCost = sizeInGB * durationInMonths * RATE_PER_GB_PER_MONTH;
+      // No minimum charge; partial cents round up (content of 64 bytes or less is free)
+      const rawCents = sizeInGB * durationInMonths * RATE_PER_GB_PER_MONTH * 100;
+      const totalCost = sizeInBytes <= 64 ? 0 : Math.max(1, Math.ceil(rawCents - 1e-9)) / 100;
       
       // Update display
       document.getElementById('total-cost').textContent = '$' + totalCost.toFixed(2);

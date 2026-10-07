@@ -694,31 +694,25 @@ The following key decisions have been made to guide implementation:
 
 ---
 
-### 16. Pricing Structure: $0.03/GB/month with $1.00 Minimum
-**Decision:** Pricing constant of $0.03/GB/month (100% markup over R2 costs) with $1.00 minimum payment.
-
-**Formula:** `Cost = Size (GB) × Duration (months) × $0.03`
+### 16. Pricing Structure: $0.03/GB/month, No Minimum Charge
+**Decision (revised 2026-10-07):** $0.03 per GB per month with **no minimum charge**. Each upload or
+extension costs `Size (GB) × Duration (months) × $0.03`, rounded **up** to the next whole cent, so any
+stored content costs at least $0.01. Content of 64 bytes or less lives in the CID and is free.
 
 **Rationale:**
-- 100% markup is standard for cloud services
-- Covers R2 costs ($0.015/GB/month) plus operational overhead
-- Accounts for Durable Objects, Workers, payment fees, moderation costs
-- $1.00 minimum covers payment processing fees (typically 2.9% + $0.30)
+- 100% markup over R2 storage ($0.015/GB/month)
+- Uploads and extensions are paid from a prepaid balance; card fees are charged when depositing
+  (`Credit + Stripe fee = Total`), so a per-upload minimum isn't needed to cover them
+- Matches what the pricing page has always shown
 
 **Example pricing:**
-- 1GB for 1 year: $0.36 → **$1.00 minimum**
-- 10GB for 1 year: $3.60
-- 100GB for 1 month: $3.00
-- 1GB for 1 month: $0.03 → **$1.00 minimum**
+- 1 GB for 1 year: $0.36
+- 10 GB for 1 year: $3.60
+- 100 GB for 1 month: $3.00
+- 1 MB for 1 month: $0.01
 
-**Payment transparency:**
-- Display payment processing fees separately when possible
-- Show: Storage cost + Processing fee = Total
-- Example: $3.00 storage + $0.30 fee = $3.30 total (when itemization supported by provider)
-
-**Edge cases:**
-- Retention extensions: Add to existing expiration, no minimum on extensions
-- Very small files: Still subject to $1.00 minimum for initial upload
+**History:** originally a $1.00 minimum on initial uploads only; the code had drifted to a $2.00
+minimum on uploads and extensions. Replaced by this decision.
 
 ---
 

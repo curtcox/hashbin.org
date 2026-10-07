@@ -16,7 +16,6 @@ const MINIMUM_DEPOSIT_CENTS = 100;
 // Minimum retention: 30 days (1 month)
 const MINIMUM_RETENTION_MONTHS = 1;
 const INLINE_CONTENT_THRESHOLD = 64;
-const MINIMUM_RETENTION_COST_CENTS = 200;
 
 /**
  * Calculate retention cost for content
@@ -43,10 +42,9 @@ export function calculateRetentionCost(sizeBytes, retentionMonths) {
   // Calculate cost in dollars
   const costDollars = sizeGB * retentionMonths * BASE_RATE_PER_GB_PER_MONTH;
 
-  // Convert to cents and round
-  const costCents = Math.round(costDollars * 100);
-
-  return Math.max(costCents, MINIMUM_RETENTION_COST_CENTS);
+  // No minimum charge: round up to the next whole cent, so any stored content costs at
+  // least $0.01. The epsilon keeps float noise (300.00000000000006) from adding a cent.
+  return Math.max(1, Math.ceil(costDollars * 100 - 1e-9));
 }
 
 /**
@@ -180,5 +178,5 @@ export function generateInsufficientBalanceMessage(balanceCents, requiredCents) 
   const balanceDollars = formatCents(balanceCents);
   const requiredDollars = formatCents(requiredCents);
   
-  return `Your account balance is too low for the minimum retention of 30 days. That would cost ${requiredDollars} and you only have ${balanceDollars} in your account.`;
+  return `Your account balance is too low. This costs ${requiredDollars} and you have ${balanceDollars}.`;
 }

@@ -58,6 +58,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | L14 | No known vulnerabilities in runtime dependencies | code | ✅ | `npm audit --omit=dev` showed a critical `@clerk/shared` route-protection bypass plus high-severity Clerk/js-cookie issues; fixed with semver-compatible updates on 2026-10-07. Re-check before launch. |
 | L15 | Content deletion and dispute moderation work in production | code | ✅ | Found 2026-10-07: `request.user` was never set, so `DELETE /api/content/{cid}` and every admin dispute endpoint always returned 401. Deletion also crashed on a misspelled binding (`PAYMENT_RECORD`), and resolving a dispute crashed before unblocking content. All fixed and covered by tests. Admin endpoints accept `X-Admin-Token` (deployed from GitHub secret `ADMIN_SECRET_TOKEN`) or an `ADMIN_USER_ID` session. **Ops:** set the `ADMIN_SECRET_TOKEN` GitHub secret. Runbook: `docs/ADMIN_SYSTEM.md` → Content Moderation. |
 | L16 | Upload and supplier detail pages reachable from their lists | code | ✅ | Found 2026-10-07: in production `/dashboard/uploads/{cid}/` and `/dashboard/suppliers/{id}` returned a 307 to `/…/detail`, dropping the ID, so every "My Uploads" card opened an error page. The worker now follows the assets redirect internally. |
+| L17 | Pricing consistent across code, UI, and docs | code | ✅ | **Decision (2026-10-07): no minimum charge; cost rounds up to the next cent.** The code charged a $2.00 minimum on every upload and extension, which contradicted Decision #16 and the pricing page. Master plan Decision #16 has been revised to match. |
 | L12 | Remove "Unstable Beta — Do not use" banner | code | ⬜ | `frontend/js/banner-config.js`. Do last. |
 
 ## Soon after launch
@@ -75,6 +76,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S10 | Per-IP rate limit on dispute submission (10/hour per plan) | code | ⬜ | `src/api/disputes.js` TODO. Today only the global anonymous rate limit and one open dispute per CID apply. |
 | S11 | Delete button for uploaders on the upload detail page | code | ⬜ | The API works (L15); the UI is `todo/content_moderation.md` Phase 8. |
 | S12 | Make the Playwright E2E suite runnable and run it in CI | code | ⬜ | `@playwright/test` isn't a dependency and no workflow runs `frontend/tests/`. Run locally with a shim on 2026-10-07: 17 pass, 7 fail on stale expectations (protected pages now redirect to sign-in, ambiguous locators, a RegExp typo). |
+| S13 | Fix the legacy grep-based shell checks in `npm test` | code | ⬜ | `test-api-keys.sh` hardcodes `/home/runner/work/...`; `test-upload-balance.sh` and `test-supplier-*.sh` check stale code patterns. They fail on the original `2c5b12d` too, so `npm test` stops early; `npm run test:unit` is the reliable suite. |
 | S7 | Production OAuth third-party publishing smoke test | ops | ⬜ | `done/third_party_publishing.md` "Production Deployment Verification". |
 
 ## Backlog (not needed for launch)
@@ -95,7 +97,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-326 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+325 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

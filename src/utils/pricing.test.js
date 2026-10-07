@@ -10,7 +10,6 @@ import {
   calculateTotalWithFees,
   checkBalanceSufficient,
   formatCents,
-  BASE_RATE_PER_GB_PER_MONTH,
 } from './pricing.js';
 
 describe('Pricing Calculator - P0 Tests', () => {
@@ -29,61 +28,36 @@ describe('Pricing Calculator - P0 Tests', () => {
     });
   });
 
-  // PRICE-20: Content >64 bytes has minimum cost of $2.00
-  describe('PRICE-20: Minimum cost enforcement', () => {
-    it('should return $2.00 minimum for content >64 bytes', () => {
-      const minimumCostCents = 200; // $2.00
-      
-      // 65 bytes (just over threshold)
-      expect(calculateRetentionCost(65, 1)).toBe(minimumCostCents);
-      
-      // 1 KB for 1 month (calculated cost would be less than $2)
-      expect(calculateRetentionCost(1024, 1)).toBe(minimumCostCents);
-      
-      // 100 KB for 1 month
-      expect(calculateRetentionCost(100 * 1024, 1)).toBe(minimumCostCents);
+  // PRICE-20: No minimum charge; cost rounds up to the next whole cent
+  describe('PRICE-20: No minimum charge', () => {
+    it('charges $0.01 for tiny non-inline content', () => {
+      expect(calculateRetentionCost(65, 1)).toBe(1);
+      expect(calculateRetentionCost(1024, 1)).toBe(1);
+      expect(calculateRetentionCost(100 * 1024, 1)).toBe(1);
+    });
+
+    it('rounds partial cents up, never down to zero', () => {
+      // 10 MB × 1 month = $0.000293 → $0.01
+      expect(calculateRetentionCost(10 * 1024 * 1024, 1)).toBe(1);
+      // 50 MB × 12 months = $0.0176 → $0.02
+      expect(calculateRetentionCost(50 * 1024 * 1024, 12)).toBe(2);
     });
   });
 
-  // PRICE-21: Small content returns $2.00 minimum, not calculated rate
-  describe('PRICE-21: Small content minimum cost', () => {
-    it('should apply $2.00 minimum for 1KB for 1 month', () => {
-      const costCents = calculateRetentionCost(1024, 1);
-      expect(costCents).toBe(200); // $2.00 minimum
-      
-      // Verify calculated cost would be less than minimum
-      const sizeGB = 1024 / (1024 * 1024 * 1024);
-      const calculatedCents = Math.round(sizeGB * 1 * BASE_RATE_PER_GB_PER_MONTH * 100);
-      expect(calculatedCents).toBeLessThan(200);
-    });
-
-    it('should apply $2.00 minimum for small files with short retention', () => {
-      // 10 MB for 1 month
-      expect(calculateRetentionCost(10 * 1024 * 1024, 1)).toBe(200);
-      
-      // 50 MB for 1 month
-      expect(calculateRetentionCost(50 * 1024 * 1024, 1)).toBe(200);
-    });
-  });
-
-  // PRICE-01: Calculate cost for 1 GB for 1 month (updated to reflect minimum)
+  // PRICE-01: Calculate cost for 1 GB for 1 month
   describe('PRICE-01: 1 GB × 1 month calculation', () => {
     it('should calculate cost for 1 GB for 1 month', () => {
       const oneGB = 1024 * 1024 * 1024;
-      const costCents = calculateRetentionCost(oneGB, 1);
-      
-      // Expected: 1 GB × 1 month × $0.03 = $0.03 = 3 cents
-      // But minimum is $2.00 = 200 cents
-      expect(costCents).toBe(200);
+      // 1 GB × 1 month × $0.03 = 3 cents
+      expect(calculateRetentionCost(oneGB, 1)).toBe(3);
+      // 1 GB × 12 months = 36 cents (matches the pricing page)
+      expect(calculateRetentionCost(oneGB, 12)).toBe(36);
     });
 
-    it('should calculate cost for large storage that exceeds minimum', () => {
-      // 100 GB × 1 month = $3.00 (exceeds $2 minimum)
+    it('should not inflate exact amounts through float noise', () => {
+      // 100 GB × 1 month = $3.00 exactly
       const hundredGB = 100 * 1024 * 1024 * 1024;
-      const costCents = calculateRetentionCost(hundredGB, 1);
-      
-      // Expected: 100 GB × 1 month × $0.03 = $3.00 = 300 cents
-      expect(costCents).toBe(300);
+      expect(calculateRetentionCost(hundredGB, 1)).toBe(300);
     });
   });
 
@@ -184,23 +158,21 @@ describe('Pricing Calculator - P0 Tests', () => {
     });
 
     it('should check balance sufficiency correctly', () => {
-      const result = checkBalanceSufficient(500, 1024, 1);
-      
-      // 1KB for 1 month costs $2.00 (200 cents)
-      // Balance of 500 cents is sufficient
+      const oneGB = 1024 * 1024 * 1024;
+      // 1 GB for 12 months costs 36 cents; 500 cents is enough
+      const result = checkBalanceSufficient(500, oneGB, 12);
       expect(result.sufficient).toBe(true);
-      expect(result.required).toBe(200);
+      expect(result.required).toBe(36);
       expect(result.shortfall).toBe(0);
     });
 
     it('should detect insufficient balance', () => {
-      const result = checkBalanceSufficient(100, 1024, 1);
-      
-      // 1KB for 1 month costs $2.00 (200 cents)
-      // Balance of 100 cents is insufficient
+      const oneGB = 1024 * 1024 * 1024;
+      // 1 GB for 12 months costs 36 cents; 10 cents is not enough
+      const result = checkBalanceSufficient(10, oneGB, 12);
       expect(result.sufficient).toBe(false);
-      expect(result.required).toBe(200);
-      expect(result.shortfall).toBe(100);
+      expect(result.required).toBe(36);
+      expect(result.shortfall).toBe(26);
     });
   });
 });

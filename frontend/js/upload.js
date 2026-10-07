@@ -315,9 +315,12 @@ function updateCostDisplay() {
  * Calculate upload cost
  */
 function calculateCost(sizeBytes, months) {
+  // Mirrors calculateRetentionCost in src/utils/pricing.js: inline content is free,
+  // otherwise no minimum and partial cents round up
+  if (sizeBytes <= 64) return 0;
   const sizeGB = sizeBytes / (1024 * 1024 * 1024);
   const costDollars = sizeGB * months * BASE_RATE_PER_GB_PER_MONTH;
-  return Math.round(costDollars * 100);
+  return Math.max(1, Math.ceil(costDollars * 100 - 1e-9));
 }
 
 /**
