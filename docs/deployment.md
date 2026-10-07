@@ -67,7 +67,7 @@ Sign up at [cloudflare.com](https://www.cloudflare.com/)
 
 ### 4. Local Development Tools (optional)
 
-- Node.js 18+ (for local testing)
+- Node.js 22+ (for local testing)
 - npm or yarn
 - Wrangler CLI (`npm install -g wrangler`)
 

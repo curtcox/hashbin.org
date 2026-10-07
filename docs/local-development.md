@@ -4,7 +4,7 @@ This guide describes how to run HashBin.org entirely locally without external se
 
 ## Prerequisites
 
-- Node.js 20+
+- Node.js 22+
 - npm
 
 ## Quick Start

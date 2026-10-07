@@ -45,7 +45,7 @@ reliability items.
 
 ### Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 22+ and npm (wrangler 4 requires it)
 - Cloudflare account (paid plan for Durable Objects and R2)
 - Clerk account (for OAuth authentication)
 
