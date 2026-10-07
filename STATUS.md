@@ -55,6 +55,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | L10 | Metadata backups (Decision #15) | code | ❓ | User balances, payment records, and content metadata exist only in Durable Objects. `BACKUP_BUCKET` is bound but never written to. Scope needs a decision. |
 | L11 | End-to-end production test: real OAuth login, real deposit, upload, download from 256t.us, dispute, deletion | ops | ⬜ | Blocked by L1, L2, L4. Checklist: `todo/manual_testing_guide.md`. |
 | L13 | Extend retention from the dashboard | code | ⬜ | The API exists (`POST /api/content/{cid}/extend`), but no UI calls it. With no grace period and no expiry emails (Decisions #8, #14), customers need an easy way to extend before content is deleted. |
+| L14 | No known vulnerabilities in runtime dependencies | code | ✅ | `npm audit --omit=dev` showed a critical `@clerk/shared` route-protection bypass plus high-severity Clerk/js-cookie issues; fixed with semver-compatible updates on 2026-10-07. Re-check before launch. |
 | L12 | Remove "Unstable Beta — Do not use" banner | code | ⬜ | `frontend/js/banner-config.js`. Do last. |
 
 ## Soon after launch
@@ -68,6 +69,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S5 | Deletion transactions shown in transaction history | code | ⬜ | `todo/content_moderation.md` Phase 9. |
 | S6 | Developer app update/delete (`PATCH`/`DELETE /api/developers/apps/{id}`) | code | ⬜ | `done/third_party_publishing.md` "Remaining". |
 | S8 | Donation UI for content | code | ⬜ | API exists (`POST /api/donate/cid/{cid}`), no UI. |
+| S9 | Dev-dependency vulnerabilities (wrangler, playwright, sharp, eslint plugins) | code | ⬜ | `npm audit` reports 29 (2 critical) in dev tooling only; not shipped to production. Fixing needs major-version upgrades. |
 | S7 | Production OAuth third-party publishing smoke test | ops | ⬜ | `done/third_party_publishing.md` "Production Deployment Verification". |
 
 ## Backlog (not needed for launch)
