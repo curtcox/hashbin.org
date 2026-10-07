@@ -13,6 +13,25 @@ export async function handleCreateDispute(request, env) {
   try {
     const data = await request.json();
 
+    // Get IP hash for rate limiting
+    const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
+    const ipHash = await hashIP(clientIP);
+
+    // Per-IP limit: 10 submissions per hour
+    const indexStubForRate = env.DISPUTE_INDEX.get(env.DISPUTE_INDEX.idFromName('dispute-index:global'));
+    const rateResponse = await indexStubForRate.fetch(new Request('http://internal/rate-limit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ip_hash: ipHash })
+    }));
+    const rate = await rateResponse.json();
+    if (!rate.allowed) {
+      return new Response(JSON.stringify({ error: 'RATE_LIMITED', retry_after_seconds: rate.retry_after_seconds }), {
+        status: 429,
+        headers: { 'Content-Type': 'application/json', 'Retry-After': String(rate.retry_after_seconds) }
+      });
+    }
+
     // Validate CID
     if (!data.cid) {
       return new Response(JSON.stringify({ error: 'CID_REQUIRED' }), {
@@ -42,13 +61,6 @@ export async function handleCreateDispute(request, env) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
-
-    // Get IP hash for rate limiting
-    const clientIP = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || 'unknown';
-    const ipHash = await hashIP(clientIP);
-
-    // TODO: Implement IP-based rate limiting (10 disputes per hour)
-    // For now, rate limiting is handled by re-dispute cooldown (30 days) in DisputeRecord
 
     // Get DisputeRecord for this CID
     const disputeId = env.DISPUTE_RECORD.idFromName(`dispute:${data.cid}`);

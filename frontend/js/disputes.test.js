@@ -59,6 +59,7 @@ describe('describeDisputeError', () => {
     expect(describeDisputeError(409, { error: 'DISPUTE_EXISTS' })).toMatch(/already has an open dispute/);
     expect(describeDisputeError(429, { error: 'REDISPUTE_TOO_SOON', days_remaining: 12.2 })).toMatch(/13 day/);
     expect(describeDisputeError(429, {})).toMatch(/Too many requests/);
+    expect(describeDisputeError(429, { error: 'RATE_LIMITED', retry_after_seconds: 600 })).toMatch(/10 minute/);
     expect(describeDisputeError(500, {})).toMatch(/could not be submitted/);
   });
 });

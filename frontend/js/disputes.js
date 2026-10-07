@@ -160,6 +160,10 @@ export function describeDisputeError(status, body = {}) {
       return body.days_remaining
         ? `A dispute for this content was closed recently. You can file a new one in ${Math.ceil(body.days_remaining)} day(s).`
         : 'A dispute for this content was closed recently. Please wait 30 days before filing again.';
+    case 'RATE_LIMITED':
+      return body.retry_after_seconds
+        ? `Too many reports from your network. Try again in ${Math.ceil(body.retry_after_seconds / 60)} minute(s).`
+        : 'Too many reports from your network. Please try again later.';
     case 'EVIDENCE_TOO_SHORT':
       return `The explanation must be at least ${EVIDENCE_MIN} characters.`;
     case 'EVIDENCE_TOO_LONG':

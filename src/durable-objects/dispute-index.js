@@ -6,6 +6,10 @@
 
 import { handleBackupRequest } from '../utils/backup.js';
 
+// Dispute submissions allowed per IP per hour
+const MAX_SUBMISSIONS_PER_WINDOW = 10;
+const RATE_WINDOW_MS = 60 * 60 * 1000;
+
 /**
  * DisputeIndex Durable Object
  */
@@ -46,6 +50,12 @@ export class DisputeIndex {
         return await this.getCacheInfo();
       }
 
+      // POST /rate-limit - Count a dispute submission from a hashed IP
+      if (method === 'POST' && url.pathname === '/rate-limit') {
+        const { ip_hash } = await request.json();
+        return await this.checkSubmissionRate(ip_hash);
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       console.error('DisputeIndex error:', error);
@@ -54,6 +64,26 @@ export class DisputeIndex {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+  }
+
+  /**
+   * Count a submission for this IP hash in the current hour; refuse past the limit.
+   * Fixed hourly buckets keep this to one key per IP per hour; old buckets are swept.
+   */
+  async checkSubmissionRate(ipHash) {
+    const bucket = Math.floor(Date.now() / RATE_WINDOW_MS);
+    const key = `rl:${bucket}:${ipHash || 'unknown'}`;
+    const count = (await this.state.storage.get(key)) || 0;
+
+    if (count >= MAX_SUBMISSIONS_PER_WINDOW) {
+      const retryAfter = Math.ceil(((bucket + 1) * RATE_WINDOW_MS - Date.now()) / 1000);
+      return Response.json({ allowed: false, retry_after_seconds: retryAfter });
+    }
+
+    await this.state.storage.put(key, count + 1);
+    const stale = await this.state.storage.list({ prefix: 'rl:', end: `rl:${bucket}:`, limit: 100 });
+    if (stale.size > 0) await this.state.storage.delete([...stale.keys()]);
+    return Response.json({ allowed: true });
   }
 
   /**

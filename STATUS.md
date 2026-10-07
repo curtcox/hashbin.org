@@ -74,7 +74,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S7 | Production OAuth third-party publishing smoke test | ops | ⬜ | `done/third_party_publishing.md` "Production Deployment Verification". |
 | S8 | Donation UI for content | code | ⬜ | API exists (`POST /api/donate/cid/{cid}`), no UI. |
 | S9 | Dev-dependency vulnerabilities (wrangler, playwright, sharp, eslint plugins) | code | ⬜ | `npm audit` reports 29 (2 critical) in dev tooling only; not shipped to production. Fixing needs major-version upgrades. |
-| S10 | Per-IP rate limit on dispute submission (10/hour per plan) | code | ⬜ | `src/api/disputes.js` TODO. Today only the global anonymous rate limit and one open dispute per CID apply. |
+| S10 | Per-IP rate limit on dispute submission (10/hour per plan) | code | ✅ | Counted per hashed IP in hourly buckets in the DisputeIndex, before any other check; returns 429 with `Retry-After`. The report form explains the wait. |
 | S11 | Delete button for uploaders on the upload detail page | code | ⬜ | The API works (L15); the UI is `todo/content_moderation.md` Phase 8. |
 | S12 | Make the Playwright E2E suite runnable and run it in CI | code | ⬜ | `@playwright/test` isn't a dependency and no workflow runs `frontend/tests/`. Run locally with a shim on 2026-10-07: 17 pass, 7 fail on stale expectations (protected pages now redirect to sign-in, ambiguous locators, a RegExp typo). |
 | S13 | Fix the legacy grep-based shell checks in `npm test` | code | ⬜ | `test-api-keys.sh` hardcodes `/home/runner/work/...`; `test-upload-balance.sh` and `test-supplier-*.sh` check stale code patterns. They fail on the original `2c5b12d` too, so `npm test` stops early; `npm run test:unit` is the reliable suite. |
@@ -98,7 +98,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-336 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+337 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |
