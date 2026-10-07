@@ -134,21 +134,21 @@
               id="duration" 
               class="form-input" 
               placeholder="Enter duration"
-              value="365"
-              min="30"
-              step="30"
+              value="1"
+              min="1"
+              step="1"
             >
             <select id="duration-unit" class="form-input" style="flex: 0 0 120px;">
-              <option value="days" selected>Days</option>
+              <option value="days">Days</option>
               <option value="months">Months</option>
-              <option value="years">Years</option>
+              <option value="years" selected>Years</option>
             </select>
           </div>
           <div class="preset-buttons">
-            <button class="preset-button" data-duration="30" data-duration-unit="days">1 Month</button>
-            <button class="preset-button active" data-duration="365" data-duration-unit="days">1 Year</button>
-            <button class="preset-button" data-duration="3650" data-duration-unit="days">1 Decade</button>
-            <button class="preset-button" data-duration="36500" data-duration-unit="days">1 Century</button>
+            <button class="preset-button" data-duration="1" data-duration-unit="months">1 Month</button>
+            <button class="preset-button active" data-duration="1" data-duration-unit="years">1 Year</button>
+            <button class="preset-button" data-duration="10" data-duration-unit="years">1 Decade</button>
+            <button class="preset-button" data-duration="100" data-duration-unit="years">1 Century</button>
           </div>
         </div>
 
@@ -288,15 +288,13 @@
       }
     }
 
-    function getDurationInDays() {
+    // Retention is bought in whole months: days round up to 30-day months
+    function getDurationInMonths() {
       const duration = parseFloat(durationInput.value) || 0;
-      const unit = durationUnitSelect.value;
-      
-      switch(unit) {
-        case 'days': return duration;
-        case 'months': return duration * 30;
-        case 'years': return duration * 365;
-        default: return duration;
+      switch (durationUnitSelect.value) {
+        case 'days': return Math.ceil(duration / DAYS_PER_MONTH);
+        case 'years': return Math.ceil(duration * 12);
+        default: return Math.ceil(duration);
       }
     }
 
@@ -311,8 +309,7 @@
     function calculateCost() {
       const sizeInBytes = getSizeInBytes();
       const sizeInGB = sizeInBytes / BYTES_PER_GB;
-      const durationInDays = getDurationInDays();
-      const durationInMonths = durationInDays / DAYS_PER_MONTH;
+      const durationInMonths = getDurationInMonths();
       
       // No minimum charge; partial cents round up (content of 64 bytes or less is free)
       const rawCents = sizeInGB * durationInMonths * RATE_PER_GB_PER_MONTH * 100;
@@ -322,7 +319,7 @@
       document.getElementById('total-cost').textContent = '$' + totalCost.toFixed(2);
       document.getElementById('result-total').textContent = '$' + totalCost.toFixed(2);
       document.getElementById('result-size').textContent = formatBytes(sizeInBytes);
-      document.getElementById('result-duration').textContent = Math.round(durationInDays) + ' days';
+      document.getElementById('result-duration').textContent = durationInMonths + (durationInMonths === 1 ? ' month' : ' months');
     }
 
     // Event listeners

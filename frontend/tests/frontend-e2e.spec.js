@@ -11,6 +11,16 @@ import { test, expect } from '@playwright/test';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:8787';
 
+/**
+ * Sign in through local auth (the suite runs against `npm run dev:local`).
+ * Protected pages redirect anonymous visitors to the home page.
+ */
+async function signInLocally(page, userId = 'e2e-user') {
+  await page.addInitScript(id => {
+    localStorage.setItem('hashbin.localAuthUser', JSON.stringify({ userId: id, username: id, name: id }));
+  }, userId);
+}
+
 test.describe('Landing Page', () => {
   test('should load and display hero section', async ({ page }) => {
     await page.goto(BASE_URL);
@@ -21,9 +31,9 @@ test.describe('Landing Page', () => {
     // Check hero heading
     await expect(page.locator('h1')).toContainText('Content Distribution');
     
-    // Check CTA buttons exist
-    await expect(page.locator('a[href="/upload.html"]')).toBeVisible();
-    await expect(page.locator('a[href="/retrieve.html"]')).toBeVisible();
+    // Check CTA buttons exist (the nav header has links to the same pages)
+    await expect(page.locator('main a[href="/upload.html"]').first()).toBeVisible();
+    await expect(page.locator('main a[href="/retrieve.html"]').first()).toBeVisible();
   });
 
   test('should have working navigation links', async ({ page }) => {
@@ -32,9 +42,17 @@ test.describe('Landing Page', () => {
     // Check navigation header loads
     await expect(page.locator('.nav-header')).toBeVisible();
     
-    // Click Upload button
-    await page.click('a[href="/upload.html"]');
-    await expect(page).toHaveURL(/\/upload\.html/);
+    // Upload requires sign-in: anonymous visitors are sent home with a return URL
+    await page.locator('main a[href="/upload.html"]').first().click();
+    await expect(page).toHaveURL(/return=%2Fupload/);
+  });
+
+  test('should open upload page when signed in', async ({ page }) => {
+    await signInLocally(page);
+    await page.goto(BASE_URL);
+    await page.locator('main a[href="/upload.html"]').first().click();
+    await expect(page).toHaveURL(/\/upload/);
+    await expect(page.locator('h1')).toContainText('Upload Content');
   });
 
   test('should display pricing information', async ({ page }) => {
@@ -75,6 +93,8 @@ test.describe('Retrieve Page', () => {
 });
 
 test.describe('Upload Page', () => {
+  test.beforeEach(async ({ page }) => signInLocally(page));
+
   test('should load upload page', async ({ page }) => {
     await page.goto(`${BASE_URL}/upload.html`);
     
@@ -97,6 +117,8 @@ test.describe('Upload Page', () => {
 });
 
 test.describe('Dashboard Page', () => {
+  test.beforeEach(async ({ page }) => signInLocally(page));
+
   test('should load dashboard page', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard.html`);
     
@@ -133,7 +155,7 @@ test.describe('Documentation Pages', () => {
     await expect(page.locator('h1')).toContainText('API Reference');
     
     // Check for endpoint documentation
-    await expect(page.locator('text=/api/auth/session')).toBeVisible();
+    await expect(page.getByText('/api/auth/session').first()).toBeVisible();
   });
 
   test('should load FAQ', async ({ page }) => {
@@ -146,8 +168,8 @@ test.describe('Documentation Pages', () => {
     await expect(page.locator('h1')).toContainText('Frequently Asked Questions');
     
     // Check for FAQ sections
-    await expect(page.locator('text=General')).toBeVisible();
-    await expect(page.locator('text=Uploads')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Uploads' })).toBeVisible();
   });
 
   test('should load pricing calculator', async ({ page }) => {
@@ -171,9 +193,9 @@ test.describe('Documentation Pages', () => {
     await page.locator('#file-size').fill('1');
     await page.locator('#size-unit').selectOption('gb');
     
-    // Set duration to 1 year (365 days)
-    await page.locator('#duration').fill('365');
-    await page.locator('#duration-unit').selectOption('days');
+    // Set duration to 1 year (12 months; retention is bought in whole months)
+    await page.locator('#duration').fill('1');
+    await page.locator('#duration-unit').selectOption('years');
     
     // Check that cost is calculated (should be $0.36 for 1GB * 12 months * $0.03)
     const totalCost = page.locator('#total-cost');

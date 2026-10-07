@@ -32,3 +32,7 @@ build-reports/
 .nyc_output/
 coverage/
 !scripts/coverage/
+
+# Playwright output
+test-results/
+playwright-report/

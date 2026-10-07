@@ -8,7 +8,7 @@ jobs:
   api-tests:
     name: Run Local API Tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
 
     steps:
       - name: Checkout code
@@ -48,6 +48,21 @@ jobs:
 
       - name: Run API Tests
         run: bash scripts/run-all-api-tests.sh
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E browser tests
+        # Reuses the dev:local server started above (see playwright.config.js)
+        run: npm run test:e2e
+
+      - name: Upload E2E report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
 
       - name: Stop server
         if: always()
