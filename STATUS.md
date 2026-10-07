@@ -4,7 +4,7 @@
 disagrees with it, this file wins and the other document is stale.
 
 - **Last audited:** 2026-10-07 (against commit `2c5b12d`)
-- **Production:** `https://hashbin.org` is live, running `2c5b12d`, health = **degraded** (Clerk test keys in production)
+- **Production:** `https://hashbin.org` and `https://256t.us` are live. `main` deploys on every push (deploy workflow green as of 2026-10-07). Health = **degraded** (Clerk test keys in production).
 - **Overall:** Feature-complete for an MVP backend. **Not ready to accept customers** — see the launch blockers below.
 
 Run `npm run status` for a one-screen summary of open items.
@@ -44,9 +44,9 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | ID | Item | Owner | Status | Notes / reference |
 |----|------|-------|--------|-------------------|
 | L1 | Production Clerk keys (`sk_live_`/`pk_live_`) in GitHub secrets | ops | ⬜ | Health reports `degraded` because of test keys. The deploy workflow now treats `degraded` as a warning (only `unhealthy` fails a deploy); the scheduled smoke test still fails until live keys are in. See `todo/clerk_remaining.md`. |
-| L2 | Stripe live mode: live secret key, live webhook endpoint + secret | ops | ❓ | It's unknown whether prod uses live keys; check `/health` after the next deploy (L3). Deposit and donation checkouts set `automatic_tax: enabled`, so **Stripe Tax must be activated** or checkout creation fails. See `docs/payments-setup.md`. |
+| L2 | Stripe live mode: live secret key, live webhook endpoint + secret | ops | ❓ | As of 2026-10-07, `/health` shows a live secret key and a webhook secret (`usingTestKeysInProduction: false`), so **deposits charge real cards**. Still unconfirmed: the live webhook endpoint points at `https://hashbin.org/api/payments/webhook`, and **Stripe Tax is activated** (deposit and donation checkouts set `automatic_tax: enabled`, so checkout creation fails without it). See `docs/payments-setup.md`. |
 | L3 | Health check flags Stripe test keys in production (like it does for Clerk) | code | ✅ | After the next deploy, `/health` → `checks.stripe.details.usingTestKeysInProduction` answers L2. |
-| L4 | `256t.us` DNS, TLS, and content worker live | ops | 🚧 | The content worker had never been reachable: its `routes` sat below the `[[r2_buckets]]` header, so TOML read them as a bucket field and wrangler dropped them. Fixed 2026-10-07, and switched to Workers **custom domains**, which create the DNS record and certificate on deploy (the API token needs permission for that). The deploy step and the `256t.us/health` check are warnings, not failures. Confirm `https://256t.us/health` after deploy. See `done/content_domain_separation.md` Phase 1. |
+| L4 | `256t.us` DNS, TLS, and content worker live | ops | ✅ | Live 2026-10-07: `https://256t.us/health` returns 200. The worker had never been reachable before: its `routes` sat below the `[[r2_buckets]]` header, so TOML read them as a bucket field. It now uses Workers custom domains, which create the DNS record and certificate on deploy. Real downloads get exercised in L11. |
 | L5 | Real Terms of Service | legal | 🚧 | **Drafted 2026-10-07** in `frontend/terms.html`, marked DRAFT. Owner: fill in placeholders, confirm the policy choices, get it reviewed, remove the DRAFT notice. Checklist: `docs/legal-review.md`. Upload and deposit pages now link to it. |
 | L6 | Privacy Policy | legal | 🚧 | **Drafted 2026-10-07** in `frontend/privacy.html`, marked DRAFT. Same checklist. Reporter contact details stay visible to signed-in users (decided 2026-10-07). |
 | L7 | DMCA designated agent registered, with contact info on the site | legal/ops | 🚧 | `frontend/dmca.html` drafted (notice and counter-notice requirements, repeat-infringer policy). Owner: register the agent with the U.S. Copyright Office and fill in agent details; set up NCMEC CSAM reporting. See `docs/legal-review.md`. |
