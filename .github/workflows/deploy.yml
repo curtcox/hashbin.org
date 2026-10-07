@@ -490,7 +490,7 @@ jobs:
 
           echo ""
           echo "Testing dedicated content domain health..."
-          CONTENT_HEALTH=$(curl -s -w "\n%{http_code}" https://256t.us/health)
+          CONTENT_HEALTH=$(curl -s -m 15 -w "\n%{http_code}" https://256t.us/health || true)
           CONTENT_STATUS=$(echo "$CONTENT_HEALTH" | tail -n1)
           CONTENT_BODY=$(echo "$CONTENT_HEALTH" | head -n-1)
 
