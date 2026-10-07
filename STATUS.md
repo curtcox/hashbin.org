@@ -71,6 +71,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S4 | Admin dispute review UI | code | ⬜ | Today admins use the API with `ADMIN_SECRET_TOKEN`. |
 | S5 | Deletion transactions shown in transaction history | code | ⬜ | `todo/content_moderation.md` Phase 9. |
 | S6 | Developer app update/delete (`PATCH`/`DELETE /api/developers/apps/{id}`) | code | ⬜ | `done/third_party_publishing.md` "Remaining". |
+| S7 | Production OAuth third-party publishing smoke test | ops | ⬜ | `done/third_party_publishing.md` "Production Deployment Verification". |
 | S8 | Donation UI for content | code | ⬜ | API exists (`POST /api/donate/cid/{cid}`), no UI. |
 | S9 | Dev-dependency vulnerabilities (wrangler, playwright, sharp, eslint plugins) | code | ⬜ | `npm audit` reports 29 (2 critical) in dev tooling only; not shipped to production. Fixing needs major-version upgrades. |
 | S10 | Per-IP rate limit on dispute submission (10/hour per plan) | code | ⬜ | `src/api/disputes.js` TODO. Today only the global anonymous rate limit and one open dispute per CID apply. |
@@ -78,7 +79,6 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S12 | Make the Playwright E2E suite runnable and run it in CI | code | ⬜ | `@playwright/test` isn't a dependency and no workflow runs `frontend/tests/`. Run locally with a shim on 2026-10-07: 17 pass, 7 fail on stale expectations (protected pages now redirect to sign-in, ambiguous locators, a RegExp typo). |
 | S13 | Fix the legacy grep-based shell checks in `npm test` | code | ⬜ | `test-api-keys.sh` hardcodes `/home/runner/work/...`; `test-upload-balance.sh` and `test-supplier-*.sh` check stale code patterns. They fail on the original `2c5b12d` too, so `npm test` stops early; `npm run test:unit` is the reliable suite. |
 | S14 | Track upheld copyright removals per uploader (repeat-infringer policy) | code | ⬜ | DMCA §5 promises account termination after repeated upheld removals. Until this is automated, count by hand from `GET /api/admin/actions`. |
-| S7 | Production OAuth third-party publishing smoke test | ops | ⬜ | `done/third_party_publishing.md` "Production Deployment Verification". |
 
 ## Backlog (not needed for launch)
 
