@@ -21,6 +21,7 @@ export { DisputeRecord } from './durable-objects/dispute-record.js';
 export { DisputeIndex } from './durable-objects/dispute-index.js';
 export { AdminActionLog } from './durable-objects/admin-action-log.js';
 export { ApplicationRegistry } from './durable-objects/application-registry.js';
+export { BackupIndex } from './durable-objects/backup-index.js';
 
 // Import API route handlers
 import {
@@ -113,6 +114,13 @@ import {
 
 import { deleteContent, getContentMetadata } from './services/content-deletion.js';
 import { MAX_UPLOAD_BYTES } from './utils/upload-limits.js';
+import {
+  handleGetBackupFile,
+  handleGetBackupStatus,
+  handleListBackupFiles,
+  handleRestoreObject,
+  handleRunBackup
+} from './api/admin-backups.js';
 import { getContentDomain } from './utils/content-domain.js';
 import {
   handleCreateDeveloperApp,
@@ -298,6 +306,9 @@ export default {
 
       // 6. Cleanup R2 objects pending deletion
       await this.cleanupR2PendingDeletion(env);
+
+      // 7. Snapshot Durable Object state to R2 (continues via BackupIndex alarms)
+      await this.startBackupSnapshot(env);
 
       console.log('Scheduled tasks completed');
     } catch (error) {
@@ -553,6 +564,40 @@ export default {
       console.log(`Expired disputes processed: ${expired} disputes closed`);
     } catch (error) {
       console.error('Error processing expired disputes:', error);
+    }
+  },
+
+  /**
+   * Start the nightly Durable Object snapshot, and alert if the last one is stale or failed
+   */
+  async startBackupSnapshot(env) {
+    try {
+      const index = env.BACKUP_INDEX.get(env.BACKUP_INDEX.idFromName('global'));
+      const status = await index.fetch(new Request('https://backup-index/snapshot/status')).then(r => r.json());
+      const last = status.last_run;
+      const staleMs = 48 * 60 * 60 * 1000;
+
+      if (!last || Date.now() - Date.parse(last.finished_at) > staleMs || last.failed > 0) {
+        const alertStore = env.ALERT_STORE.get(env.ALERT_STORE.idFromName('global'));
+        await alertStore.fetch(new Request('https://dummy/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'backup_unhealthy',
+            severity: 'critical',
+            title: 'Backup snapshot missing, stale, or incomplete',
+            message: last
+              ? `Last snapshot ${last.id} finished ${last.finished_at} with ${last.failed} failure(s)`
+              : 'No completed backup snapshot yet',
+            metadata: { last_run: last || null }
+          })
+        }));
+      }
+
+      await index.fetch(new Request('https://backup-index/snapshot/start', { method: 'POST' }));
+      console.log('Backup snapshot started');
+    } catch (error) {
+      console.error('Error starting backup snapshot:', error);
     }
   },
 
@@ -907,6 +952,27 @@ function handleApiRoutes(url, request, env) {
 
   if (url.pathname === '/api/admin/profitability' && request.method === 'GET') {
     return handleGetProfitability(request, env);
+  }
+
+  // Admin backup routes
+  if (url.pathname === '/api/admin/backups' && request.method === 'GET') {
+    return handleGetBackupStatus(request, env);
+  }
+
+  if (url.pathname === '/api/admin/backups/run' && request.method === 'POST') {
+    return handleRunBackup(request, env);
+  }
+
+  if (url.pathname === '/api/admin/backups/file' && request.method === 'GET') {
+    return handleGetBackupFile(request, env);
+  }
+
+  if (url.pathname.match(/^\/api\/admin\/backups\/[^/]+\/files$/) && request.method === 'GET') {
+    return handleListBackupFiles(request, env, url.pathname.split('/')[4]);
+  }
+
+  if (url.pathname === '/api/admin/restore' && request.method === 'POST') {
+    return handleRestoreObject(request, env);
   }
 
   // Public deletion records API routes (no auth required for transparency)

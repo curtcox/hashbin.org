@@ -1,3 +1,5 @@
+import { handleBackupRequest } from '../utils/backup.js';
+
 /**
  * PlatformStats Durable Object
  * Aggregates and caches platform-wide statistics
@@ -11,6 +13,9 @@ export class PlatformStats {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const path = url.pathname;
 

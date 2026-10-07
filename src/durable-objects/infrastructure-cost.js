@@ -4,6 +4,8 @@
  * Single instance stores aggregate costs for all services
  */
 
+import { handleBackupRequest } from '../utils/backup.js';
+
 /**
  * Get current month period string in YYYY-MM format
  * @returns {string} Current month period (e.g., "2026-01")
@@ -15,6 +17,7 @@ function getCurrentMonthPeriod() {
   return `${year}-${month}`;
 }
 
+
 export class InfrastructureCost {
   constructor(state, env) {
     this.state = state;
@@ -22,6 +25,9 @@ export class InfrastructureCost {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const method = request.method;
 

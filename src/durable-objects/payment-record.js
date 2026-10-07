@@ -1,3 +1,5 @@
+import { handleBackupRequest } from '../utils/backup.js';
+
 /**
  * PaymentRecord Durable Object
  * Stores payment transactions and financial records
@@ -11,6 +13,9 @@ export class PaymentRecord {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const method = request.method;
 

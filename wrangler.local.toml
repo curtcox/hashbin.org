@@ -103,6 +103,11 @@ name = "APPLICATION_REGISTRY"
 class_name = "ApplicationRegistry"
 script_name = "hashbin-worker-local"
 
+[[durable_objects.bindings]]
+name = "BACKUP_INDEX"
+class_name = "BackupIndex"
+script_name = "hashbin-worker-local"
+
 # R2 bucket bindings (local emulation)
 [[r2_buckets]]
 binding = "CONTENT_BUCKET"
@@ -148,3 +153,7 @@ new_sqlite_classes = ["DisputeRecord", "DisputeIndex", "AdminActionLog"]
 [[migrations]]
 tag = "v9"
 new_sqlite_classes = ["ApplicationRegistry"]
+
+[[migrations]]
+tag = "v10"
+new_sqlite_classes = ["BackupIndex"]

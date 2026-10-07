@@ -1,3 +1,5 @@
+import { handleBackupRequest } from '../utils/backup.js';
+
 /**
  * AlertStore Durable Object
  * Stores and manages system alerts with deduplication
@@ -10,6 +12,9 @@ export class AlertStore {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const path = url.pathname;
 

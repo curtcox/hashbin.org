@@ -4,6 +4,8 @@
  * Singleton: admin-action-log:global
  */
 
+import { handleBackupRequest } from '../utils/backup.js';
+
 /**
  * AdminActionLog Durable Object
  */
@@ -17,6 +19,9 @@ export class AdminActionLog {
    * Handle requests to this Durable Object
    */
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const method = request.method;
 

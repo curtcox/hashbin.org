@@ -1,4 +1,5 @@
 import { generateOAuthSecret, sha256Hex } from '../auth/oauth.js';
+import { handleBackupRequest } from '../utils/backup.js';
 
 export class ApplicationRegistry {
   constructor(state, env) {
@@ -7,6 +8,9 @@ export class ApplicationRegistry {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
 
     if (url.pathname === '/apps' && request.method === 'POST') {

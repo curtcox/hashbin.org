@@ -250,6 +250,10 @@ CSV file download with appropriate headers.
 
 **Rate Limit:** 1 export per minute (to be implemented)
 
+## Backups
+
+Snapshot status, on-demand runs, and restores: see [backup-and-restore.md](backup-and-restore.md).
+
 ## Content Moderation (Disputes and Takedowns)
 
 The dispute endpoints accept the same `X-Admin-Token` header. Alternatively, set the

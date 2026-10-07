@@ -3,6 +3,8 @@
  * Stores metadata for uploaded content including hash, size, expiration, and contest status
  */
 
+import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
+
 // Rate limiting constants
 const DEFAULT_RATE_LIMIT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 const MINIMUM_MTBR_MS = 100; // Minimum time between requests: 100ms
@@ -14,6 +16,33 @@ export class ContentMetadata {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
+    const response = await this.handleRequest(request);
+    await this.ensureBackupRegistration();
+    return response;
+  }
+
+  /**
+   * Name this object was created with, once its data identifies it
+   */
+  async backupName() {
+    const content = await this.state.storage.get('content');
+    return content?.hash_256t;
+  }
+
+  /**
+   * Register with the BackupIndex (once per object; see src/utils/backup.js)
+   */
+  async ensureBackupRegistration() {
+    if (this.backupRegistered) return;
+    const name = await this.backupName();
+    if (!name) return;
+    this.backupRegistered = await registerForBackup(this.state, this.env, 'CONTENT_METADATA', name);
+  }
+
+  async handleRequest(request) {
     const url = new URL(request.url);
     const method = request.method;
 

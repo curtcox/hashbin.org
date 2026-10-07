@@ -3,6 +3,8 @@
  * Manages alternate supplier registrations and their CID mappings
  */
 
+import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
+
 /**
  * Supplier Registry Durable Object
  * Stores supplier information, CID mappings, and statistics
@@ -14,6 +16,33 @@ export class SupplierRegistry {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
+    const response = await this.handleRequest(request);
+    await this.ensureBackupRegistration();
+    return response;
+  }
+
+  /**
+   * Name this object was created with, once its data identifies it
+   */
+  async backupName() {
+    const supplier = await this.state.storage.get('supplier');
+    return supplier?.supplier_id;
+  }
+
+  /**
+   * Register with the BackupIndex (once per object; see src/utils/backup.js)
+   */
+  async ensureBackupRegistration() {
+    if (this.backupRegistered) return;
+    const name = await this.backupName();
+    if (!name) return;
+    this.backupRegistered = await registerForBackup(this.state, this.env, 'SUPPLIER_REGISTRY', name);
+  }
+
+  async handleRequest(request) {
     const url = new URL(request.url);
     const path = url.pathname;
 

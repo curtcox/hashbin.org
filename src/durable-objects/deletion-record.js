@@ -6,6 +6,7 @@
  */
 
 import { createHash } from 'node:crypto';
+import { handleBackupRequest } from '../utils/backup.js';
 
 export class DeletionRecord {
   constructor(state, env) {
@@ -14,6 +15,9 @@ export class DeletionRecord {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const method = request.method;
 

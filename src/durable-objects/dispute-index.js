@@ -4,6 +4,8 @@
  * Singleton: dispute-index:global
  */
 
+import { handleBackupRequest } from '../utils/backup.js';
+
 /**
  * DisputeIndex Durable Object
  */
@@ -17,6 +19,9 @@ export class DisputeIndex {
    * Handle requests to this Durable Object
    */
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const method = request.method;
 

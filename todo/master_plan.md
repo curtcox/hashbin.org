@@ -118,7 +118,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - ✅ Cloudflare account and domain configuration
 - ✅ R2 bucket creation and configuration
 - ✅ Durable Objects setup and configuration
-- ⏳ **Backup and disaster recovery** (not yet implemented — STATUS.md L10):
+- ✅ **Backup and disaster recovery** (nightly snapshots, `docs/backup-and-restore.md`; event log deferred, STATUS.md B8):
   - Event sourcing: Log all state changes to R2
   - Daily snapshots: Full Durable Objects state to R2
   - Multi-region replication evaluation

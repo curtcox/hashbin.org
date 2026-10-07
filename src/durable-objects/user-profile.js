@@ -3,6 +3,8 @@
  * Stores user profile data synced from Clerk authentication
  */
 
+import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
+
 // Maximum API keys per user
 const MAX_API_KEYS = 25;
 
@@ -13,6 +15,33 @@ export class UserProfile {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
+    const response = await this.handleRequest(request);
+    await this.ensureBackupRegistration();
+    return response;
+  }
+
+  /**
+   * Name this object was created with, once its data identifies it
+   */
+  async backupName() {
+    const profile = await this.state.storage.get('profile');
+    return profile?.user_id;
+  }
+
+  /**
+   * Register with the BackupIndex (once per object; see src/utils/backup.js)
+   */
+  async ensureBackupRegistration() {
+    if (this.backupRegistered) return;
+    const name = await this.backupName();
+    if (!name) return;
+    this.backupRegistered = await registerForBackup(this.state, this.env, 'USER_PROFILES', name);
+  }
+
+  async handleRequest(request) {
     const url = new URL(request.url);
     const method = request.method;
 

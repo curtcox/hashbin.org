@@ -52,7 +52,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | L7 | DMCA designated agent registered, with contact info on the site | legal/ops | ⬜ | Required for DMCA safe harbor (17 U.S.C. §512(c)(2)). |
 | L8 | Public UI for reporting content (dispute submission + open disputes list) | code | ✅ | `/disputes/submit.html`, `/disputes/index.html`, `/disputes/view.html?cid=`, a dispute notice and "Report this content" link on `/info.html`, and links from the FAQ, footer, and sitemap. Verified in a browser against local dev; the 256t.us worker returns 451 for disputed and 404 for deleted content. `/public-records.html` (previously broken: it called a nonexistent `/api/records`) now shows real deletion records. |
 | L9 | Upload size limit matches reality | code | ✅ | **Decision (2026-10-07): cap at 90 MB.** Enforced server-side (`src/utils/upload-limits.js`, 413 before buffering) and in the upload UI and docs; published as `max_upload_bytes` in `/api/config`. Larger files are B6. L11 should include an upload near 90 MB to confirm it fits in Worker memory. |
-| L10 | Metadata backups: daily snapshots | code | ⬜ | **Decision (2026-10-07): nightly JSON snapshots to `BACKUP_BUCKET` plus a documented restore procedure (RPO 24h).** The per-write event log from Decision #15 is deferred (B8). |
+| L10 | Metadata backups: daily snapshots | code | ✅ | **Decision (2026-10-07): nightly snapshots (RPO 24h).** `BackupIndex` DO + cron: every user, payment, content, dispute, and supplier object plus all singletons → `hashbin-backups-prod/snapshots/{run}/`, keeping 30 runs. Admin API to check, run, and restore; `scripts/backup/restore-snapshot.mjs`. Stale or failed runs raise a critical alert. Snapshot and restore verified end to end in local workerd. Runbook: `docs/backup-and-restore.md`. **Ops:** after the first production deploy, run `POST /api/admin/backups/run` and confirm `failed: 0`. |
 | L11 | End-to-end production test: real OAuth login, real deposit, upload, download from 256t.us, dispute, deletion | ops | ⬜ | Blocked by L1, L2, L4. Checklist: `todo/manual_testing_guide.md`. |
 | L13 | Extend retention from the dashboard | code | ✅ | Extend Retention card on `/dashboard/uploads/{cid}`: quotes come from `/api/payments/calculate`, then a confirmation, then `POST /api/content/{cid}/extend`. Verified in a browser against local dev. |
 | L14 | No known vulnerabilities in runtime dependencies | code | ✅ | `npm audit --omit=dev` showed a critical `@clerk/shared` route-protection bypass plus high-severity Clerk/js-cookie issues; fixed with semver-compatible updates on 2026-10-07. Re-check before launch. |
@@ -97,7 +97,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-325 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+332 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

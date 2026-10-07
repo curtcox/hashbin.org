@@ -1,3 +1,5 @@
+import { handleBackupRequest } from '../utils/backup.js';
+
 /**
  * KeyRegistry Durable Object
  * Maps API key hashes to user IDs for efficient lookup
@@ -10,6 +12,9 @@ export class KeyRegistry {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const method = request.method;
 

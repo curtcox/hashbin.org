@@ -1,3 +1,5 @@
+import { handleBackupRequest } from '../utils/backup.js';
+
 /**
  * AuditLog Durable Object
  * Tracks admin actions and significant system events
@@ -11,6 +13,9 @@ export class AuditLog {
   }
 
   async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
     const url = new URL(request.url);
     const path = url.pathname;
 

@@ -3,6 +3,8 @@
  * Stores dispute records and history for a single CID
  */
 
+import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
+
 /**
  * DisputeRecord Durable Object
  * One instance per CID
@@ -13,10 +15,38 @@ export class DisputeRecord {
     this.env = env;
   }
 
+  async fetch(request) {
+    const backupResponse = await handleBackupRequest(this.state, request);
+    if (backupResponse) return backupResponse;
+
+    const response = await this.handleRequest(request);
+    await this.ensureBackupRegistration();
+    return response;
+  }
+
+  /**
+   * Name this object was created with, once its data identifies it
+   */
+  async backupName() {
+    const active = await this.state.storage.get('active_dispute');
+    const cid = active?.cid || (await this.state.storage.get('dispute_history'))?.[0]?.cid;
+    return cid ? `dispute:${cid}` : null;
+  }
+
+  /**
+   * Register with the BackupIndex (once per object; see src/utils/backup.js)
+   */
+  async ensureBackupRegistration() {
+    if (this.backupRegistered) return;
+    const name = await this.backupName();
+    if (!name) return;
+    this.backupRegistered = await registerForBackup(this.state, this.env, 'DISPUTE_RECORD', name);
+  }
+
   /**
    * Handle requests to this Durable Object
    */
-  async fetch(request) {
+  async handleRequest(request) {
     const url = new URL(request.url);
     const method = request.method;
 
