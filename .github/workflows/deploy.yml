@@ -528,7 +528,7 @@ jobs:
 
             for ((i=1; i<=MAX_RETRIES; i++)); do
               # Use cache-busting headers
-              HTML_RESPONSE=$(curl -s -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://hashbin.org$PAGE?_=$(date +%s)")
+              HTML_RESPONSE=$(curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://hashbin.org$PAGE?_=$(date +%s)")
 
               if echo "$HTML_RESPONSE" | grep -q "<!-- git-sha: $GIT_SHA -->"; then
                 echo "✅ Git SHA found in HTML: $GIT_SHA ($PAGE)"
