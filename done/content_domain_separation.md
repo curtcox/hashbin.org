@@ -1,5 +1,9 @@
 # Content Domain Separation: hashbin.org + 256t.us
 
+> **Status (2026-10-07):** Code complete (commit `2c5b12d`: Phases 2–6). Phase 1 infrastructure
+> (DNS, R2 buckets) is tracked as STATUS.md **L4** and is unverified. The checkboxes below were not
+> ticked when the work landed; trust this note and STATUS.md over them.
+
 ## Motivation
 
 User-uploaded files (HTML, SVG, JS, etc.) currently share an origin with the admin

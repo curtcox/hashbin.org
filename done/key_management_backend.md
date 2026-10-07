@@ -2,7 +2,7 @@
 
 **Status:** ✅ Implementation Complete - Ready for Deployment
 **Date:** 2026-01-16
-**Related:** `todo/key_management_ui.md`
+**Related:** `done/key_management_ui.md`
 
 ## Implementation Summary
 

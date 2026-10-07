@@ -865,12 +865,12 @@ TEST: Export link is clearly labeled
 | Document | Updates Needed |
 |----------|---------------|
 | `todo/master_plan.md` | Add transaction history feature to roadmap |
-| `todo/add_to_balance.md` | Reference transaction history for deposits |
+| `done/add_to_balance.md` | Reference transaction history for deposits |
 | `todo/content_rate_limit.md` | Reference transaction history for bandwidth purchases |
-| `todo/account_management.md` | Reference transaction history for account activity |
+| `done/account_management.md` | Reference transaction history for account activity |
 | `todo/user_stories.md` | Add user stories for viewing transaction history |
 | `todo/frontend_ui.md` | Add transaction history page to frontend scope |
-| `todo/navigation_discoverability.md` | Add transaction history to navigation plan |
+| `done/navigation_discoverability.md` | Add transaction history to navigation plan |
 
 ---
 

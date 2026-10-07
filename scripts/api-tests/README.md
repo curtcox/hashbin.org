@@ -193,10 +193,10 @@ When adding new tests:
 3. Add test to appropriate suite or create new suite
 4. Update master runner (`scripts/run-all-api-tests.sh`)
 5. Add npm script to `package.json`
-6. Document new tests in `todo/local_API_tests.md`
+6. Document new tests in `done/local_API_tests.md`
 
 ## References
 
-- Full test plan: `todo/local_API_tests.md`
+- Full test plan: `done/local_API_tests.md`
 - API documentation: Project README and source code
 - CI workflow: `.github/workflows/local-api-tests.yml`

@@ -190,4 +190,4 @@ ES6 modules and modern JavaScript features are used without transpilation.
 
 ## Next Steps
 
-See `todo/login.md` for the complete login implementation plan and `todo/frontend_ui.md` for future frontend features.
+See `done/login.md` for the complete login implementation plan and `todo/frontend_ui.md` for future frontend features.

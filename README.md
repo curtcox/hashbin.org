@@ -33,42 +33,13 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 
 ## Project Status
 
-### ✅ Phase 1: Foundation & Infrastructure (Complete)
-- Cloudflare infrastructure setup
-- GitHub Actions CI/CD pipeline
-- Single production environment
-- Health monitoring and logging
+**See [STATUS.md](STATUS.md)** — the single source of truth for what's done, what blocks launch, and what's next.
+Run `npm run status` for a one-screen summary.
 
-### ✅ Phase 3: Authentication & Authorization (Complete)
-- Clerk OAuth integration (Google, Apple, Microsoft, GitHub)
-- Session management (Clerk JWT validation)
-- API key generation and management
-- Rate limiting (anonymous, authenticated, per-key)
-- Account management (creation, deletion, linking)
-- On-demand user profile creation
-- **15/15 tests passing** ✅
-
-### ✅ Phase 7: Frontend Login UI (Complete)
-- Landing page with navigation and auth header
-- User authentication UI (Sign In/Sign Out)
-- Balance display in header
-- Protected pages (upload, dashboard, deposit)
-- Public retrieve page
-- Session persistence and auth gate
-- **Frontend deployed with Worker** ✅
-
-### 🚧 Phase 2: Core Content Operations (Planned)
-- 256t hash generation and validation
-- Content upload/download endpoints
-- R2 storage integration
-- Content metadata in Durable Objects
-
-### 📋 Phase 4-6: Future Features
-- Payment system (Stripe integration)
-- Retention management and expiration
-- Content contestation and dispute resolution
-
-See [todo/master_plan.md](todo/master_plan.md) for the complete roadmap.
+In short: the MVP feature set (upload/download, auth, API keys, payments, expiration, disputes backend,
+OAuth third-party publishing) is implemented and deployed. The site is **not yet accepting customers**;
+the remaining launch blockers are production credentials, legal pages, the content-reporting UI, and a few
+reliability items.
 
 ## Quick Start
 
@@ -142,10 +113,10 @@ For full details, see [docs/local-development.md](docs/local-development.md).
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    API Layer (Cloudflare Workers)            │
-│  - Authentication & Authorization (✅ Complete)              │
-│  - Content upload/download (🚧 Planned)                      │
-│  - Payment processing (📋 Planned)                           │
-│  - Contest management (📋 Planned)                           │
+│  - Authentication & Authorization                            │
+│  - Content upload (downloads served from 256t.us)            │
+│  - Payment processing (Stripe)                               │
+│  - Dispute management                                        │
 └──────────────────┬──────────────────────────────────────────┘
                    │
       ┌────────────┼────────────┬─────────────┐
@@ -185,7 +156,8 @@ HashBin.org supports two authentication methods:
 #### Public Endpoints (No Authentication)
 - `GET /` - Service information
 - `GET /health` - Health check with component status
-- `GET /api/content/{hash}` - Download content (🚧 Planned)
+- `GET /api/content/{hash}` - Content metadata
+- `GET https://256t.us/{hash}` - Download content (separate origin)
 
 #### Authentication Endpoints
 - `GET /api/auth/session` - Get current session info
@@ -211,7 +183,7 @@ See [docs/API.md](docs/API.md) for complete API reference documentation.
 - **Key Expiration**: Maximum 5-year expiration on all API keys
 - **Account Deletion**: Requires 2FA confirmation
 
-See [todo/user_authorization.md#security-considerations](todo/user_authorization.md#security-considerations) for details.
+See [done/user_authorization.md#security-considerations](done/user_authorization.md#security-considerations) for details.
 
 ## Production Deployment
 
@@ -222,7 +194,7 @@ See [todo/user_authorization.md#security-considerations](todo/user_authorization
 
 ### Deployment Steps
 
-See [todo/user_authorization.md#production-deployment-checklist](todo/user_authorization.md#production-deployment-checklist) for the complete deployment checklist.
+See [done/user_authorization.md#production-deployment-checklist](done/user_authorization.md#production-deployment-checklist) for the complete deployment checklist.
 
 Quick summary:
 1. Configure OAuth providers in Clerk Dashboard
@@ -243,7 +215,7 @@ npm run dev
 ./scripts/test-auth-system.sh
 ```
 
-Current test coverage: **15/15 tests passing** ✅
+Unit tests: `npm run test:unit`. Full suite: `npm test`.
 
 Test categories:
 - Anonymous access to public endpoints
@@ -261,11 +233,12 @@ See [todo/manual_testing_guide.md](todo/manual_testing_guide.md) for comprehensi
 
 - **[API Reference](docs/API.md)** - Complete API endpoint documentation with examples ✨
 - **[Frontend Deployment](docs/frontend-deployment.md)** - Frontend setup and Clerk configuration ✨
-- **[Master Plan](todo/master_plan.md)** - Complete implementation roadmap
-- **[User Authorization](todo/user_authorization.md)** - Authentication system (Phase 3) ✅
-- **[Login Implementation](todo/login.md)** - Frontend login functionality ✅
-- **[Account Management](todo/account_management.md)** - Account linking and deletion
-- **[Content Dispute Resolution](todo/content_dispute_resolution.md)** - Contest system (Phase 6)
+- **[Project Status](STATUS.md)** - Launch readiness and current work
+- **[Master Plan](todo/master_plan.md)** - Vision, architecture, and decisions
+- **[User Authorization](done/user_authorization.md)** - Authentication system (Phase 3) ✅
+- **[Login Implementation](done/login.md)** - Frontend login functionality ✅
+- **[Account Management](done/account_management.md)** - Account linking and deletion
+- **[Content Moderation](todo/content_moderation.md)** - Disputes and deletion (Phase 6)
 - **[Deployment Guide](docs/deployment.md)** - Production deployment instructions
 - **[Health Check](docs/health.md)** - Health endpoint documentation
 

@@ -1,5 +1,7 @@
 # HashBin.org User Stories
 
+> Launch readiness is tracked in [`STATUS.md`](../STATUS.md). Story statuses re-checked against the code on 2026-10-07; the summary statistics at the bottom are from an earlier date and may lag.
+
 This document contains user stories for the HashBin.org platform, organized by user type and feature area. Each story shows separate status for Web UI and API implementation:
 - **UI**: Web interface status (✅ complete, 📋 planned, N/A not applicable)
 - **API**: Backend API status (✅ complete, 📋 planned, N/A not applicable)
@@ -60,19 +62,19 @@ This document contains user stories for the HashBin.org platform, organized by u
   - _Paths: UI: `/dashboard/account/` (planned) | API: `DELETE /api/auth/account`_
 
 ### Navigation & Discoverability
-- [UI: 📋 | API: N/A] **As a user**, I would like to access my dashboard from the navigation menu so that I can easily find my account information.
+- [UI: ✅ | API: N/A] **As a user**, I would like to access my dashboard from the navigation menu so that I can easily find my account information.
   - _Paths: UI: Header navigation → `/dashboard.html` (planned link)_
-- [UI: 📋 | API: N/A] **As a user**, I would like to navigate to API key management from the dashboard so that I can create and manage my API keys.
+- [UI: ✅ | API: N/A] **As a user**, I would like to navigate to API key management from the dashboard so that I can create and manage my API keys.
   - _Paths: UI: `/dashboard.html` → `/dashboard/api-keys/` (planned)_
-- [UI: 📋 | API: N/A] **As a user**, I would like to see all available features in a clear menu structure so that I can discover what the platform offers.
+- [UI: ✅ | API: N/A] **As a user**, I would like to see all available features in a clear menu structure so that I can discover what the platform offers.
   - _Paths: UI: Dashboard sidebar navigation (planned)_
-- [UI: 📋 | API: N/A] **As a user**, I would like consistent navigation across all pages so that I can move between features easily.
+- [UI: ✅ | API: N/A] **As a user**, I would like consistent navigation across all pages so that I can move between features easily.
   - _Paths: UI: All pages (header/footer/sidebar planned)_
-- [UI: 📋 | API: N/A] **As a user**, I would like to view a site map showing all available pages and features so that I can understand the full platform structure.
+- [UI: ✅ | API: N/A] **As a user**, I would like to view a site map showing all available pages and features so that I can understand the full platform structure.
   - _Paths: UI: `/sitemap.html` or footer link (planned)_
-- [UI: 📋 | API: N/A] **As a user**, I would like clear visual indicators of which section I'm currently viewing so that I always know where I am.
+- [UI: ✅ | API: N/A] **As a user**, I would like clear visual indicators of which section I'm currently viewing so that I always know where I am.
   - _Paths: UI: All pages (active nav indicators planned)_
-- [UI: 📋 | API: N/A] **As a user**, I would like breadcrumb navigation on nested pages so that I can easily navigate back to parent sections.
+- [UI: ✅ | API: N/A] **As a user**, I would like breadcrumb navigation on nested pages so that I can easily navigate back to parent sections.
   - _Paths: UI: Dashboard subpages (breadcrumbs planned)_
 
 ### Balance and Payments
@@ -118,15 +120,15 @@ This document contains user stories for the HashBin.org platform, organized by u
   - _Paths: UI: `/dashboard.html` (basic list), `/dashboard/uploads/` (planned) | API: UserProfile DO stores upload_history_
 - [UI: 📋 | API: ✅] **As a content publisher**, I would like to extend retention before expiration so that I can keep content available longer.
   - _Paths: UI: `/dashboard/uploads/{hash}` (planned) | API: `POST /api/content/{cid}/extend`_
-- [UI: 📋 | API: 📋] **As a content publisher**, I would like to see when my content will expire so that I can plan retention extensions.
+- [UI: ✅ | API: ✅] **As a content publisher**, I would like to see when my content will expire so that I can plan retention extensions.
   - _Paths: UI: `/dashboard/uploads/` (planned) | API: `GET /api/content/{cid}` expiration_timestamp (planned)_
-- [UI: 📋 | API: 📋] **As a content publisher**, I would like to view download statistics for my content so that I can understand usage patterns.
+- [UI: ✅ | API: ✅] **As a content publisher**, I would like to view download statistics for my content so that I can understand usage patterns.
   - _Paths: UI: `/dashboard/uploads/{hash}` (planned) | API: Download tracking (planned)_
 
 ### Rate Limiting for Content
-- [UI: 📋 | API: ✅] **As a content publisher**, I would like to purchase bandwidth (MTBR rate limiting) for my content so that I can control access frequency.
+- [UI: ✅ | API: ✅] **As a content publisher**, I would like to purchase bandwidth (MTBR rate limiting) for my content so that I can control access frequency.
   - _Paths: UI: `/dashboard/uploads/{hash}/rate-limit` (planned) | API: `POST /api/content/rate-limit/purchase`_
-- [UI: 📋 | API: ✅] **As a content publisher**, I would like to see rate limit pricing based on file size and request frequency so that I can budget appropriately.
+- [UI: ✅ | API: ✅] **As a content publisher**, I would like to see rate limit pricing based on file size and request frequency so that I can budget appropriately.
   - _Paths: UI: `/dashboard/uploads/{hash}/rate-limit` (planned) | API: Pricing calculator in rate-limit handler_
 - [UI: N/A | API: ✅] **As a content publisher**, I would like rate limits to stack when purchasing multiple times so that I can incrementally increase capacity.
   - _Paths: API: `POST /api/content/rate-limit/purchase` (stacking logic)_
@@ -170,27 +172,27 @@ This document contains user stories for the HashBin.org platform, organized by u
 ## API Developers
 
 ### API Keys
-- [UI: 📋 | API: ✅] **As a developer**, I would like to generate API keys so that I can access the platform programmatically.
+- [UI: ✅ | API: ✅] **As a developer**, I would like to generate API keys so that I can access the platform programmatically.
   - _Paths: UI: `/dashboard/api-keys/create` (planned) | API: `POST /api/auth/apikeys`_
-- [UI: 📋 | API: ✅] **As a developer**, I would like to create up to 25 API keys so that I can separate keys by application or environment.
+- [UI: ✅ | API: ✅] **As a developer**, I would like to create up to 25 API keys so that I can separate keys by application or environment.
   - _Paths: UI: `/dashboard/api-keys/` (planned) | API: `POST /api/auth/apikeys` (25 key limit enforced)_
 - [UI: N/A | API: ✅] **As a developer**, I would like keys with format `hb_live_*` (production) or `hb_test_*` (development) so that I can distinguish environments.
   - _Paths: API: `POST /api/auth/apikeys` (key format based on environment)_
 - [UI: N/A | API: ✅] **As a developer**, I would like keys to expire after a maximum of 5 years so that I'm forced to rotate credentials periodically.
   - _Paths: API: `POST /api/auth/apikeys` (max 5-year expiration enforced)_
-- [UI: 📋 | API: ✅] **As a developer**, I would like to name my API keys so that I can identify their purpose.
+- [UI: ✅ | API: ✅] **As a developer**, I would like to name my API keys so that I can identify their purpose.
   - _Paths: UI: `/dashboard/api-keys/create` (planned) | API: `POST /api/auth/apikeys` (name parameter)_
-- [UI: 📋 | API: N/A] **As a developer**, I would like to see API keys only once at creation so that security is maintained.
+- [UI: ✅ | API: N/A] **As a developer**, I would like to see API keys only once at creation so that security is maintained.
   - _Paths: UI: `/dashboard/api-keys/create` (planned, one-time display)_
-- [UI: 📋 | API: ✅] **As a developer**, I would like to list my API keys (without plaintext values) so that I can manage active credentials.
+- [UI: ✅ | API: ✅] **As a developer**, I would like to list my API keys (without plaintext values) so that I can manage active credentials.
   - _Paths: UI: `/dashboard/api-keys/` (planned) | API: `GET /api/auth/apikeys`_
-- [UI: 📋 | API: ✅] **As a developer**, I would like to revoke API keys so that I can disable compromised credentials.
+- [UI: ✅ | API: ✅] **As a developer**, I would like to revoke API keys so that I can disable compromised credentials.
   - _Paths: UI: `/dashboard/api-keys/:id` (planned) | API: `DELETE /api/auth/apikeys/:id`_
 - [UI: N/A | API: ✅] **As a developer**, I would like keys stored as SHA-256 hashes so that plaintext keys are never exposed in storage.
   - _Paths: API: KeyRegistry DO, UserProfile DO (SHA-256 hashed storage)_
-- [UI: 📋 | API: ✅] **As a developer**, I would like to see when keys were last used so that I can identify inactive keys.
+- [UI: ✅ | API: ✅] **As a developer**, I would like to see when keys were last used so that I can identify inactive keys.
   - _Paths: UI: `/dashboard/api-keys/` (planned) | API: `GET /api/auth/apikeys` (last_used_at field)_
-- [UI: 📋 | API: ✅] **As a developer**, I would like to reveal an API key with fresh session authentication so that I can recover a key if needed.
+- [UI: ✅ | API: ✅] **As a developer**, I would like to reveal an API key with fresh session authentication so that I can recover a key if needed.
   - _Paths: UI: `/dashboard/api-keys/:id` (planned) | API: `POST /api/auth/apikeys/:id/reveal`_
 
 ### Rate Limits
@@ -234,15 +236,15 @@ This document contains user stories for the HashBin.org platform, organized by u
 ## Content Contesters
 
 ### Contest Submission
-- [UI: 📋 | API: 📋] **As a contester**, I would like to submit a contest for copyrighted content so that I can protect my intellectual property.
-  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/contest/submit` (planned)_
-- [UI: 📋 | API: 📋] **As a contester**, I would like to submit a contest for illegal content so that harmful material can be removed.
-  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/contest/submit` (planned)_
-- [UI: 📋 | API: 📋] **As a contester**, I would like to submit a contest for abusive content so that policy violations are addressed.
-  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/contest/submit` (planned)_
-- [UI: 📋 | API: 📋] **As a contester**, I would like to upload evidence documents so that my claim is properly supported.
-  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/contest/:id/evidence` (planned)_
-- [UI: 📋 | API: 📋] **As a contester**, I would like my evidence immediately visible to moderators and payers so that disputes can be resolved quickly.
+- [UI: 📋 | API: ✅] **As a contester**, I would like to submit a contest for copyrighted content so that I can protect my intellectual property.
+  - _Paths: UI: `/disputes/submit.html` (planned, STATUS L8) | API: `POST /api/disputes`_
+- [UI: 📋 | API: ✅] **As a contester**, I would like to submit a contest for illegal content so that harmful material can be removed.
+  - _Paths: UI: `/disputes/submit.html` (planned, STATUS L8) | API: `POST /api/disputes`_
+- [UI: 📋 | API: ✅] **As a contester**, I would like to submit a contest for abusive content so that policy violations are addressed.
+  - _Paths: UI: `/disputes/submit.html` (planned, STATUS L8) | API: `POST /api/disputes`_
+- [UI: 📋 | API: ✅] **As a contester**, I would like to upload evidence documents so that my claim is properly supported.
+  - _Paths: UI: `/contest/submit` (planned) | API: `POST /api/disputes` (evidence as text + URLs; no file upload)_
+- [UI: 📋 | API: ✅] **As a contester**, I would like my evidence immediately visible to moderators and payers so that disputes can be resolved quickly.
   - _Paths: UI: `/admin/contests/:id`, `/contest/:id` (planned) | API: ContestRecord DO with evidence (planned)_
 
 ### Communication
@@ -260,8 +262,8 @@ This document contains user stories for the HashBin.org platform, organized by u
   - _Paths: UI: N/A | API: Contest validation rules (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like manual review for nuanced cases so that fair decisions are made.
   - _Paths: UI: `/admin/contests/:id` (planned) | API: Contest review workflow (planned)_
-- [UI: 📋 | API: 📋] **As a contester**, I would like to see contest status updates so that I know the progress of my claim.
-  - _Paths: UI: `/contest/:id` (planned) | API: `GET /api/contest/:id` (planned)_
+- [UI: 📋 | API: ✅] **As a contester**, I would like to see contest status updates so that I know the progress of my claim.
+  - _Paths: UI: `/contest/:id` (planned) | API: `GET /api/disputes/{id}`_
 - [UI: 📋 | API: 📋] **As a contester**, I would like to appeal decisions so that incorrect rulings can be challenged.
   - _Paths: UI: `/contest/:id/appeal` (planned) | API: `POST /api/contest/:id/appeal` (planned)_
 - [UI: 📋 | API: 📋] **As a contester**, I would like DMCA-compliant 24-48 hour response times so that legal requirements are met.
@@ -272,32 +274,32 @@ This document contains user stories for the HashBin.org platform, organized by u
 ## Platform Administrators
 
 ### Content Moderation
-- [UI: 📋 | API: 📋] **As an administrator**, I would like to review contest submissions so that I can make fair decisions.
-  - _Paths: UI: `/admin/contests/` (planned) | API: `GET /api/admin/contests` (planned)_
-- [UI: 📋 | API: 📋] **As an administrator**, I would like to see all evidence immediately upon contest filing so that I can assess claims quickly.
-  - _Paths: UI: `/admin/contests/:id` (planned) | API: `GET /api/admin/contests/:id` (planned)_
+- [UI: 📋 | API: ✅] **As an administrator**, I would like to review contest submissions so that I can make fair decisions.
+  - _Paths: UI: `/admin/contests/` (planned) | API: `GET /api/admin/disputes`_
+- [UI: 📋 | API: ✅] **As an administrator**, I would like to see all evidence immediately upon contest filing so that I can assess claims quickly.
+  - _Paths: UI: `/admin/contests/:id` (planned) | API: `GET /api/disputes/{id}` (admin token)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like automated rules to filter obvious violations so that I can focus on complex cases.
   - _Paths: UI: `/admin/moderation/` (planned) | API: Auto-moderation rules (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to view message threads between payers and contesters so that I understand dispute context.
   - _Paths: UI: `/admin/contests/:id/messages` (planned) | API: `GET /api/admin/messages/:threadId` (planned)_
 - [UI: 📋 | API: 📋] **As an administrator**, I would like to offer paid moderation services so that users can request official intervention.
   - _Paths: UI: `/admin/moderation/pricing` (planned) | API: Paid moderation endpoints (planned)_
-- [UI: 📋 | API: 📋] **As an administrator**, I would like to take down content with compelling evidence so that platform policies are enforced.
-  - _Paths: UI: `/admin/contests/:id` (planned) | API: `POST /api/admin/contests/:id/resolve` (planned)_
-- [UI: 📋 | API: 📋] **As an administrator**, I would like to maintain public records of decisions so that operations are transparent.
-  - _Paths: UI: `/public-records/contests/` (planned) | API: `GET /api/public/contests` (planned)_
+- [UI: 📋 | API: ✅] **As an administrator**, I would like to take down content with compelling evidence so that platform policies are enforced.
+  - _Paths: UI: `/admin/contests/:id` (planned) | API: `PATCH /api/admin/disputes/{cid}`, `POST /api/admin/content/{cid}/delete`_
+- [UI: 📋 | API: ✅] **As an administrator**, I would like to maintain public records of decisions so that operations are transparent.
+  - _Paths: UI: `/public-records/contests/` (planned) | API: `GET /api/disputes`, `GET /api/public/deletions`_
 
 ### System Management
 - [UI: N/A | API: ✅] **As an administrator**, I would like to monitor system health across all components so that I can ensure uptime.
   - _Paths: API: `GET /health`, monitoring endpoints_
 - [UI: N/A | API: ✅] **As an administrator**, I would like to track financial metrics (revenue, costs, profit) so that the platform is sustainable.
   - _Paths: API: PaymentRecord DO aggregations, balance tracking_
-- [UI: 📋 | API: 📋] **As an administrator**, I would like to see aggregate platform statistics so that I can understand usage patterns.
-  - _Paths: UI: `/admin/metrics/` (planned) | API: `GET /api/admin/stats` (planned)_
-- [UI: 📋 | API: 📋] **As an administrator**, I would like alerts for unusual activity so that I can respond to issues proactively.
-  - _Paths: UI: `/admin/` (planned) | API: Alerting system (planned)_
-- [UI: 📋 | API: 📋] **As an administrator**, I would like to export data for transparency so that operations remain auditable.
-  - _Paths: UI: `/admin/export/` (planned) | API: `GET /api/admin/export` (planned)_
+- [UI: 📋 | API: ✅] **As an administrator**, I would like to see aggregate platform statistics so that I can understand usage patterns.
+  - _Paths: UI: `/admin/metrics/` (planned) | API: `GET /api/admin/stats`_
+- [UI: 📋 | API: ✅] **As an administrator**, I would like alerts for unusual activity so that I can respond to issues proactively.
+  - _Paths: UI: `/admin/` (planned) | API: `GET /api/admin/alerts` (no push delivery, STATUS S3)_
+- [UI: 📋 | API: ✅] **As an administrator**, I would like to export data for transparency so that operations remain auditable.
+  - _Paths: UI: `/admin/export/` (planned) | API: `GET /api/admin/export`_
 
 ---
 

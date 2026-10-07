@@ -21,7 +21,7 @@ This document outlines the implementation plan for user login functionality and 
 - Balance display after authentication
 - Logout functionality
 
-**Out of Scope (see `todo/add_to_balance.md`):**
+**Out of Scope (see `done/add_to_balance.md`):**
 - Depositing funds via Stripe
 - Payment processing
 - Transaction history display
@@ -539,7 +539,7 @@ Per resolved question from `frontend_ui.md`:
 
 | File | Changes | Status |
 |------|---------|--------|
-| `todo/login.md` | Updated implementation status | ✅ Updated |
+| `done/login.md` | Updated implementation status | ✅ Updated |
 | `wrangler.toml` | Add static assets serving (if needed) | ⏳ Pending |
 
 ---
@@ -650,7 +650,7 @@ When Clerk service is unavailable:
 
 | Dependency | Plan | Status |
 |------------|------|--------|
-| Deposit funds | `todo/add_to_balance.md` | Planned (next phase) |
+| Deposit funds | `done/add_to_balance.md` | Planned (next phase) |
 | Upload content | `todo/master_plan.md` Phase 2 | Planned |
 | Dashboard UI | `todo/frontend_ui.md` | Planned |
 

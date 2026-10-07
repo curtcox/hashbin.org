@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Key Management UI has been fully implemented as specified in `todo/key_management_ui.md`. All core features are complete and ready for testing.
+The Key Management UI has been fully implemented as specified in `done/key_management_ui.md`. All core features are complete and ready for testing.
 
 ## Implementation Status: ✅ COMPLETE
 
@@ -158,7 +158,7 @@ The Key Management UI has been fully implemented as specified in `todo/key_manag
 
 ### Files Modified
 1. `frontend/dashboard.html` - Added API keys summary card
-2. `todo/key_management_ui.md` - Updated status
+2. `done/key_management_ui.md` - Updated status
 
 ### Code Quality
 - ✅ ES6 modules

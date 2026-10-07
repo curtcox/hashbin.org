@@ -705,7 +705,7 @@ The tests in this plan are sourced from:
 1. `done/user_authorization.md` - Auth system test plan (111+ tests)
 2. `done/api_keys.md` - API keys test plan (57+ tests)
 3. `done/payments.md` - Payments test plan (57+ tests)
-4. `todo/local_API_tests.md` - Local API test plan (137 tests)
+4. `done/local_API_tests.md` - Local API test plan (137 tests)
 5. `done/deployment_validation.md` - Deployment validation plan (89 tests)
 6. `todo/manual_testing_guide.md` - Manual OAuth testing guide
 

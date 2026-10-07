@@ -1,5 +1,8 @@
 # HashBin.org Master Implementation Plan
 
+> **Current status lives in [`STATUS.md`](../STATUS.md).** This document covers vision,
+> architecture, and decisions. Phase status below was last synced with STATUS.md on 2026-10-07.
+
 ## Project Overview
 
 HashBin.org is a content distribution platform using 256t hash-based content addressing. Users can publish content that others can retrieve using cryptographic hashes. The system operates on a pay-to-publish, free-to-download model with time-based retention and a content contestation mechanism.
@@ -115,7 +118,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - ✅ Cloudflare account and domain configuration
 - ✅ R2 bucket creation and configuration
 - ✅ Durable Objects setup and configuration
-- ⏳ **Backup and disaster recovery** (deferred to Phase 2):
+- ⏳ **Backup and disaster recovery** (not yet implemented — STATUS.md L10):
   - Event sourcing: Log all state changes to R2
   - Daily snapshots: Full Durable Objects state to R2
   - Multi-region replication evaluation
@@ -134,8 +137,9 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - GitHub Actions (deployment)
 - Cloudflare Pages (frontend hosting)
 
-### Phase 2: Core Content Operations
+### Phase 2: Core Content Operations ✅ COMPLETE
 **Goal:** Implement basic upload and download functionality
+**Status:** Complete. Open issue: the advertised 5 GB limit exceeds Cloudflare's 100 MB request body limit (STATUS.md L9)
 
 **Deliverables:**
 - 256t hash generation and validation library (JavaScript)
@@ -151,7 +155,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 **Sub-Plans:**
 - `done/upload.md` - Upload implementation with 256t hash generation ✅
 - `done/download.md` - Download implementation ✅
-- `todo/download_remaining.md` - Remaining: info page, contested content handling, performance testing
+- `done/download_extended.md` - Info page and contested content (451) handling ✅
 
 **No search/discovery features** - Hash-only access as per architectural decision #12
 
@@ -207,7 +211,6 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 
 **Sub-Plans:**
 - `done/payments.md` - Stripe payment integration (COMPLETE)
-- `todo/pricing_model.md` - Storage pricing and calculations
 
 **Technologies:**
 - Stripe (payment processor)
@@ -215,27 +218,28 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Cloudflare Workers (webhook handlers)
 - Durable Objects (payment records)
 
-### Phase 5: Retention & Expiration Management
+### Phase 5: Retention & Expiration Management ✅ COMPLETE
 **Goal:** Automate content lifecycle management
-**Status:** Foundation Complete - Planning Done, Implementation Pending
+**Status:** Complete. Follow-up: R2 cleanup of soft-deleted content (STATUS.md S1)
 
 **Deliverables:**
 - ✅ Retention extension API endpoint
 - ✅ Retention payment tracking
-- ⏳ Scheduled job for expiration checks (Cloudflare Cron Triggers)
-- ⏳ Content deletion process (R2 + Durable Objects cleanup)
-- ⏳ Public deletion records
+- ✅ Scheduled job for expiration checks (Cloudflare Cron Triggers)
+- ✅ Content deletion process (R2 + Durable Objects cleanup)
+- ✅ Public deletion records
 - **No grace period** - Immediate deletion when job runs (see Decision #8)
 - **No expiration notifications** - Users responsible for tracking
 
 **Sub-Plans:**
 - `done/content_lifecycle.md` - Planning and foundation ✅
-- `todo/content_lifecycle_remaining.md` - Implementation of cron jobs, deletion, public records
+- `done/content_lifecycle_complete.md` - Cron jobs, deletion, public records ✅
 
 **Implementation:** Use Cloudflare Workers Cron Triggers (runs daily at 2 AM UTC)
 
-### Phase 6: Contestation System
+### Phase 6: Contestation System 🚧 IN PROGRESS
 **Goal:** Implement transparent content dispute resolution
+**Status:** Dispute/deletion backend and admin API done. Public reporting UI is a launch blocker (STATUS.md L8). Messaging, appeals, and tiered review are backlog (B1, B2)
 
 **Deliverables:**
 - Contest submission form and API
@@ -262,7 +266,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - DMCA compliance (24-48 hour response time)
 
 **Sub-Plans:**
-- `todo/contestation_system.md` - Dispute resolution workflow
+- `todo/content_dispute_resolution.md` - Tiered escalation workflow (backlog)
 - `todo/content_moderation.md` - Review and moderation tools, messaging limits, admin pricing
 
 **Technologies:**
@@ -270,8 +274,9 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Durable Objects (contest records, messages)
 - R2 (evidence storage)
 
-### Phase 7: Public Records & Transparency
+### Phase 7: Public Records & Transparency 🚧 PARTIAL
 **Goal:** Provide public visibility into system operations
+**Status:** Public deletion records API and `/public-records.html` done; public dispute list ships with L8
 
 **Deliverables:**
 - Public records database/API
@@ -283,9 +288,9 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Archive/historical records
 
 **Sub-Plans:**
-- `todo/public_records.md` - Transparency and reporting system
+- (no separate plan; see `done/content_lifecycle_complete.md` and `todo/content_moderation.md`)
 
-### Phase 8: Frontend Development
+### Phase 8: Frontend Development ✅ COMPLETE
 **Goal:** Create user-friendly web interface
 
 **Deliverables:**
@@ -302,8 +307,8 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - **No analytics tracking** (financial only)
 
 **Sub-Plans:**
-- `todo/frontend_ui.md` - Web interface implementation
-- `todo/api_documentation.md` - Public API docs
+- `done/frontend_ui.md` - Web interface implementation ✅
+- `docs/API.md`, `frontend/docs/` - API documentation ✅
 
 **Technologies:**
 - Vanilla JavaScript (ES6+)
@@ -311,8 +316,9 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Web Components (if needed)
 - Cloudflare Pages (hosting)
 
-### Phase 9: Testing & Quality Assurance
+### Phase 9: Testing & Quality Assurance 🚧 PARTIAL
 **Goal:** Ensure system reliability and security
+**Status:** Unit, local API, and Playwright E2E suites exist and run in CI. Load testing and an external security audit have not been done
 
 **Deliverables:**
 - Unit test suite
@@ -324,11 +330,12 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Browser compatibility testing
 
 **Sub-Plans:**
-- `todo/testing_strategy.md` - Comprehensive test plan
-- `todo/security_audit.md` - Security review and hardening
+- `done/add_missing_tests_to_ci.md`, `done/local_API_tests.md` ✅
+- Security audit plan: not yet written
 
-### Phase 10: Legal & Compliance
+### Phase 10: Legal & Compliance ⬜ NOT STARTED
 **Goal:** Ensure legal compliance and protect all parties
+**Status:** Launch blockers STATUS.md L5 (Terms), L6 (Privacy), L7 (DMCA agent)
 
 **Deliverables:**
 - Terms of Service
@@ -342,10 +349,11 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - GDPR compliance (if applicable)
 
 **Sub-Plans:**
-- `todo/legal_compliance.md` - Terms, policies, and compliance
+- Tracked in STATUS.md (L5–L7); no separate plan yet
 
-### Phase 11: Launch & Operations
+### Phase 11: Launch & Operations 🚧 IN PROGRESS
 **Goal:** Production launch and ongoing maintenance
+**Status:** Deployed to production; launch blockers tracked in STATUS.md
 
 **Deliverables:**
 - Production deployment
@@ -358,8 +366,8 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Documentation for operators
 
 **Sub-Plans:**
-- `todo/operations.md` - Production operations and maintenance
-- `todo/monitoring.md` - System monitoring and alerting
+- `todo/clerk_remaining.md`, `todo/deployment_checklist.md`, `todo/manual_testing_guide.md`
+- `done/system_management.md` - Admin stats, alerts, audit log ✅
 
 ## Architectural Decisions
 
@@ -934,107 +942,11 @@ No blocking questions remain for beginning implementation.
 
 ## Next Steps
 
-**Phases 1, 3, and 4 are complete.** The project is ready to continue Phase 2 implementation and begin Phase 5.
-
-### Immediate Actions
-
-1. **Continue Phase 2 implementation** - Core content operations (256t hash, upload/download)
-2. **Begin Phase 5 implementation** - Retention and expiration management
-3. **Deploy to production** - Configure Clerk and Stripe production credentials
-4. **Continue frontend development** - Integration with authentication and payments
-
-### Sub-Plans Status
-
-1. **`done/site_creation.md`** - Infrastructure and deployment (Phase 1) ✅ COMPLETE
-   - Cloudflare account setup
-   - R2 bucket configuration
-   - Durable Objects setup
-   - GitHub Actions CI/CD
-   - Backup strategy (deferred to Phase 2)
-
-2. **`done/upload.md`** - Upload and 256t hash implementation (Phase 2) ✅ COMPLETE
-   - JavaScript implementation of 256t spec (client and server)
-   - Hash generation and validation
-   - Content upload API endpoint
-   - R2 storage integration
-   - Inline content support (≤64 bytes)
-   - Upload UI with drag-and-drop
-
-3. **`done/download.md`** - Download implementation (Phase 2) ✅ COMPLETE
-   - Content download API endpoint
-   - Inline content extraction from CID
-   - MIME type handling (60+ extensions)
-   - Caching and range request support
-   - Download count tracking
-   - HEAD and Range request support
-
-3a. **`todo/download_remaining.md`** - Download remaining (Phase 2/6)
-   - Contested content handling (451 status) - requires contest system
-   - Info page (`/info/{cid}`) - UX enhancement
-   - Performance testing with large files - requires production
-
-4. **`done/user_authorization.md`** - Authentication system (Phase 3) ✅ COMPLETE
-   - Clerk integration
-   - OAuth flow setup
-   - API key generation
-   - Rate limiting
-
-5. **`done/api_keys.md`** - API key management (Phase 3) ✅ COMPLETE
-   - API key generation and validation
-   - Key revocation and expiration
-   - KeyRegistry Durable Object
-
-6. **`done/payments.md`** - Payment processing (Phase 4) ✅ COMPLETE
-   - Stripe integration
-   - Pricing calculator
-   - Webhook handlers
-
-7. **`done/deployment_validation.md`** - Deployment validation (Phase 1) ✅ COMPLETE
-   - Smoke tests
-   - Health checks
-   - CI/CD validation
-
-### Development Environment Setup
-
-Before creating sub-plans, set up local development tools:
-- Install [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) for local Workers development
-- Set up Cloudflare account
-- Configure GitHub repository for Actions
-- Install Node.js and npm for JavaScript development
-
-## Sub-Plans Index
-
-### Completed Plans (done/)
-
-1. `done/site_creation.md` - Cloudflare setup, domain, R2, deployment ✅
-2. `done/user_authorization.md` - Multi-provider authentication ✅
-3. `done/api_keys.md` - API key management ✅
-4. `done/payments.md` - Payment integration and processing ✅
-5. `done/stripe.md` - Stripe integration details ✅
-6. `done/deployment_validation.md` - Deployment smoke tests ✅
-7. `done/upload.md` - Content upload implementation (256t, inline content, UI) ✅
-8. `done/download.md` - Content download implementation (MIME types, caching, range requests) ✅
-9. `done/clerk.md` - Clerk backend and monitoring implementation ✅
-10. `done/content_lifecycle.md` - Content lifecycle planning and foundation ✅
-11. `done/only_production.md` - Single production environment consolidation ✅
-12. `done/user_transaction_history.md` - Transaction history UI and backend ✅
-13. `done/key_management_backend.md` - API key usage tracking and name updates ✅
-14. `done/running_fully_local.md` - Local development environment setup ✅
-
-### Pending Plans (todo/)
-
-1. `todo/download_remaining.md` - Download: info page, contested content, performance testing
-2. `todo/content_lifecycle_remaining.md` - Expiration automation: cron jobs, deletion, public records
-3. `todo/clerk_remaining.md` - Clerk production deployment and configuration
-4. `todo/deployment_setup.md` - Deployment configuration guide
-5. `todo/frontend_ui.md` - Web interface enhancements
-6. `todo/content_moderation.md` - Review and moderation tools (Phase 6)
-7. `todo/balance_transfer.md` - Balance transfer between users
-8. `todo/account_management.md` - Account management features
-9. Other planning documents for future phases (see todo/ directory)
+See [`STATUS.md`](../STATUS.md) for launch blockers, post-launch work, and the backlog,
+and run `npm run status` for a summary. Completed plans are in `done/`; active plans are in `todo/`.
 
 ---
 
-**Document Version:** 3.2
-**Last Updated:** 2026-01-18
-**Status:** Phases 1, 3, 4 Complete - Infrastructure, authentication, and payments operational
+**Document Version:** 4.0
+**Last Updated:** 2026-10-07
+**Status:** See STATUS.md

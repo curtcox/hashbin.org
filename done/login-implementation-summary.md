@@ -8,7 +8,7 @@
 
 ## Overview
 
-This document summarizes the implementation of the frontend login functionality for HashBin.org as specified in `todo/login.md`. The implementation adds a complete web interface with Clerk OAuth authentication.
+This document summarizes the implementation of the frontend login functionality for HashBin.org as specified in `done/login.md`. The implementation adds a complete web interface with Clerk OAuth authentication.
 
 ## What Was Implemented
 
@@ -41,7 +41,7 @@ This document summarizes the implementation of the frontend login functionality 
 - `wrangler.toml` - Added assets binding for static file serving
 - `src/index.js` - Updated Worker routing to serve frontend
 - `README.md` - Added frontend status and documentation links
-- `todo/login.md` - Updated implementation progress
+- `done/login.md` - Updated implementation progress
 
 ---
 
@@ -229,12 +229,12 @@ Before deploying to production:
 - `docs/frontend-deployment.md` - Deployment and configuration
 
 ### Internal
-- `todo/login.md` - Implementation plan (updated with progress)
+- `done/login.md` - Implementation plan (updated with progress)
 - This summary document
 
 ---
 
-## Success Criteria (From todo/login.md)
+## Success Criteria (From done/login.md)
 
 ✅ User can sign in via any enabled OAuth provider
 ✅ User sees their balance after signing in
@@ -271,7 +271,7 @@ Potential improvements for future iterations:
 
 ## Conclusion
 
-The frontend login functionality has been successfully implemented according to the specifications in `todo/login.md`. All code quality checks have passed, and the implementation is ready for configuration and deployment.
+The frontend login functionality has been successfully implemented according to the specifications in `done/login.md`. All code quality checks have passed, and the implementation is ready for configuration and deployment.
 
 **Next Step**: Configure Clerk OAuth and perform manual testing.
 

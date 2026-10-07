@@ -375,7 +375,7 @@ git log --name-only --oneline -5
 - **Testing Guide:** `todo/manual_testing_guide.md`
 - **Test Script:** `scripts/test-auth-system.sh`
 - **Related Docs:**
-  - `todo/account_management.md` - Account linking and deletion
+  - `done/account_management.md` - Account linking and deletion
   - `todo/content_dispute_resolution.md` - Escalation system (Phase 3.6)
   - `todo/master_plan.md` - Overall project roadmap
 
