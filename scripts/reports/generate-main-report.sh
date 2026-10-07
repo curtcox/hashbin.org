@@ -587,6 +587,8 @@ echo "GitHub Pages API key upload helper generated: build-reports/upload-via-api
 # Static GitHub Pages helpers kept as plain HTML files
 cp scripts/reports/pages/verify-upload-and-extend.html build-reports/verify-upload-and-extend.html
 echo "GitHub Pages upload-and-extend verification page copied: build-reports/verify-upload-and-extend.html"
+cp scripts/reports/pages/diagram.html build-reports/diagram.html
+echo "GitHub Pages diagram editor copied: build-reports/diagram.html"
 
 # Bundle the browser SDK alongside generated GitHub Pages helpers so module imports stay same-origin.
 mkdir -p build-reports/sdk
