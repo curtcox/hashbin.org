@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Upload and Extend - HashBin.org</title>
+  <style>
+    :root {
+      --bg: #f6f8fa;
+      --surface: #ffffff;
+      --border: #d0d7de;
+      --text: #24292f;
+      --muted: #57606a;
+      --accent: #0969da;
+      --pass-bg: #dafbe1;
+      --pass-border: #4ac26b;
+      --fail-bg: #ffebe9;
+      --fail-border: #ff8182;
+      --warn-bg: #fff8c5;
+      --warn-border: #d4a72c;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8d96a0;
+        --accent: #4493f8;
+        --pass-bg: #12261e;
+        --pass-border: #2ea043;
+        --fail-bg: #2d1214;
+        --fail-border: #f85149;
+        --warn-bg: #272115;
+        --warn-border: #9e6a03;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 24px 16px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 28px;
+    }
+    h1 { margin: 0 0 10px 0; font-size: 28px; }
+    h2 { margin: 28px 0 10px 0; font-size: 18px; }
+    p { line-height: 1.5; }
+    .muted { color: var(--muted); font-size: 14px; }
+    form { margin-top: 20px; display: grid; gap: 14px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 600px) {
+      .row { grid-template-columns: 1fr; }
+      .container { padding: 20px 16px; }
+    }
+    label { display: grid; gap: 6px; font-weight: 600; }
+    label .hint { font-weight: 400; color: var(--muted); font-size: 13px; }
+    .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400; }
+    input, select, button {
+      font: inherit;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      min-width: 0;
+    }
+    input[type="checkbox"] { padding: 0; margin-top: 3px; }
+    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    button {
+      background: var(--accent);
+      color: #ffffff;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button[disabled] { opacity: 0.6; cursor: not-allowed; }
+    .summary {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+    }
+    .summary.pass { background: var(--pass-bg); border-color: var(--pass-border); }
+    .summary.fail { background: var(--fail-bg); border-color: var(--fail-border); }
+    ol.steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+    ol.steps li {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: grid;
+      grid-template-columns: 22px 1fr;
+      gap: 8px;
+    }
+    ol.steps li.pass { background: var(--pass-bg); border-color: var(--pass-border); }
+    ol.steps li.fail { background: var(--fail-bg); border-color: var(--fail-border); }
+    ol.steps li.skip { background: var(--warn-bg); border-color: var(--warn-border); }
+    .icon { font-weight: 700; }
+    .detail { color: var(--muted); font-size: 13px; margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .links { margin-top: 22px; display: flex; gap: 14px; flex-wrap: wrap; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    code {
+      background: var(--bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Verify Upload and Extend</h1>
+    <p class="muted">
+      Checks, against production <code>https://hashbin.org</code>, that an account with enough balance can upload new
+      content and extend the retention of existing content. It spends real balance: usually $0.01 per step for the
+      generated test file. Your API key stays in this page and is sent only to hashbin.org.
+    </p>
+
+    <form id="verify-form">
+      <label for="api-key">
+        API key
+        <span class="hint">Create one at <a href="https://hashbin.org/api-keys.html" target="_blank" rel="noopener noreferrer">hashbin.org/api-keys.html</a>.</span>
+        <input id="api-key" type="password" autocomplete="off" required placeholder="hb_live_...">
+      </label>
+
+      <div class="row">
+        <label for="upload-months">
+          Retention for the new upload
+          <select id="upload-months">
+            <option value="1" selected>1 month</option>
+            <option value="3">3 months</option>
+            <option value="12">12 months</option>
+          </select>
+        </label>
+        <label for="extend-months">
+          Months to add when extending
+          <select id="extend-months">
+            <option value="1" selected>1 month</option>
+            <option value="3">3 months</option>
+            <option value="12">12 months</option>
+          </select>
+        </label>
+      </div>
+
+      <label for="test-file">
+        Content to upload (optional)
+        <span class="hint">Leave empty to generate a unique 4 KB text file. A file that is already on HashBin isn't new content, and the upload check fails.</span>
+        <input id="test-file" type="file">
+      </label>
+
+      <label for="existing-cid">
+        Existing content to extend (optional)
+        <span class="hint">A CID you uploaded earlier. Leave empty to extend the content uploaded in this run.</span>
+        <input id="existing-cid" type="text" autocomplete="off" spellcheck="false" placeholder="AAAA...">
+      </label>
+
+      <label class="check" for="cleanup">
+        <input id="cleanup" type="checkbox" checked>
+        <span>Delete the content uploaded in this run when the checks finish (it's a test file; deletion isn't refunded)</span>
+      </label>
+
+      <button id="run-button" type="submit">Run verification</button>
+    </form>
+
+    <div id="summary" class="summary" aria-live="polite">Enter an API key and run the verification.</div>
+
+    <h2>Steps</h2>
+    <ol id="steps" class="steps"></ol>
+
+    <div class="links">
+      <a href="index.html">Back to Build Report</a>
+      <a href="upload-via-api-key.html">Upload via API Key</a>
+      <a href="https://hashbin.org/deposit.html" target="_blank" rel="noopener noreferrer">Add funds</a>
+      <a href="https://hashbin.org/transactions.html" target="_blank" rel="noopener noreferrer">Transactions</a>
+    </div>
+  </div>
+
+  <script>
+    // ?api= and ?content= point the page at a local dev server for testing. Only localhost is accepted,
+    // so a crafted link can't send someone's API key anywhere but hashbin.org.
+    function localOverride(name, fallback) {
+      const value = new URLSearchParams(window.location.search).get(name);
+      if (!value) return fallback;
+      try {
+        const url = new URL(value);
+        if (url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname)) return url.origin;
+      } catch {
+        // fall through to the default
+      }
+      return fallback;
+    }
+    const API_BASE = localOverride('api', 'https://hashbin.org');
+    const CONTENT_BASE = localOverride('content', 'https://256t.us');
+    // Content at or below this size is stored inside its CID and costs nothing (src/utils/hash256t.js)
+    const INLINE_CONTENT_THRESHOLD = 64;
+
+    const form = document.getElementById('verify-form');
+    const runButton = document.getElementById('run-button');
+    const summaryEl = document.getElementById('summary');
+    const stepsEl = document.getElementById('steps');
+
+    class StepFailure extends Error {}
+
+    function dollars(cents) {
+      return `$${(cents / 100).toFixed(2)}`;
+    }
+
+    function setSummary(message, type) {
+      summaryEl.className = `summary${type ? ` ${type}` : ''}`;
+      summaryEl.textContent = message;
+    }
+
+    function addStep(title) {
+      const li = document.createElement('li');
+      const icon = document.createElement('span');
+      icon.className = 'icon';
+      icon.textContent = '…';
+      const body = document.createElement('div');
+      const titleEl = document.createElement('div');
+      titleEl.textContent = title;
+      const detail = document.createElement('div');
+      detail.className = 'detail';
+      body.append(titleEl, detail);
+      li.append(icon, body);
+      stepsEl.append(li);
+
+      return {
+        pass(text) { li.className = 'pass'; icon.textContent = '✓'; detail.textContent = text || ''; },
+        fail(text) { li.className = 'fail'; icon.textContent = '✗'; detail.textContent = text || ''; },
+        skip(text) { li.className = 'skip'; icon.textContent = '–'; detail.textContent = text || ''; }
+      };
+    }
+
+    // Runs one step: `fn` returns the detail text on success or throws StepFailure
+    async function step(title, fn) {
+      const ui = addStep(title);
+      try {
+        const detail = await fn();
+        ui.pass(detail);
+      } catch (error) {
+        ui.fail(error.message);
+        throw error instanceof StepFailure ? error : new StepFailure(error.message);
+      }
+    }
+
+    async function api(path, apiKey, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (apiKey) headers.Authorization = `ApiKey ${apiKey}`;
+      let response;
+      try {
+        response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+      } catch (error) {
+        throw new StepFailure(`Network error calling ${path}: ${error.message}`);
+      }
+      const text = await response.text();
+      let data;
+      try { data = JSON.parse(text); } catch { data = { message: text }; }
+      return { status: response.status, ok: response.ok, data };
+    }
+
+    function describeError(result) {
+      return `HTTP ${result.status}: ${result.data.message || result.data.error || JSON.stringify(result.data)}`;
+    }
+
+    async function getBalance(apiKey) {
+      const result = await api('/api/balance', apiKey);
+      if (!result.ok) throw new StepFailure(`Couldn't read the balance. ${describeError(result)}`);
+      return result.data.balance_cents;
+    }
+
+    async function quote(sizeBytes, months) {
+      if (sizeBytes <= INLINE_CONTENT_THRESHOLD) return 0;
+      const result = await api('/api/payments/calculate', null, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ size_bytes: sizeBytes, retention_months: months })
+      });
+      if (!result.ok) throw new StepFailure(`Couldn't get a price quote. ${describeError(result)}`);
+      return result.data.cost_cents;
+    }
+
+    // Mirrors ContentMetadata.extendRetention: calendar months in UTC, clamped to the month's last day
+    function addMonthsUtc(iso, months) {
+      const date = new Date(iso);
+      const day = date.getUTCDate();
+      date.setUTCMonth(date.getUTCMonth() + months);
+      if (date.getUTCDate() !== day) date.setUTCDate(0);
+      return date.toISOString();
+    }
+
+    function sameInstant(a, b) {
+      return Math.abs(new Date(a).getTime() - new Date(b).getTime()) < 1000;
+    }
+
+    function generateTestFile() {
+      const random = crypto.getRandomValues(new Uint8Array(16));
+      const nonce = [...random].map((b) => b.toString(16).padStart(2, '0')).join('');
+      const lines = [`HashBin upload-and-extend verification ${new Date().toISOString()} ${nonce}`];
+      for (let i = 1; i <= 64; i++) {
+        lines.push(`line ${i}: generated by the GitHub Pages verification page; safe to delete.`);
+      }
+      return new File([lines.join('\n') + '\n'], `hashbin-verify-${nonce.slice(0, 8)}.txt`, { type: 'text/plain' });
+    }
+
+    function bytesEqual(a, b) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+      return true;
+    }
+
+    async function run(apiKey) {
+      const uploadMonths = parseInt(document.getElementById('upload-months').value, 10);
+      const extendMonths = parseInt(document.getElementById('extend-months').value, 10);
+      const chosenFile = document.getElementById('test-file').files[0];
+      const existingCid = document.getElementById('existing-cid').value.trim();
+      const cleanup = document.getElementById('cleanup').checked;
+      const file = chosenFile || generateTestFile();
+      const fileBytes = new Uint8Array(await file.arrayBuffer());
+
+      let balance;
+      let uploaded = null;
+      let extendTarget = null;
+
+      try {
+        await step('Read the account balance', async () => {
+          balance = await getBalance(apiKey);
+          return `Balance: ${dollars(balance)}`;
+        });
+
+        await step('Look up the content to extend', async () => {
+          if (!existingCid) {
+            return 'Will extend the content uploaded in this run.';
+          }
+          const result = await api(`/api/content/${encodeURIComponent(existingCid)}`, apiKey);
+          if (!result.ok) throw new StepFailure(`Couldn't find ${existingCid}. ${describeError(result)}`);
+          if (result.data.deleted_at) throw new StepFailure('That content has been deleted and can no longer be extended.');
+          extendTarget = { cid: existingCid, size: result.data.size_bytes, expiresAt: result.data.expires_at };
+          return `${result.data.size_bytes} bytes, expires ${result.data.expires_at}`;
+        });
+
+        let uploadCost;
+        let extendCost;
+        await step('Confirm the balance covers both operations', async () => {
+          uploadCost = await quote(fileBytes.length, uploadMonths);
+          extendCost = await quote(extendTarget ? extendTarget.size : fileBytes.length, extendMonths);
+          const needed = uploadCost + extendCost;
+          if (balance < needed) {
+            throw new StepFailure(`Needs ${dollars(needed)} but the balance is ${dollars(balance)}. Add funds and run again.`);
+          }
+          return `Upload ${dollars(uploadCost)} + extension ${dollars(extendCost)} = ${dollars(needed)} of ${dollars(balance)}`;
+        });
+
+        await step(`Upload ${file.name} (${fileBytes.length} bytes) for ${uploadMonths} month(s)`, async () => {
+          const formData = new FormData();
+          formData.append('content', file, file.name);
+          formData.append('retention_months', String(uploadMonths));
+          const startedAt = new Date().toISOString();
+          const result = await api(`/api/content?retention_months=${uploadMonths}`, apiKey, { method: 'POST', body: formData });
+          if (!result.ok) throw new StepFailure(`Upload failed. ${describeError(result)}`);
+          if (result.status !== 201) {
+            throw new StepFailure(`Expected 201 Created for new content but got ${result.status}: this content was already on HashBin, so the upload extended it instead. CID ${result.data.cid}`);
+          }
+          uploaded = { cid: result.data.cid, expiresAt: result.data.expires_at, size: result.data.size_bytes };
+          const problems = [];
+          if (result.data.cost_cents !== uploadCost) problems.push(`charged ${dollars(result.data.cost_cents)}, quoted ${dollars(uploadCost)}`);
+          if (result.data.new_balance_cents !== balance - result.data.cost_cents) {
+            problems.push(`balance went ${dollars(balance)} → ${dollars(result.data.new_balance_cents)} for a ${dollars(result.data.cost_cents)} charge`);
+          }
+          const earliest = addMonthsUtc(startedAt, uploadMonths);
+          if (new Date(result.data.expires_at) < new Date(earliest) - 60000) problems.push(`expires ${result.data.expires_at}, before ${earliest}`);
+          if (problems.length) throw new StepFailure(problems.join('; '));
+          balance = result.data.new_balance_cents;
+          return `CID ${uploaded.cid}\nCharged ${dollars(result.data.cost_cents)}; balance now ${dollars(balance)}; expires ${uploaded.expiresAt}`;
+        });
+
+        await step('Download the new content from 256t.us', async () => {
+          let response;
+          try {
+            response = await fetch(`${CONTENT_BASE}/${uploaded.cid}`, { cache: 'no-store' });
+          } catch (error) {
+            throw new StepFailure(`Network error fetching from 256t.us: ${error.message}`);
+          }
+          if (!response.ok) throw new StepFailure(`256t.us returned HTTP ${response.status}`);
+          const downloaded = new Uint8Array(await response.arrayBuffer());
+          if (!bytesEqual(downloaded, fileBytes)) {
+            throw new StepFailure(`Downloaded ${downloaded.length} bytes that don't match the ${fileBytes.length} uploaded`);
+          }
+          return `${downloaded.length} bytes, identical to the upload`;
+        });
+
+        if (!extendTarget) {
+          extendTarget = { cid: uploaded.cid, size: uploaded.size, expiresAt: uploaded.expiresAt };
+        }
+
+        await step(`Extend ${extendTarget.cid === uploaded.cid ? 'the new content' : 'the existing content'} by ${extendMonths} month(s)`, async () => {
+          const expected = addMonthsUtc(extendTarget.expiresAt, extendMonths);
+          const result = await api(`/api/content/${encodeURIComponent(extendTarget.cid)}/extend`, apiKey, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ months_to_add: extendMonths })
+          });
+          if (!result.ok) throw new StepFailure(`Extension failed. ${describeError(result)}`);
+          const problems = [];
+          if (!sameInstant(result.data.expires_at, expected)) problems.push(`new expiry ${result.data.expires_at}, expected ${expected}`);
+          if (result.data.cost_cents !== extendCost) problems.push(`charged ${dollars(result.data.cost_cents)}, quoted ${dollars(extendCost)}`);
+          if (result.data.new_balance_cents !== balance - result.data.cost_cents) {
+            problems.push(`balance went ${dollars(balance)} → ${dollars(result.data.new_balance_cents)} for a ${dollars(result.data.cost_cents)} charge`);
+          }
+          if (problems.length) throw new StepFailure(problems.join('; '));
+          balance = result.data.new_balance_cents;
+          extendTarget.expiresAt = result.data.expires_at;
+          return `Expiry moved to ${result.data.expires_at}; charged ${dollars(result.data.cost_cents)}; balance now ${dollars(balance)}`;
+        });
+
+        await step('Confirm the new expiry is stored', async () => {
+          const result = await api(`/api/content/${encodeURIComponent(extendTarget.cid)}`, apiKey);
+          if (!result.ok) throw new StepFailure(`Couldn't read the content back. ${describeError(result)}`);
+          if (!sameInstant(result.data.expires_at, extendTarget.expiresAt)) {
+            throw new StepFailure(`Stored expiry is ${result.data.expires_at}, expected ${extendTarget.expiresAt}`);
+          }
+          return `Stored expiry: ${result.data.expires_at}`;
+        });
+
+        await step('Confirm the final balance', async () => {
+          const finalBalance = await getBalance(apiKey);
+          if (finalBalance !== balance) throw new StepFailure(`Balance is ${dollars(finalBalance)}, expected ${dollars(balance)}`);
+          return `Balance: ${dollars(finalBalance)}`;
+        });
+
+        setSummary('PASS: this account can upload new content and extend existing content.', 'pass');
+      } catch (error) {
+        setSummary(`FAIL: ${error.message}`, 'fail');
+      } finally {
+        if (uploaded && cleanup) {
+          await step('Delete the content uploaded in this run', async () => {
+            const result = await api(`/api/content/${encodeURIComponent(uploaded.cid)}`, apiKey, {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ reason: 'Upload-and-extend verification cleanup' })
+            });
+            if (!result.ok) throw new StepFailure(`Couldn't delete ${uploaded.cid}. ${describeError(result)}`);
+            return `Deleted ${uploaded.cid}`;
+          }).catch(() => {});
+        } else if (uploaded) {
+          addStep('Delete the content uploaded in this run').skip(`Kept ${uploaded.cid}`);
+        }
+      }
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const apiKey = document.getElementById('api-key').value.trim();
+      if (!apiKey) {
+        setSummary('An API key is required.', 'fail');
+        return;
+      }
+      runButton.disabled = true;
+      stepsEl.replaceChildren();
+      setSummary('Running…', '');
+      try {
+        await run(apiKey);
+      } finally {
+        runButton.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

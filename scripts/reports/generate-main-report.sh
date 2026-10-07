@@ -584,6 +584,10 @@ UPLOAD_API_KEY_EOF
 
 echo "GitHub Pages API key upload helper generated: build-reports/upload-via-api-key.html"
 
+# Static GitHub Pages helpers kept as plain HTML files
+cp scripts/reports/pages/verify-upload-and-extend.html build-reports/verify-upload-and-extend.html
+echo "GitHub Pages upload-and-extend verification page copied: build-reports/verify-upload-and-extend.html"
+
 # Bundle the browser SDK alongside generated GitHub Pages helpers so module imports stay same-origin.
 mkdir -p build-reports/sdk
 cp frontend/sdk/hashbin.js build-reports/sdk/hashbin.js
