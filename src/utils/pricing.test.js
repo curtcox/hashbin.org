@@ -176,3 +176,27 @@ describe('Pricing Calculator - P0 Tests', () => {
     });
   });
 });
+
+describe('Donation months', () => {
+  it('buys whole months, rounded down', async () => {
+    const { calculateDonationMonths } = await import('./pricing.js');
+    const oneGB = 1024 * 1024 * 1024;
+    // $1 at $0.03/GB/month for 1 GB = 33.3 months → 33
+    expect(calculateDonationMonths(100, oneGB)).toBe(33);
+    // $1 for 50 GB = 0.67 months → 0 (too small)
+    expect(calculateDonationMonths(100, 50 * oneGB)).toBe(0);
+  });
+
+  it('caps at 100 years and refuses inline content', async () => {
+    const { calculateDonationMonths, MAX_DONATION_MONTHS } = await import('./pricing.js');
+    expect(calculateDonationMonths(100, 65)).toBe(MAX_DONATION_MONTHS);
+    expect(calculateDonationMonths(100, 64)).toBe(0);
+  });
+
+  it('sets the minimum donation to one month of retention, at least $1', async () => {
+    const { minimumDonationCents } = await import('./pricing.js');
+    const oneGB = 1024 * 1024 * 1024;
+    expect(minimumDonationCents(1024)).toBe(100);
+    expect(minimumDonationCents(100 * oneGB)).toBe(300);
+  });
+});

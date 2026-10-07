@@ -11,7 +11,10 @@ import {
   calculateTotalWithFees,
   formatCents, 
   calculateRetentionCost,
-  BASE_RATE_PER_GB_PER_MONTH
+  calculateDonationMonths,
+  calculateNewExpiration,
+  minimumDonationCents,
+  MIN_DONATION_CENTS
 } from '../utils/pricing.js';
 import { recordDeposit, recordDispute } from '../utils/platform-stats.js';
 
@@ -44,7 +47,7 @@ export async function handleCreateDeposit(request, env) {
     const amount_cents = data.amount_cents;
 
     // Validate amount
-    if (!amount_cents || amount_cents < 100) {
+    if (!Number.isInteger(amount_cents) || amount_cents < MIN_DONATION_CENTS) {
       return new Response(
         JSON.stringify({
           error: 'Invalid amount',
@@ -370,10 +373,8 @@ async function handleCheckoutSessionCompleted(session, env) {
       const content = await contentResponse.json();
       const size_bytes = content.size_bytes;
 
-      // Calculate months to add
-      const donationDollars = amount_cents / 100;
-      const sizeGB = size_bytes / (1024 * 1024 * 1024);
-      const monthsToAdd = donationDollars / (sizeGB * BASE_RATE_PER_GB_PER_MONTH);
+      // Whole months to add (same rule the checkout quoted)
+      const monthsToAdd = calculateDonationMonths(amount_cents, size_bytes);
 
       // Extend retention
       const transactionId = crypto.randomUUID();
@@ -506,15 +507,22 @@ export async function handleCreateDonation(request, env, cid) {
       );
     }
 
-    // Calculate how many months this donation provides
-    const donationDollars = amount_cents / 100;
-    const sizeGB = existsData.size_bytes / (1024 * 1024 * 1024);
-    const monthsAdded = donationDollars / (sizeGB * BASE_RATE_PER_GB_PER_MONTH);
-
-    // Calculate new expiration
-    const currentExpiration = new Date(existsData.expires_at);
-    const newExpiration = new Date(currentExpiration);
-    newExpiration.setMonth(newExpiration.getMonth() + Math.floor(monthsAdded));
+    // Whole months this donation buys; refuse donations that wouldn't add any
+    const monthsAdded = calculateDonationMonths(amount_cents, existsData.size_bytes);
+    if (monthsAdded < 1) {
+      const isInline = existsData.size_bytes <= 64;
+      return new Response(
+        JSON.stringify({
+          error: isInline ? 'Inline content' : 'Donation too small',
+          message: isInline
+            ? 'This content is stored in its CID and is free to keep; it needs no donations'
+            : `A donation must buy at least one month of retention: minimum ${formatCents(minimumDonationCents(existsData.size_bytes))}`,
+          min_amount_cents: isInline ? null : minimumDonationCents(existsData.size_bytes)
+        }),
+        { status: 400, headers: { 'content-type': 'application/json' } }
+      );
+    }
+    const newExpiration = new Date(calculateNewExpiration(existsData.expires_at, monthsAdded));
 
     // Initialize Stripe
     const stripe = new Stripe(env.STRIPE_SECRET_KEY, {
@@ -539,7 +547,7 @@ export async function handleCreateDonation(request, env, cid) {
             currency: 'usd',
             product_data: {
               name: `Extend HashBin Content (${cid.substring(0, 12)}...)`,
-              description: `Donate ${formatCents(amount_cents)} to extend retention by ~${Math.floor(monthsAdded)} months`
+              description: `Donate ${formatCents(amount_cents)} to extend retention by ${monthsAdded} month(s)`
             },
             unit_amount: amount_cents
           },
@@ -547,8 +555,8 @@ export async function handleCreateDonation(request, env, cid) {
         }
       ],
       mode: 'payment',
-      success_url: `${baseUrl}/content/${cid}?donation=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${baseUrl}/content/${cid}?donation=cancel`,
+      success_url: `${baseUrl}/info.html?cid=${encodeURIComponent(cid)}&donation=success`,
+      cancel_url: `${baseUrl}/info.html?cid=${encodeURIComponent(cid)}&donation=cancel`,
       client_reference_id: donorId,
       metadata: {
         type: 'donation',
@@ -565,7 +573,7 @@ export async function handleCreateDonation(request, env, cid) {
       JSON.stringify({
         checkout_url: session.url,
         session_id: session.id,
-        estimated_months_added: Math.floor(monthsAdded),
+        estimated_months_added: monthsAdded,
         estimated_new_expiration: newExpiration.toISOString(),
         current_expiration: existsData.expires_at,
         amount_cents: amount_cents

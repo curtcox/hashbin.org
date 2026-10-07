@@ -44,7 +44,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | ID | Item | Owner | Status | Notes / reference |
 |----|------|-------|--------|-------------------|
 | L1 | Production Clerk keys (`sk_live_`/`pk_live_`) in GitHub secrets | ops | ⬜ | Health reports `degraded` because of test keys. The deploy workflow's "Verify deployment - Custom domain" step requires `healthy`, so **every `main` deploy run has been marked failed since 2026-01-24** even though the code deploys. See `todo/clerk_remaining.md`. |
-| L2 | Stripe live mode: live secret key, live webhook endpoint + secret | ops | ❓ | It's unknown whether prod uses live keys; check `/health` after the next deploy (L3). See `docs/payments-setup.md`. |
+| L2 | Stripe live mode: live secret key, live webhook endpoint + secret | ops | ❓ | It's unknown whether prod uses live keys; check `/health` after the next deploy (L3). Deposit and donation checkouts set `automatic_tax: enabled`, so **Stripe Tax must be activated** or checkout creation fails. See `docs/payments-setup.md`. |
 | L3 | Health check flags Stripe test keys in production (like it does for Clerk) | code | ✅ | After the next deploy, `/health` → `checks.stripe.details.usingTestKeysInProduction` answers L2. |
 | L4 | `256t.us` DNS, TLS, and content worker live | ops | ❓ | Code done (`workers/256t-content/`). Not reachable from the audit environment, so unverified. The deploy workflow also checks `https://256t.us/health`. See `done/content_domain_separation.md` Phase 1. |
 | L5 | Real Terms of Service | legal | 🚧 | **Drafted 2026-10-07** in `frontend/terms.html`, marked DRAFT. Owner: fill in placeholders, confirm the policy choices, get it reviewed, remove the DRAFT notice. Checklist: `docs/legal-review.md`. Upload and deposit pages now link to it. |
@@ -72,7 +72,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S5 | Deletion transactions shown in transaction history | code | ✅ | "Content Deletion" rows with reason and closed dispute, plus a filter option. Also fixed: CID links in the history pointed to a nonexistent `/content/{cid}` route (now `/info.html?cid=`), and the detail text is now HTML-escaped. |
 | S6 | Developer app update/delete (`PATCH`/`DELETE /api/developers/apps/{id}`) | code | ⬜ | `done/third_party_publishing.md` "Remaining". |
 | S7 | Production OAuth third-party publishing smoke test | ops | ⬜ | `done/third_party_publishing.md` "Production Deployment Verification". |
-| S8 | Donation UI for content | code | ⬜ | API exists (`POST /api/donate/cid/{cid}`), no UI. |
+| S8 | Donation UI for content | code | ✅ | "Keep this content available" card on `/info.html` with a live preview; Stripe checkout; thank-you/cancel messages on return. Also fixed: Stripe returned donors to a nonexistent `/content/{cid}`; donations too small to buy a month were charged but added nothing; very small files produced an invalid date, so the webhook failed after payment. Donations now buy whole months (minimum one month, cap 100 years per donation). |
 | S9 | Dev-dependency vulnerabilities (wrangler, playwright, sharp, eslint plugins) | code | ⬜ | `npm audit` reports 29 (2 critical) in dev tooling only; not shipped to production. Fixing needs major-version upgrades. |
 | S10 | Per-IP rate limit on dispute submission (10/hour per plan) | code | ✅ | Counted per hashed IP in hourly buckets in the DisputeIndex, before any other check; returns 429 with `Retry-After`. The report form explains the wait. |
 | S11 | Delete button for uploaders on the upload detail page | code | ✅ | Shown only when an authenticated `GET /api/content/{cid}` returns `is_owner`; asks for confirmation, then deletes. Also fixed: that public endpoint returned the uploader's account ID, payer IDs, and the deletion reason (Decision #9 says uploaders stay anonymous); it now returns a public view. Verified in a browser. |
@@ -98,7 +98,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-346 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+351 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

@@ -122,6 +122,32 @@ export function calculateRetentionMonths(donationCents, sizeBytes) {
   return months;
 }
 
+// Cap on retention one donation can add (100 years)
+export const MAX_DONATION_MONTHS = 1200;
+export const MIN_DONATION_CENTS = 100;
+
+/**
+ * Whole months of retention a donation buys (rounded down, capped at 100 years).
+ * Inline content (64 bytes or less) is free and can't take donations.
+ * @param {number} donationCents - Donation amount in cents
+ * @param {number} sizeBytes - Content size in bytes
+ * @returns {number} Whole months to add
+ */
+export function calculateDonationMonths(donationCents, sizeBytes) {
+  if (donationCents <= 0 || sizeBytes <= INLINE_CONTENT_THRESHOLD) return 0;
+  const months = Math.floor(calculateRetentionMonths(donationCents, sizeBytes) + 1e-9);
+  return Math.min(months, MAX_DONATION_MONTHS);
+}
+
+/**
+ * Smallest donation that adds at least one month
+ * @param {number} sizeBytes - Content size in bytes
+ * @returns {number} Cents
+ */
+export function minimumDonationCents(sizeBytes) {
+  return Math.max(MIN_DONATION_CENTS, calculateRetentionCost(sizeBytes, 1));
+}
+
 /**
  * Format cents as dollar string
  * @param {number} cents - Amount in cents
