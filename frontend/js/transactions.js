@@ -6,6 +6,15 @@
 import { authenticatedFetch, formatBalance, handleApiError } from './utils.js';
 
 /**
+ * Escape text for HTML insertion
+ * @param {*} value Value to escape
+ * @returns {string} Escaped string
+ */
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+/**
  * Format transaction amount with direction indicator and color
  * @param {number} amountCents Amount in cents
  * @param {string} type Transaction type
@@ -15,6 +24,11 @@ export function formatTransactionAmount(amountCents, type) {
   const dollars = Math.abs(amountCents) / 100;
   const formatted = `$${dollars.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   
+  // Deletions are recorded for history only; no money moves
+  if (type === 'content_deletion') {
+    return { formatted: '—', cssClass: 'amount-none' };
+  }
+
   // Deposits are positive (IN), purchases are negative (OUT)
   if (type === 'deposit') {
     return {
@@ -134,7 +148,8 @@ export function getTransactionTypeLabel(type) {
     'upload_payment': 'Content Upload',
     'cid_extension': 'Retention Extension',
     'donation_received': 'Donation to Content',
-    'rate_limit_purchase': 'Bandwidth Purchase'
+    'rate_limit_purchase': 'Bandwidth Purchase',
+    'content_deletion': 'Content Deletion'
   };
   
   return labels[type] || type;
@@ -150,7 +165,8 @@ export function buildTransactionDetails(transaction) {
   
   // CID link (if present)
   if (transaction.cid) {
-    details.push(`<div><strong>CID:</strong> <a href="/content/${transaction.cid}" class="cid-link">${transaction.cid}</a></div>`);
+    const cid = escapeHtml(transaction.cid);
+    details.push(`<div><strong>CID:</strong> <a href="/info.html?cid=${encodeURIComponent(transaction.cid)}" class="cid-link">${cid}</a></div>`);
   }
   
   // Type-specific details
@@ -175,6 +191,15 @@ export function buildTransactionDetails(transaction) {
     }
   }
   
+  if (transaction.type === 'content_deletion') {
+    if (transaction.deletion_reason) {
+      details.push(`<div><strong>Reason:</strong> ${escapeHtml(transaction.deletion_reason)}</div>`);
+    }
+    if (transaction.dispute_id) {
+      details.push(`<div><strong>Closed dispute:</strong> <a href="/disputes/view.html?cid=${encodeURIComponent(transaction.cid || '')}">${escapeHtml(transaction.dispute_id)}</a></div>`);
+    }
+  }
+
   // Stripe reference (if present)
   if (transaction.type === 'deposit' && transaction.stripe_session_id) {
     details.push(`<div><strong>Stripe:</strong> <span style="font-family: monospace; font-size: 0.875rem;">${transaction.stripe_session_id.slice(0, 20)}...</span></div>`);
@@ -182,7 +207,7 @@ export function buildTransactionDetails(transaction) {
   
   // Failed transaction details
   if (transaction.status === 'failed' && transaction.failure_reason) {
-    details.push(`<div class="failure-reason"><strong>Reason:</strong> ${transaction.failure_reason}</div>`);
+    details.push(`<div class="failure-reason"><strong>Reason:</strong> ${escapeHtml(transaction.failure_reason)}</div>`);
   }
   
   return details.length > 0 ? details.join('') : '-';
