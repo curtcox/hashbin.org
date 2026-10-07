@@ -1287,7 +1287,7 @@ async function checkR2Buckets(env) {
 /**
  * Check Clerk integration health
  */
-async function checkClerk(env) {
+export async function checkClerk(env) {
   if (env.ENVIRONMENT === 'local') {
     return {
       status: 'operational',
@@ -1342,7 +1342,7 @@ async function checkClerk(env) {
 /**
  * Check Stripe integration health
  */
-async function checkStripe(env) {
+export async function checkStripe(env) {
   if (env.ENVIRONMENT === 'local') {
     return {
       status: 'operational',
@@ -1356,23 +1356,31 @@ async function checkStripe(env) {
 
   const checks = {
     secretKeyConfigured: false,
-    webhookSecretConfigured: false
+    webhookSecretConfigured: false,
+    usingTestKeysInProduction: false
   };
 
   try {
     // Check required secrets are configured
     checks.secretKeyConfigured = !!env.STRIPE_SECRET_KEY;
     checks.webhookSecretConfigured = !!env.STRIPE_WEBHOOK_SECRET;
+    // Standard (sk_) and restricted (rk_) keys both carry a _test_ marker in test mode
+    checks.usingTestKeysInProduction = env.ENVIRONMENT === 'production' &&
+      /^(sk|rk)_test_/.test(env.STRIPE_SECRET_KEY || '');
 
     const allConfigured = checks.secretKeyConfigured &&
                           checks.webhookSecretConfigured;
     const someConfigured = checks.secretKeyConfigured ||
                            checks.webhookSecretConfigured;
+    const healthy = allConfigured && !checks.usingTestKeysInProduction;
 
     return {
-      status: allConfigured ? 'operational' : (someConfigured ? 'degraded' : 'down'),
-      message: allConfigured ? 'Stripe secrets configured' :
-               (someConfigured ? 'Some Stripe secrets missing' : 'Stripe not configured'),
+      status: healthy ? 'operational' : (someConfigured ? 'degraded' : 'down'),
+      message: healthy
+        ? 'Stripe secrets configured'
+        : (checks.usingTestKeysInProduction
+            ? 'Stripe is using test keys in production'
+            : (someConfigured ? 'Some Stripe secrets missing' : 'Stripe not configured')),
       details: checks
     };
   } catch (error) {

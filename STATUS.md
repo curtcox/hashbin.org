@@ -44,8 +44,8 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | ID | Item | Owner | Status | Notes / reference |
 |----|------|-------|--------|-------------------|
 | L1 | Production Clerk keys (`sk_live_`/`pk_live_`) in GitHub secrets | ops | ⬜ | Health reports `degraded` because of test keys. The deploy workflow's "Verify deployment - Custom domain" step requires `healthy`, so **every `main` deploy run has been marked failed since 2026-01-24** even though the code deploys. See `todo/clerk_remaining.md`. |
-| L2 | Stripe live mode: live secret key, live webhook endpoint + secret | ops | ❓ | It's unknown whether prod uses live keys; health can't tell yet (see L3). See `docs/payments-setup.md`. |
-| L3 | Health check flags Stripe test keys in production (like it does for Clerk) | code | ⬜ | Without this, L2 can't be verified from outside. |
+| L2 | Stripe live mode: live secret key, live webhook endpoint + secret | ops | ❓ | It's unknown whether prod uses live keys; check `/health` after the next deploy (L3). See `docs/payments-setup.md`. |
+| L3 | Health check flags Stripe test keys in production (like it does for Clerk) | code | ✅ | After the next deploy, `/health` → `checks.stripe.details.usingTestKeysInProduction` answers L2. |
 | L4 | `256t.us` DNS, TLS, and content worker live | ops | ❓ | Code done (`workers/256t-content/`). Not reachable from the audit environment, so unverified. The deploy workflow also checks `https://256t.us/health`. See `done/content_domain_separation.md` Phase 1. |
 | L5 | Real Terms of Service | legal | ⬜ | `frontend/terms.html` is placeholder text. Must cover: no refunds (Decision #13), no grace period on expiry (#8), content responsibility, dispute process, liability, governing law. |
 | L6 | Privacy Policy | legal | ⬜ | No page exists. Must cover: Clerk/Stripe as processors, hashed IPs, public records, account deletion and data retention. |
@@ -87,7 +87,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-296 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+303 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |
