@@ -5,15 +5,29 @@
 
 // Clerk instance
 let clerkInstance = null;
+let initPromise = null;
 
 // Auth state listeners
 const authStateListeners = new Set();
 
 /**
- * Initialize Clerk SDK
+ * Initialize Clerk SDK. Safe to call repeatedly: every caller shares one
+ * initialization, and a failed attempt can be retried.
  * @returns {Promise<boolean>} True if initialization succeeded
  */
-export async function initializeAuth() {
+export function initializeAuth() {
+  if (!initPromise) {
+    initPromise = loadClerk().then((ok) => {
+      if (!ok) {
+        initPromise = null;
+      }
+      return ok;
+    });
+  }
+  return initPromise;
+}
+
+async function loadClerk() {
   try {
     // Get Clerk publishable key from API config endpoint
     let publishableKey = null;
@@ -198,6 +212,8 @@ export async function signOut() {
  * @returns {Promise<string|null>} Session token or null if not authenticated
  */
 export async function getSessionToken() {
+  // Pages may request a token before app.js has finished initializing Clerk
+  await initializeAuth();
   if (!clerkInstance || !clerkInstance.session) {
     return null;
   }
