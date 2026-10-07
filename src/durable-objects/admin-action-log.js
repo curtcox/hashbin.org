@@ -32,6 +32,16 @@ export class AdminActionLog {
       }
 
       // GET /actions - Get action logs with filtering
+      if (method === 'POST' && url.pathname === '/strike') {
+        return await this.recordStrike(await request.json());
+      }
+
+      if (method === 'GET' && url.pathname === '/repeat-infringers') {
+        const min = parseInt(url.searchParams.get('min') || '3');
+        const since = url.searchParams.get('since') || new Date(0).toISOString();
+        return await this.listRepeatInfringers(min, since);
+      }
+
       if (method === 'GET' && url.pathname === '/actions') {
         return await this.getActions(url);
       }
@@ -106,6 +116,38 @@ export class AdminActionLog {
       status: 201,
       headers: { 'Content-Type': 'application/json' }
     });
+  }
+
+  /**
+   * Record an upheld copyright removal against an uploader (one per CID)
+   */
+  async recordStrike({ uploader_id, cid, dispute_id }) {
+    if (!uploader_id || !cid) {
+      return Response.json({ error: 'UPLOADER_AND_CID_REQUIRED' }, { status: 400 });
+    }
+    const key = `strike:${uploader_id}`;
+    const strikes = (await this.state.storage.get(key)) || [];
+    if (!strikes.some(strike => strike.cid === cid)) {
+      strikes.push({ cid, dispute_id: dispute_id || null, at: new Date().toISOString() });
+      await this.state.storage.put(key, strikes);
+    }
+    return Response.json({ uploader_id, strikes: strikes.length }, { status: 201 });
+  }
+
+  /**
+   * Uploaders with at least `min` upheld copyright removals since `since`
+   */
+  async listRepeatInfringers(min, since) {
+    const entries = await this.state.storage.list({ prefix: 'strike:' });
+    const infringers = [];
+    for (const [key, strikes] of entries) {
+      const recent = strikes.filter(strike => strike.at >= since);
+      if (recent.length >= min) {
+        infringers.push({ uploader_id: key.slice('strike:'.length), strikes: recent.length, recent_strikes: recent });
+      }
+    }
+    infringers.sort((a, b) => b.strikes - a.strikes);
+    return Response.json({ min, since, infringers });
   }
 
   /**

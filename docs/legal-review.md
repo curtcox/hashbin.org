@@ -34,8 +34,9 @@ These are written to match the current code. Change the code or the text if you 
 5. **DMCA notices auto-expire after 30 days** if not reviewed, and the content becomes available
    again (DMCA §2). Confirm that's acceptable for formal copyright notices.
 6. **Repeat-infringer threshold** `[NUMBER]` upheld removals in `[PERIOD]` (DMCA §5). Safe harbor
-   requires a reasonably implemented policy. Today the admin tracks this by hand via
-   `GET /api/admin/actions`; automating it is STATUS.md S14.
+   requires a reasonably implemented policy. Strikes are tracked automatically and the cron alerts
+   at the code defaults of **3 in 365 days** (`REPEAT_INFRINGER_*` in `src/api/admin-disputes.js`).
+   Keep the page and the constants in sync. Closing the account is still a manual admin step.
 7. **CSAM reporting** (Terms §5, Privacy §3): U.S. providers must report apparent CSAM to NCMEC
    (18 U.S.C. § 2258A). Set up a NCMEC CyberTipline account and an internal procedure.
 

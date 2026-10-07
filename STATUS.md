@@ -78,7 +78,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S11 | Delete button for uploaders on the upload detail page | code | ⬜ | The API works (L15); the UI is `todo/content_moderation.md` Phase 8. |
 | S12 | Make the Playwright E2E suite runnable and run it in CI | code | ⬜ | `@playwright/test` isn't a dependency and no workflow runs `frontend/tests/`. Run locally with a shim on 2026-10-07: 17 pass, 7 fail on stale expectations (protected pages now redirect to sign-in, ambiguous locators, a RegExp typo). |
 | S13 | Fix the legacy grep-based shell checks in `npm test` | code | ⬜ | `test-api-keys.sh` hardcodes `/home/runner/work/...`; `test-upload-balance.sh` and `test-supplier-*.sh` check stale code patterns. They fail on the original `2c5b12d` too, so `npm test` stops early; `npm run test:unit` is the reliable suite. |
-| S14 | Track upheld copyright removals per uploader (repeat-infringer policy) | code | ⬜ | DMCA §5 promises account termination after repeated upheld removals. Until this is automated, count by hand from `GET /api/admin/actions`. |
+| S14 | Track upheld copyright removals per uploader (repeat-infringer policy) | code | ✅ | An admin removal that closes a copyright dispute records a strike (one per CID); `GET /api/admin/repeat-infringers`; the nightly alert fires at 3 strikes in 365 days. Also fixed: upholding a dispute (`PATCH status: closed_deleted`) unblocked the content instead of removing it; it now runs the full takedown. Closing an account is still manual. |
 
 ## Backlog (not needed for launch)
 
@@ -98,7 +98,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-337 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+342 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

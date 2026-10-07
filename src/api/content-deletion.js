@@ -133,7 +133,7 @@ export async function handleDeleteContent(request, env, cid) {
           body: JSON.stringify({
             status: 'closed_deleted',
             resolution: 'deleted',
-            resolution_reason: `Content deleted by ${deletedBy}`,
+            resolution_reason: isAdmin ? reason : `Content deleted by ${deletedBy}`,
             resolved_by: deletedBy
           })
         }));
@@ -200,6 +200,20 @@ export async function handleDeleteContent(request, env, cid) {
       const adminLogId = env.ADMIN_ACTION_LOG.idFromName('admin-action-log:global');
       const adminLogStub = env.ADMIN_ACTION_LOG.get(adminLogId);
 
+      // An admin removal that closes a copyright dispute counts against the uploader
+      // under the repeat-infringer policy (frontend/dmca.html)
+      if (disputeToClose?.claim_type === 'copyright' && metadata.uploader_id) {
+        await adminLogStub.fetch(new Request('http://internal/strike', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            uploader_id: metadata.uploader_id,
+            cid,
+            dispute_id: disputeToClose.dispute_id
+          })
+        }));
+      }
+
       await adminLogStub.fetch(new Request('http://internal/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,7 +223,9 @@ export async function handleDeleteContent(request, env, cid) {
           target_cid: cid,
           target_dispute_id: disputeToClose?.dispute_id || null,
           details: {
-            reason: reason
+            reason: reason,
+            uploader_id: metadata.uploader_id || null,
+            claim_type: disputeToClose?.claim_type || null
           }
         })
       }));

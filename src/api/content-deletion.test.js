@@ -43,7 +43,8 @@ function createMockEnv() {
               return new Response(JSON.stringify({
                 dispute_id: 'disp-123',
                 cid: 'test-cid',
-                status: 'open'
+                status: 'open',
+                claim_type: 'copyright'
               }), { status: 200 });
             }
             if (request.method === 'PATCH') {
@@ -87,14 +88,19 @@ function createMockEnv() {
         })
       }))
     },
-    ADMIN_ACTION_LOG: {
-      idFromName: vi.fn(() => 'mock-log-id'),
-      get: vi.fn(() => ({
-        fetch: vi.fn(async () => {
-          return new Response(JSON.stringify({ success: true }), { status: 201 });
-        })
-      }))
-    },
+    ADMIN_ACTION_LOG: (() => {
+      const calls = [];
+      return {
+        calls,
+        idFromName: vi.fn(() => 'mock-log-id'),
+        get: vi.fn(() => ({
+          fetch: vi.fn(async (request) => {
+            calls.push({ path: new URL(request.url).pathname, body: await request.clone().text() });
+            return new Response(JSON.stringify({ success: true }), { status: 201 });
+          })
+        }))
+      };
+    })(),
     CONTENT_BUCKET: {
       put: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined)
@@ -304,6 +310,25 @@ describe('Content Deletion API', () => {
 
       const response = await handleAdminDeleteContent(request, mockEnv, 'test-cid');
       expect(response.status).toBe(401);
+    });
+  });
+
+  describe('repeat-infringer strikes', () => {
+    it('records a strike against the uploader when an admin removes copyright-disputed content', async () => {
+      const request = new Request('http://localhost/api/content/test-cid', { method: 'DELETE' });
+      request.user = { userId: 'admin-user-123' };
+
+      expect((await handleDeleteContent(request, mockEnv, 'test-cid')).status).toBe(200);
+      const strikeCall = mockEnv.ADMIN_ACTION_LOG.calls.find(c => c.path === '/strike');
+      expect(JSON.parse(strikeCall.body)).toMatchObject({ uploader_id: 'user-456', cid: 'test-cid', dispute_id: 'disp-123' });
+    });
+
+    it('records no strike when the uploader deletes their own content', async () => {
+      const request = new Request('http://localhost/api/content/test-cid', { method: 'DELETE' });
+      request.user = { userId: 'user-456' };
+
+      expect((await handleDeleteContent(request, mockEnv, 'test-cid')).status).toBe(200);
+      expect(mockEnv.ADMIN_ACTION_LOG.calls.some(c => c.path === '/strike')).toBe(false);
     });
   });
 

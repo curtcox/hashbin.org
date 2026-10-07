@@ -109,6 +109,8 @@ import {
 import {
   handleAdminListDisputes,
   handleAdminUpdateDispute,
+  getRepeatInfringers,
+  handleGetRepeatInfringers,
   handleGetAdminActions
 } from './api/admin-disputes.js';
 
@@ -499,6 +501,22 @@ export default {
         }));
       }
       
+      // 4. Accounts at the repeat-infringer threshold (DMCA policy) need an admin decision
+      const { infringers = [] } = await getRepeatInfringers(env);
+      if (infringers.length > 0) {
+        await alertStoreStub.fetch(new Request('https://dummy/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'repeat_infringer',
+            severity: 'warning',
+            title: 'Accounts reached the repeat-infringer threshold',
+            message: `${infringers.length} account(s) have repeated upheld copyright removals; review under the DMCA policy`,
+            metadata: { uploader_ids: infringers.map(i => i.uploader_id) }
+          })
+        }));
+      }
+
       console.log('Anomaly detection complete');
     } catch (error) {
       console.error('Error running anomaly detection:', error);
@@ -840,6 +858,10 @@ function handleApiRoutes(url, request, env) {
   if (url.pathname.match(/^\/api\/admin\/content\/[^\/]+\/delete$/) && request.method === 'POST') {
     const cid = url.pathname.split('/')[4];
     return handleAdminDeleteContent(request, env, cid);
+  }
+
+  if (url.pathname === '/api/admin/repeat-infringers' && request.method === 'GET') {
+    return handleGetRepeatInfringers(request, env);
   }
 
   if (url.pathname === '/api/admin/actions' && request.method === 'GET') {

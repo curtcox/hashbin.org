@@ -278,6 +278,38 @@ describe('Admin Disputes API', () => {
       expect(mockEnv.DISPUTE_INDEX.idFromName).toHaveBeenCalled();
     });
 
+    it('takes the content down when a dispute is upheld (closed_deleted)', async () => {
+      const softDelete = vi.fn();
+      mockEnv.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
+      mockEnv.CONTENT_BUCKET = { put: vi.fn(), delete: vi.fn() };
+      mockEnv.CONTENT_METADATA = {
+        idFromName: () => 'cid',
+        get: () => ({
+          fetch: async (req) => {
+            const { pathname } = new URL(req.url);
+            if (pathname === '/content') return Response.json({ uploader_id: 'user-9', size_bytes: 5000, deleted_at: null });
+            if (pathname === '/soft-delete') { softDelete(); return Response.json({ success: true }); }
+            return new Response('nope', { status: 404 });
+          }
+        })
+      };
+      const ok = { idFromName: () => 'x', get: () => ({ fetch: async () => Response.json({ success: true, transactions: [] }) }) };
+      mockEnv.PAYMENT_RECORDS = ok;
+      mockEnv.DELETION_RECORD = ok;
+
+      const request = new Request('http://localhost/api/admin/disputes/test-cid', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'a'.repeat(64) },
+        body: JSON.stringify({ status: 'closed_deleted', resolution_reason: 'Infringes registered work' })
+      });
+
+      const response = await handleAdminUpdateDispute(request, mockEnv, 'test-cid');
+      expect(response.status).toBe(200);
+      expect((await response.json()).deleted.deleted_by).toBe('admin');
+      expect(softDelete).toHaveBeenCalled();
+      expect(mockEnv.CONTENT_BUCKET.put).toHaveBeenCalledWith('test-cid.deleted', expect.any(String), expect.any(Object));
+    });
+
     it('should return 400 for invalid status', async () => {
       const request = new Request('http://localhost/api/admin/disputes/test-cid', {
         method: 'PATCH',

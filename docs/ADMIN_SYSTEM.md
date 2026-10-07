@@ -272,13 +272,25 @@ curl -X PATCH -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/jso
   -d '{"status":"closed_denied","resolution_reason":"Not infringing"}' \
   https://hashbin.org/api/admin/disputes/{cid}
 
+# Uphold a dispute: same as taking the content down (below), with your reason on the dispute
+curl -X PATCH -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"status":"closed_deleted","resolution_reason":"Infringes the reporter'"'"'s registered work"}' \
+  https://hashbin.org/api/admin/disputes/{cid}
+
 # Take content down (closes any open dispute, writes a public deletion record)
 curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
   -d '{"reason":"DMCA notice upheld"}' https://hashbin.org/api/admin/content/{cid}/delete
 
 # Review the moderation log
 curl -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/actions
+
+# Accounts with repeated upheld copyright removals (defaults: 3 in 365 days)
+curl -H "X-Admin-Token: $ADMIN_TOKEN" "https://hashbin.org/api/admin/repeat-infringers?min=3&days=365"
 ```
+
+Removing content while a **copyright** dispute is open records a strike against the uploader.
+The nightly cron raises a `repeat_infringer` alert when any account reaches the threshold; close
+those accounts per the DMCA policy (`frontend/dmca.html` §5).
 
 ## Usage Examples
 

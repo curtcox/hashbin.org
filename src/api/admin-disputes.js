@@ -4,6 +4,7 @@
  */
 
 import { adminActorId, isAdminRequest } from '../auth/admin.js';
+import { handleDeleteContent } from './content-deletion.js';
 
 /**
  * GET /api/admin/disputes
@@ -125,6 +126,19 @@ export async function handleAdminUpdateDispute(request, env, cid) {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
+    }
+
+    // Upholding a dispute means taking the content down: run the full deletion flow,
+    // which soft-deletes the content, closes the dispute, and logs the action
+    if (data.status === 'closed_deleted') {
+      const takedown = new Request(request.url, {
+        method: 'DELETE',
+        headers: request.headers,
+        body: JSON.stringify({ reason: data.resolution_reason || 'Dispute upheld' })
+      });
+      takedown.user = request.user;
+      takedown.isAdmin = true;
+      return handleDeleteContent(takedown, env, cid);
     }
 
     // Get DisputeRecord for this CID
@@ -300,4 +314,39 @@ export async function handleGetAdminActions(request, env) {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+}
+
+// Repeat-infringer policy defaults; keep in sync with frontend/dmca.html section 5
+export const REPEAT_INFRINGER_THRESHOLD = 3;
+export const REPEAT_INFRINGER_WINDOW_DAYS = 365;
+
+/**
+ * Uploaders at or over the repeat-infringer threshold
+ * @param {Object} env - Environment bindings
+ * @param {number} min - Minimum upheld copyright removals
+ * @param {number} days - Look-back window in days
+ * @returns {Promise<Object>} { min, since, infringers: [{ uploader_id, strikes, recent_strikes }] }
+ */
+export async function getRepeatInfringers(env, min = REPEAT_INFRINGER_THRESHOLD, days = REPEAT_INFRINGER_WINDOW_DAYS) {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+  const log = env.ADMIN_ACTION_LOG.get(env.ADMIN_ACTION_LOG.idFromName('admin-action-log:global'));
+  const response = await log.fetch(new Request(`http://internal/repeat-infringers?min=${min}&since=${encodeURIComponent(since)}`));
+  return response.json();
+}
+
+/**
+ * GET /api/admin/repeat-infringers?min=3&days=365
+ * Accounts with repeated upheld copyright removals (admin only)
+ */
+export async function handleGetRepeatInfringers(request, env) {
+  if (!isAdminRequest(request, env)) {
+    return new Response(JSON.stringify({ error: request.user?.userId ? 'NOT_ADMIN' : 'UNAUTHORIZED' }), {
+      status: request.user?.userId ? 403 : 401,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  const url = new URL(request.url);
+  const min = Math.max(1, parseInt(url.searchParams.get('min') || String(REPEAT_INFRINGER_THRESHOLD)));
+  const days = Math.max(1, parseInt(url.searchParams.get('days') || String(REPEAT_INFRINGER_WINDOW_DAYS)));
+  return Response.json(await getRepeatInfringers(env, min, days));
 }
