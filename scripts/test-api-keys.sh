@@ -4,6 +4,7 @@
 # This script runs against a local wrangler dev server
 
 set -e
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Colors for output
 RED='\033[0;31m'
@@ -61,14 +62,14 @@ log_test "generateApiKey produces correct format (hb_ prefix)"
 
 # This test checks the implementation directly by examining the code
 # In a real test we'd need to actually call the function
-if grep -q "const PREFIX = 'hb_'" /home/runner/work/hashbin.org/hashbin.org/src/auth/utils.js; then
+if grep -q "const PREFIX = 'hb_'" $REPO_ROOT/src/auth/utils.js; then
   log_pass "generateApiKey implementation uses hb_ PREFIX"
 else
   log_fail "generateApiKey implementation not found or incorrect"
 fi
 
 # Verify the function returns the PREFIX
-if grep -q "return PREFIX + randomPart" /home/runner/work/hashbin.org/hashbin.org/src/auth/utils.js; then
+if grep -q "return PREFIX + randomPart" $REPO_ROOT/src/auth/utils.js; then
   log_pass "generateApiKey returns PREFIX + randomPart"
 else
   log_fail "generateApiKey does not use PREFIX correctly"
@@ -80,7 +81,7 @@ fi
 log_test "validateApiKeyFormat correctly validates key format"
 
 # Test implementation exists
-if grep -q "export function validateApiKeyFormat" /home/runner/work/hashbin.org/hashbin.org/src/auth/utils.js; then
+if grep -q "export function validateApiKeyFormat" $REPO_ROOT/src/auth/utils.js; then
   log_pass "validateApiKeyFormat function exists"
 else
   log_fail "validateApiKeyFormat function not found"
@@ -91,13 +92,13 @@ fi
 # ==========================================
 log_test "Encryption/decryption functions are implemented"
 
-if grep -q "export async function encryptApiKey" /home/runner/work/hashbin.org/hashbin.org/src/auth/utils.js; then
+if grep -q "export async function encryptApiKey" $REPO_ROOT/src/auth/utils.js; then
   log_pass "encryptApiKey function exists"
 else
   log_fail "encryptApiKey function not found"
 fi
 
-if grep -q "export async function decryptApiKey" /home/runner/work/hashbin.org/hashbin.org/src/auth/utils.js; then
+if grep -q "export async function decryptApiKey" $REPO_ROOT/src/auth/utils.js; then
   log_pass "decryptApiKey function exists"
 else
   log_fail "decryptApiKey function not found"
@@ -108,7 +109,7 @@ fi
 # ==========================================
 log_test "isSessionFresh function is implemented"
 
-if grep -q "export function isSessionFresh" /home/runner/work/hashbin.org/hashbin.org/src/auth/utils.js; then
+if grep -q "export function isSessionFresh" $REPO_ROOT/src/auth/utils.js; then
   log_pass "isSessionFresh function exists"
 else
   log_fail "isSessionFresh function not found"
@@ -119,7 +120,7 @@ fi
 # ==========================================
 log_test "UserProfile stores key_encrypted field"
 
-if grep -q "key_encrypted: data.key_encrypted" /home/runner/work/hashbin.org/hashbin.org/src/durable-objects/user-profile.js; then
+if grep -q "key_encrypted: data.key_encrypted" $REPO_ROOT/src/durable-objects/user-profile.js; then
   log_pass "UserProfile stores key_encrypted field"
 else
   log_fail "UserProfile does not store key_encrypted field"
@@ -130,7 +131,7 @@ fi
 # ==========================================
 log_test "UserProfile stores reveal_timestamps for rate limiting"
 
-if grep -q "reveal_timestamps: \[\]" /home/runner/work/hashbin.org/hashbin.org/src/durable-objects/user-profile.js; then
+if grep -q "reveal_timestamps: \[\]" $REPO_ROOT/src/durable-objects/user-profile.js; then
   log_pass "UserProfile initializes reveal_timestamps array"
 else
   log_fail "UserProfile does not initialize reveal_timestamps"
@@ -141,7 +142,7 @@ fi
 # ==========================================
 log_test "Revoke API key returns 200 for already revoked keys"
 
-if grep -q "message: 'API key already revoked'" /home/runner/work/hashbin.org/hashbin.org/src/durable-objects/user-profile.js; then
+if grep -q "message: 'API key already revoked'" $REPO_ROOT/src/durable-objects/user-profile.js; then
   log_pass "Revoke operation is idempotent"
 else
   log_fail "Revoke operation not idempotent"
@@ -152,7 +153,7 @@ fi
 # ==========================================
 log_test "UserProfile has revealApiKey method"
 
-if grep -q "async revealApiKey(keyId)" /home/runner/work/hashbin.org/hashbin.org/src/durable-objects/user-profile.js; then
+if grep -q "async revealApiKey(keyId)" $REPO_ROOT/src/durable-objects/user-profile.js; then
   log_pass "UserProfile.revealApiKey method exists"
 else
   log_fail "UserProfile.revealApiKey method not found"
@@ -163,7 +164,7 @@ fi
 # ==========================================
 log_test "Reveal endpoint route is registered"
 
-if grep -q "url.pathname.endsWith('/reveal')" /home/runner/work/hashbin.org/hashbin.org/src/durable-objects/user-profile.js; then
+if grep -q "url.pathname.endsWith('/reveal')" $REPO_ROOT/src/durable-objects/user-profile.js; then
   log_pass "Reveal route registered in UserProfile"
 else
   log_fail "Reveal route not registered in UserProfile"
@@ -174,7 +175,7 @@ fi
 # ==========================================
 log_test "handleRevealApiKey handler exists"
 
-if grep -q "export async function handleRevealApiKey" /home/runner/work/hashbin.org/hashbin.org/src/api/auth.js; then
+if grep -q "export async function handleRevealApiKey" $REPO_ROOT/src/api/auth.js; then
   log_pass "handleRevealApiKey handler exists"
 else
   log_fail "handleRevealApiKey handler not found"
@@ -185,7 +186,7 @@ fi
 # ==========================================
 log_test "Main router includes reveal endpoint"
 
-if grep -q "handleRevealApiKey" /home/runner/work/hashbin.org/hashbin.org/src/index.js; then
+if grep -q "handleRevealApiKey" $REPO_ROOT/src/index.js; then
   log_pass "Main router includes handleRevealApiKey"
 else
   log_fail "Main router does not include handleRevealApiKey"
@@ -196,7 +197,7 @@ fi
 # ==========================================
 log_test "Reveal endpoint checks session freshness"
 
-if grep -q "isSessionFresh(session, 5)" /home/runner/work/hashbin.org/hashbin.org/src/api/auth.js; then
+if grep -q "isSessionFresh(session, 5)" $REPO_ROOT/src/api/auth.js; then
   log_pass "Reveal endpoint validates session freshness"
 else
   log_fail "Reveal endpoint does not validate session freshness"
@@ -207,7 +208,7 @@ fi
 # ==========================================
 log_test "Reveal endpoint enforces rate limiting (3 per hour)"
 
-if grep -q "recentReveals.length >= 3" /home/runner/work/hashbin.org/hashbin.org/src/durable-objects/user-profile.js; then
+if grep -q "recentReveals.length >= 3" $REPO_ROOT/src/durable-objects/user-profile.js; then
   log_pass "Reveal rate limiting logic exists"
 else
   log_fail "Reveal rate limiting logic not found"
@@ -218,7 +219,7 @@ fi
 # ==========================================
 log_test "API_KEY_ENCRYPTION_KEY is documented in wrangler.toml"
 
-if grep -q "API_KEY_ENCRYPTION_KEY" /home/runner/work/hashbin.org/hashbin.org/wrangler.toml; then
+if grep -q "API_KEY_ENCRYPTION_KEY" $REPO_ROOT/wrangler.toml; then
   log_pass "API_KEY_ENCRYPTION_KEY documented in wrangler.toml"
 else
   log_fail "API_KEY_ENCRYPTION_KEY not documented in wrangler.toml"
@@ -229,7 +230,7 @@ fi
 # ==========================================
 log_test "Encryption key generation script exists"
 
-if [ -f "/home/runner/work/hashbin.org/hashbin.org/scripts/generate-encryption-key.sh" ]; then
+if [ -f "$REPO_ROOT/scripts/generate-encryption-key.sh" ]; then
   log_pass "generate-encryption-key.sh script exists"
 else
   log_fail "generate-encryption-key.sh script not found"
@@ -240,7 +241,7 @@ fi
 # ==========================================
 log_test "API key creation encrypts the key"
 
-if grep -q "const keyEncrypted = await encryptApiKey" /home/runner/work/hashbin.org/hashbin.org/src/api/auth.js; then
+if grep -q "await encryptApiKey(" $REPO_ROOT/src/api/auth.js; then
   log_pass "API key creation includes encryption"
 else
   log_fail "API key creation does not encrypt keys"
@@ -251,7 +252,7 @@ fi
 # ==========================================
 log_test "API key creation checks for API_KEY_ENCRYPTION_KEY"
 
-if grep -q "if (!env.API_KEY_ENCRYPTION_KEY)" /home/runner/work/hashbin.org/hashbin.org/src/api/auth.js; then
+if grep -q "if (!env.API_KEY_ENCRYPTION_KEY)" $REPO_ROOT/src/api/auth.js; then
   log_pass "Create endpoint validates encryption key exists"
 else
   log_fail "Create endpoint does not validate encryption key"
@@ -262,7 +263,7 @@ fi
 # ==========================================
 log_test "Reveal endpoint decrypts and returns API key"
 
-if grep -q "const apiKey = await decryptApiKey" /home/runner/work/hashbin.org/hashbin.org/src/api/auth.js; then
+if grep -q "await decryptApiKey(" $REPO_ROOT/src/api/auth.js; then
   log_pass "Reveal endpoint decrypts API key"
 else
   log_fail "Reveal endpoint does not decrypt API key"
@@ -273,7 +274,7 @@ fi
 # ==========================================
 log_test "Reveal endpoint rejects revoked keys"
 
-if grep -q "error: 'KEY_REVOKED'" /home/runner/work/hashbin.org/hashbin.org/src/durable-objects/user-profile.js; then
+if grep -q "error: 'KEY_REVOKED'" $REPO_ROOT/src/durable-objects/user-profile.js; then
   log_pass "Reveal endpoint checks for revoked keys"
 else
   log_fail "Reveal endpoint does not check for revoked keys"
@@ -284,7 +285,7 @@ fi
 # ==========================================
 log_test "Reveal endpoint requires Clerk session (not API key)"
 
-if grep -q "if (authResult.user.authMethod !== 'clerk')" /home/runner/work/hashbin.org/hashbin.org/src/api/auth.js; then
+if grep -q "if (authResult.user.authMethod !== 'clerk')" $REPO_ROOT/src/api/auth.js; then
   log_pass "Reveal endpoint requires Clerk session"
 else
   log_fail "Reveal endpoint does not validate auth method"

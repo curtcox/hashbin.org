@@ -215,7 +215,9 @@ npm run dev
 ./scripts/test-auth-system.sh
 ```
 
-Unit tests: `npm run test:unit`. Full suite: `npm test`.
+Unit tests: `npm run test:unit`. Browser tests: `npm run test:e2e` (starts `npm run dev:local` if
+needed). Full suite: `npm test` (its supplier checks call the API, so run `npm run dev:local` first).
+Local API suites: `npm run test:api` against `npm run dev:local`.
 
 Test categories:
 - Anonymous access to public endpoints

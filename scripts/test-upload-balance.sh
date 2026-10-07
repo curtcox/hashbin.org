@@ -58,14 +58,14 @@ else
 fi
 
 # ==========================================
-# Test 2: upload.js imports getSessionToken
+# Test 2: upload.js imports getAuthHeaders (works for Clerk and local auth)
 # ==========================================
-log_test "upload.js imports getSessionToken for FormData uploads"
+log_test "upload.js imports getAuthHeaders for FormData uploads"
 
-if grep -q "import.*getSessionToken.*from.*auth.js" frontend/js/upload.js; then
-  log_pass "upload.js imports getSessionToken from auth.js"
+if grep -q "import.*getAuthHeaders.*from.*auth-loader.js" frontend/js/upload.js; then
+  log_pass "upload.js imports getAuthHeaders from auth-loader.js"
 else
-  log_fail "upload.js does not import getSessionToken"
+  log_fail "upload.js does not import getAuthHeaders"
 fi
 
 # ==========================================
@@ -92,18 +92,17 @@ fi
 # ==========================================
 log_test "handleUpload function adds Authorization header for file uploads"
 
-# Check that handleUpload gets session token
-if grep -A 40 "async function handleUpload" frontend/js/upload.js | grep -q "getSessionToken()"; then
-  log_pass "handleUpload calls getSessionToken()"
+# Check that handleUpload gets auth headers and sends them
+if grep -A 80 "async function handleUpload" frontend/js/upload.js | grep -q "await getAuthHeaders()"; then
+  log_pass "handleUpload calls getAuthHeaders()"
 else
-  log_fail "handleUpload does not call getSessionToken()"
+  log_fail "handleUpload does not call getAuthHeaders()"
 fi
 
-# Check that handleUpload adds Authorization header
-if grep -A 40 "async function handleUpload" frontend/js/upload.js | grep -q "'Authorization'.*Bearer"; then
-  log_pass "handleUpload adds Authorization header with Bearer token"
+if grep -A 80 "async function handleUpload" frontend/js/upload.js | grep -q "headers: authHeaders"; then
+  log_pass "handleUpload sends the auth headers"
 else
-  log_fail "handleUpload does not add Authorization header"
+  log_fail "handleUpload does not send the auth headers"
 fi
 
 # ==========================================
@@ -118,7 +117,7 @@ else
 fi
 
 # Check that authenticatedFetch adds Authorization header
-if grep -A 15 "export async function authenticatedFetch" frontend/js/utils.js | grep -q "Authorization"; then
+if grep -A 15 "export async function authenticatedFetch" frontend/js/utils.js | grep -q "getAuthHeaders"; then
   log_pass "authenticatedFetch adds Authorization header"
 else
   log_fail "authenticatedFetch does not add Authorization header"
@@ -182,7 +181,7 @@ else
 fi
 
 # Check that handleUpload checks for auth token
-if grep -A 50 "async function handleUpload" frontend/js/upload.js | grep -q "if (!token)"; then
+if grep -A 80 "async function handleUpload" frontend/js/upload.js | grep -q "if (!authHeaders)"; then
   log_pass "handleUpload checks for missing auth token"
 else
   log_fail "handleUpload does not check for missing auth token"

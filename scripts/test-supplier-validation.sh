@@ -15,12 +15,12 @@ FAIL_COUNT=0
 
 pass() {
   echo "✓ $1"
-  ((PASS_COUNT++))
+  PASS_COUNT=$((PASS_COUNT + 1))
 }
 
 fail() {
   echo "✗ $1: $2"
-  ((FAIL_COUNT++))
+  FAIL_COUNT=$((FAIL_COUNT + 1))
 }
 
 # Since these are unit tests for utilities, we'll test them via the API
@@ -125,7 +125,7 @@ response=$(curl -s -X POST "$BASE_URL/api/suppliers" \
   -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
   -d '{"name":"Test","supplier_type":"CID_GROUP","base_url":""}')
-if echo "$response" | grep -q "URL cannot be empty"; then
+if echo "$response" | grep -q "URL is required"; then
   pass "U14: Empty URL rejected"
 else
   fail "U14: Empty URL rejected" "Expected empty URL error"
@@ -197,7 +197,7 @@ response=$(curl -s -X POST "$BASE_URL/api/suppliers" \
   -H "$AUTH_HEADER" \
   -H "Content-Type: application/json" \
   -d '{"name":"","supplier_type":"CID_GROUP","base_url":"https://example.com"}')
-if echo "$response" | grep -q "Supplier name cannot be empty"; then
+if echo "$response" | grep -q "Supplier name is required"; then
   pass "Name validation: Empty name rejected"
 else
   fail "Name validation" "Expected empty name error"

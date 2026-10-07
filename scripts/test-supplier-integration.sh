@@ -14,12 +14,12 @@ FAIL_COUNT=0
 
 pass() {
   echo "✓ $1"
-  ((PASS_COUNT++))
+  PASS_COUNT=$((PASS_COUNT + 1))
 }
 
 fail() {
   echo "✗ $1: $2"
-  ((FAIL_COUNT++))
+  FAIL_COUNT=$((FAIL_COUNT + 1))
 }
 
 BASE_URL="${BASE_URL:-http://localhost:8787}"
