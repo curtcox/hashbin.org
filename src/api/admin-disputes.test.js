@@ -46,21 +46,20 @@ function createMockEnv(isAdmin = true) {
           const url = new URL(request.url);
           if (url.pathname === '/dispute') {
             if (request.method === 'GET') {
+              // DisputeRecord GET /dispute returns the dispute itself
               return new Response(JSON.stringify({
-                dispute: {
-                  dispute_id: 'disp-123',
-                  cid: 'test-cid-1',
-                  status: 'open',
-                  claim_type: 'copyright',
-                  evidence: 'Evidence text',
-                  evidence_urls: ['https://example.com/proof'],
-                  created_at: '2024-01-01T00:00:00Z',
-                  updated_at: '2024-01-01T00:00:00Z',
-                  expires_at: '2024-01-31T00:00:00Z',
-                  submitter_contact: {
-                    type: 'email',
-                    value: 'reporter@example.com'
-                  }
+                dispute_id: 'disp-123',
+                cid: 'test-cid-1',
+                status: 'open',
+                claim_type: 'copyright',
+                evidence: 'Evidence text',
+                evidence_urls: ['https://example.com/proof'],
+                created_at: '2024-01-01T00:00:00Z',
+                updated_at: '2024-01-01T00:00:00Z',
+                expires_at: '2024-01-31T00:00:00Z',
+                submitter_contact: {
+                  type: 'email',
+                  value: 'reporter@example.com'
                 }
               }), { status: 200 });
             }
@@ -262,6 +261,21 @@ describe('Admin Disputes API', () => {
       expect(data.success).toBe(true);
       expect(data.dispute.status).toBe('closed_denied');
       expect(data.dispute.resolved_by).toBe('admin');
+    });
+
+    it('should accept X-Admin-Token, unindex the dispute, and clear the marker', async () => {
+      mockEnv.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
+      mockEnv.CONTENT_BUCKET = { put: vi.fn(), delete: vi.fn() };
+      const request = new Request('http://localhost/api/admin/disputes/test-cid', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'a'.repeat(64) },
+        body: JSON.stringify({ status: 'closed_denied', resolution_reason: 'Not infringing' })
+      });
+
+      const response = await handleAdminUpdateDispute(request, mockEnv, 'test-cid');
+      expect(response.status).toBe(200);
+      expect(mockEnv.CONTENT_BUCKET.delete).toHaveBeenCalledWith('test-cid.disputed');
+      expect(mockEnv.DISPUTE_INDEX.idFromName).toHaveBeenCalled();
     });
 
     it('should return 400 for invalid status', async () => {

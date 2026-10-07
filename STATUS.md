@@ -56,6 +56,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | L11 | End-to-end production test: real OAuth login, real deposit, upload, download from 256t.us, dispute, deletion | ops | ⬜ | Blocked by L1, L2, L4. Checklist: `todo/manual_testing_guide.md`. |
 | L13 | Extend retention from the dashboard | code | ⬜ | The API exists (`POST /api/content/{cid}/extend`), but no UI calls it. With no grace period and no expiry emails (Decisions #8, #14), customers need an easy way to extend before content is deleted. |
 | L14 | No known vulnerabilities in runtime dependencies | code | ✅ | `npm audit --omit=dev` showed a critical `@clerk/shared` route-protection bypass plus high-severity Clerk/js-cookie issues; fixed with semver-compatible updates on 2026-10-07. Re-check before launch. |
+| L15 | Content deletion and dispute moderation work in production | code | ✅ | Found 2026-10-07: `request.user` was never set, so `DELETE /api/content/{cid}` and every admin dispute endpoint always returned 401. Deletion also crashed on a misspelled binding (`PAYMENT_RECORD`), and resolving a dispute crashed before unblocking content. All fixed and covered by tests. Admin endpoints accept `X-Admin-Token` (deployed from GitHub secret `ADMIN_SECRET_TOKEN`) or an `ADMIN_USER_ID` session. **Ops:** set the `ADMIN_SECRET_TOKEN` GitHub secret. Runbook: `docs/ADMIN_SYSTEM.md` → Content Moderation. |
 | L12 | Remove "Unstable Beta — Do not use" banner | code | ⬜ | `frontend/js/banner-config.js`. Do last. |
 
 ## Soon after launch
@@ -90,7 +91,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-306 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+313 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

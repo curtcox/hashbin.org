@@ -41,11 +41,9 @@ function createMockEnv() {
           if (url.pathname === '/dispute') {
             if (request.method === 'GET') {
               return new Response(JSON.stringify({
-                dispute: {
-                  dispute_id: 'disp-123',
-                  cid: 'test-cid',
-                  status: 'open'
-                }
+                dispute_id: 'disp-123',
+                cid: 'test-cid',
+                status: 'open'
               }), { status: 200 });
             }
             if (request.method === 'PATCH') {
@@ -64,7 +62,7 @@ function createMockEnv() {
         })
       }))
     },
-    PAYMENT_RECORD: {
+    PAYMENT_RECORDS: {
       idFromName: vi.fn(() => 'mock-payment-id'),
       get: vi.fn(() => ({
         fetch: vi.fn(async (request) => {
@@ -279,6 +277,48 @@ describe('Content Deletion API', () => {
       const data = await response.json();
       expect(data.success).toBe(true);
       expect(data.deleted.deleted_by).toBe('admin');
+    });
+    it('should allow deletion with X-Admin-Token and no signed-in user', async () => {
+      mockEnv.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
+      const request = new Request('http://localhost/api/admin/content/test-cid/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'a'.repeat(64) },
+        body: JSON.stringify({ reason: 'DMCA notice' })
+      });
+
+      const response = await handleAdminDeleteContent(request, mockEnv, 'test-cid');
+      expect(response.status).toBe(200);
+
+      const data = await response.json();
+      expect(data.deleted.deleted_by).toBe('admin');
+      expect(data.deleted.dispute_closed).toBe(true);
+    });
+
+    it('should reject an invalid X-Admin-Token', async () => {
+      mockEnv.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
+      const request = new Request('http://localhost/api/admin/content/test-cid/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'b'.repeat(64) },
+        body: JSON.stringify({})
+      });
+
+      const response = await handleAdminDeleteContent(request, mockEnv, 'test-cid');
+      expect(response.status).toBe(401);
+    });
+  });
+
+  describe('deletion side effects', () => {
+    it('records the deletion in the uploader history and closes the open dispute', async () => {
+      const request = new Request('http://localhost/api/content/test-cid', { method: 'DELETE' });
+      request.user = { userId: 'admin-user-123' };
+
+      const response = await handleDeleteContent(request, mockEnv, 'test-cid');
+      expect(response.status).toBe(200);
+
+      const data = await response.json();
+      expect(data.deleted.dispute_closed).toBe(true);
+      // Transaction goes to the uploader, not the admin who deleted it
+      expect(mockEnv.PAYMENT_RECORDS.idFromName).toHaveBeenCalledWith('user-456');
     });
   });
 });

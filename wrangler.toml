@@ -27,7 +27,8 @@ workers_dev = true
 # STRIPE_SECRET_KEY (required for payments)
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
 # API_KEY_ENCRYPTION_KEY (required for API key reveal - 256-bit AES key in base64)
-# ADMIN_SECRET_TOKEN (required for admin endpoints - 64-character hex string)
+# ADMIN_SECRET_TOKEN (required for admin endpoints, including dispute moderation - 64-character hex string)
+# ADMIN_USER_ID (optional - Clerk user ID that may moderate disputes while signed in)
 # OAUTH_SIGNING_KEY (required for OAuth authorize/token/revoke flow)
 
 # Durable Objects bindings

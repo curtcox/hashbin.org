@@ -54,3 +54,26 @@ export function requireAdmin(request, env) {
 
   return null; // Authentication successful
 }
+
+/**
+ * Whether the caller is the platform admin: a valid X-Admin-Token, or a signed-in
+ * user (request.user) whose ID matches ADMIN_USER_ID
+ * @param {Request} request - HTTP request
+ * @param {object} env - Environment bindings
+ * @returns {boolean} - True if the caller is the admin
+ */
+export function isAdminRequest(request, env) {
+  if (validateAdminToken(request.headers.get('X-Admin-Token'), env)) {
+    return true;
+  }
+  return Boolean(env.ADMIN_USER_ID && request.user?.userId === env.ADMIN_USER_ID);
+}
+
+/**
+ * Identifier for the admin in audit records
+ * @param {Request} request - HTTP request
+ * @returns {string} - Admin's user ID, or 'admin_token' for token auth
+ */
+export function adminActorId(request) {
+  return request.user?.userId || 'admin_token';
+}

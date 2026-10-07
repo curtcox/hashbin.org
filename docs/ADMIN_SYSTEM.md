@@ -250,6 +250,32 @@ CSV file download with appropriate headers.
 
 **Rate Limit:** 1 export per minute (to be implemented)
 
+## Content Moderation (Disputes and Takedowns)
+
+The dispute endpoints accept the same `X-Admin-Token` header. Alternatively, set the
+`ADMIN_USER_ID` secret to your Clerk user ID to moderate while signed in.
+
+```bash
+# List open disputes, including reporter contact info
+curl -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/disputes
+
+# Mark a dispute under review (content stays blocked with HTTP 451 on 256t.us)
+curl -X PATCH -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"status":"under_review"}' https://hashbin.org/api/admin/disputes/{cid}
+
+# Deny a dispute (content becomes available again)
+curl -X PATCH -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"status":"closed_denied","resolution_reason":"Not infringing"}' \
+  https://hashbin.org/api/admin/disputes/{cid}
+
+# Take content down (closes any open dispute, writes a public deletion record)
+curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{"reason":"DMCA notice upheld"}' https://hashbin.org/api/admin/content/{cid}/delete
+
+# Review the moderation log
+curl -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/actions
+```
+
 ## Usage Examples
 
 ### Using curl

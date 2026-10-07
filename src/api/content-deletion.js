@@ -3,22 +3,24 @@
  * Handles uploader and admin content deletion with dispute management
  */
 
+import { adminActorId, isAdminRequest } from '../auth/admin.js';
+
 /**
  * DELETE /api/content/{cid}
  * Delete content (uploader or admin only)
  */
 export async function handleDeleteContent(request, env, cid) {
   try {
-    // Authentication required
-    if (!request.user?.userId) {
+    // Authentication required (admin token callers arrive via handleAdminDeleteContent)
+    if (!request.user?.userId && !request.isAdmin) {
       return new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
-    const userId = request.user.userId;
-    const isAdmin = env.ADMIN_USER_ID && userId === env.ADMIN_USER_ID;
+    const isAdmin = request.isAdmin === true || isAdminRequest(request, env);
+    const userId = request.user?.userId || adminActorId(request);
 
     // Get content metadata
     const contentId = env.CONTENT_METADATA.idFromName(cid);
@@ -106,10 +108,11 @@ export async function handleDeleteContent(request, env, cid) {
     let disputeToClose = null;
 
     if (activeDisputeResponse.ok) {
-      const disputeData = await activeDisputeResponse.json();
+      // GET /dispute returns the active dispute object itself (not wrapped)
+      const activeDispute = await activeDisputeResponse.json();
       // Close dispute if it's open or under review
-      if (disputeData.dispute && (disputeData.dispute.status === 'open' || disputeData.dispute.status === 'under_review')) {
-        disputeToClose = disputeData.dispute;
+      if (activeDispute.status === 'open' || activeDispute.status === 'under_review') {
+        disputeToClose = activeDispute;
 
         // Update dispute status to closed_deleted
         await disputeStub.fetch(new Request('http://internal/dispute', {
@@ -137,9 +140,9 @@ export async function handleDeleteContent(request, env, cid) {
       }
     }
 
-    // 3. Create content_deletion transaction in PaymentRecord (amount: 0)
-    const paymentId = env.PAYMENT_RECORD.idFromName(userId);
-    const paymentStub = env.PAYMENT_RECORD.get(paymentId);
+    // 3. Record a content_deletion transaction (amount: 0) in the uploader's history
+    const paymentId = env.PAYMENT_RECORDS.idFromName(metadata.uploader_id);
+    const paymentStub = env.PAYMENT_RECORDS.get(paymentId);
 
     // Get current balance
     const balanceResponse = await paymentStub.fetch(new Request('http://internal/transactions?limit=1'));
@@ -152,7 +155,7 @@ export async function handleDeleteContent(request, env, cid) {
       body: JSON.stringify({
         transaction_id: `txn_del_${crypto.randomUUID()}`,
         type: 'content_deletion',
-        user_id: userId,
+        user_id: metadata.uploader_id,
         amount_cents: 0,
         balance_before_cents: currentBalance,
         balance_after_cents: currentBalance,
@@ -233,21 +236,10 @@ export async function handleDeleteContent(request, env, cid) {
  */
 export async function handleAdminDeleteContent(request, env, cid) {
   try {
-    // Authentication required
-    if (!request.user?.userId) {
-      return new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    const userId = request.user.userId;
-    const isAdmin = env.ADMIN_USER_ID && userId === env.ADMIN_USER_ID;
-
-    // Check if user is admin
-    if (!isAdmin) {
-      return new Response(JSON.stringify({ error: 'NOT_ADMIN' }), {
-        status: 403,
+    if (!isAdminRequest(request, env)) {
+      const authenticated = Boolean(request.user?.userId);
+      return new Response(JSON.stringify({ error: authenticated ? 'NOT_ADMIN' : 'UNAUTHORIZED' }), {
+        status: authenticated ? 403 : 401,
         headers: { 'Content-Type': 'application/json' }
       });
     }
@@ -264,6 +256,7 @@ export async function handleAdminDeleteContent(request, env, cid) {
       body: JSON.stringify({ reason })
     });
     modifiedRequest.user = request.user;
+    modifiedRequest.isAdmin = true;
 
     // Call standard delete handler
     return await handleDeleteContent(modifiedRequest, env, cid);

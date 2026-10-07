@@ -129,6 +129,7 @@ import {
 
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
+import { isOAuthAuth } from './auth/oauth-access.js';
 
 // Configuration constants
 const VALID_ENVIRONMENTS = ['development', 'production', 'local'];
@@ -169,6 +170,12 @@ export default {
     const authResult = await authenticate(request, env);
     const rateLimitError = applyRateLimit(request, authResult);
     if (rateLimitError) return rateLimitError;
+
+    // Handlers for deletion and dispute moderation read the caller from request.user.
+    // OAuth tokens are publish-only, so they never get user-level powers here.
+    if (authResult.authenticated && !isOAuthAuth(authResult)) {
+      request.user = authResult.user;
+    }
 
     // API and OAuth routes
     if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/oauth/') || url.pathname === '/health') {

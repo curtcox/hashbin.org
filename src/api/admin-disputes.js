@@ -3,15 +3,7 @@
  * Admin-only dispute management endpoints
  */
 
-/**
- * Check if user is admin
- */
-function isAdmin(request, env) {
-  if (!request.user?.userId || !env.ADMIN_USER_ID) {
-    return false;
-  }
-  return request.user.userId === env.ADMIN_USER_ID;
-}
+import { adminActorId, isAdminRequest } from '../auth/admin.js';
 
 /**
  * GET /api/admin/disputes
@@ -20,7 +12,7 @@ function isAdmin(request, env) {
 export async function handleAdminListDisputes(request, env) {
   try {
     // Check admin authorization
-    if (!isAdmin(request, env)) {
+    if (!isAdminRequest(request, env)) {
       return new Response(JSON.stringify({ 
         error: request.user?.userId ? 'NOT_ADMIN' : 'UNAUTHORIZED' 
       }), {
@@ -69,8 +61,8 @@ export async function handleAdminListDisputes(request, env) {
           );
 
           if (detailResponse.ok) {
-            const detailData = await detailResponse.json();
-            return detailData.dispute;
+            // GET /dispute returns the dispute object itself (not wrapped)
+            return await detailResponse.json();
           }
 
           return dispute;
@@ -111,7 +103,7 @@ export async function handleAdminListDisputes(request, env) {
 export async function handleAdminUpdateDispute(request, env, cid) {
   try {
     // Check admin authorization
-    if (!isAdmin(request, env)) {
+    if (!isAdminRequest(request, env)) {
       return new Response(JSON.stringify({ 
         error: request.user?.userId ? 'NOT_ADMIN' : 'UNAUTHORIZED' 
       }), {
@@ -151,6 +143,7 @@ export async function handleAdminUpdateDispute(request, env, cid) {
       });
     }
 
+    // DisputeRecord returns the active dispute object itself (not wrapped)
     const currentDispute = await currentDisputeResponse.json();
 
     // Update dispute status
@@ -176,7 +169,7 @@ export async function handleAdminUpdateDispute(request, env, cid) {
     const updatedDispute = await updateResponse.json();
 
     // If status changed to closed, update DisputeIndex
-    if (data.status.startsWith('closed_') && currentDispute.dispute.status === 'open') {
+    if (data.status.startsWith('closed_') && ['open', 'under_review'].includes(currentDispute.status)) {
       const indexId = env.DISPUTE_INDEX.idFromName('dispute-index:global');
       const indexStub = env.DISPUTE_INDEX.get(indexId);
 
@@ -184,7 +177,7 @@ export async function handleAdminUpdateDispute(request, env, cid) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          dispute_id: currentDispute.dispute.dispute_id
+          dispute_id: currentDispute.dispute_id
         })
       }));
     }
@@ -192,7 +185,7 @@ export async function handleAdminUpdateDispute(request, env, cid) {
     try {
       if (data.status === 'open' || data.status === 'under_review') {
         await env.CONTENT_BUCKET.put(`${cid}.disputed`, JSON.stringify({
-          dispute_id: currentDispute.dispute.dispute_id,
+          dispute_id: currentDispute.dispute_id,
           status: data.status,
           updated_at: new Date().toISOString()
         }), {
@@ -222,12 +215,12 @@ export async function handleAdminUpdateDispute(request, env, cid) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        admin_user_id: request.user.userId,
+        admin_user_id: adminActorId(request),
         action_type: actionType,
         target_cid: cid,
-        target_dispute_id: currentDispute.dispute.dispute_id,
+        target_dispute_id: currentDispute.dispute_id,
         details: {
-          old_status: currentDispute.dispute.status,
+          old_status: currentDispute.status,
           new_status: data.status,
           resolution_reason: data.resolution_reason
         }
@@ -261,7 +254,7 @@ export async function handleAdminUpdateDispute(request, env, cid) {
 export async function handleGetAdminActions(request, env) {
   try {
     // Check admin authorization
-    if (!isAdmin(request, env)) {
+    if (!isAdminRequest(request, env)) {
       return new Response(JSON.stringify({ 
         error: request.user?.userId ? 'NOT_ADMIN' : 'UNAUTHORIZED' 
       }), {
