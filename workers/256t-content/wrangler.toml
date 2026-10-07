@@ -6,9 +6,11 @@ compatibility_date = "2024-12-01"
 binding = "CONTENT_BUCKET"
 bucket_name = "hashbin-content-256t-prod"
 
+# Custom domains: Cloudflare creates the DNS records and certificates on deploy.
+# (Plain routes need a proxied DNS record to exist first, and 256t.us had none.)
 routes = [
-  { pattern = "256t.us/*", zone_name = "256t.us" },
-  { pattern = "www.256t.us/*", zone_name = "256t.us" }
+  { pattern = "256t.us", custom_domain = true },
+  { pattern = "www.256t.us", custom_domain = true }
 ]
 
 [vars]
