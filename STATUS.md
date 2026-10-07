@@ -65,7 +65,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 
 | ID | Item | Owner | Status | Notes / reference |
 |----|------|-------|--------|-------------------|
-| S1 | R2 cleanup of soft-deleted content (`DeletionPendingIndex`) | code | ⬜ | `cleanupR2PendingDeletion` in `src/index.js` is a stub. Deleted content is already hidden (a `.deleted` marker blocks serving), but its bytes stay in R2 and keep costing money. |
+| S1 | R2 cleanup of soft-deleted content | code | ✅ | Deletions queue the CID in the DeletionRecord; the daily cron removes the bytes after 24h (200 per run; the `.deleted` marker stays). Also fixed: re-uploading, extending, or donating to deleted content charged the user while the content stayed deleted. These now return 410 before charging. Content soft-deleted before this change isn't queued; any such bytes can be removed by hand. |
 | S2 | Clerk webhook endpoint `POST /api/webhooks/clerk` | code | ⬜ | Several docs say it exists, but it doesn't. Profiles are created on demand, so it's only needed to react to deletions on Clerk's side. |
 | S3 | Operator alert delivery (email/webhook) | code | ⬜ | Anomaly alerts are only stored in `AlertStore`. Someone has to poll `/api/admin/alerts`. |
 | S4 | Admin dispute review UI | code | ⬜ | Today admins use the API with `ADMIN_SECRET_TOKEN`. |
@@ -98,7 +98,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-332 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+336 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

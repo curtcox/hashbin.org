@@ -113,6 +113,7 @@ import {
 } from './api/admin-disputes.js';
 
 import { deleteContent, getContentMetadata } from './services/content-deletion.js';
+import { cleanupPendingR2Deletions } from './services/r2-cleanup.js';
 import { MAX_UPLOAD_BYTES } from './utils/upload-limits.js';
 import {
   handleGetBackupFile,
@@ -602,32 +603,12 @@ export default {
   },
 
   /**
-   * Cleanup R2 objects pending deletion
-   * Deletes R2 objects for content that has been soft-deleted for >24 hours
+   * Remove R2 bytes for content soft-deleted more than 24 hours ago
    */
   async cleanupR2PendingDeletion(env) {
     try {
-      console.log('Cleaning up R2 pending deletion...');
-      
-      // Note: This requires an index or scanning mechanism to find content with pending_r2_deletion
-      // For this implementation, we document the requirements for production enhancement
-      
-      // Production Requirements:
-      // 1. Create a DeletionPendingIndex Durable Object to track soft-deleted content
-      // 2. When softDeleteContent() is called, add the CID to DeletionPendingIndex with timestamp
-      // 3. This scheduled job queries DeletionPendingIndex for entries > 24 hours old
-      // 4. For each eligible entry: delete from R2, call markR2Deleted(), remove from index
-      
-      // Issue: Without a global index, we cannot efficiently find ContentMetadata objects
-      // with pending_r2_deletion=true. This must be implemented before production use.
-      
-      // TODO(GitHub Issue): Implement DeletionPendingIndex for efficient R2 cleanup
-      // Until implemented, R2 cleanup must be performed manually or via separate tooling
-      
-      console.log('R2 cleanup: Requires DeletionPendingIndex implementation (see TODO in code)');
-      console.log('Manual workaround: Query ContentMetadata objects with pending_r2_deletion=true and deleted_at > 24h');
-
-      
+      const { cleaned, failed } = await cleanupPendingR2Deletions(env);
+      console.log(`R2 cleanup complete: ${cleaned} cleaned, ${failed} failed`);
     } catch (error) {
       console.error('Error cleaning up R2:', error);
     }

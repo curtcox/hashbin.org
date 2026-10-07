@@ -1,3 +1,5 @@
+const PENDING_PREFIX = 'pending:';
+
 /**
  * DeletionRecord Durable Object
  * Stores public deletion records for transparency
@@ -47,6 +49,26 @@ export class DeletionRecord {
         return await this.getDeletionStats();
       }
 
+      // Queue soft-deleted content for R2 cleanup
+      if (url.pathname === '/pending' && method === 'POST') {
+        const { hash_256t } = await request.json();
+        return await this.queuePendingR2Deletion(hash_256t);
+      }
+
+      // Soft-deleted content queued before a cutoff, oldest first
+      if (url.pathname === '/pending' && method === 'GET') {
+        const before = url.searchParams.get('before') || new Date().toISOString();
+        const limit = Math.min(parseInt(url.searchParams.get('limit') || '100'), 500);
+        return await this.listPendingR2Deletions(before, limit);
+      }
+
+      // Remove cleaned-up entries from the queue
+      if (url.pathname === '/pending/remove' && method === 'POST') {
+        const { keys } = await request.json();
+        await this.state.storage.delete((keys || []).filter(key => key.startsWith(PENDING_PREFIX)));
+        return Response.json({ removed: (keys || []).length });
+      }
+
       return new Response('Not Found', { status: 404 });
     } catch (error) {
       return new Response(
@@ -60,6 +82,31 @@ export class DeletionRecord {
         }
       );
     }
+  }
+
+  /**
+   * Queue content whose R2 bytes should be removed after the retention window.
+   * Keys sort by queue time so the cleanup job can take the oldest first.
+   */
+  async queuePendingR2Deletion(hash_256t) {
+    if (!hash_256t) {
+      return Response.json({ error: 'hash_256t required' }, { status: 400 });
+    }
+    const queuedAt = new Date().toISOString();
+    const key = `${PENDING_PREFIX}${queuedAt}:${hash_256t}`;
+    await this.state.storage.put(key, { hash_256t, queued_at: queuedAt });
+    return Response.json({ key }, { status: 201 });
+  }
+
+  async listPendingR2Deletions(before, limit) {
+    const entries = await this.state.storage.list({
+      prefix: PENDING_PREFIX,
+      end: `${PENDING_PREFIX}${before}`,
+      limit
+    });
+    return Response.json({
+      pending: [...entries].map(([key, value]) => ({ key, ...value }))
+    });
   }
 
   /**

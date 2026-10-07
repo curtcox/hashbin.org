@@ -4,6 +4,7 @@
  */
 
 import Stripe from 'stripe';
+import { contentDeletedResponse } from './content.js';
 import { authenticate } from '../auth/middleware.js';
 import { handleLocalDepositUnavailable, handleLocalDonationUnavailable } from './local-payments.js';
 import { 
@@ -487,6 +488,10 @@ export async function handleCreateDonation(request, env, cid) {
       new Request('http://internal/exists')
     );
     const existsData = await existsResponse.json();
+
+    if (existsData.deleted) {
+      return contentDeletedResponse();
+    }
 
     if (!existsData.exists) {
       return new Response(

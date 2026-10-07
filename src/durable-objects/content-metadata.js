@@ -275,6 +275,7 @@ export class ContentMetadata {
     return new Response(
       JSON.stringify({
         exists: true,
+        deleted: Boolean(content.deleted_at),
         size_bytes: content.size_bytes,
         expires_at: content.expires_at
       }),
@@ -300,6 +301,13 @@ export class ContentMetadata {
           status: 404,
           headers: { 'content-type': 'application/json' }
         }
+      );
+    }
+
+    if (content.deleted_at) {
+      return new Response(
+        JSON.stringify({ error: 'CONTENT_DELETED', message: 'Deleted content cannot be extended' }),
+        { status: 410, headers: { 'content-type': 'application/json' } }
       );
     }
 

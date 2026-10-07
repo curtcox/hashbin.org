@@ -31,6 +31,19 @@ async function writeContentMeta(env, cid, metadata = {}) {
 }
 
 /**
+ * 410 for uploads, extensions, or donations targeting deleted content
+ */
+export function contentDeletedResponse() {
+  return new Response(
+    JSON.stringify({
+      error: 'content_deleted',
+      message: 'This content was deleted and can no longer be uploaded, extended, or funded'
+    }),
+    { status: 410, headers: { 'content-type': 'application/json' } }
+  );
+}
+
+/**
  * POST /api/content
  * Upload content with payment from balance
  */
@@ -183,6 +196,11 @@ export async function handleUploadContent(request, env) {
       new Request('http://internal/exists')
     );
     const existsData = await existsResponse.json();
+
+    // Deleted content stays deleted (it may have been taken down); don't charge for it
+    if (existsData.deleted) {
+      return contentDeletedResponse();
+    }
 
     if (existsData.exists) {
       // Content already exists - extend retention by minimum 30 days
@@ -605,6 +623,9 @@ export async function handleExtendContent(request, env, cid) {
     }
 
     const content = await contentResponse.json();
+    if (content.deleted_at) {
+      return contentDeletedResponse();
+    }
     const size_bytes = content.size_bytes;
 
     // Calculate cost

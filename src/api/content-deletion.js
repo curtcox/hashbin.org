@@ -84,6 +84,18 @@ export async function handleDeleteContent(request, env, cid) {
       });
     }
 
+    // Queue the R2 bytes for removal by the daily cleanup job (after a 24-hour window)
+    try {
+      const deletionRecordStub = env.DELETION_RECORD.get(env.DELETION_RECORD.idFromName('global'));
+      await deletionRecordStub.fetch(new Request('http://internal/pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash_256t: cid })
+      }));
+    } catch (queueError) {
+      console.error('Error queueing R2 cleanup:', queueError);
+    }
+
     try {
       await env.CONTENT_BUCKET.put(`${cid}.deleted`, JSON.stringify({
         deleted_at: new Date().toISOString(),
