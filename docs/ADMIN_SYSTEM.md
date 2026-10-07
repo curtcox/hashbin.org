@@ -269,6 +269,11 @@ Snapshot status, on-demand runs, and restores: see [backup-and-restore.md](backu
 
 ## Content Moderation (Disputes and Takedowns)
 
+The easiest way is the moderation page, **`/admin/disputes.html`**: paste the admin token (kept
+only in that tab's session storage) to review open disputes with reporter contact details, mark
+them under review, deny them (content restored), or uphold them (content taken down). The
+repeat-infringer list is on the same page. Everything below is the equivalent API.
+
 The dispute endpoints accept the same `X-Admin-Token` header. Alternatively, set the
 `ADMIN_USER_ID` secret to your Clerk user ID to moderate while signed in.
 

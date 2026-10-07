@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Moderation - HashBin.org Admin</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/disputes.css">
+  <style>
+    .admin-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: flex-end; margin-top: 1rem; }
+    .admin-actions input { flex: 1; min-width: 220px; }
+    .btn-danger { color: #b91c1c; border-color: #b91c1c; }
+    .admin-contact { font-family: 'Courier New', monospace; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <div class="container" style="max-width: 900px;">
+      <h1>Moderation</h1>
+
+      <section class="card" id="token-card">
+        <p>Enter the admin token (the <code>ADMIN_SECRET_TOKEN</code> secret). It's kept only in this tab's session storage.</p>
+        <form id="token-form" class="admin-actions">
+          <input type="password" id="token-input" class="form-input" autocomplete="off" placeholder="64-character token" required>
+          <button class="btn btn-primary" type="submit">Continue</button>
+        </form>
+      </section>
+
+      <div id="admin-content" class="hidden">
+        <div class="dispute-header">
+          <h2 style="margin: 0;">Open disputes <span id="dispute-count" class="form-text"></span></h2>
+          <div>
+            <button class="btn btn-secondary btn-sm" id="refresh">Refresh</button>
+            <button class="btn btn-secondary btn-sm" id="sign-out">Forget token</button>
+          </div>
+        </div>
+        <div id="admin-error" class="alert alert-error hidden" role="alert"></div>
+        <div id="dispute-list" aria-live="polite"></div>
+
+        <h2 style="margin-top: 2.5rem;">Repeat infringers</h2>
+        <p class="form-text">Accounts with 3 or more upheld copyright removals in the last 365 days. Close them per the <a href="/dmca.html">DMCA policy</a>.</p>
+        <div id="infringer-list"></div>
+      </div>
+    </div>
+  </main>
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/admin-disputes.js"></script>
+</body>
+</html>
