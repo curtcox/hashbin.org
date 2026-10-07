@@ -1,4 +1,5 @@
 import { requireAuth } from '/js/auth-gate.js';
+import { escapeHtml } from '/js/html.js';
 import { authenticatedFetch, handleApiError, showToast } from '/js/utils.js';
 import { renderNavHeader } from '/js/nav-header.js';
 
@@ -32,17 +33,17 @@ function renderAuthorizations(authorizations) {
     <div class="account-authorizations-grid">
       ${authorizations.map((authorization) => `
         <article class="account-authorization-card">
-          <h3>${authorization.app_name}</h3>
+          <h3>${escapeHtml(authorization.app_name)}</h3>
           <p>${formatMoneyLimit(authorization.spending_limit)}</p>
           <div class="account-chip-row">
-            ${(authorization.scopes || []).map((scope) => `<span class="account-chip">${scope}</span>`).join('')}
+            ${(authorization.scopes || []).map((scope) => `<span class="account-chip">${escapeHtml(scope)}</span>`).join('')}
           </div>
           ${authorization.redirect_uris?.length ? `
             <ul class="account-authorization-list">
-              ${authorization.redirect_uris.map((uri) => `<li><code>${uri}</code></li>`).join('')}
+              ${authorization.redirect_uris.map((uri) => `<li><code>${escapeHtml(uri)}</code></li>`).join('')}
             </ul>
           ` : ''}
-          <button class="btn btn-secondary revoke-authorization" type="button" data-app-id="${authorization.app_id}">
+          <button class="btn btn-secondary revoke-authorization" type="button" data-app-id="${escapeHtml(authorization.app_id)}">
             Revoke access
           </button>
         </article>

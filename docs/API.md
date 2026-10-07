@@ -515,6 +515,22 @@ Download content (public, no cookies). Returns 451 for disputed content and 404 
 
 ---
 
+## Developer App Endpoints
+
+Manage OAuth apps for third-party publishing (see `/developers`). Require a signed-in session or API
+key; OAuth access tokens are refused.
+
+- `POST /api/developers/apps`: register `{app_name, redirect_uris[]}` and get `client_id` and `client_secret` (shown once)
+- `GET /api/developers/apps`: your apps
+- `PATCH /api/developers/apps/{app_id}`: change `app_name`, `redirect_uris`, `logo_url`, or `website_url`
+- `DELETE /api/developers/apps/{app_id}`: delete the app. Users can't authorize it anymore, refresh
+  tokens stop working, and issued access tokens expire within an hour.
+
+Redirect URIs must be `https://` (or `http://localhost` for development) and have no fragment; at most 10.
+App names are 1–100 characters. Apps you don't own answer 404.
+
+---
+
 ## Examples
 
 ### Example: Creating an API Key

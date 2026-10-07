@@ -184,3 +184,15 @@
     grid-template-columns: 1fr;
   }
 }
+
+.developers-app-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.developers-edit-form {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

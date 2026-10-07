@@ -128,6 +128,8 @@ import { getContentDomain } from './utils/content-domain.js';
 import {
   handleCreateDeveloperApp,
   handleListDeveloperApps,
+  handleUpdateDeveloperApp,
+  handleDeleteDeveloperApp,
   handleGetOAuthAuthorizePage,
   handleOAuthAuthorize,
   handleOAuthToken,
@@ -716,6 +718,15 @@ function handleApiRoutes(url, request, env) {
 
   if (url.pathname === '/api/developers/apps' && request.method === 'GET') {
     return handleListDeveloperApps(request, env);
+  }
+
+  const developerAppMatch = url.pathname.match(/^\/api\/developers\/apps\/([^/]+)$/);
+  if (developerAppMatch && request.method === 'PATCH') {
+    return handleUpdateDeveloperApp(request, env, developerAppMatch[1]);
+  }
+
+  if (developerAppMatch && request.method === 'DELETE') {
+    return handleDeleteDeveloperApp(request, env, developerAppMatch[1]);
   }
 
   if (url.pathname === '/oauth/authorize' && request.method === 'POST') {

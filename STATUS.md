@@ -70,7 +70,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | S3 | Operator alert delivery (email/webhook) | code | ⬜ | Anomaly alerts are only stored in `AlertStore`. Someone has to poll `/api/admin/alerts`. |
 | S4 | Admin dispute review UI | code | ⬜ | Today admins use the API with `ADMIN_SECRET_TOKEN`. |
 | S5 | Deletion transactions shown in transaction history | code | ✅ | "Content Deletion" rows with reason and closed dispute, plus a filter option. Also fixed: CID links in the history pointed to a nonexistent `/content/{cid}` route (now `/info.html?cid=`), and the detail text is now HTML-escaped. |
-| S6 | Developer app update/delete (`PATCH`/`DELETE /api/developers/apps/{id}`) | code | ⬜ | `done/third_party_publishing.md` "Remaining". |
+| S6 | Developer app update/delete (`PATCH`/`DELETE /api/developers/apps/{id}`) | code | ✅ | Owner-only (others get 404), with Edit/Delete in the `/developers` console; delete is a soft delete. Redirect URIs are now validated (https or localhost, no fragment). **Security fix:** the account page rendered third-party app names as raw HTML, so a malicious app could run script against users who authorized it; this and the developer console are now escaped. OAuth tokens can no longer manage developer apps. |
 | S7 | Production OAuth third-party publishing smoke test | ops | ⬜ | `done/third_party_publishing.md` "Production Deployment Verification". |
 | S8 | Donation UI for content | code | ✅ | "Keep this content available" card on `/info.html` with a live preview; Stripe checkout; thank-you/cancel messages on return. Also fixed: Stripe returned donors to a nonexistent `/content/{cid}`; donations too small to buy a month were charged but added nothing; very small files produced an invalid date, so the webhook failed after payment. Donations now buy whole months (minimum one month, cap 100 years per donation). |
 | S9 | Dev-dependency vulnerabilities (wrangler, playwright, sharp, eslint plugins) | code | ⬜ | `npm audit` reports 29 (2 critical) in dev tooling only; not shipped to production. Fixing needs major-version upgrades. |
@@ -98,7 +98,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-351 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+355 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

@@ -1,6 +1,7 @@
 import { requireAuth } from '/js/auth-gate.js';
 import { authenticatedFetch, handleApiError, showToast } from '/js/utils.js';
 import { renderNavHeader } from '/js/nav-header.js';
+import { escapeHtml } from '/js/html.js';
 
 renderNavHeader();
 await requireAuth();
@@ -27,17 +28,74 @@ function renderAppList(apps) {
   appsListEl.innerHTML = `
     <div class="developers-app-list">
       ${apps.map((app) => `
-        <article class="developers-app-card">
-          <h3>${app.app_name}</h3>
-          <p><strong>Client ID:</strong> <code>${app.client_id}</code></p>
-          <p><strong>Status:</strong> ${app.status}</p>
+        <article class="developers-app-card" data-app-id="${escapeHtml(app.app_id)}">
+          <h3>${escapeHtml(app.app_name)}</h3>
+          <p><strong>Client ID:</strong> <code>${escapeHtml(app.client_id)}</code></p>
+          <p><strong>Status:</strong> ${escapeHtml(app.status)}</p>
           <ul>
-            ${app.redirect_uris.map((redirectUri) => `<li><code>${redirectUri}</code></li>`).join('')}
+            ${app.redirect_uris.map((redirectUri) => `<li><code>${escapeHtml(redirectUri)}</code></li>`).join('')}
           </ul>
+          <form class="developers-edit-form hidden">
+            <label class="form-label">App name <input class="form-input edit-name" maxlength="100" value="${escapeHtml(app.app_name)}"></label>
+            <label class="form-label">Redirect URIs (one per line)
+              <textarea class="form-input edit-uris" rows="3">${escapeHtml(app.redirect_uris.join('\n'))}</textarea>
+            </label>
+            <button type="submit" class="btn btn-primary btn-sm">Save</button>
+            <button type="button" class="btn btn-secondary btn-sm cancel-edit">Cancel</button>
+          </form>
+          <div class="developers-app-actions">
+            <button type="button" class="btn btn-secondary btn-sm edit-app">Edit</button>
+            <button type="button" class="btn btn-secondary btn-sm delete-app">Delete</button>
+          </div>
         </article>
       `).join('')}
     </div>
   `;
+
+  for (const card of appsListEl.querySelectorAll('.developers-app-card')) {
+    const appId = card.dataset.appId;
+    const editForm = card.querySelector('.developers-edit-form');
+    card.querySelector('.edit-app').addEventListener('click', () => editForm.classList.remove('hidden'));
+    card.querySelector('.cancel-edit').addEventListener('click', () => editForm.classList.add('hidden'));
+    editForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      updateApp(appId, {
+        app_name: editForm.querySelector('.edit-name').value.trim(),
+        redirect_uris: parseRedirectUris(editForm.querySelector('.edit-uris').value)
+      });
+    });
+    card.querySelector('.delete-app').addEventListener('click', () => deleteApp(appId));
+  }
+}
+
+async function updateApp(appId, changes) {
+  try {
+    const response = await authenticatedFetch(`/api/developers/apps/${encodeURIComponent(appId)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(changes)
+    });
+    await handleApiError(response);
+    showToast('Application updated', 'success');
+    await loadApps();
+  } catch (error) {
+    showToast(error.message || 'Failed to update application.', 'error', 5000);
+  }
+}
+
+async function deleteApp(appId) {
+  const confirmed = window.confirm(
+    'Delete this application? Users can no longer authorize it, existing tokens stop refreshing, and access tokens expire within an hour. This cannot be undone.'
+  );
+  if (!confirmed) return;
+  try {
+    const response = await authenticatedFetch(`/api/developers/apps/${encodeURIComponent(appId)}`, { method: 'DELETE' });
+    await handleApiError(response);
+    showToast('Application deleted', 'success');
+    await loadApps();
+  } catch (error) {
+    showToast(error.message || 'Failed to delete application.', 'error', 5000);
+  }
 }
 
 async function loadApps() {
@@ -49,7 +107,7 @@ async function loadApps() {
     const data = await response.json();
     renderAppList(data.apps || []);
   } catch (error) {
-    appsListEl.innerHTML = `<p class="developers-list-state">${error.message || 'Unable to load applications.'}</p>`;
+    appsListEl.innerHTML = `<p class="developers-list-state">${escapeHtml(error.message || 'Unable to load applications.')}</p>`;
   }
 }
 
@@ -78,9 +136,9 @@ form.addEventListener('submit', async (event) => {
     statusEl.textContent = 'Application created. Copy the client secret now.';
     outputEl.classList.remove('hidden');
     outputEl.innerHTML = `
-      <strong>${app.app_name}</strong>
-      <div>Client ID <code>${app.client_id}</code></div>
-      <div>Client Secret <code>${app.client_secret}</code></div>
+      <strong>${escapeHtml(app.app_name)}</strong>
+      <div>Client ID <code>${escapeHtml(app.client_id)}</code></div>
+      <div>Client Secret <code>${escapeHtml(app.client_secret)}</code></div>
     `;
     form.reset();
     showToast('Application registered', 'success');

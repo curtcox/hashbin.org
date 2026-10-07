@@ -89,4 +89,50 @@ describe('ApplicationRegistry Durable Object', () => {
     expect(data.client_secret_hash).toBeTypeOf('string');
     expect(data.client_secret_hash).not.toBe(created.client_secret);
   });
+
+  describe('update and delete', () => {
+    async function create(owner = 'user_123') {
+      const response = await registry.fetch(new Request('http://internal/apps', {
+        method: 'POST',
+        body: JSON.stringify({ app_name: 'Example', owner_user_id: owner, redirect_uris: ['https://example.com/cb'] })
+      }));
+      return (await response.json()).app_id;
+    }
+    const patch = (appId, body) => registry.fetch(new Request(`http://internal/apps/${appId}`, { method: 'PATCH', body: JSON.stringify(body) }));
+    const remove = (appId, owner) => registry.fetch(new Request(`http://internal/apps/${appId}?owner_user_id=${owner}`, { method: 'DELETE' }));
+
+    it('lets the owner rename and change redirect URIs', async () => {
+      const appId = await create();
+      const response = await patch(appId, { owner_user_id: 'user_123', app_name: 'Renamed', redirect_uris: ['https://new.example/cb'] });
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ app_name: 'Renamed', redirect_uris: ['https://new.example/cb'] });
+    });
+
+    it('hides other owners\' apps behind 404', async () => {
+      const appId = await create();
+      expect((await patch(appId, { owner_user_id: 'intruder', app_name: 'Mine now' })).status).toBe(404);
+      expect((await remove(appId, 'intruder')).status).toBe(404);
+    });
+
+    it('rejects unsafe redirect URIs and names', async () => {
+      const appId = await create();
+      for (const redirect_uris of [['http://evil.example/cb'], ['javascript:alert(1)'], ['https://ok.example/cb#frag'], []]) {
+        expect((await patch(appId, { owner_user_id: 'user_123', redirect_uris })).status).toBe(400);
+      }
+      expect((await patch(appId, { owner_user_id: 'user_123', app_name: 'x'.repeat(101) })).status).toBe(400);
+      expect((await patch(appId, { owner_user_id: 'user_123', redirect_uris: ['http://localhost:3000/cb'] })).status).toBe(200);
+    });
+
+    it('soft-deletes: hidden from lists, inactive for authorization and CORS', async () => {
+      const appId = await create();
+      expect((await remove(appId, 'user_123')).status).toBe(200);
+
+      const list = await (await registry.fetch(new Request('http://internal/apps?owner_user_id=user_123'))).json();
+      expect(list.apps).toEqual([]);
+      const app = await (await registry.fetch(new Request(`http://internal/apps/${appId}`))).json();
+      expect(app.status).toBe('deleted');
+      const cors = await (await registry.fetch(new Request('http://internal/origins/check?origin=https://example.com'))).json();
+      expect(cors.allowed).toBe(false);
+    });
+  });
 });

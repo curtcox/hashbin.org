@@ -1,6 +1,72 @@
 import { generateOAuthSecret, sha256Hex } from '../auth/oauth.js';
 import { handleBackupRequest } from '../utils/backup.js';
 
+const MAX_APP_NAME = 100;
+const MAX_REDIRECT_URIS = 10;
+
+/**
+ * Validate the optional fields of a create/update request
+ * @returns {Response|null} 400 response, or null when valid
+ */
+function validateAppFields(data) {
+  const fail = message => Response.json({ error: 'invalid_request', message }, { status: 400 });
+
+  if (data.app_name !== undefined) {
+    if (typeof data.app_name !== 'string' || !data.app_name.trim() || data.app_name.length > MAX_APP_NAME) {
+      return fail(`app_name must be 1-${MAX_APP_NAME} characters`);
+    }
+  }
+  if (data.redirect_uris !== undefined) {
+    if (!Array.isArray(data.redirect_uris) || data.redirect_uris.length > MAX_REDIRECT_URIS) {
+      return fail(`Provide 1-${MAX_REDIRECT_URIS} redirect_uris`);
+    }
+    for (const uri of data.redirect_uris) {
+      if (!isAllowedRedirectUri(uri)) {
+        return fail(`Invalid redirect_uri: must be an https URL (or http://localhost) without a fragment`);
+      }
+    }
+  }
+  for (const field of ['logo_url', 'website_url']) {
+    if (data[field] !== undefined && data[field] !== null && !isHttpsUrl(data[field])) {
+      return fail(`${field} must be an https URL`);
+    }
+  }
+  return null;
+}
+
+function isHttpsUrl(value) {
+  try {
+    return new URL(value).protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedRedirectUri(value) {
+  try {
+    const url = new URL(value);
+    if (url.hash) return false;
+    if (url.protocol === 'https:') return true;
+    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function publicApp(app) {
+  return {
+    app_id: app.app_id,
+    client_id: app.app_id,
+    app_name: app.app_name,
+    redirect_uris: app.redirect_uris,
+    logo_url: app.logo_url || null,
+    website_url: app.website_url || null,
+    status: app.status,
+    created_at: app.created_at,
+    updated_at: app.updated_at || null
+  };
+}
+
 export class ApplicationRegistry {
   constructor(state, env) {
     this.state = state;
@@ -23,6 +89,14 @@ export class ApplicationRegistry {
 
     if (url.pathname.startsWith('/apps/') && request.method === 'GET') {
       return this.getApplication(url.pathname.split('/')[2]);
+    }
+
+    if (url.pathname.startsWith('/apps/') && request.method === 'PATCH') {
+      return this.updateApplication(url.pathname.split('/')[2], await request.json());
+    }
+
+    if (url.pathname.startsWith('/apps/') && request.method === 'DELETE') {
+      return this.deleteApplication(url.pathname.split('/')[2], url.searchParams.get('owner_user_id'));
     }
 
     if (url.pathname === '/origins/check' && request.method === 'GET') {
@@ -50,6 +124,8 @@ export class ApplicationRegistry {
         headers: { 'content-type': 'application/json' }
       });
     }
+    const invalid = validateAppFields(data);
+    if (invalid) return invalid;
 
     const apps = await this.loadApplications();
     const clientSecret = generateOAuthSecret('hbs_');
@@ -81,19 +157,58 @@ export class ApplicationRegistry {
     });
   }
 
-  async listApplications(ownerUserId) {
+  /**
+   * Find an app the caller owns, or the error response to return
+   */
+  async findOwnedApplication(appId, ownerUserId) {
     const apps = await this.loadApplications();
+    const index = apps.findIndex((app) => app.app_id === appId && app.status !== 'deleted');
+    if (index === -1 || !ownerUserId || apps[index].owner_user_id !== ownerUserId) {
+      // Same answer for "missing" and "not yours", so app IDs can't be probed
+      return { error: Response.json({ error: 'not_found', message: 'Application not found' }, { status: 404 }) };
+    }
+    return { apps, index };
+  }
+
+  async updateApplication(appId, data) {
+    const { apps, index, error } = await this.findOwnedApplication(appId, data?.owner_user_id);
+    if (error) return error;
+
+    const invalid = validateAppFields(data);
+    if (invalid) return invalid;
+    if (data.redirect_uris !== undefined && (!Array.isArray(data.redirect_uris) || data.redirect_uris.length === 0)) {
+      return Response.json({ error: 'invalid_request', message: 'At least one redirect_uri is required' }, { status: 400 });
+    }
+
+    const app = apps[index];
+    for (const field of ['app_name', 'redirect_uris', 'logo_url', 'website_url']) {
+      if (data[field] !== undefined) app[field] = data[field];
+    }
+    app.updated_at = new Date().toISOString();
+    await this.saveApplications(apps);
+    return Response.json(publicApp(app));
+  }
+
+  /**
+   * Soft-delete: the app can no longer authorize users or refresh tokens, and its
+   * origins lose CORS access. Access tokens already issued expire within an hour.
+   */
+  async deleteApplication(appId, ownerUserId) {
+    const { apps, index, error } = await this.findOwnedApplication(appId, ownerUserId);
+    if (error) return error;
+
+    apps[index].status = 'deleted';
+    apps[index].deleted_at = new Date().toISOString();
+    await this.saveApplications(apps);
+    return Response.json({ deleted: true, app_id: appId });
+  }
+
+  async listApplications(ownerUserId) {
+    const apps = (await this.loadApplications()).filter((app) => app.status !== 'deleted');
     const filtered = ownerUserId ? apps.filter((app) => app.owner_user_id === ownerUserId) : apps;
 
     return new Response(JSON.stringify({
-      apps: filtered.map((app) => ({
-        app_id: app.app_id,
-        client_id: app.app_id,
-        app_name: app.app_name,
-        redirect_uris: app.redirect_uris,
-        status: app.status,
-        created_at: app.created_at
-      }))
+      apps: filtered.map(publicApp)
     }), {
       headers: { 'content-type': 'application/json' }
     });
