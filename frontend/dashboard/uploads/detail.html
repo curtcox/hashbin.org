@@ -332,6 +332,38 @@
               </div>
             </div>
             
+            <!-- Extend Retention -->
+            <div class="info-card" id="extend-card" style="display: none;">
+              <h3 style="margin-bottom: 0.5rem;">⏳ Extend Retention</h3>
+              <p class="form-help" style="margin-bottom: 1rem;">
+                Content is deleted as soon as it expires, with no grace period and no reminder email.
+                Extensions are added to the current expiration date and are paid from your balance.
+              </p>
+              <form id="extend-form" style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap;">
+                <div>
+                  <label class="form-label" for="extend-months">Add</label>
+                  <select id="extend-months" class="form-select form-input">
+                    <option value="1">1 month</option>
+                    <option value="3">3 months</option>
+                    <option value="6">6 months</option>
+                    <option value="12" selected>12 months</option>
+                    <option value="24">24 months</option>
+                    <option value="60">60 months</option>
+                  </select>
+                </div>
+                <div>
+                  <div class="form-label">Cost</div>
+                  <div id="extend-cost" style="font-weight: 600; padding: 0.5rem 0;">—</div>
+                </div>
+                <div>
+                  <div class="form-label">New expiration</div>
+                  <div id="extend-new-expiry" style="font-weight: 600; padding: 0.5rem 0;">—</div>
+                </div>
+                <button type="submit" id="extend-btn" class="btn btn-primary" disabled>Extend</button>
+              </form>
+              <div id="extend-message" class="alert hidden" role="status" style="margin-top: 1rem;"></div>
+            </div>
+
             <!-- Current Rate Limit Status -->
             <div class="info-card">
               <h3 style="margin-bottom: 1rem;">Current Rate Limit Status</h3>
@@ -541,5 +573,6 @@
   </script>
   <script type="module" src="/js/app.js"></script>
   <script type="module" src="/js/rate-limit-purchase.js"></script>
+  <script type="module" src="/js/extend-retention.js"></script>
 </body>
 </html>

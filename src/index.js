@@ -221,18 +221,16 @@ export default {
     if (env.ASSETS) {
       try {
         // Special handling for /dashboard/uploads/{cid}/ -> serve detail.html
-        if (url.pathname.match(/^\/dashboard\/uploads\/[^/]+\/?$/)) {
-          const detailRequest = new Request(new URL('/dashboard/uploads/detail.html', url), request);
-          const detailAsset = await env.ASSETS.fetch(detailRequest);
+        if (url.pathname.match(/^\/dashboard\/uploads\/[^/]+\/?$/) && !url.pathname.startsWith('/dashboard/uploads/detail')) {
+          const detailAsset = await fetchAssetPage(env, request, url, '/dashboard/uploads/detail.html');
           if (detailAsset.status !== 404) {
             return withGitShaComment(detailAsset, env);
           }
         }
         
         // Special handling for /dashboard/suppliers/{supplier_id} -> serve detail.html
-        if (url.pathname.match(/^\/dashboard\/suppliers\/[^/]+\/?$/)) {
-          const detailRequest = new Request(new URL('/dashboard/suppliers/detail.html', url), request);
-          const detailAsset = await env.ASSETS.fetch(detailRequest);
+        if (url.pathname.match(/^\/dashboard\/suppliers\/[^/]+\/?$/) && !url.pathname.startsWith('/dashboard/suppliers/detail')) {
+          const detailAsset = await fetchAssetPage(env, request, url, '/dashboard/suppliers/detail.html');
           if (detailAsset.status !== 404) {
             return withGitShaComment(detailAsset, env);
           }
@@ -240,8 +238,7 @@ export default {
 
         // Special handling for /developers -> serve developers/index.html
         if (url.pathname === '/developers' || url.pathname === '/developers/') {
-          const developersRequest = new Request(new URL('/developers/index.html', url), request);
-          const developersAsset = await env.ASSETS.fetch(developersRequest);
+          const developersAsset = await fetchAssetPage(env, request, url, '/developers/index.html');
           if (developersAsset.status !== 404) {
             return withGitShaComment(developersAsset, env);
           }
@@ -591,6 +588,21 @@ export default {
     }
   },
 };
+
+/**
+ * Serve a static page from ASSETS at a different path than the one requested.
+ * The assets binding answers "/x.html" with a redirect to its canonical URL ("/x"),
+ * which would send the browser away from the requested URL (losing e.g. a CID in
+ * the path), so follow that one redirect here instead.
+ */
+async function fetchAssetPage(env, request, url, assetPath) {
+  const assetResponse = await env.ASSETS.fetch(new Request(new URL(assetPath, url), request));
+  const location = assetResponse.headers.get('location');
+  if (assetResponse.status >= 300 && assetResponse.status < 400 && location) {
+    return env.ASSETS.fetch(new Request(new URL(location, url), request));
+  }
+  return assetResponse;
+}
 
 /**
  * Handle API routes

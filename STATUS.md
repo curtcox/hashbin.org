@@ -54,9 +54,10 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | L9 | Upload size limit matches reality | code | ✅ | **Decision (2026-10-07): cap at 90 MB.** Enforced server-side (`src/utils/upload-limits.js`, 413 before buffering) and in the upload UI and docs; published as `max_upload_bytes` in `/api/config`. Larger files are B6. L11 should include an upload near 90 MB to confirm it fits in Worker memory. |
 | L10 | Metadata backups: daily snapshots | code | ⬜ | **Decision (2026-10-07): nightly JSON snapshots to `BACKUP_BUCKET` plus a documented restore procedure (RPO 24h).** The per-write event log from Decision #15 is deferred (B8). |
 | L11 | End-to-end production test: real OAuth login, real deposit, upload, download from 256t.us, dispute, deletion | ops | ⬜ | Blocked by L1, L2, L4. Checklist: `todo/manual_testing_guide.md`. |
-| L13 | Extend retention from the dashboard | code | ⬜ | The API exists (`POST /api/content/{cid}/extend`), but no UI calls it. With no grace period and no expiry emails (Decisions #8, #14), customers need an easy way to extend before content is deleted. |
+| L13 | Extend retention from the dashboard | code | ✅ | Extend Retention card on `/dashboard/uploads/{cid}`: quotes come from `/api/payments/calculate`, then a confirmation, then `POST /api/content/{cid}/extend`. Verified in a browser against local dev. |
 | L14 | No known vulnerabilities in runtime dependencies | code | ✅ | `npm audit --omit=dev` showed a critical `@clerk/shared` route-protection bypass plus high-severity Clerk/js-cookie issues; fixed with semver-compatible updates on 2026-10-07. Re-check before launch. |
 | L15 | Content deletion and dispute moderation work in production | code | ✅ | Found 2026-10-07: `request.user` was never set, so `DELETE /api/content/{cid}` and every admin dispute endpoint always returned 401. Deletion also crashed on a misspelled binding (`PAYMENT_RECORD`), and resolving a dispute crashed before unblocking content. All fixed and covered by tests. Admin endpoints accept `X-Admin-Token` (deployed from GitHub secret `ADMIN_SECRET_TOKEN`) or an `ADMIN_USER_ID` session. **Ops:** set the `ADMIN_SECRET_TOKEN` GitHub secret. Runbook: `docs/ADMIN_SYSTEM.md` → Content Moderation. |
+| L16 | Upload and supplier detail pages reachable from their lists | code | ✅ | Found 2026-10-07: in production `/dashboard/uploads/{cid}/` and `/dashboard/suppliers/{id}` returned a 307 to `/…/detail`, dropping the ID, so every "My Uploads" card opened an error page. The worker now follows the assets redirect internally. |
 | L12 | Remove "Unstable Beta — Do not use" banner | code | ⬜ | `frontend/js/banner-config.js`. Do last. |
 
 ## Soon after launch
@@ -94,7 +95,7 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-324 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+326 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |
