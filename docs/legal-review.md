@@ -29,9 +29,8 @@ These are written to match the current code. Change the code or the text if you 
 2. **Balance when *we* close an account without cause**: `[REFUND / CREDIT POLICY]` (Terms §7).
 3. **Unused balance doesn't expire** while the account is open (Terms §3). Some jurisdictions
    regulate stored-value balances; confirm this is acceptable.
-4. **Reporter contact details are visible to every signed-in user** (Privacy §3), per
-   `todo/content_moderation.md` decision #10. Consider limiting this to admins and the content's
-   uploader to reduce harassment risk; that's a small code change in `src/api/disputes.js`.
+4. ~~Reporter contact visibility~~ **Decided 2026-10-07:** reporter contact details stay visible
+   to every signed-in user (and admins), not to anonymous visitors. Privacy §3 says so.
 5. **DMCA notices auto-expire after 30 days** if not reviewed, and the content becomes available
    again (DMCA §2). Confirm that's acceptable for formal copyright notices.
 6. **Repeat-infringer threshold** `[NUMBER]` upheld removals in `[PERIOD]` (DMCA §5). Safe harbor
