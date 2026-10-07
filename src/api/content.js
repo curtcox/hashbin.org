@@ -4,6 +4,7 @@
  */
 
 import { authenticate } from '../auth/middleware.js';
+import { MAX_UPLOAD_BYTES, uploadTooLargeResponse } from '../utils/upload-limits.js';
 import { hasOAuthScope, insufficientScopeResponse, isOAuthAuth, oauthNotAllowedResponse } from '../auth/oauth-access.js';
 import { 
   calculateRetentionCost, 
@@ -64,6 +65,13 @@ export async function handleUploadContent(request, env) {
     let size_bytes;
     let contentType = requestContentType.split(';')[0] || 'application/octet-stream';
 
+    // Reject oversized uploads before buffering the body. Multipart bodies carry a
+    // little framing overhead, which the post-parse check below allows for.
+    const declaredLength = parseInt(request.headers.get('content-length') || '', 10);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_UPLOAD_BYTES + 64 * 1024) {
+      return uploadTooLargeResponse(declaredLength);
+    }
+
     if (requestContentType.includes('multipart/form-data')) {
       const formData = await request.formData();
       const file = formData.get('content');
@@ -85,11 +93,17 @@ export async function handleUploadContent(request, env) {
       }
 
       size_bytes = file.size;
+      if (size_bytes > MAX_UPLOAD_BYTES) {
+        return uploadTooLargeResponse(size_bytes);
+      }
       contentData = await file.arrayBuffer();
       contentType = file.type || contentType;
     } else {
       contentData = await request.arrayBuffer();
       size_bytes = contentData.byteLength;
+      if (size_bytes > MAX_UPLOAD_BYTES) {
+        return uploadTooLargeResponse(size_bytes);
+      }
     }
 
     if (!contentData || size_bytes === 0) {

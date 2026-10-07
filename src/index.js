@@ -112,6 +112,7 @@ import {
 } from './api/admin-disputes.js';
 
 import { deleteContent, getContentMetadata } from './services/content-deletion.js';
+import { MAX_UPLOAD_BYTES } from './utils/upload-limits.js';
 import { getContentDomain } from './utils/content-domain.js';
 import {
   handleCreateDeveloperApp,
@@ -991,7 +992,8 @@ function handleConfig(env) {
     clerkPublishableKey: isLocalMode ? null : (env.CLERK_PUBLISHABLE_KEY || null),
     isLocalMode,
     authMode: isLocalMode ? 'local' : 'clerk',
-    content_domain: getContentDomain(env)
+    content_domain: getContentDomain(env),
+    max_upload_bytes: MAX_UPLOAD_BYTES
   };
 
   return new Response(JSON.stringify(config), {

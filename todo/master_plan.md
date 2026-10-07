@@ -139,7 +139,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 
 ### Phase 2: Core Content Operations ✅ COMPLETE
 **Goal:** Implement basic upload and download functionality
-**Status:** Complete. Open issue: the advertised 5 GB limit exceeds Cloudflare's 100 MB request body limit (STATUS.md L9)
+**Status:** Complete. Upload limit is 90 MB (STATUS.md L9); larger uploads are backlog B6
 
 **Deliverables:**
 - 256t hash generation and validation library (JavaScript)
@@ -150,7 +150,7 @@ HashBin.org is a content distribution platform using 256t hash-based content add
 - Hash verification on upload
 - Content integrity checking
 - Basic error handling and validation
-- Maximum file size: 5TB (R2 single object limit for MVP)
+- Maximum file size: 90 MB (Workers request limit; multipart is backlog B6)
 
 **Sub-Plans:**
 - `done/upload.md` - Upload implementation with 256t hash generation ✅

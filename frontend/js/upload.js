@@ -8,7 +8,8 @@ import { authenticatedFetch } from './utils.js';
 import { getAuthHeaders } from './auth-loader.js';
 
 // Constants
-const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024; // 5GB
+// Keep in sync with MAX_UPLOAD_BYTES in src/utils/upload-limits.js
+const MAX_FILE_SIZE = 90 * 1024 * 1024; // 90 MB
 const BASE_RATE_PER_GB_PER_MONTH = 0.03;
 
 // State
@@ -141,7 +142,7 @@ async function handleDrop(event) {
 async function processFile(file) {
   // Validate file size
   if (file.size > MAX_FILE_SIZE) {
-    showError(`File too large. Maximum size is 5GB. Your file is ${formatFileSize(file.size)}.`);
+    showError(`File too large. Maximum size is 90 MB. Your file is ${formatFileSize(file.size)}.`);
     return;
   }
   

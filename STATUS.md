@@ -47,12 +47,12 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | L2 | Stripe live mode: live secret key, live webhook endpoint + secret | ops | ❓ | It's unknown whether prod uses live keys; check `/health` after the next deploy (L3). See `docs/payments-setup.md`. |
 | L3 | Health check flags Stripe test keys in production (like it does for Clerk) | code | ✅ | After the next deploy, `/health` → `checks.stripe.details.usingTestKeysInProduction` answers L2. |
 | L4 | `256t.us` DNS, TLS, and content worker live | ops | ❓ | Code done (`workers/256t-content/`). Not reachable from the audit environment, so unverified. The deploy workflow also checks `https://256t.us/health`. See `done/content_domain_separation.md` Phase 1. |
-| L5 | Real Terms of Service | legal | ⬜ | `frontend/terms.html` is placeholder text. Must cover: no refunds (Decision #13), no grace period on expiry (#8), content responsibility, dispute process, liability, governing law. |
+| L5 | Real Terms of Service | legal | ⬜ | **Decision (2026-10-07): Claude drafts it with placeholders; the owner fills them in and gets it reviewed.** `frontend/terms.html` is placeholder text. Must cover: no refunds (Decision #13), no grace period on expiry (#8), content responsibility, dispute process, liability, governing law. |
 | L6 | Privacy Policy | legal | ⬜ | No page exists. Must cover: Clerk/Stripe as processors, hashed IPs, public records, account deletion and data retention. |
 | L7 | DMCA designated agent registered, with contact info on the site | legal/ops | ⬜ | Required for DMCA safe harbor (17 U.S.C. §512(c)(2)). |
 | L8 | Public UI for reporting content (dispute submission + open disputes list) | code | ⬜ | The backend API is done (`POST/GET /api/disputes`). The UI is missing: `todo/content_moderation.md` Phases 6–8. |
-| L9 | Upload size limit matches reality | code | ❓ | The UI and docs say 5 GB, but `src/api/content.js` buffers the whole body, and Cloudflare caps request bodies at 100 MB (Worker memory is 128 MB). Either lower the advertised limit or build streaming/multipart upload. |
-| L10 | Metadata backups (Decision #15) | code | ❓ | User balances, payment records, and content metadata exist only in Durable Objects. `BACKUP_BUCKET` is bound but never written to. Scope needs a decision. |
+| L9 | Upload size limit matches reality | code | ✅ | **Decision (2026-10-07): cap at 90 MB.** Enforced server-side (`src/utils/upload-limits.js`, 413 before buffering) and in the upload UI and docs; published as `max_upload_bytes` in `/api/config`. Larger files are B6. L11 should include an upload near 90 MB to confirm it fits in Worker memory. |
+| L10 | Metadata backups: daily snapshots | code | ⬜ | **Decision (2026-10-07): nightly JSON snapshots to `BACKUP_BUCKET` plus a documented restore procedure (RPO 24h).** The per-write event log from Decision #15 is deferred (B8). |
 | L11 | End-to-end production test: real OAuth login, real deposit, upload, download from 256t.us, dispute, deletion | ops | ⬜ | Blocked by L1, L2, L4. Checklist: `todo/manual_testing_guide.md`. |
 | L13 | Extend retention from the dashboard | code | ⬜ | The API exists (`POST /api/content/{cid}/extend`), but no UI calls it. With no grace period and no expiry emails (Decisions #8, #14), customers need an easy way to extend before content is deleted. |
 | L14 | No known vulnerabilities in runtime dependencies | code | ✅ | `npm audit --omit=dev` showed a critical `@clerk/shared` route-protection bypass plus high-severity Clerk/js-cookie issues; fixed with semver-compatible updates on 2026-10-07. Re-check before launch. |
@@ -81,15 +81,16 @@ Everything here must be ✅ before the beta banner comes down and customers are 
 | B3 | npm distribution of `hashbin-sdk` | code | ⬜ | `done/third_party_publishing.md` |
 | B4 | Developer webhooks and bulk operations | code | ⬜ | `todo/user_stories.md` (API Developers) |
 | B5 | Peer-to-peer balance transfer | legal | ❓ | `todo/balance_transfer.md` — undecided whether it should exist |
-| B6 | Uploads larger than 100 MB (multipart, up to R2's limits) | code | ⬜ | Depends on the L9 decision |
+| B6 | Uploads larger than 90 MB (multipart, up to R2's limits) | code | ⬜ | Follows the L9 decision |
 | B7 | Sample third-party integration app | code | ⬜ | `done/third_party_publishing.md` |
+| B8 | Append-only event log to R2 for every state change (Decision #15, RPO ≤1h) | code | ⬜ | Deferred by the L10 decision |
 
 ---
 
 ## What's done
 
 The backend for each of these is implemented and covered by unit tests (`npm run test:unit`:
-303 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
+306 passing, 2 skipped, as of the last audit). "Done" means implemented, not tested in
 production with live credentials (that's L11).
 
 | Area | Plan(s) |

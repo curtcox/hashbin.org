@@ -492,18 +492,26 @@ Get transaction history for the current user's balance.
 
 ---
 
-## Content Endpoints (Planned)
+## Content Endpoints
 
-The following endpoints are planned for Phase 2 (Core Content Operations):
+Uploads go to `hashbin.org`; content is served from the separate origin `https://256t.us/{cid}`.
+The frontend's [API reference](https://hashbin.org/docs/api.html) has full request/response details.
 
 ### POST /api/content
-Upload new content (requires authentication)
+Upload content (requires authentication; cost is deducted from balance). Body is either raw bytes
+(`Content-Type` is stored) or `multipart/form-data` with a `content` file field. Retention is
+`retention_months` (query or form field, default 1). Maximum upload size is **90 MB**; larger
+requests return `413 Payload Too Large` with `max_upload_bytes` in the body. The current limit is
+also published as `max_upload_bytes` in `GET /api/config`.
 
-### GET /api/content/{hash}
-Download content by 256t hash (public access)
+### GET /api/content/{cid}
+Content metadata (public). Includes `url` and `download_domain`.
 
-### GET /api/content/{hash}/metadata
-Get content metadata (public access)
+### POST /api/content/{cid}/extend
+Extend retention (requires authentication; cost deducted from balance).
+
+### GET https://256t.us/{cid}[.{ext}]
+Download content (public, no cookies). Returns 451 for disputed content and 404 for deleted or expired content.
 
 ---
 

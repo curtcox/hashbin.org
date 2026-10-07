@@ -195,32 +195,28 @@ Content: https://256t.us/{cid}</div>
             <span class="endpoint-method method-post">POST</span>
             <span class="endpoint-path">/api/content</span>
           </div>
-          <p style="margin-top: 0.5rem; color: var(--color-text-light);">Upload new content</p>
-          
-          <h4 style="margin-top: 1rem;">Request Headers</h4>
+          <p style="margin-top: 0.5rem; color: var(--color-text-light);">Upload new content (requires authentication). The cost is deducted from your balance. Maximum upload size is 90 MB; larger requests get <code>413 Payload Too Large</code>.</p>
+          <p>Send the raw bytes as the request body, or a <code>multipart/form-data</code> body with a <code>content</code> file field (and an optional <code>retention_months</code> field). The server computes the 256t hash.</p>
+
+          <h4 style="margin-top: 1rem;">Request</h4>
           <table class="param-table">
             <thead>
               <tr>
-                <th>Header</th>
-                <th>Type</th>
+                <th>Name</th>
+                <th>Where</th>
                 <th>Description</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>Content-Type</td>
-                <td>string</td>
-                <td>Must be <code>application/octet-stream</code></td>
+                <td>header</td>
+                <td>MIME type stored with the content (for raw bodies), or <code>multipart/form-data</code></td>
               </tr>
               <tr>
-                <td>X-Content-Hash</td>
-                <td>string</td>
-                <td><span class="required-badge">REQUIRED</span> 256t hash of content</td>
-              </tr>
-              <tr>
-                <td>X-Retention-Days</td>
-                <td>number</td>
-                <td><span class="required-badge">REQUIRED</span> Retention duration (multiple of 30)</td>
+                <td>retention_months</td>
+                <td>query or form field</td>
+                <td>Whole months of retention, minimum 1 (default 1). OAuth clients always use the user's default retention.</td>
               </tr>
             </tbody>
           </table>
@@ -231,6 +227,7 @@ Content: https://256t.us/{cid}</div>
   "size_bytes": 1024,
   "cost_cents": 1,
   "expires_at": "2027-01-24T00:00:00Z",
+  "new_balance_cents": 999,
   "url": "https://256t.us/00000123..."
 }</div>
         </div>
