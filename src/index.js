@@ -256,14 +256,6 @@ export default {
           }
         }
 
-        // Special handling for /developers -> serve developers/index.html
-        if (url.pathname === '/developers' || url.pathname === '/developers/') {
-          const developersAsset = await fetchAssetPage(env, request, url, '/developers/index.html');
-          if (developersAsset.status !== 404) {
-            return withGitShaComment(developersAsset, env);
-          }
-        }
-        
         // Serve static files
         const asset = await env.ASSETS.fetch(request);
         

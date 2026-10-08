@@ -64,6 +64,12 @@
   gap: 1.5rem;
 }
 
+/* Let long client IDs and URIs wrap instead of widening the columns. */
+.developers-grid > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .developers-code {
   background: #0f172a;
   color: #e2e8f0;
