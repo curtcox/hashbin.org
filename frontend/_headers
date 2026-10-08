@@ -1,0 +1,3 @@
+# Let other sites import the hosted SDK as a JavaScript module.
+/sdk/*
+  Access-Control-Allow-Origin: *

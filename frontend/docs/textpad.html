@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<!-- Generated from scripts/docs/textpad-doc.template.html by scripts/docs/generate-textpad-doc.py; edit those, not this file. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Textpad: a complete, documented example app that loads, edits and saves text on HashBin.org">
+  <title>Textpad Example App - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <style>
+    .textpad-doc pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .textpad-doc code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .textpad-doc :not(pre) > code,
+    .textpad-doc td,
+    .textpad-doc th { overflow-wrap: anywhere; }
+    .textpad-doc section.card { margin-bottom: 2rem; }
+    .textpad-doc h3 { margin-top: 1.5rem; }
+    .textpad-doc ul, .textpad-doc ol { margin-left: 1.5rem; line-height: 1.7; }
+    .textpad-doc table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    .textpad-doc th, .textpad-doc td {
+      text-align: left;
+      vertical-align: top;
+      padding: 0.5rem 1rem 0.5rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .textpad-doc .try-links a { overflow-wrap: anywhere; }
+    .textpad-doc .launch {
+      display: inline-block;
+      margin-top: 0.5rem;
+    }
+    #full-source { max-height: 70vh; }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <div class="container textpad-doc">
+      <h1>Textpad: an example app</h1>
+
+      <section class="card">
+        <h2>What it is</h2>
+        <p>
+          Textpad is a small text editor that keeps its documents on HashBin. It is a complete
+          working app in one HTML file of plain JavaScript, with no build step, written to be
+          read. This page walks through how it works.
+        </p>
+        <ul>
+          <li><strong>Open:</strong> <code>/docs/textpad/app#256t=&lt;256t string&gt;</code> shows the text stored under that 256t string.</li>
+          <li><strong>Edit and save:</strong> Save publishes the text to HashBin and puts its new 256t string in the address bar, so the URL is always a link to what is on screen.</li>
+          <li><strong>Pay with the user's account:</strong> saving is billed to the user's own HashBin balance. They approve Textpad once on hashbin.org and stay connected on later visits.</li>
+          <li><strong>Explain problems:</strong> a malformed 256t string, one with nothing stored under it, or content that isn't text each gets its own clear message.</li>
+        </ul>
+        <p><a class="btn btn-primary launch" href="/docs/textpad/app">Open Textpad</a></p>
+      </section>
+
+      <section class="card try-links">
+        <h2>Try it</h2>
+        <p>These links need no account, because short texts are stored inside the 256t string itself (see <a href="#format">the 256t format</a>):</p>
+        <table>
+          <thead><tr><th>Link</th><th>What you'll see</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><a href="/docs/textpad/app#256t=AAAAAAAtSGVsbG8gZnJvbSBUZXh0cGFkISBFZGl0IG1lLCB0aGVuIGNsaWNrIFNhdmUu">A short text</a></td>
+              <td>"Hello from Textpad! Edit me, then click Save." Edit it and click Save to try saving (you'll be asked to connect your HashBin account).</td>
+            </tr>
+            <tr>
+              <td><a href="/docs/textpad/app#256t=not-a-real-256t-string">A malformed 256t string</a></td>
+              <td>An error saying the string isn't a valid 256t string.</td>
+            </tr>
+            <tr>
+              <td><a href="/docs/textpad/app#256t=AAAAAACwWtUgZ2UMlj4CoXhIco07j6nzAz02alBGkdJ6oylnpdO1mBWExC55lx7o7sVYqQc7SwmJ_RNmo-u9pFPH-ksrxQ">A string with nothing stored under it</a></td>
+              <td>An error saying nothing is stored under it. The string is well formed, but no one has saved that content.</td>
+            </tr>
+            <tr>
+              <td><a href="/docs/textpad/app#256t=AAAAAAAE__4AAQ">Content that isn't text</a></td>
+              <td>An error saying the content isn't text. These four bytes are not valid UTF-8.</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>How saving is paid for</h2>
+        <ul>
+          <li>Textpad is a <a href="/developers">registered HashBin app</a>. The first time a user saves, Textpad sends them to hashbin.org to sign in and approve it, using OAuth 2.0 with PKCE. Textpad never sees their password or an API key.</li>
+          <li>Textpad asks for two permissions: <code>content:write</code> to publish, and <code>balance:read</code> to show the balance.</li>
+          <li>Each save is charged to the user's balance at the normal <a href="/docs/pricing.html">price</a>, and kept for the <em>default retention period</em> set on their <a href="/account.html">account page</a> (one month unless they change it). Texts of 64 bytes or less are free.</li>
+          <li>The user stays connected: the SDK keeps a refresh token in the browser's <code>localStorage</code> and renews access as needed. <strong>Disconnect</strong> revokes it, and users can also revoke Textpad from their account page.</li>
+          <li>Content on HashBin can't be changed. Saving an edited text creates a new 256t string; the old text stays available under its old string until it expires.</li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Messages and what causes them</h2>
+        <table>
+          <thead><tr><th>Situation</th><th>Textpad shows</th></tr></thead>
+          <tbody>
+            <tr><td>The string has characters outside <code>A–Z a–z 0–9 - _</code>, or its length doesn't match the length it encodes (for example, a link cut off when copied)</td><td>"… isn't a valid 256t string. Check that the link was copied completely."</td></tr>
+            <tr><td>The URL ends in <code>#256t=</code> with nothing after it</td><td>"This link has "#256t=" but no 256t string after it."</td></tr>
+            <tr><td>256t.us answers 404: never saved, expired, or deleted</td><td>"Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved."</td></tr>
+            <tr><td>256t.us answers 451: the content is under dispute</td><td>"This text is unavailable while a dispute about it is reviewed."</td></tr>
+            <tr><td>The content isn't valid UTF-8, or contains NUL characters (binary data)</td><td>"This 256t string points to content that isn't text, so Textpad can't open it."</td></tr>
+            <tr><td>The network request fails</td><td>"Couldn't reach HashBin to load this text…"</td></tr>
+            <tr><td>The user declines on the HashBin approval page</td><td>"You didn't approve Textpad on HashBin, so nothing was saved." Their edits are kept.</td></tr>
+            <tr><td>The balance is too low to save</td><td>HashBin's explanation, with an <em>Add funds</em> link.</td></tr>
+            <tr><td>The connection was revoked or has expired</td><td>"Your HashBin connection has ended. Click Save to connect again."</td></tr>
+          </tbody>
+        </table>
+        <p>
+          When a link can't be opened, the editor is left empty instead of showing the previous text,
+          so nothing on screen can be mistaken for the content of a broken link.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>The code, step by step</h2>
+        <p>
+          All of Textpad's logic is one <code>&lt;script type="module"&gt;</code> in
+          <a href="/docs/textpad/app">app.html</a>, in seven numbered parts. The excerpts below are
+          copied from it exactly; the <a href="#source">full source</a> is at the end of this page.
+        </p>
+
+        <h3>1. Configuration</h3>
+        <p>
+          Textpad uses the <a href="/docs/sdk.html">HashBin browser SDK</a> for the OAuth flow. The
+          configuration names the app (its client ID), where HashBin is, and the redirect URI that
+          HashBin sends the user back to after they approve Textpad.
+        </p>
+        <pre><code class="excerpt">import { HashBinClient } from "/sdk/hashbin.js";</code></pre>
+        <pre><code class="excerpt">// The client ID from registering Textpad at https://hashbin.org/developers
+let CLIENT_ID = "app_1a74e62b-d752-4a3c-81af-5c850af18c5b";
+// The HashBin service, and the domain that serves published content.
+let HASHBIN_URL = "https://hashbin.org";
+let CONTENT_URL = "https://256t.us";
+
+// Development only: on a page served by a local HashBin server
+// (npm run dev:local), "?dev=&lt;client ID&gt;" uses that server and an app
+// registered on it, so nothing touches the real service.
+const DEV_CLIENT_ID = new URLSearchParams(location.search).get("dev");
+const DEV = Boolean(DEV_CLIENT_ID) &amp;&amp; ["localhost", "127.0.0.1"].includes(location.hostname);
+if (DEV) {
+  CLIENT_ID = DEV_CLIENT_ID;
+  HASHBIN_URL = CONTENT_URL = location.origin;
+}
+
+// HashBin sends the user back here after they approve Textpad. It must
+// match a redirect URI registered for the app, character for character.
+const REDIRECT_URI = location.origin + location.pathname +
+  (DEV ? `?dev=${encodeURIComponent(CLIENT_ID)}` : "");
+
+// What Textpad asks the user to allow: publishing (billed to their
+// balance) and reading their balance so it can be shown.
+const SCOPES = ["content:write", "balance:read"];
+
+const hb = new HashBinClient({
+  clientId: CLIENT_ID,
+  redirectUri: REDIRECT_URI,
+  baseUrl: HASHBIN_URL,
+  contentBaseUrl: CONTENT_URL
+});</code></pre>
+        <p>
+          The redirect URI must match one registered for the app exactly. hashbin.org serves pages
+          without the <code>.html</code> extension, so Textpad's registered redirect URI is
+          <code>https://hashbin.org/docs/textpad/app</code>; <code>location.origin + location.pathname</code>
+          produces exactly that. The <code>?dev=</code> switch only takes effect on <code>localhost</code>
+          or <code>127.0.0.1</code>, so it can't redirect a deployed copy anywhere unexpected.
+        </p>
+
+        <h3>2. Page state</h3>
+        <p>
+          Textpad remembers the 256t string of the text it shows (<code>currentCid</code>) and that
+          text as it was loaded or last saved (<code>savedText</code>). Comparing <code>savedText</code>
+          with the editor tells it whether there are unsaved changes, which decides whether Save is
+          enabled and whether to warn before leaving.
+        </p>
+        <pre><code class="excerpt">// Shows text in the editor as the saved version of currentCid.
+function setDocument(cid, text) {
+  currentCid = cid;
+  editor.value = text;
+  // Browsers turn "\r\n" line endings into "\n" inside a textarea, so take
+  // the saved text back from the editor; otherwise a text with Windows
+  // line endings would look edited before the user has typed anything.
+  savedText = editor.value;
+  updateControls();
+}</code></pre>
+
+        <h3 id="format">3. The 256t string in the URL</h3>
+        <p>
+          Textpad keeps the 256t string in the URL fragment: <code>app#256t=&lt;string&gt;</code>. The
+          fragment is never sent to a server, and changing it doesn't reload the page.
+        </p>
+        <pre><code class="excerpt">function cidFromUrl() {
+  const match = location.hash.match(/^#256t=(.*)$/);
+  if (!match) {
+    return null;
+  }
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1]; // A stray "%" can't be decoded; isValid256t rejects it.
+  }
+}</code></pre>
+        <p>
+          A 256t string has two parts, both in base64url. The first 8 characters hold the content's
+          length in bytes. The rest is the content itself when it is 64 bytes or less, or else its
+          SHA-512 hash, which is always 86 characters. Checking that the two parts agree catches
+          typos and truncated links before any network request is made:
+        </p>
+        <pre><code class="excerpt">function base64UrlToBytes(text) {
+  const base64 = text.replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(base64), (char) =&gt; char.charCodeAt(0));
+}
+
+// A 256t string is base64url text in two parts:
+//   - 8 characters holding the content's length in bytes
+//     (a 6-byte big-endian number);
+//   - then the content itself if it is 64 bytes or less, or else the
+//     content's SHA-512 hash (always 86 characters).
+// Checking this up front gives a clear message for a mistyped or cut-off
+// link instead of a confusing "not found".
+function contentLength(cid) {
+  return base64UrlToBytes(cid.slice(0, 8)).reduce((total, byte) =&gt; total * 256 + byte, 0);
+}
+
+function isValid256t(cid) {
+  if (!/^[A-Za-z0-9_-]{8,94}$/.test(cid)) {
+    return false;
+  }
+  const length = contentLength(cid);
+  const expectedRest = length &lt;= 64 ? Math.ceil((length * 4) / 3) : 86;
+  return cid.length - 8 === expectedRest;
+}</code></pre>
+
+        <h3>4. Loading text</h3>
+        <p>
+          HashBin stores bytes, not text. Textpad decodes them as UTF-8 in strict mode, so anything
+          that isn't text is refused instead of being shown as garbled characters:
+        </p>
+        <pre><code class="excerpt">// Content on HashBin is just bytes. Textpad only opens bytes that are
+// valid UTF-8 text. "fatal: true" makes the decoder throw on anything
+// else instead of quietly inserting replacement characters, and
+// "ignoreBOM: true" keeps a leading byte order mark so that saving
+// unchanged text gives back exactly the same bytes and 256t string.
+function decodeText(bytes) {
+  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+  // Valid UTF-8 can still be binary data; a NUL character is a reliable
+  // sign of that, and real text practically never contains one.
+  if (text.includes("\0")) {
+    throw new TypeError("Content contains NUL characters");
+  }
+  return text;
+}</code></pre>
+        <p>
+          Loading checks the string, then either decodes a short text straight from the string or
+          downloads a longer one from <code>https://256t.us/&lt;string&gt;</code>. Downloading needs
+          no account and no token. Each failure gets its own message:
+        </p>
+        <pre><code class="excerpt">async function loadFromUrl() {
+  const cid = cidFromUrl();
+  clearMessage();
+
+  if (cid === null) {
+    setDocument(null, "");
+    return;
+  }
+
+  // Whatever happens below, don't leave the previous text on screen as if
+  // it belonged to this link.
+  setDocument(null, "");
+
+  if (cid === "") {
+    showMessage("This link has \"#256t=\" but no 256t string after it.", { error: true });
+    return;
+  }
+  if (!isValid256t(cid)) {
+    const shown = cid.length &gt; 100 ? `${cid.slice(0, 100)}…` : cid;
+    showMessage(`"${shown}" isn't a valid 256t string. Check that the link was copied completely.`, { error: true });
+    return;
+  }
+
+  // Short texts are inside the 256t string itself, so there is nothing
+  // to download.
+  if (contentLength(cid) &lt;= 64) {
+    showText(cid, base64UrlToBytes(cid.slice(8)));
+    return;
+  }
+
+  busy = true;
+  updateControls();
+  showMessage("Loading…");
+  try {
+    let response;
+    try {
+      response = await fetch(hb.getContentUrl(cid));
+    } catch {
+      showMessage("Couldn't reach HashBin to load this text. Check your connection and reload the page.", { error: true });
+      return;
+    }
+
+    if (response.status === 404) {
+      showMessage("Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved.", { error: true });
+      return;
+    }
+    if (response.status === 451) {
+      showMessage("This text is unavailable while a dispute about it is reviewed.", { error: true });
+      return;
+    }
+    if (!response.ok) {
+      showMessage(`HashBin couldn't return this text (HTTP ${response.status}). Try again later.`, { error: true });
+      return;
+    }
+
+    showText(cid, await response.arrayBuffer());
+  } finally {
+    busy = false;
+    updateControls();
+  }
+}</code></pre>
+
+        <h3>5. Connecting to the user's HashBin account</h3>
+        <p>
+          The first save sends the user to hashbin.org to approve Textpad. That leaves the page, so
+          Textpad first stores the user's text in <code>sessionStorage</code>, keyed by the OAuth
+          <code>state</code> value. When HashBin sends the user back, <code>finishSignIn</code>
+          trades the one-time code for tokens through the SDK, restores the text, and returns it so
+          the save can carry on.
+        </p>
+        <pre><code class="excerpt">const DRAFT_KEY = "textpad:draft:";
+
+function isConnected() {
+  return Boolean(hb.getTokens()?.refreshToken);
+}
+
+async function connectAndSave() {
+  const { url, state } = await hb.authorize({ scopes: SCOPES, mode: "manual" });
+  sessionStorage.setItem(DRAFT_KEY + state, JSON.stringify({
+    cid: currentCid,
+    savedText,
+    text: editor.value
+  }));
+  busy = true; // Also stops the "unsaved changes" warning while leaving.
+  updateControls();
+  location.assign(url);
+}
+
+// When HashBin sends the user back, the URL carries ?code=…&amp;state=… (or
+// ?error=access_denied if they declined). This exchanges the code for
+// tokens, cleans the URL and returns the draft saved before leaving.
+async function finishSignIn() {
+  const params = new URLSearchParams(location.search);
+  if (!params.has("code") &amp;&amp; !params.has("error")) {
+    return null;
+  }
+
+  const draftKey = DRAFT_KEY + params.get("state");
+  const draft = JSON.parse(sessionStorage.getItem(draftKey) || "null");
+  sessionStorage.removeItem(draftKey);
+
+  // Put the URL back the way it was before signing in.
+  history.replaceState(null, "", REDIRECT_URI + (draft?.cid ? `#256t=${draft.cid}` : ""));
+
+  if (draft) {
+    currentCid = draft.cid;
+    savedText = draft.savedText;
+    editor.value = draft.text;
+  }
+
+  if (params.get("error")) {
+    showMessage("You didn't approve Textpad on HashBin, so nothing was saved.", { error: true });
+    return null;
+  }
+  try {
+    await hb.handleCallback({ search: params.toString() });
+  } catch (error) {
+    showMessage(`Connecting to HashBin failed: ${error.message}`, { error: true });
+    return null;
+  }
+  return draft;
+}</code></pre>
+        <p>
+          Every request made as the user goes through <code>api()</code>. The SDK's
+          <code>authorizedFetch</code> adds the access token and renews it when it has expired. A
+          401 response means the user revoked Textpad, so Textpad forgets the tokens and asks them to
+          connect again.
+        </p>
+        <pre><code class="excerpt">// Raised when the stored sign-in no longer works (it expired, or the user
+// revoked Textpad on their HashBin account page).
+class NotConnectedError extends Error {}
+
+// Calls the HashBin API as the user. The SDK adds the access token and
+// renews it when it has expired; when renewal fails it forgets the tokens.
+async function api(path, options) {
+  let response;
+  try {
+    response = await hb.authorizedFetch(path, options);
+  } catch (error) {
+    if (!isConnected()) {
+      throw new NotConnectedError();
+    }
+    throw error;
+  }
+  if (response.status === 401) {
+    hb.clearTokens();
+    throw new NotConnectedError();
+  }
+  return response;
+}</code></pre>
+
+        <h3>6. Saving text</h3>
+        <p>
+          Saving is a single <code>POST /api/content</code> whose body is the text. The response
+          holds the new 256t string (<code>cid</code>), which Textpad writes into the URL with
+          <code>history.pushState</code>, so the browser's Back button returns to the previous
+          version.
+        </p>
+        <pre><code class="excerpt">async function save() {
+  if (busy || !hasUnsavedChanges() || editor.value === "") {
+    return;
+  }
+  if (!isConnected()) {
+    showMessage("Taking you to HashBin to approve Textpad…");
+    await connectAndSave();
+    return;
+  }
+
+  const text = editor.value;
+  busy = true;
+  updateControls();
+  showMessage("Saving…");
+  try {
+    // The request body is the text itself. Uploads made with an OAuth
+    // app are kept for the user's default retention period (set on their
+    // HashBin account page) and charged to their balance. Texts of 64
+    // bytes or less are stored inside the 256t string and are free.
+    const response = await api("/api/content", {
+      method: "POST",
+      headers: { "content-type": "text/plain; charset=utf-8" },
+      body: text
+    });
+    const result = await response.json().catch(() =&gt; ({}));
+
+    if (!response.ok) {
+      if (result.error === "insufficient_balance") {
+        showMessage(result.message || "Your HashBin balance is too low to save this.", {
+          error: true,
+          link: { href: `${HASHBIN_URL}/deposit.html`, text: "Add funds" }
+        });
+      } else {
+        showMessage(`Saving failed: ${result.message || result.error || `HTTP ${response.status}`}`, { error: true });
+      }
+      return;
+    }
+
+    // Record the new 256t string in the URL. pushState doesn't fire
+    // "hashchange", so the text isn't reloaded, and Back returns to the
+    // previous version.
+    setUrlHash(`#256t=${result.cid}`);
+    currentCid = result.cid;
+    savedText = text;
+    const expires = result.expires_at
+      ? ` Kept until ${new Date(result.expires_at).toLocaleDateString()}.`
+      : "";
+    showMessage(`Saved. The address bar now links to this text.${expires}`, {
+      link: { href: hb.getContentUrl(result.cid), text: "View raw text" }
+    });
+    showAccount();
+  } catch (error) {
+    if (error instanceof NotConnectedError) {
+      showAccount();
+      showMessage("Your HashBin connection has ended. Click Save to connect again.", { error: true });
+    } else {
+      showMessage(`Saving failed: ${error.message}`, { error: true });
+    }
+  } finally {
+    busy = false;
+    updateControls();
+  }
+}</code></pre>
+
+        <h3>7. Starting up</h3>
+        <p>
+          On load, Textpad first checks whether HashBin has just sent the user back from the approval
+          page. If it has, Textpad finishes the save they asked for; otherwise it opens whatever the
+          URL points to. Listeners, not shown here, handle Back and Forward, pasted links, the
+          New button, <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>S</kbd>, and the unsaved-changes warning.
+        </p>
+        <pre><code class="excerpt">// Start up: finish a sign-in if HashBin just sent the user back, then
+// either carry on with the save they asked for or load the URL's text.
+const draft = await finishSignIn();
+shownHash = location.hash;
+if (draft) {
+  updateControls();
+  showAccount();
+  save();
+} else {
+  if (messageBox.hidden) {
+    await loadFromUrl();
+  } else {
+    updateControls();
+  }
+  showAccount();
+}</code></pre>
+      </section>
+
+      <section class="card">
+        <h2>Run your own copy</h2>
+        <ol>
+          <li>
+            Register an app on the <a href="/developers">Developers page</a>. Use the address your
+            copy will have as its redirect URI, for example
+            <code>https://your-name.github.io/textpad/app.html</code>. Use the address exactly as it
+            appears in the browser; some hosts drop the <code>.html</code>.
+          </li>
+          <li>Save <a href="/docs/textpad/app.html" download="app.html">app.html</a> to your site.</li>
+          <li>
+            Change the SDK import to the hosted copy:
+            <code>import { HashBinClient } from "https://hashbin.org/sdk/hashbin.js";</code>
+          </li>
+          <li>Replace <code>CLIENT_ID</code> with your app's client ID.</li>
+          <li>
+            Change the links to <code>/deposit.html</code> and the docs if you like. Everything
+            else, including <code>HASHBIN_URL</code> and <code>CONTENT_URL</code>, stays as it is.
+          </li>
+        </ol>
+        <p>
+          To work on Textpad against a local HashBin server instead (<code>npm run dev:local</code>),
+          register an app on that server with the redirect URI
+          <code>http://127.0.0.1:8787/docs/textpad/app?dev=&lt;client ID&gt;</code> and open that same
+          address.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Things to know</h2>
+        <ul>
+          <li><strong>Tokens live in <code>localStorage</code>.</strong> Any script on the same origin can read them, so don't load scripts you don't trust on a page that uses the SDK. Textpad inserts every message with <code>textContent</code>, never <code>innerHTML</code>, so text from a 256t string can't inject markup.</li>
+          <li><strong>Line endings.</strong> Browsers turn Windows <code>\r\n</code> line endings into <code>\n</code> inside a text box, so saving such a file after editing it stores <code>\n</code> endings.</li>
+          <li><strong>Saving the same text again.</strong> Save stays disabled until the text changes. If edited text happens to match something already on HashBin (for example after undoing back to an earlier version), HashBin keeps the existing copy and extends how long it is kept, which is charged like a new save.</li>
+          <li><strong>Saves use the account's default retention.</strong> Apps cannot choose how long content is kept; users set their default on the account page.</li>
+        </ul>
+      </section>
+
+      <section class="card" id="source">
+        <h2>Full source</h2>
+        <p>
+          The complete <a href="/docs/textpad/app.html" download="app.html">app.html</a>, loaded from the
+          live file:
+        </p>
+        <pre id="full-source"><code>Loading…</code></pre>
+      </section>
+    </div>
+  </main>
+
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> |
+      <a href="/docs/index.html">Docs</a> |
+      <a href="/docs/sdk.html">SDK</a> |
+      <a href="/developers">Developers</a> |
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <script type="module" src="/js/app.js"></script>
+  <script>
+    // Show the live app source, so the listing can never fall out of date.
+    fetch('/docs/textpad/app.html')
+      .then((response) => {
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return response.text();
+      })
+      .then((source) => {
+        document.querySelector('#full-source code').textContent = source;
+      })
+      .catch(() => {
+        document.querySelector('#full-source code').textContent = 'The source could not be loaded. Open app.html and use View Source instead.';
+      });
+  </script>
+</body>
+</html>

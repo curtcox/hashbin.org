@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<!--
+  HashBin Textpad: a complete example app in one file.
+
+  Walkthrough: https://hashbin.org/docs/textpad.html
+
+  What it does
+    - Opening  app#256t=<256t string>  loads that text from HashBin
+      (https://256t.us/<256t string>) into the editor.
+    - Save publishes the edited text to HashBin and puts the new 256t string
+      in the URL, so the address bar is always a link to what you see.
+    - Saving is billed to the user's own HashBin balance. The user approves
+      Textpad once on hashbin.org (OAuth 2.0 with PKCE, through the HashBin
+      browser SDK) and stays connected on later visits.
+
+  Everything is plain HTML, CSS and JavaScript; there is no build step.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Textpad: edit and save plain text on HashBin. An example HashBin app.">
+  <title>Textpad - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --ink: #0f172a;
+      --muted: #64748b;
+      --line: #cbd5e1;
+      --accent: #2563eb;
+      --error-bg: #fef2f2;
+      --error-line: #fca5a5;
+      --error-ink: #991b1b;
+      --note-bg: #eff6ff;
+      --note-line: #93c5fd;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0b1120;
+        --panel: #111827;
+        --ink: #e5e7eb;
+        --muted: #94a3b8;
+        --line: #334155;
+        --accent: #60a5fa;
+        --error-bg: #3b0d0d;
+        --error-line: #b91c1c;
+        --error-ink: #fecaca;
+        --note-bg: #0c1f3d;
+        --note-line: #1e40af;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    header, main { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 16px;
+      padding-top: 16px;
+    }
+    h1 { margin: 0; font-size: 1.5rem; flex: 1; }
+    h1 a { color: inherit; text-decoration: none; }
+    #account { color: var(--muted); font-size: 0.9rem; }
+    #message {
+      margin: 16px 0 0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--note-line);
+      background: var(--note-bg);
+      overflow-wrap: anywhere;
+    }
+    #message.error { border-color: var(--error-line); background: var(--error-bg); color: var(--error-ink); }
+    #message a { color: inherit; }
+    textarea {
+      display: block;
+      width: 100%;
+      min-height: 55vh;
+      margin-top: 16px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      font: 15px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+      resize: vertical;
+    }
+    textarea:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
+    button {
+      font: inherit;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      cursor: pointer;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    button:disabled { opacity: 0.5; cursor: default; }
+    #savedState { color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
+    footer { max-width: 860px; margin: 24px auto; padding: 0 16px; color: var(--muted); font-size: 0.9rem; }
+    footer a { color: var(--accent); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><a href="app">Textpad</a></h1>
+    <span id="account">Not connected to HashBin</span>
+    <button id="disconnect" type="button" hidden>Disconnect</button>
+  </header>
+
+  <main>
+    <p id="message" role="status" hidden></p>
+    <textarea id="editor" aria-label="Text" spellcheck="true"
+      placeholder="Type some text, then click Save to publish it on HashBin."></textarea>
+    <div class="bar">
+      <button id="save" type="button" class="primary">Save</button>
+      <button id="new" type="button">New</button>
+      <span id="savedState"></span>
+    </div>
+  </main>
+
+  <footer>
+    An example HashBin app. Read <a href="../textpad">how Textpad works</a>.
+  </footer>
+
+  <script type="module">
+    // The HashBin browser SDK handles the OAuth sign-in, token storage and
+    // token renewal. A copy of Textpad on another site imports it from
+    // "https://hashbin.org/sdk/hashbin.js".
+    import { HashBinClient } from "/sdk/hashbin.js";
+
+    // ------------------------------------------------------------------
+    // 1. Configuration
+    // ------------------------------------------------------------------
+
+    // The client ID from registering Textpad at https://hashbin.org/developers
+    let CLIENT_ID = "app_1a74e62b-d752-4a3c-81af-5c850af18c5b";
+    // The HashBin service, and the domain that serves published content.
+    let HASHBIN_URL = "https://hashbin.org";
+    let CONTENT_URL = "https://256t.us";
+
+    // Development only: on a page served by a local HashBin server
+    // (npm run dev:local), "?dev=<client ID>" uses that server and an app
+    // registered on it, so nothing touches the real service.
+    const DEV_CLIENT_ID = new URLSearchParams(location.search).get("dev");
+    const DEV = Boolean(DEV_CLIENT_ID) && ["localhost", "127.0.0.1"].includes(location.hostname);
+    if (DEV) {
+      CLIENT_ID = DEV_CLIENT_ID;
+      HASHBIN_URL = CONTENT_URL = location.origin;
+    }
+
+    // HashBin sends the user back here after they approve Textpad. It must
+    // match a redirect URI registered for the app, character for character.
+    const REDIRECT_URI = location.origin + location.pathname +
+      (DEV ? `?dev=${encodeURIComponent(CLIENT_ID)}` : "");
+
+    // What Textpad asks the user to allow: publishing (billed to their
+    // balance) and reading their balance so it can be shown.
+    const SCOPES = ["content:write", "balance:read"];
+
+    const hb = new HashBinClient({
+      clientId: CLIENT_ID,
+      redirectUri: REDIRECT_URI,
+      baseUrl: HASHBIN_URL,
+      contentBaseUrl: CONTENT_URL
+    });
+
+    // ------------------------------------------------------------------
+    // 2. Page state
+    // ------------------------------------------------------------------
+
+    const editor = document.getElementById("editor");
+    const saveButton = document.getElementById("save");
+    const newButton = document.getElementById("new");
+    const disconnectButton = document.getElementById("disconnect");
+    const accountLabel = document.getElementById("account");
+    const savedStateLabel = document.getElementById("savedState");
+    const messageBox = document.getElementById("message");
+
+    // The 256t string of the text in the editor, and that text exactly as it
+    // was loaded or last saved. Comparing it with the editor tells us whether
+    // there are unsaved changes. Both are null for a new, unsaved text.
+    let currentCid = null;
+    let savedText = null;
+
+    // Set while a load or save is running, to ignore extra clicks.
+    let busy = false;
+
+    function hasUnsavedChanges() {
+      return editor.value !== (savedText ?? "");
+    }
+
+    function showMessage(text, { error = false, link = null } = {}) {
+      messageBox.textContent = text;
+      if (link) {
+        const anchor = document.createElement("a");
+        anchor.href = link.href;
+        anchor.textContent = link.text;
+        messageBox.append(" ", anchor);
+      }
+      messageBox.classList.toggle("error", error);
+      messageBox.hidden = false;
+    }
+
+    function clearMessage() {
+      messageBox.hidden = true;
+      messageBox.textContent = "";
+    }
+
+    function updateControls() {
+      const changed = hasUnsavedChanges();
+      saveButton.disabled = busy || !changed || editor.value === "";
+      newButton.disabled = busy;
+      editor.readOnly = busy;
+      if (currentCid && !changed) {
+        savedStateLabel.textContent = `Saved as 256t:${currentCid.slice(0, 12)}…`;
+      } else if (currentCid) {
+        savedStateLabel.textContent = "Unsaved changes";
+      } else {
+        savedStateLabel.textContent = editor.value ? "Not saved yet" : "";
+      }
+    }
+
+    // Shows text in the editor as the saved version of currentCid.
+    function setDocument(cid, text) {
+      currentCid = cid;
+      editor.value = text;
+      // Browsers turn "\r\n" line endings into "\n" inside a textarea, so take
+      // the saved text back from the editor; otherwise a text with Windows
+      // line endings would look edited before the user has typed anything.
+      savedText = editor.value;
+      updateControls();
+    }
+
+    // ------------------------------------------------------------------
+    // 3. The 256t string in the URL
+    // ------------------------------------------------------------------
+
+    // Textpad keeps the 256t string in the URL fragment: app#256t=<cid>
+    // The fragment never reaches a server, and the page can change it after
+    // a save without reloading.
+    function cidFromUrl() {
+      const match = location.hash.match(/^#256t=(.*)$/);
+      if (!match) {
+        return null;
+      }
+      try {
+        return decodeURIComponent(match[1]);
+      } catch {
+        return match[1]; // A stray "%" can't be decoded; isValid256t rejects it.
+      }
+    }
+
+    // The fragment the page is showing, so a cancelled navigation can put it
+    // back. Every URL change Textpad makes goes through setUrlHash.
+    let shownHash = location.hash;
+
+    function setUrlHash(hash) {
+      history.pushState(null, "", hash || location.pathname + location.search);
+      shownHash = location.hash;
+    }
+
+    function base64UrlToBytes(text) {
+      const base64 = text.replace(/-/g, "+").replace(/_/g, "/");
+      return Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+    }
+
+    // A 256t string is base64url text in two parts:
+    //   - 8 characters holding the content's length in bytes
+    //     (a 6-byte big-endian number);
+    //   - then the content itself if it is 64 bytes or less, or else the
+    //     content's SHA-512 hash (always 86 characters).
+    // Checking this up front gives a clear message for a mistyped or cut-off
+    // link instead of a confusing "not found".
+    function contentLength(cid) {
+      return base64UrlToBytes(cid.slice(0, 8)).reduce((total, byte) => total * 256 + byte, 0);
+    }
+
+    function isValid256t(cid) {
+      if (!/^[A-Za-z0-9_-]{8,94}$/.test(cid)) {
+        return false;
+      }
+      const length = contentLength(cid);
+      const expectedRest = length <= 64 ? Math.ceil((length * 4) / 3) : 86;
+      return cid.length - 8 === expectedRest;
+    }
+
+    // ------------------------------------------------------------------
+    // 4. Loading text
+    // ------------------------------------------------------------------
+
+    // Content on HashBin is just bytes. Textpad only opens bytes that are
+    // valid UTF-8 text. "fatal: true" makes the decoder throw on anything
+    // else instead of quietly inserting replacement characters, and
+    // "ignoreBOM: true" keeps a leading byte order mark so that saving
+    // unchanged text gives back exactly the same bytes and 256t string.
+    function decodeText(bytes) {
+      const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+      // Valid UTF-8 can still be binary data; a NUL character is a reliable
+      // sign of that, and real text practically never contains one.
+      if (text.includes("\0")) {
+        throw new TypeError("Content contains NUL characters");
+      }
+      return text;
+    }
+
+    function showText(cid, bytes) {
+      try {
+        setDocument(cid, decodeText(bytes));
+        clearMessage();
+      } catch {
+        showMessage("This 256t string points to content that isn't text, so Textpad can't open it.", { error: true });
+      }
+    }
+
+    async function loadFromUrl() {
+      const cid = cidFromUrl();
+      clearMessage();
+
+      if (cid === null) {
+        setDocument(null, "");
+        return;
+      }
+
+      // Whatever happens below, don't leave the previous text on screen as if
+      // it belonged to this link.
+      setDocument(null, "");
+
+      if (cid === "") {
+        showMessage("This link has \"#256t=\" but no 256t string after it.", { error: true });
+        return;
+      }
+      if (!isValid256t(cid)) {
+        const shown = cid.length > 100 ? `${cid.slice(0, 100)}…` : cid;
+        showMessage(`"${shown}" isn't a valid 256t string. Check that the link was copied completely.`, { error: true });
+        return;
+      }
+
+      // Short texts are inside the 256t string itself, so there is nothing
+      // to download.
+      if (contentLength(cid) <= 64) {
+        showText(cid, base64UrlToBytes(cid.slice(8)));
+        return;
+      }
+
+      busy = true;
+      updateControls();
+      showMessage("Loading…");
+      try {
+        let response;
+        try {
+          response = await fetch(hb.getContentUrl(cid));
+        } catch {
+          showMessage("Couldn't reach HashBin to load this text. Check your connection and reload the page.", { error: true });
+          return;
+        }
+
+        if (response.status === 404) {
+          showMessage("Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved.", { error: true });
+          return;
+        }
+        if (response.status === 451) {
+          showMessage("This text is unavailable while a dispute about it is reviewed.", { error: true });
+          return;
+        }
+        if (!response.ok) {
+          showMessage(`HashBin couldn't return this text (HTTP ${response.status}). Try again later.`, { error: true });
+          return;
+        }
+
+        showText(cid, await response.arrayBuffer());
+      } finally {
+        busy = false;
+        updateControls();
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // 5. Connecting to the user's HashBin account
+    // ------------------------------------------------------------------
+
+    // Sign-in leaves this page, so anything the user typed is kept in
+    // sessionStorage under the OAuth "state" value and put back afterwards.
+    const DRAFT_KEY = "textpad:draft:";
+
+    function isConnected() {
+      return Boolean(hb.getTokens()?.refreshToken);
+    }
+
+    async function connectAndSave() {
+      const { url, state } = await hb.authorize({ scopes: SCOPES, mode: "manual" });
+      sessionStorage.setItem(DRAFT_KEY + state, JSON.stringify({
+        cid: currentCid,
+        savedText,
+        text: editor.value
+      }));
+      busy = true; // Also stops the "unsaved changes" warning while leaving.
+      updateControls();
+      location.assign(url);
+    }
+
+    // When HashBin sends the user back, the URL carries ?code=…&state=… (or
+    // ?error=access_denied if they declined). This exchanges the code for
+    // tokens, cleans the URL and returns the draft saved before leaving.
+    async function finishSignIn() {
+      const params = new URLSearchParams(location.search);
+      if (!params.has("code") && !params.has("error")) {
+        return null;
+      }
+
+      const draftKey = DRAFT_KEY + params.get("state");
+      const draft = JSON.parse(sessionStorage.getItem(draftKey) || "null");
+      sessionStorage.removeItem(draftKey);
+
+      // Put the URL back the way it was before signing in.
+      history.replaceState(null, "", REDIRECT_URI + (draft?.cid ? `#256t=${draft.cid}` : ""));
+
+      if (draft) {
+        currentCid = draft.cid;
+        savedText = draft.savedText;
+        editor.value = draft.text;
+      }
+
+      if (params.get("error")) {
+        showMessage("You didn't approve Textpad on HashBin, so nothing was saved.", { error: true });
+        return null;
+      }
+      try {
+        await hb.handleCallback({ search: params.toString() });
+      } catch (error) {
+        showMessage(`Connecting to HashBin failed: ${error.message}`, { error: true });
+        return null;
+      }
+      return draft;
+    }
+
+    // Raised when the stored sign-in no longer works (it expired, or the user
+    // revoked Textpad on their HashBin account page).
+    class NotConnectedError extends Error {}
+
+    // Calls the HashBin API as the user. The SDK adds the access token and
+    // renews it when it has expired; when renewal fails it forgets the tokens.
+    async function api(path, options) {
+      let response;
+      try {
+        response = await hb.authorizedFetch(path, options);
+      } catch (error) {
+        if (!isConnected()) {
+          throw new NotConnectedError();
+        }
+        throw error;
+      }
+      if (response.status === 401) {
+        hb.clearTokens();
+        throw new NotConnectedError();
+      }
+      return response;
+    }
+
+    async function showAccount() {
+      const connected = isConnected();
+      disconnectButton.hidden = !connected;
+      if (!connected) {
+        accountLabel.textContent = "Not connected to HashBin";
+        return;
+      }
+      accountLabel.textContent = "Connected to HashBin";
+      try {
+        const response = await api("/api/balance");
+        if (response.ok) {
+          const { balance_cents } = await response.json();
+          accountLabel.textContent = `HashBin balance: $${(balance_cents / 100).toFixed(2)}`;
+        }
+      } catch (error) {
+        if (error instanceof NotConnectedError) {
+          showAccount();
+        }
+      }
+    }
+
+    async function disconnect() {
+      const tokens = hb.getTokens();
+      hb.clearTokens();
+      showAccount();
+      // Revoking the refresh token on the server ends Textpad's access, not
+      // just this browser's copy of it.
+      if (tokens?.refreshToken) {
+        await fetch(`${HASHBIN_URL}/oauth/revoke`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token: tokens.refreshToken, token_type_hint: "refresh_token" })
+        }).catch(() => {});
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // 6. Saving text
+    // ------------------------------------------------------------------
+
+    async function save() {
+      if (busy || !hasUnsavedChanges() || editor.value === "") {
+        return;
+      }
+      if (!isConnected()) {
+        showMessage("Taking you to HashBin to approve Textpad…");
+        await connectAndSave();
+        return;
+      }
+
+      const text = editor.value;
+      busy = true;
+      updateControls();
+      showMessage("Saving…");
+      try {
+        // The request body is the text itself. Uploads made with an OAuth
+        // app are kept for the user's default retention period (set on their
+        // HashBin account page) and charged to their balance. Texts of 64
+        // bytes or less are stored inside the 256t string and are free.
+        const response = await api("/api/content", {
+          method: "POST",
+          headers: { "content-type": "text/plain; charset=utf-8" },
+          body: text
+        });
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          if (result.error === "insufficient_balance") {
+            showMessage(result.message || "Your HashBin balance is too low to save this.", {
+              error: true,
+              link: { href: `${HASHBIN_URL}/deposit.html`, text: "Add funds" }
+            });
+          } else {
+            showMessage(`Saving failed: ${result.message || result.error || `HTTP ${response.status}`}`, { error: true });
+          }
+          return;
+        }
+
+        // Record the new 256t string in the URL. pushState doesn't fire
+        // "hashchange", so the text isn't reloaded, and Back returns to the
+        // previous version.
+        setUrlHash(`#256t=${result.cid}`);
+        currentCid = result.cid;
+        savedText = text;
+        const expires = result.expires_at
+          ? ` Kept until ${new Date(result.expires_at).toLocaleDateString()}.`
+          : "";
+        showMessage(`Saved. The address bar now links to this text.${expires}`, {
+          link: { href: hb.getContentUrl(result.cid), text: "View raw text" }
+        });
+        showAccount();
+      } catch (error) {
+        if (error instanceof NotConnectedError) {
+          showAccount();
+          showMessage("Your HashBin connection has ended. Click Save to connect again.", { error: true });
+        } else {
+          showMessage(`Saving failed: ${error.message}`, { error: true });
+        }
+      } finally {
+        busy = false;
+        updateControls();
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // 7. Wiring it together
+    // ------------------------------------------------------------------
+
+    function confirmDiscard() {
+      return !hasUnsavedChanges() || confirm("Discard your unsaved changes?");
+    }
+
+    editor.addEventListener("input", updateControls);
+    saveButton.addEventListener("click", save);
+    disconnectButton.addEventListener("click", disconnect);
+
+    // Ctrl+S / Cmd+S saves.
+    document.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "s") {
+        event.preventDefault();
+        save();
+      }
+    });
+
+    newButton.addEventListener("click", () => {
+      if (!confirmDiscard()) return;
+      setUrlHash("");
+      clearMessage();
+      setDocument(null, "");
+      editor.focus();
+    });
+
+    // Someone pasted a different #256t= link, or used Back/Forward.
+    window.addEventListener("hashchange", () => {
+      if (!confirmDiscard()) {
+        history.replaceState(null, "", shownHash || location.pathname + location.search);
+        return;
+      }
+      shownHash = location.hash;
+      loadFromUrl();
+    });
+
+    window.addEventListener("beforeunload", (event) => {
+      if (hasUnsavedChanges() && !busy) {
+        event.preventDefault();
+      }
+    });
+
+    // Start up: finish a sign-in if HashBin just sent the user back, then
+    // either carry on with the save they asked for or load the URL's text.
+    const draft = await finishSignIn();
+    shownHash = location.hash;
+    if (draft) {
+      updateControls();
+      showAccount();
+      save();
+    } else {
+      if (messageBox.hidden) {
+        await loadFromUrl();
+      } else {
+        updateControls();
+      }
+      showAccount();
+    }
+  </script>
+</body>
+</html>

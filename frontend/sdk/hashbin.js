@@ -281,7 +281,18 @@ export class HashBinClient {
     }
   }
 
-  async refreshAccessToken() {
+  // Refresh tokens are single-use, so concurrent callers share one renewal;
+  // a second request with the same token would be rejected and sign the user out.
+  refreshAccessToken() {
+    if (!this.refreshing) {
+      this.refreshing = this.renewTokens().finally(() => {
+        this.refreshing = null;
+      });
+    }
+    return this.refreshing;
+  }
+
+  async renewTokens() {
     if (!this.fetch) {
       throw new Error('fetch is unavailable.');
     }

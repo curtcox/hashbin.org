@@ -81,6 +81,49 @@ describe('HashBin browser SDK', () => {
     expect(transactionStorage.getItem('hashbin:pkce:app_123:state_123')).toBeNull();
   });
 
+  it('shares one token renewal between concurrent requests', async () => {
+    const storage = createMemoryStorage();
+    const fetch = vi.fn(async (url) => {
+      if (url.endsWith('/oauth/token')) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return new Response(JSON.stringify({
+          access_token: 'new-access',
+          refresh_token: 'new-refresh',
+          token_type: 'Bearer',
+          scope: 'content:write',
+          expires_in: 3600
+        }), { status: 200 });
+      }
+      return new Response('{}', { status: 200 });
+    });
+    const client = new HashBinClient({
+      clientId: 'app_123',
+      redirectUri: 'https://publisher.example/callback',
+      baseUrl: 'https://hashbin.test',
+      storage,
+      transactionStorage: createMemoryStorage(),
+      fetch
+    });
+    storage.setItem('hashbin:tokens:app_123', JSON.stringify({
+      accessToken: 'old-access',
+      refreshToken: 'old-refresh',
+      expiresAt: Date.now() - 1000
+    }));
+
+    await Promise.all([
+      client.authorizedFetch('/api/balance'),
+      client.authorizedFetch('/api/balance'),
+      client.authorizedFetch('/api/balance')
+    ]);
+
+    const tokenCalls = fetch.mock.calls.filter(([url]) => url.endsWith('/oauth/token'));
+    expect(tokenCalls).toHaveLength(1);
+    expect(client.getTokens().refreshToken).toBe('new-refresh');
+    for (const [url, options] of fetch.mock.calls.filter(([url]) => url.endsWith('/api/balance'))) {
+      expect(options.headers.Authorization).toBe('Bearer new-access');
+    }
+  });
+
   it('builds content urls from the dedicated content domain', () => {
     const client = new HashBinClient({
       clientId: 'app_123',
