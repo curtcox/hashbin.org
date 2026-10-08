@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<!-- Generated from scripts/docs/textpad-expo-doc.template.html by scripts/docs/generate-textpad-docs.py; edit those, not this file. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Textpad for Expo: a documented React Native app that opens, edits and saves text on HashBin.org">
+  <title>Textpad for Expo - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <style>
+    .textpad-doc pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .textpad-doc code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .textpad-doc :not(pre) > code,
+    .textpad-doc td,
+    .textpad-doc th { overflow-wrap: anywhere; }
+    .textpad-doc section.card { margin-bottom: 2rem; }
+    .textpad-doc h3 { margin-top: 1.5rem; }
+    .textpad-doc ul, .textpad-doc ol { margin-left: 1.5rem; line-height: 1.7; }
+    .textpad-doc table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    .textpad-doc th, .textpad-doc td {
+      text-align: left;
+      vertical-align: top;
+      padding: 0.5rem 1rem 0.5rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .textpad-doc .full-source { max-height: 70vh; }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <div class="container textpad-doc">
+      <h1>Textpad for Expo</h1>
+
+      <section class="card">
+        <h2>What it is</h2>
+        <p>
+          This is <a href="/docs/textpad">Textpad</a>, HashBin's example text editor, rebuilt as an
+          iOS and Android app with <a href="https://expo.dev">Expo</a> and React Native. It does the
+          same things as the web version, and this page explains the parts that work differently on
+          a phone. There is also a <a href="/docs/textpad-flutter">Flutter version</a>.
+        </p>
+        <ul>
+          <li><strong>Open:</strong> a link such as <code>org.hashbin.textpad.expo://open?256t=&lt;256t string&gt;</code> opens Textpad with that text. Users can also paste a 256t string, a 256t.us link or a web Textpad link into the <em>Open</em> field.</li>
+          <li><strong>Edit and save:</strong> Save publishes the text to the user's HashBin account. <em>Copy link</em> then copies a link that opens the text in any browser.</li>
+          <li><strong>Pay with the user's account:</strong> the user approves Textpad once on hashbin.org, inside the app, and stays connected.</li>
+          <li><strong>Explain problems:</strong> a malformed 256t string, one with nothing stored under it, or content that isn't text each gets its own message.</li>
+        </ul>
+        <p>
+          The project is in the HashBin repository at
+          <a href="https://github.com/curtcox/hashbin.org/tree/main/examples/textpad-expo">examples/textpad-expo</a>.
+          The code is in three files:
+        </p>
+        <table>
+          <tbody>
+            <tr><td><code>textpad.js</code></td><td>256t strings, links and text decoding. Plain JavaScript with no React Native, so it is tested under Node.</td></tr>
+            <tr><td><code>hashbin.js</code></td><td>A small HashBin OAuth client: sign-in, token storage and renewal, and API calls. Copy it into your own app.</td></tr>
+            <tr><td><code>App.js</code></td><td>The screen, and what happens when the user taps something.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Try it</h2>
+        <p>
+          <a href="#run">Install the app</a> on a phone or simulator first. These links then open in
+          it; short texts need no account, because they are stored inside the 256t string itself.
+        </p>
+        <table>
+          <thead><tr><th>Link</th><th>What you'll see</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><a href="org.hashbin.textpad.expo://open?256t=AAAAAAAtSGVsbG8gZnJvbSBUZXh0cGFkISBFZGl0IG1lLCB0aGVuIGNsaWNrIFNhdmUu">A short text</a></td>
+              <td>"Hello from Textpad! Edit me, then click Save." Edit it and tap Save to try saving.</td>
+            </tr>
+            <tr>
+              <td><a href="org.hashbin.textpad.expo://open?256t=not-a-real-256t-string">A malformed 256t string</a></td>
+              <td>An error saying the string isn't a valid 256t string.</td>
+            </tr>
+            <tr>
+              <td><a href="org.hashbin.textpad.expo://open?256t=AAAAAAAE__4AAQ">Content that isn't text</a></td>
+              <td>An error saying the content isn't text.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          In the simulator you can open a link from a terminal:
+          <code>xcrun simctl openurl booted "org.hashbin.textpad.expo://open?256t=…"</code> on iOS, or
+          <code>adb shell am start -a android.intent.action.VIEW -d "org.hashbin.textpad.expo://open?256t=…"</code>
+          on Android.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Signing in from an app</h2>
+        <p>
+          A phone app signs in to HashBin with the same OAuth 2.0 and PKCE flow as a web page. Four
+          things are different:
+        </p>
+        <ul>
+          <li>
+            <strong>The approval page opens in an in-app browser.</strong> On iOS this is an
+            <code>ASWebAuthenticationSession</code>, on Android a Chrome Custom Tab. The user sees
+            the real hashbin.org address, and it shares the browser's sign-in, so they often don't
+            need to sign in again. iOS first asks "Textpad Wants to Use hashbin.org to Sign In";
+            that prompt comes from the system, not from HashBin.
+          </li>
+          <li>
+            <strong>The redirect URI uses the app's own URL scheme:</strong>
+            <code>org.hashbin.textpad.expo://oauth</code>. The scheme is set in <code>app.json</code>,
+            and the system hands links that use it to this app. HashBin accepts redirect URIs like
+            this when the scheme is named after a domain, written backwards (RFC 8252). A plain name
+            such as <code>textpad://</code> is refused, because any app could claim it.
+          </li>
+          <li>
+            <strong>Tokens are kept in secure storage</strong>, the iOS Keychain or the Android
+            Keystore, through <code>expo-secure-store</code>. A web page has to use
+            <code>localStorage</code>.
+          </li>
+          <li>
+            <strong>Nothing has to survive a page change.</strong> The app keeps running while the
+            browser is open, so unlike the web version it doesn't save the user's text before
+            signing in.
+          </li>
+        </ul>
+        <p>
+          Everything else matches the web version. Textpad asks for <code>content:write</code> and
+          <code>balance:read</code>. Each save is charged to the user's balance and kept for the
+          default retention period set on their <a href="/account.html">account page</a>, and texts
+          of 64 bytes or less are free. <strong>Disconnect</strong> revokes the app's access on the
+          server, and users can also revoke Textpad from their account page.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Messages and what causes them</h2>
+        <table>
+          <thead><tr><th>Situation</th><th>Textpad shows</th></tr></thead>
+          <tbody>
+            <tr><td>The string has characters outside <code>A–Z a–z 0–9 - _</code>, or its length doesn't match the length it encodes (for example, a link cut off when copied)</td><td>"… isn't a valid 256t string. Check that the link was copied completely."</td></tr>
+            <tr><td>The link ends in <code>256t=</code> with nothing after it</td><td>"This link has "256t=" but no 256t string after it."</td></tr>
+            <tr><td>Something pasted into <em>Open</em> is a link with no 256t string in it</td><td>"That link doesn't contain a 256t string."</td></tr>
+            <tr><td>256t.us answers 404: never saved, expired, or deleted</td><td>"Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved."</td></tr>
+            <tr><td>256t.us answers 451: the content is under dispute</td><td>"This text is unavailable while a dispute about it is reviewed."</td></tr>
+            <tr><td>256t.us answers 429: the text has used up its download allowance</td><td>"HashBin is limiting how often this text can be downloaded. Try again later."</td></tr>
+            <tr><td>The content isn't valid UTF-8, or contains NUL characters (binary data)</td><td>"This 256t string points to content that isn't text, so Textpad can't open it."</td></tr>
+            <tr><td>The network request fails</td><td>"Couldn't reach HashBin to load this text…"</td></tr>
+            <tr><td>The user taps Deny on the HashBin approval page</td><td>"You didn't approve Textpad on HashBin, so nothing was saved." Their edits are kept.</td></tr>
+            <tr><td>The user closes the approval page</td><td>Nothing; the text stays as it was, unsaved.</td></tr>
+            <tr><td>The balance is too low to save</td><td>HashBin's explanation, with an <em>Add funds</em> link.</td></tr>
+            <tr><td>The connection was revoked or has expired</td><td>"Your HashBin connection has ended. Tap Save to connect again."</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>The code, step by step</h2>
+        <p>The excerpts below are copied exactly from the app; the <a href="#source">full source</a> is at the end of this page.</p>
+
+        <h3>1. Configuration</h3>
+        <p>
+          <code>App.js</code> starts by naming the app (its client ID), where HashBin is, and the
+          redirect URI. <code>EXPO_PUBLIC_</code> environment variables let a developer point the
+          app at a local HashBin server without editing the code. Expo copies them into the app when
+          it is bundled, so a published app always uses hashbin.org.
+        </p>
+@@EXCERPT start="// The HashBin service, and the domain" term="});"@@
+        <p>The redirect URI's scheme is the one in <code>app.json</code>:</p>
+@@EXCERPT file="app.json" start="    &quot;scheme&quot;" term="    &quot;scheme&quot;"@@
+
+        <h3>2. Finding the 256t string in a link</h3>
+        <p>
+          Textpad accepts its own deep links, and also the links people are likely to have: a web
+          Textpad link, a raw 256t.us link, or just the string. It ignores links that hold no 256t
+          string, such as the one that ends a sign-in.
+        </p>
+@@EXCERPT file="textpad.js" start="// Textpad opens a 256t string from any of these:" anchor="export function cidFromText" term="}"@@
+
+        <h3>3. Checking a 256t string</h3>
+        <p>
+          A 256t string has two parts, both in base64url. The first 8 characters hold the content's
+          length in bytes. The rest is the content itself when it is 64 bytes or less, or else its
+          SHA-512 hash, which is always 86 characters. Checking that the two parts agree catches
+          typos and truncated links before any network request is made:
+        </p>
+@@EXCERPT file="textpad.js" start="// A 256t string is base64url text" anchor="export function isValid256t" term="}"@@
+
+        <h3>4. Turning bytes into text</h3>
+        <p>
+          HashBin stores bytes, not text, and React Native has no strict UTF-8 decoder. JavaScript's
+          <code>decodeURIComponent</code> is one, though: given the bytes as <code>%XX</code> escapes,
+          it throws on anything that isn't valid UTF-8.
+        </p>
+@@EXCERPT file="textpad.js" start="// Content on HashBin is just bytes." anchor="export function decodeText" term="}"@@
+
+        <h3>5. Opening a text</h3>
+        <p>
+          Opening checks the string, then either decodes a short text straight from it or downloads a
+          longer one from <code>https://256t.us/&lt;string&gt;</code>. Downloading needs no account.
+          Each failure gets its own message, and the editor is emptied first, so nothing on screen
+          can be mistaken for the content of a broken link.
+        </p>
+@@EXCERPT start="  async function openCid(cid) {" term="  }"@@
+
+        <h3>6. Signing in</h3>
+        <p>
+          <code>connect()</code> in <code>hashbin.js</code> builds the authorization link with a PKCE
+          challenge, opens it with <code>WebBrowser.openAuthSessionAsync</code>, and waits. When
+          HashBin redirects to <code>org.hashbin.textpad.expo://oauth?code=…</code>, the browser closes
+          and hands that link back. The app checks the <code>state</code>, then trades the code for
+          tokens.
+        </p>
+@@EXCERPT file="hashbin.js" start="  // Opens HashBin's approval page" anchor="  async connect() {" term="  }"@@
+
+        <h3>7. Renewing access</h3>
+        <p>
+          Access tokens last an hour. Every API call goes through <code>account.fetch()</code>, which
+          renews an expired token first. Refresh tokens work only once, so calls that need a new
+          token at the same moment share a single renewal. A refused refresh token, or a 401 from
+          the API, means the user has to approve Textpad again.
+        </p>
+@@EXCERPT file="hashbin.js" start="  // Access tokens last an hour." anchor="  async renewTokens() {" term="  }"@@
+@@EXCERPT file="hashbin.js" start="  // fetch() for HashBin API paths" term="  }"@@
+
+        <h3>8. Saving text</h3>
+        <p>
+          Save connects first if needed, then sends one <code>POST /api/content</code> whose body is
+          the text. The response holds the new 256t string (<code>cid</code>).
+        </p>
+@@EXCERPT start="  async function save() {" term="  }"@@
+
+        <h3>9. Receiving links</h3>
+        <p>
+          React Native's <code>Linking</code> module gives the link that launched the app, and then
+          any link opened while it runs. The listener is set up once, so it calls the newest
+          <code>openLink</code> through a ref; otherwise it would see the text as it was when the app
+          started.
+        </p>
+@@EXCERPT start="  // The link listener below is set up once" term="  }, []);"@@
+      </section>
+
+      <section class="card" id="run">
+        <h2>Run it</h2>
+        <p>
+          You need Node.js, plus Xcode for iOS or Android Studio for Android. Textpad uses its own
+          URL scheme, so it needs a <a href="https://docs.expo.dev/develop/development-builds/introduction/">development build</a>;
+          it can't run in Expo Go, which has a scheme of its own.
+        </p>
+        <pre><code>git clone https://github.com/curtcox/hashbin.org.git
+cd hashbin.org/examples/textpad-expo
+npm install
+npx expo run:ios        # or: npx expo run:android</code></pre>
+        <p>
+          The first run builds the native app, which takes a few minutes. After that, edits to the
+          JavaScript reload instantly.
+        </p>
+
+        <h3>Make your own app from it</h3>
+        <ol>
+          <li>
+            Pick a URL scheme from a domain you control, written backwards, for example
+            <code>com.example.notes</code>. Set it as <code>scheme</code>,
+            <code>ios.bundleIdentifier</code> and <code>android.package</code> in <code>app.json</code>.
+          </li>
+          <li>
+            Register an app on the <a href="/developers">Developers page</a> with the redirect URI
+            <code>com.example.notes://oauth</code>.
+          </li>
+          <li>In <code>App.js</code>, set <code>REDIRECT_URI</code> to that address and <code>CLIENT_ID</code> to your app's client ID.</li>
+          <li>Rebuild the native app (<code>npx expo prebuild --clean</code>, then <code>npx expo run:ios</code>), since the scheme is part of it.</li>
+        </ol>
+
+        <h3>Against a local HashBin server</h3>
+        <p>
+          Start the server with <code>npm run dev:local</code> in the repository root. On its
+          <a href="http://127.0.0.1:8787/developers">Developers page</a>, register an app with the
+          redirect URI <code>org.hashbin.textpad.expo://oauth</code>. Then run:
+        </p>
+        <pre><code>EXPO_PUBLIC_HASHBIN_URL=http://127.0.0.1:8787 \
+EXPO_PUBLIC_TEXTPAD_CLIENT_ID=&lt;client ID&gt; \
+npx expo run:ios</code></pre>
+        <p>
+          In the Android emulator, the computer is <code>10.0.2.2</code> instead of
+          <code>127.0.0.1</code>. Expo copies these variables into the app when it bundles the
+          JavaScript, so restart with <code>npx expo start --clear</code> after changing them.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Things to know</h2>
+        <ul>
+          <li><strong>Copied links point to the web.</strong> <em>Copy link</em> copies a link to the web version of Textpad, which opens in any browser on any device; pasting it into this app's <em>Open</em> field works too.</li>
+          <li><strong>Saving the same text again.</strong> Save stays disabled until the text changes. If edited text happens to match something already on HashBin, HashBin keeps the existing copy and extends how long it is kept, which is charged like a new save.</li>
+          <li><strong>Saves use the account's default retention.</strong> Apps cannot choose how long content is kept; users set their default on the account page.</li>
+          <li><strong>Android can close a backgrounded app.</strong> If the phone is very short of memory while the approval page is open, Android may close Textpad, and unsaved text would be lost. A production app could keep a draft in storage to guard against this.</li>
+        </ul>
+      </section>
+
+      <section class="card" id="source">
+        <h2>Full source</h2>
+        <h3>textpad.js</h3>
+@@SOURCE file="textpad.js"@@
+        <h3>hashbin.js</h3>
+@@SOURCE file="hashbin.js"@@
+        <h3>App.js</h3>
+@@SOURCE file="App.js"@@
+        <h3>app.json</h3>
+@@SOURCE file="app.json"@@
+        <h3>package.json</h3>
+@@SOURCE file="package.json"@@
+      </section>
+    </div>
+  </main>
+
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> |
+      <a href="/docs/index.html">Docs</a> |
+      <a href="/docs/sdk.html">SDK</a> |
+      <a href="/developers">Developers</a> |
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

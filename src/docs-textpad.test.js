@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { generate256tHash } from './utils/hash256t.js';
 
 const appHtml = readFileSync(new URL('../frontend/docs/textpad/app.html', import.meta.url), 'utf8');
-const docHtml = readFileSync(new URL('../frontend/docs/textpad.html', import.meta.url), 'utf8');
 
 // The app's script, de-indented the same way the doc page's excerpts are.
 const appScript = appHtml
@@ -26,20 +25,46 @@ function loadAppFunctions(names) {
   return new Function(`${sources.join('\n')}\nreturn { ${names.join(', ')} };`)();
 }
 
+// Each walkthrough page and the folder its code comes from.
+const PAGES = [
+  ['frontend/docs/textpad.html', 'frontend/docs/textpad'],
+  ['frontend/docs/textpad-expo.html', 'examples/textpad-expo'],
+  ['frontend/docs/textpad-flutter.html', 'examples/textpad-flutter']
+];
+
+const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+// The generator strips an excerpt's indentation; put some back.
+function indent(text, spaces) {
+  return text.split('\n').map((line) => (line ? ' '.repeat(spaces) + line : line)).join('\n');
+}
+
 describe('Textpad docs', () => {
-  it('quotes the app source exactly in every excerpt', () => {
-    const excerpts = [...docHtml.matchAll(/<pre><code class="excerpt">([\s\S]*?)<\/code><\/pre>/g)]
-      .map((match) => unescapeHtml(match[1]));
+  for (const [page, folder] of PAGES) {
+    const pageHtml = read(page);
 
-    expect(excerpts.length).toBeGreaterThan(5);
-    for (const excerpt of excerpts) {
-      expect(appScript, 'Run python3 scripts/docs/generate-textpad-doc.py').toContain(excerpt);
-    }
-  });
+    it(`${page} quotes its app exactly`, () => {
+      const excerpts = [...pageHtml.matchAll(/<pre><code class="excerpt" data-file="([^"]*)">([\s\S]*?)<\/code><\/pre>/g)];
+      expect(excerpts.length).toBeGreaterThan(5);
+      for (const [, file, code] of excerpts) {
+        const source = read(`${folder}/${file}`);
+        const excerpt = unescapeHtml(code);
+        expect(
+          [0, 2, 4, 6, 8, 10, 12].some((spaces) => source.includes(indent(excerpt, spaces))),
+          `${file}: ${excerpt.split('\n')[0]} (run python3 scripts/docs/generate-textpad-docs.py)`
+        ).toBe(true);
+      }
 
-  it('has a real client ID configured', () => {
-    expect(appHtml).not.toContain('app_REPLACE_WITH_CLIENT_ID');
+      for (const [, file, code] of pageHtml.matchAll(/<code class="source" data-file="([^"]*)">([\s\S]*?)<\/code>/g)) {
+        expect(unescapeHtml(code) === read(`${folder}/${file}`), `${file} (run python3 scripts/docs/generate-textpad-docs.py)`).toBe(true);
+      }
+    });
+  }
+
+  it('has a real client ID configured in every version', () => {
     expect(appHtml).toMatch(/let CLIENT_ID = "app_[0-9a-f-]{36}";/);
+    expect(read('examples/textpad-expo/App.js')).toMatch(/\|\| "app_[0-9a-f-]{36}";/);
+    expect(read('examples/textpad-flutter/lib/main.dart')).toMatch(/defaultValue: 'app_[0-9a-f-]{36}'/);
   });
 });
 

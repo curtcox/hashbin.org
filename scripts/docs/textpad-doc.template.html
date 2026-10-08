@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generated from scripts/docs/textpad-doc.template.html by scripts/docs/generate-textpad-doc.py; edit those, not this file. -->
+<!-- Generated from scripts/docs/textpad-doc.template.html by scripts/docs/generate-textpad-docs.py; edit those, not this file. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -66,6 +66,10 @@
           <li><strong>Pay with the user's account:</strong> saving is billed to the user's own HashBin balance. They approve Textpad once on hashbin.org and stay connected on later visits.</li>
           <li><strong>Explain problems:</strong> a malformed 256t string, one with nothing stored under it, or content that isn't text each gets its own clear message.</li>
         </ul>
+        <p>
+          Textpad is also available as an iOS and Android app, built with
+          <a href="/docs/textpad-expo">Expo</a> or <a href="/docs/textpad-flutter">Flutter</a>.
+        </p>
         <p><a class="btn btn-primary launch" href="/docs/textpad/app">Open Textpad</a></p>
       </section>
 
@@ -115,6 +119,7 @@
             <tr><td>The URL ends in <code>#256t=</code> with nothing after it</td><td>"This link has "#256t=" but no 256t string after it."</td></tr>
             <tr><td>256t.us answers 404: never saved, expired, or deleted</td><td>"Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved."</td></tr>
             <tr><td>256t.us answers 451: the content is under dispute</td><td>"This text is unavailable while a dispute about it is reviewed."</td></tr>
+            <tr><td>256t.us answers 429: the text has used up its download allowance</td><td>"HashBin is limiting how often this text can be downloaded. Try again later."</td></tr>
             <tr><td>The content isn't valid UTF-8, or contains NUL characters (binary data)</td><td>"This 256t string points to content that isn't text, so Textpad can't open it."</td></tr>
             <tr><td>The network request fails</td><td>"Couldn't reach HashBin to load this text…"</td></tr>
             <tr><td>The user declines on the HashBin approval page</td><td>"You didn't approve Textpad on HashBin, so nothing was saved." Their edits are kept.</td></tr>

@@ -1,0 +1,1575 @@
+<!DOCTYPE html>
+<!-- Generated from scripts/docs/textpad-expo-doc.template.html by scripts/docs/generate-textpad-docs.py; edit those, not this file. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Textpad for Expo: a documented React Native app that opens, edits and saves text on HashBin.org">
+  <title>Textpad for Expo - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <style>
+    .textpad-doc pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .textpad-doc code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .textpad-doc :not(pre) > code,
+    .textpad-doc td,
+    .textpad-doc th { overflow-wrap: anywhere; }
+    .textpad-doc section.card { margin-bottom: 2rem; }
+    .textpad-doc h3 { margin-top: 1.5rem; }
+    .textpad-doc ul, .textpad-doc ol { margin-left: 1.5rem; line-height: 1.7; }
+    .textpad-doc table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    .textpad-doc th, .textpad-doc td {
+      text-align: left;
+      vertical-align: top;
+      padding: 0.5rem 1rem 0.5rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .textpad-doc .full-source { max-height: 70vh; }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <div class="container textpad-doc">
+      <h1>Textpad for Expo</h1>
+
+      <section class="card">
+        <h2>What it is</h2>
+        <p>
+          This is <a href="/docs/textpad">Textpad</a>, HashBin's example text editor, rebuilt as an
+          iOS and Android app with <a href="https://expo.dev">Expo</a> and React Native. It does the
+          same things as the web version, and this page explains the parts that work differently on
+          a phone. There is also a <a href="/docs/textpad-flutter">Flutter version</a>.
+        </p>
+        <ul>
+          <li><strong>Open:</strong> a link such as <code>org.hashbin.textpad.expo://open?256t=&lt;256t string&gt;</code> opens Textpad with that text. Users can also paste a 256t string, a 256t.us link or a web Textpad link into the <em>Open</em> field.</li>
+          <li><strong>Edit and save:</strong> Save publishes the text to the user's HashBin account. <em>Copy link</em> then copies a link that opens the text in any browser.</li>
+          <li><strong>Pay with the user's account:</strong> the user approves Textpad once on hashbin.org, inside the app, and stays connected.</li>
+          <li><strong>Explain problems:</strong> a malformed 256t string, one with nothing stored under it, or content that isn't text each gets its own message.</li>
+        </ul>
+        <p>
+          The project is in the HashBin repository at
+          <a href="https://github.com/curtcox/hashbin.org/tree/main/examples/textpad-expo">examples/textpad-expo</a>.
+          The code is in three files:
+        </p>
+        <table>
+          <tbody>
+            <tr><td><code>textpad.js</code></td><td>256t strings, links and text decoding. Plain JavaScript with no React Native, so it is tested under Node.</td></tr>
+            <tr><td><code>hashbin.js</code></td><td>A small HashBin OAuth client: sign-in, token storage and renewal, and API calls. Copy it into your own app.</td></tr>
+            <tr><td><code>App.js</code></td><td>The screen, and what happens when the user taps something.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>Try it</h2>
+        <p>
+          <a href="#run">Install the app</a> on a phone or simulator first. These links then open in
+          it; short texts need no account, because they are stored inside the 256t string itself.
+        </p>
+        <table>
+          <thead><tr><th>Link</th><th>What you'll see</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><a href="org.hashbin.textpad.expo://open?256t=AAAAAAAtSGVsbG8gZnJvbSBUZXh0cGFkISBFZGl0IG1lLCB0aGVuIGNsaWNrIFNhdmUu">A short text</a></td>
+              <td>"Hello from Textpad! Edit me, then click Save." Edit it and tap Save to try saving.</td>
+            </tr>
+            <tr>
+              <td><a href="org.hashbin.textpad.expo://open?256t=not-a-real-256t-string">A malformed 256t string</a></td>
+              <td>An error saying the string isn't a valid 256t string.</td>
+            </tr>
+            <tr>
+              <td><a href="org.hashbin.textpad.expo://open?256t=AAAAAAAE__4AAQ">Content that isn't text</a></td>
+              <td>An error saying the content isn't text.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          In the simulator you can open a link from a terminal:
+          <code>xcrun simctl openurl booted "org.hashbin.textpad.expo://open?256t=…"</code> on iOS, or
+          <code>adb shell am start -a android.intent.action.VIEW -d "org.hashbin.textpad.expo://open?256t=…"</code>
+          on Android.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Signing in from an app</h2>
+        <p>
+          A phone app signs in to HashBin with the same OAuth 2.0 and PKCE flow as a web page. Four
+          things are different:
+        </p>
+        <ul>
+          <li>
+            <strong>The approval page opens in an in-app browser.</strong> On iOS this is an
+            <code>ASWebAuthenticationSession</code>, on Android a Chrome Custom Tab. The user sees
+            the real hashbin.org address, and it shares the browser's sign-in, so they often don't
+            need to sign in again. iOS first asks "Textpad Wants to Use hashbin.org to Sign In";
+            that prompt comes from the system, not from HashBin.
+          </li>
+          <li>
+            <strong>The redirect URI uses the app's own URL scheme:</strong>
+            <code>org.hashbin.textpad.expo://oauth</code>. The scheme is set in <code>app.json</code>,
+            and the system hands links that use it to this app. HashBin accepts redirect URIs like
+            this when the scheme is named after a domain, written backwards (RFC 8252). A plain name
+            such as <code>textpad://</code> is refused, because any app could claim it.
+          </li>
+          <li>
+            <strong>Tokens are kept in secure storage</strong>, the iOS Keychain or the Android
+            Keystore, through <code>expo-secure-store</code>. A web page has to use
+            <code>localStorage</code>.
+          </li>
+          <li>
+            <strong>Nothing has to survive a page change.</strong> The app keeps running while the
+            browser is open, so unlike the web version it doesn't save the user's text before
+            signing in.
+          </li>
+        </ul>
+        <p>
+          Everything else matches the web version. Textpad asks for <code>content:write</code> and
+          <code>balance:read</code>. Each save is charged to the user's balance and kept for the
+          default retention period set on their <a href="/account.html">account page</a>, and texts
+          of 64 bytes or less are free. <strong>Disconnect</strong> revokes the app's access on the
+          server, and users can also revoke Textpad from their account page.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Messages and what causes them</h2>
+        <table>
+          <thead><tr><th>Situation</th><th>Textpad shows</th></tr></thead>
+          <tbody>
+            <tr><td>The string has characters outside <code>A–Z a–z 0–9 - _</code>, or its length doesn't match the length it encodes (for example, a link cut off when copied)</td><td>"… isn't a valid 256t string. Check that the link was copied completely."</td></tr>
+            <tr><td>The link ends in <code>256t=</code> with nothing after it</td><td>"This link has "256t=" but no 256t string after it."</td></tr>
+            <tr><td>Something pasted into <em>Open</em> is a link with no 256t string in it</td><td>"That link doesn't contain a 256t string."</td></tr>
+            <tr><td>256t.us answers 404: never saved, expired, or deleted</td><td>"Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved."</td></tr>
+            <tr><td>256t.us answers 451: the content is under dispute</td><td>"This text is unavailable while a dispute about it is reviewed."</td></tr>
+            <tr><td>256t.us answers 429: the text has used up its download allowance</td><td>"HashBin is limiting how often this text can be downloaded. Try again later."</td></tr>
+            <tr><td>The content isn't valid UTF-8, or contains NUL characters (binary data)</td><td>"This 256t string points to content that isn't text, so Textpad can't open it."</td></tr>
+            <tr><td>The network request fails</td><td>"Couldn't reach HashBin to load this text…"</td></tr>
+            <tr><td>The user taps Deny on the HashBin approval page</td><td>"You didn't approve Textpad on HashBin, so nothing was saved." Their edits are kept.</td></tr>
+            <tr><td>The user closes the approval page</td><td>Nothing; the text stays as it was, unsaved.</td></tr>
+            <tr><td>The balance is too low to save</td><td>HashBin's explanation, with an <em>Add funds</em> link.</td></tr>
+            <tr><td>The connection was revoked or has expired</td><td>"Your HashBin connection has ended. Tap Save to connect again."</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>The code, step by step</h2>
+        <p>The excerpts below are copied exactly from the app; the <a href="#source">full source</a> is at the end of this page.</p>
+
+        <h3>1. Configuration</h3>
+        <p>
+          <code>App.js</code> starts by naming the app (its client ID), where HashBin is, and the
+          redirect URI. <code>EXPO_PUBLIC_</code> environment variables let a developer point the
+          app at a local HashBin server without editing the code. Expo copies them into the app when
+          it is bundled, so a published app always uses hashbin.org.
+        </p>
+        <pre><code class="excerpt" data-file="App.js">// The HashBin service, and the domain that serves published content.
+// Development only: EXPO_PUBLIC_HASHBIN_URL points the app at a local
+// HashBin server (npm run dev:local), which serves content itself.
+const HASHBIN_URL = process.env.EXPO_PUBLIC_HASHBIN_URL || "https://hashbin.org";
+const CONTENT_URL = process.env.EXPO_PUBLIC_HASHBIN_URL || "https://256t.us";
+
+// The client ID from registering Textpad at https://hashbin.org/developers,
+// or EXPO_PUBLIC_TEXTPAD_CLIENT_ID for an app registered on a local server.
+const CLIENT_ID = process.env.EXPO_PUBLIC_TEXTPAD_CLIENT_ID || "app_1a74e62b-d752-4a3c-81af-5c850af18c5b";
+
+// HashBin sends the user back to this link after they approve Textpad. Its
+// scheme is the app's own ("scheme" in app.json), so the system hands the
+// link to this app. It must match a registered redirect URI exactly.
+const REDIRECT_URI = "org.hashbin.textpad.expo://oauth";
+
+// What Textpad asks the user to allow: publishing (billed to their
+// balance) and reading their balance so it can be shown.
+const SCOPES = ["content:write", "balance:read"];
+
+const account = new HashBinAccount({
+  clientId: CLIENT_ID,
+  redirectUri: REDIRECT_URI,
+  baseUrl: HASHBIN_URL,
+  scopes: SCOPES
+});</code></pre>
+        <p>The redirect URI's scheme is the one in <code>app.json</code>:</p>
+        <pre><code class="excerpt" data-file="app.json">"scheme": "org.hashbin.textpad.expo",</code></pre>
+
+        <h3>2. Finding the 256t string in a link</h3>
+        <p>
+          Textpad accepts its own deep links, and also the links people are likely to have: a web
+          Textpad link, a raw 256t.us link, or just the string. It ignores links that hold no 256t
+          string, such as the one that ends a sign-in.
+        </p>
+        <pre><code class="excerpt" data-file="textpad.js">// Textpad opens a 256t string from any of these:
+//   - its own deep link:     org.hashbin.textpad.expo://open?256t=&lt;cid&gt;
+//   - a web Textpad link:    https://hashbin.org/docs/textpad/app#256t=&lt;cid&gt;
+//   - a raw content link:    https://256t.us/&lt;cid&gt;
+//   - the bare 256t string:  &lt;cid&gt;
+// It returns null for a link that holds no 256t string, such as the
+// "org.hashbin.textpad.expo://oauth?code=…" link that ends a sign-in.
+export function cidFromText(text) {
+  const trimmed = text.trim();
+  const param = trimmed.match(/[#?&amp;]256t=([^&amp;#]*)/);
+  if (param) {
+    try {
+      return decodeURIComponent(param[1]);
+    } catch {
+      return param[1]; // A stray "%" can't be decoded; isValid256t rejects it.
+    }
+  }
+  const contentLink = trimmed.match(/^https:\/\/256t\.us\/([^/?#]*)/);
+  if (contentLink) {
+    return contentLink[1];
+  }
+  return trimmed.includes("://") ? null : trimmed;
+}</code></pre>
+
+        <h3>3. Checking a 256t string</h3>
+        <p>
+          A 256t string has two parts, both in base64url. The first 8 characters hold the content's
+          length in bytes. The rest is the content itself when it is 64 bytes or less, or else its
+          SHA-512 hash, which is always 86 characters. Checking that the two parts agree catches
+          typos and truncated links before any network request is made:
+        </p>
+        <pre><code class="excerpt" data-file="textpad.js">// A 256t string is base64url text in two parts:
+//   - 8 characters holding the content's length in bytes
+//     (a 6-byte big-endian number);
+//   - then the content itself if it is 64 bytes or less, or else the
+//     content's SHA-512 hash (always 86 characters).
+// Checking this up front gives a clear message for a mistyped or cut-off
+// link instead of a confusing "not found".
+export function contentLength(cid) {
+  return base64UrlToBytes(cid.slice(0, 8)).reduce((total, byte) =&gt; total * 256 + byte, 0);
+}
+
+export function isValid256t(cid) {
+  if (!/^[A-Za-z0-9_-]{8,94}$/.test(cid)) {
+    return false;
+  }
+  const length = contentLength(cid);
+  const expectedRest = length &lt;= 64 ? Math.ceil((length * 4) / 3) : 86;
+  return cid.length - 8 === expectedRest;
+}</code></pre>
+
+        <h3>4. Turning bytes into text</h3>
+        <p>
+          HashBin stores bytes, not text, and React Native has no strict UTF-8 decoder. JavaScript's
+          <code>decodeURIComponent</code> is one, though: given the bytes as <code>%XX</code> escapes,
+          it throws on anything that isn't valid UTF-8.
+        </p>
+        <pre><code class="excerpt" data-file="textpad.js">// Content on HashBin is just bytes. Textpad only opens bytes that are valid
+// UTF-8 text. React Native has no strict UTF-8 decoder, but
+// decodeURIComponent is one: given the bytes as %XX escapes, it throws on
+// anything that isn't valid UTF-8 instead of inserting replacement
+// characters. It also keeps a leading byte order mark, so saving unchanged
+// text gives back exactly the same bytes and 256t string.
+export function decodeText(bytes) {
+  let escaped = "";
+  for (const byte of bytes) {
+    escaped += byte &lt; 16 ? `%0${byte.toString(16)}` : `%${byte.toString(16)}`;
+  }
+  const text = decodeURIComponent(escaped);
+  // Valid UTF-8 can still be binary data; a NUL character is a reliable
+  // sign of that, and real text practically never contains one.
+  if (text.includes("\0")) {
+    throw new TypeError("Content contains NUL characters");
+  }
+  return text;
+}</code></pre>
+
+        <h3>5. Opening a text</h3>
+        <p>
+          Opening checks the string, then either decodes a short text straight from it or downloads a
+          longer one from <code>https://256t.us/&lt;string&gt;</code>. Downloading needs no account.
+          Each failure gets its own message, and the editor is emptied first, so nothing on screen
+          can be mistaken for the content of a broken link.
+        </p>
+        <pre><code class="excerpt" data-file="App.js">async function openCid(cid) {
+  // Whatever happens below, don't leave the previous text on screen as if
+  // it belonged to this link.
+  setDocument(null, "");
+  clearMessage();
+
+  if (cid === "") {
+    showMessage("This link has \"256t=\" but no 256t string after it.", { error: true });
+    return;
+  }
+  if (!isValid256t(cid)) {
+    const shown = cid.length &gt; 100 ? `${cid.slice(0, 100)}…` : cid;
+    showMessage(`"${shown}" isn't a valid 256t string. Check that the link was copied completely.`, { error: true });
+    return;
+  }
+
+  // Short texts are inside the 256t string itself.
+  const inline = inlineBytes(cid);
+  if (inline) {
+    showText(cid, inline);
+    return;
+  }
+
+  setBusy(true);
+  showMessage("Loading…");
+  try {
+    let response;
+    try {
+      response = await fetch(`${CONTENT_URL}/${cid}`);
+    } catch {
+      showMessage("Couldn't reach HashBin to load this text. Check your connection and try again.", { error: true });
+      return;
+    }
+
+    if (response.status === 404) {
+      showMessage("Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved.", { error: true });
+      return;
+    }
+    if (response.status === 451) {
+      showMessage("This text is unavailable while a dispute about it is reviewed.", { error: true });
+      return;
+    }
+    // Each stored text has a download allowance; when it runs out, 256t.us answers 429.
+    if (response.status === 429) {
+      showMessage("HashBin is limiting how often this text can be downloaded. Try again later.", { error: true });
+      return;
+    }
+    if (!response.ok) {
+      showMessage(`HashBin couldn't return this text (HTTP ${response.status}). Try again later.`, { error: true });
+      return;
+    }
+
+    showText(cid, new Uint8Array(await response.arrayBuffer()));
+  } finally {
+    setBusy(false);
+  }
+}</code></pre>
+
+        <h3>6. Signing in</h3>
+        <p>
+          <code>connect()</code> in <code>hashbin.js</code> builds the authorization link with a PKCE
+          challenge, opens it with <code>WebBrowser.openAuthSessionAsync</code>, and waits. When
+          HashBin redirects to <code>org.hashbin.textpad.expo://oauth?code=…</code>, the browser closes
+          and hands that link back. The app checks the <code>state</code>, then trades the code for
+          tokens.
+        </p>
+        <pre><code class="excerpt" data-file="hashbin.js">// Opens HashBin's approval page in an in-app browser and waits for the
+// user to come back. Resolves to "connected", "denied" (the user clicked
+// Deny) or "cancelled" (the user closed the browser).
+async connect() {
+  // PKCE: a random secret (the verifier) stays in the app, and only its
+  // SHA-256 hash (the challenge) goes into the sign-in link. Whoever
+  // exchanges the code for tokens must know the verifier, so a code
+  // intercepted on the way back to the app is useless to anyone else.
+  const verifier = bytesToBase64Url(Crypto.getRandomBytes(32));
+  const challenge = (await Crypto.digestStringAsync(
+    Crypto.CryptoDigestAlgorithm.SHA256,
+    verifier,
+    { encoding: Crypto.CryptoEncoding.BASE64 }
+  )).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  // "state" ties the reply to this request.
+  const state = bytesToBase64Url(Crypto.getRandomBytes(16));
+
+  const query = {
+    client_id: this.clientId,
+    redirect_uri: this.redirectUri,
+    response_type: "code",
+    scope: this.scopes.join(" "),
+    state,
+    code_challenge: challenge,
+    code_challenge_method: "S256"
+  };
+  const authorizeUrl = `${this.baseUrl}/oauth/authorize?` + Object.entries(query)
+    .map(([name, value]) =&gt; `${name}=${encodeURIComponent(value)}`)
+    .join("&amp;");
+
+  // On iOS this is an ASWebAuthenticationSession, on Android a Chrome
+  // Custom Tab. It closes by itself when HashBin redirects to
+  // redirectUri, and hands that link back here.
+  const result = await WebBrowser.openAuthSessionAsync(authorizeUrl, this.redirectUri);
+  if (result.type !== "success") {
+    return "cancelled";
+  }
+
+  const params = queryParams(result.url);
+  if (params.state !== state) {
+    throw new Error("The reply from HashBin doesn't match this sign-in.");
+  }
+  if (params.error === "access_denied") {
+    return "denied";
+  }
+  if (params.error || !params.code) {
+    throw new Error(params.error || "HashBin didn't send an authorization code.");
+  }
+
+  // Trade the one-time code (plus the verifier) for tokens.
+  const response = await fetch(`${this.baseUrl}/oauth/token`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      grant_type: "authorization_code",
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      code: params.code,
+      code_verifier: verifier
+    })
+  });
+  const body = await response.json().catch(() =&gt; ({}));
+  if (!response.ok) {
+    throw new Error(body.message || body.error || `HTTP ${response.status}`);
+  }
+  await this.saveTokens(body);
+  return "connected";
+}</code></pre>
+
+        <h3>7. Renewing access</h3>
+        <p>
+          Access tokens last an hour. Every API call goes through <code>account.fetch()</code>, which
+          renews an expired token first. Refresh tokens work only once, so calls that need a new
+          token at the same moment share a single renewal. A refused refresh token, or a 401 from
+          the API, means the user has to approve Textpad again.
+        </p>
+        <pre><code class="excerpt" data-file="hashbin.js">// Access tokens last an hour. A refresh token gets a new one, and is
+// itself replaced: each refresh token works only once. Calls that need a
+// new token at the same moment share one refresh, because a second
+// refresh with the same (by then used) token would fail.
+refreshAccessToken() {
+  if (!this.refreshing) {
+    this.refreshing = this.renewTokens().finally(() =&gt; {
+      this.refreshing = null;
+    });
+  }
+  return this.refreshing;
+}
+
+async renewTokens() {
+  const response = await fetch(`${this.baseUrl}/oauth/token`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ grant_type: "refresh_token", refresh_token: this.tokens.refreshToken })
+  });
+  const body = await response.json().catch(() =&gt; ({}));
+  if (body.error === "invalid_grant") {
+    // Expired or revoked: the user has to approve the app again.
+    await this.clearTokens();
+    throw new NotConnectedError();
+  }
+  if (!response.ok) {
+    throw new Error(body.message || body.error || `HTTP ${response.status}`);
+  }
+  await this.saveTokens(body);
+}</code></pre>
+        <pre><code class="excerpt" data-file="hashbin.js">// fetch() for HashBin API paths, as the signed-in user.
+async fetch(path, options = {}) {
+  if (!this.isConnected()) {
+    throw new NotConnectedError();
+  }
+  if (Date.now() &gt; this.tokens.expiresAt - EXPIRY_MARGIN_MS) {
+    await this.refreshAccessToken();
+    if (!this.isConnected()) {
+      throw new NotConnectedError(); // Disconnected while renewing.
+    }
+  }
+  const response = await fetch(`${this.baseUrl}${path}`, {
+    ...options,
+    headers: { ...options.headers, authorization: `Bearer ${this.tokens.accessToken}` }
+  });
+  if (response.status === 401) {
+    await this.clearTokens();
+    throw new NotConnectedError();
+  }
+  return response;
+}</code></pre>
+
+        <h3>8. Saving text</h3>
+        <p>
+          Save connects first if needed, then sends one <code>POST /api/content</code> whose body is
+          the text. The response holds the new 256t string (<code>cid</code>).
+        </p>
+        <pre><code class="excerpt" data-file="App.js">async function save() {
+  if (busy || !hasUnsavedChanges || text === "") {
+    return;
+  }
+  // The editor is read-only while busy, so this is what gets saved.
+  const textToSave = text;
+  setBusy(true);
+  try {
+    // The first save asks the user to approve Textpad. Unlike a web page,
+    // the app keeps running while the browser is open, so nothing has to
+    // be stored to survive the trip.
+    if (!account.isConnected()) {
+      showMessage("Waiting for you to approve Textpad on HashBin…");
+      const outcome = await account.connect();
+      showAccount();
+      if (outcome === "denied") {
+        showMessage("You didn't approve Textpad on HashBin, so nothing was saved.", { error: true });
+        return;
+      }
+      if (outcome === "cancelled") {
+        clearMessage();
+        return;
+      }
+    }
+
+    showMessage("Saving…");
+    // The request body is the text itself. Uploads made with an OAuth
+    // app are kept for the user's default retention period (set on their
+    // HashBin account page) and charged to their balance. Texts of 64
+    // bytes or less are stored inside the 256t string and are free.
+    const response = await account.fetch("/api/content", {
+      method: "POST",
+      headers: { "content-type": "text/plain; charset=utf-8" },
+      body: textToSave
+    });
+    const result = await response.json().catch(() =&gt; ({}));
+
+    if (!response.ok) {
+      if (result.error === "insufficient_balance") {
+        showMessage(result.message || "Your HashBin balance is too low to save this.", {
+          error: true,
+          actions: [{ label: "Add funds", onPress: () =&gt; Linking.openURL(`${HASHBIN_URL}/deposit.html`) }]
+        });
+      } else {
+        showMessage(`Saving failed: ${result.message || result.error || `HTTP ${response.status}`}`, { error: true });
+      }
+      return;
+    }
+
+    setCurrentCid(result.cid);
+    setSavedText(textToSave);
+    const expires = result.expires_at
+      ? ` Kept until ${new Date(result.expires_at).toLocaleDateString()}.`
+      : "";
+    showMessage(`Saved.${expires}`, {
+      actions: [
+        { label: "Copy link", onPress: () =&gt; copyLink(result.cid) },
+        { label: "View raw text", onPress: () =&gt; Linking.openURL(`${CONTENT_URL}/${result.cid}`) }
+      ]
+    });
+    showAccount();
+  } catch (error) {
+    if (error instanceof NotConnectedError) {
+      showAccount();
+      showMessage("Your HashBin connection has ended. Tap Save to connect again.", { error: true });
+    } else {
+      showMessage(`Saving failed: ${error.message}`, { error: true });
+    }
+  } finally {
+    setBusy(false);
+  }
+}</code></pre>
+
+        <h3>9. Receiving links</h3>
+        <p>
+          React Native's <code>Linking</code> module gives the link that launched the app, and then
+          any link opened while it runs. The listener is set up once, so it calls the newest
+          <code>openLink</code> through a ref; otherwise it would see the text as it was when the app
+          started.
+        </p>
+        <pre><code class="excerpt" data-file="App.js">// The link listener below is set up once, but openLink changes with
+// every render (it reads the current text). The ref always holds the
+// latest one.
+const openLinkRef = useRef(openLink);
+openLinkRef.current = openLink;
+
+useEffect(() =&gt; {
+  // Start up: read saved tokens, then open the link that launched the
+  // app, if any.
+  (async () =&gt; {
+    await account.load();
+    showAccount();
+    const initialLink = await Linking.getInitialURL();
+    if (initialLink) {
+      openLinkRef.current(initialLink);
+    }
+  })();
+
+  // A 256t link opened while the app is already running.
+  const subscription = Linking.addEventListener("url", ({ url }) =&gt; openLinkRef.current(url));
+  return () =&gt; subscription.remove();
+}, []);</code></pre>
+      </section>
+
+      <section class="card" id="run">
+        <h2>Run it</h2>
+        <p>
+          You need Node.js, plus Xcode for iOS or Android Studio for Android. Textpad uses its own
+          URL scheme, so it needs a <a href="https://docs.expo.dev/develop/development-builds/introduction/">development build</a>;
+          it can't run in Expo Go, which has a scheme of its own.
+        </p>
+        <pre><code>git clone https://github.com/curtcox/hashbin.org.git
+cd hashbin.org/examples/textpad-expo
+npm install
+npx expo run:ios        # or: npx expo run:android</code></pre>
+        <p>
+          The first run builds the native app, which takes a few minutes. After that, edits to the
+          JavaScript reload instantly.
+        </p>
+
+        <h3>Make your own app from it</h3>
+        <ol>
+          <li>
+            Pick a URL scheme from a domain you control, written backwards, for example
+            <code>com.example.notes</code>. Set it as <code>scheme</code>,
+            <code>ios.bundleIdentifier</code> and <code>android.package</code> in <code>app.json</code>.
+          </li>
+          <li>
+            Register an app on the <a href="/developers">Developers page</a> with the redirect URI
+            <code>com.example.notes://oauth</code>.
+          </li>
+          <li>In <code>App.js</code>, set <code>REDIRECT_URI</code> to that address and <code>CLIENT_ID</code> to your app's client ID.</li>
+          <li>Rebuild the native app (<code>npx expo prebuild --clean</code>, then <code>npx expo run:ios</code>), since the scheme is part of it.</li>
+        </ol>
+
+        <h3>Against a local HashBin server</h3>
+        <p>
+          Start the server with <code>npm run dev:local</code> in the repository root. On its
+          <a href="http://127.0.0.1:8787/developers">Developers page</a>, register an app with the
+          redirect URI <code>org.hashbin.textpad.expo://oauth</code>. Then run:
+        </p>
+        <pre><code>EXPO_PUBLIC_HASHBIN_URL=http://127.0.0.1:8787 \
+EXPO_PUBLIC_TEXTPAD_CLIENT_ID=&lt;client ID&gt; \
+npx expo run:ios</code></pre>
+        <p>
+          In the Android emulator, the computer is <code>10.0.2.2</code> instead of
+          <code>127.0.0.1</code>. Expo copies these variables into the app when it bundles the
+          JavaScript, so restart with <code>npx expo start --clear</code> after changing them.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Things to know</h2>
+        <ul>
+          <li><strong>Copied links point to the web.</strong> <em>Copy link</em> copies a link to the web version of Textpad, which opens in any browser on any device; pasting it into this app's <em>Open</em> field works too.</li>
+          <li><strong>Saving the same text again.</strong> Save stays disabled until the text changes. If edited text happens to match something already on HashBin, HashBin keeps the existing copy and extends how long it is kept, which is charged like a new save.</li>
+          <li><strong>Saves use the account's default retention.</strong> Apps cannot choose how long content is kept; users set their default on the account page.</li>
+          <li><strong>Android can close a backgrounded app.</strong> If the phone is very short of memory while the approval page is open, Android may close Textpad, and unsaved text would be lost. A production app could keep a draft in storage to guard against this.</li>
+        </ul>
+      </section>
+
+      <section class="card" id="source">
+        <h2>Full source</h2>
+        <h3>textpad.js</h3>
+        <pre class="full-source"><code class="source" data-file="textpad.js">// 256t strings, links and text decoding for Textpad.
+//
+// Nothing in this file uses React Native, so the same code runs in the app
+// and in plain Node.js tests (see src/docs-textpad-native.test.js in the
+// hashbin.org repository).
+
+// ----------------------------------------------------------------------
+// Finding a 256t string in a link
+// ----------------------------------------------------------------------
+
+// Textpad opens a 256t string from any of these:
+//   - its own deep link:     org.hashbin.textpad.expo://open?256t=&lt;cid&gt;
+//   - a web Textpad link:    https://hashbin.org/docs/textpad/app#256t=&lt;cid&gt;
+//   - a raw content link:    https://256t.us/&lt;cid&gt;
+//   - the bare 256t string:  &lt;cid&gt;
+// It returns null for a link that holds no 256t string, such as the
+// "org.hashbin.textpad.expo://oauth?code=…" link that ends a sign-in.
+export function cidFromText(text) {
+  const trimmed = text.trim();
+  const param = trimmed.match(/[#?&amp;]256t=([^&amp;#]*)/);
+  if (param) {
+    try {
+      return decodeURIComponent(param[1]);
+    } catch {
+      return param[1]; // A stray "%" can't be decoded; isValid256t rejects it.
+    }
+  }
+  const contentLink = trimmed.match(/^https:\/\/256t\.us\/([^/?#]*)/);
+  if (contentLink) {
+    return contentLink[1];
+  }
+  return trimmed.includes("://") ? null : trimmed;
+}
+
+// The query parameters of a link, such as the "code" and "state" that
+// HashBin adds when it sends the user back after sign-in. (React Native's
+// URL class doesn't support searchParams, so this is done by hand.)
+export function queryParams(link) {
+  const query = link.split("#")[0].split("?")[1] || "";
+  const params = {};
+  for (const pair of query.split("&amp;").filter(Boolean)) {
+    const [name, value = ""] = pair.split("=");
+    params[decodeURIComponent(name)] = decodeURIComponent(value.replace(/\+/g, " "));
+  }
+  return params;
+}
+
+// ----------------------------------------------------------------------
+// Checking a 256t string
+// ----------------------------------------------------------------------
+
+export function base64UrlToBytes(text) {
+  const base64 = text.replace(/-/g, "+").replace(/_/g, "/");
+  return Uint8Array.from(atob(base64), (char) =&gt; char.charCodeAt(0));
+}
+
+export function bytesToBase64Url(bytes) {
+  const base64 = btoa(String.fromCharCode(...bytes));
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+// A 256t string is base64url text in two parts:
+//   - 8 characters holding the content's length in bytes
+//     (a 6-byte big-endian number);
+//   - then the content itself if it is 64 bytes or less, or else the
+//     content's SHA-512 hash (always 86 characters).
+// Checking this up front gives a clear message for a mistyped or cut-off
+// link instead of a confusing "not found".
+export function contentLength(cid) {
+  return base64UrlToBytes(cid.slice(0, 8)).reduce((total, byte) =&gt; total * 256 + byte, 0);
+}
+
+export function isValid256t(cid) {
+  if (!/^[A-Za-z0-9_-]{8,94}$/.test(cid)) {
+    return false;
+  }
+  const length = contentLength(cid);
+  const expectedRest = length &lt;= 64 ? Math.ceil((length * 4) / 3) : 86;
+  return cid.length - 8 === expectedRest;
+}
+
+// Short texts are inside the 256t string itself, so there is nothing to
+// download: this returns their bytes, or null for longer content.
+export function inlineBytes(cid) {
+  return contentLength(cid) &lt;= 64 ? base64UrlToBytes(cid.slice(8)) : null;
+}
+
+// ----------------------------------------------------------------------
+// Turning bytes into text
+// ----------------------------------------------------------------------
+
+// Content on HashBin is just bytes. Textpad only opens bytes that are valid
+// UTF-8 text. React Native has no strict UTF-8 decoder, but
+// decodeURIComponent is one: given the bytes as %XX escapes, it throws on
+// anything that isn't valid UTF-8 instead of inserting replacement
+// characters. It also keeps a leading byte order mark, so saving unchanged
+// text gives back exactly the same bytes and 256t string.
+export function decodeText(bytes) {
+  let escaped = "";
+  for (const byte of bytes) {
+    escaped += byte &lt; 16 ? `%0${byte.toString(16)}` : `%${byte.toString(16)}`;
+  }
+  const text = decodeURIComponent(escaped);
+  // Valid UTF-8 can still be binary data; a NUL character is a reliable
+  // sign of that, and real text practically never contains one.
+  if (text.includes("\0")) {
+    throw new TypeError("Content contains NUL characters");
+  }
+  return text;
+}
+</code></pre>
+        <h3>hashbin.js</h3>
+        <pre class="full-source"><code class="source" data-file="hashbin.js">// A small HashBin OAuth client for React Native.
+//
+// It signs the user in with OAuth 2.0 and PKCE in the system browser, keeps
+// the tokens in the device's secure storage (the iOS Keychain or Android
+// Keystore), renews the access token when it expires, and calls the HashBin
+// API as the user. Copy this file into your own app and change the
+// options passed to the constructor.
+
+import * as Crypto from "expo-crypto";
+import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
+import { bytesToBase64Url, queryParams } from "./textpad";
+
+// Raised when the stored sign-in no longer works: it expired, or the user
+// revoked the app on their HashBin account page.
+export class NotConnectedError extends Error {}
+
+const TOKENS_KEY = "hashbin.tokens";
+
+// Renew the access token this long before it expires, so a request never
+// sets out with a token that runs out on the way.
+const EXPIRY_MARGIN_MS = 60 * 1000;
+
+export class HashBinAccount {
+  constructor({ clientId, redirectUri, baseUrl, scopes }) {
+    this.clientId = clientId;
+    this.redirectUri = redirectUri;
+    this.baseUrl = baseUrl;
+    this.scopes = scopes;
+    this.tokens = null; // { accessToken, refreshToken, expiresAt }
+    this.refreshing = null;
+  }
+
+  // Reads the tokens saved by an earlier run of the app.
+  async load() {
+    const saved = await SecureStore.getItemAsync(TOKENS_KEY);
+    this.tokens = saved ? JSON.parse(saved) : null;
+  }
+
+  isConnected() {
+    return Boolean(this.tokens?.refreshToken);
+  }
+
+  async saveTokens(response) {
+    this.tokens = {
+      accessToken: response.access_token,
+      refreshToken: response.refresh_token,
+      expiresAt: Date.now() + response.expires_in * 1000
+    };
+    await SecureStore.setItemAsync(TOKENS_KEY, JSON.stringify(this.tokens));
+  }
+
+  async clearTokens() {
+    this.tokens = null;
+    await SecureStore.deleteItemAsync(TOKENS_KEY);
+  }
+
+  // --------------------------------------------------------------------
+  // Signing in
+  // --------------------------------------------------------------------
+
+  // Opens HashBin's approval page in an in-app browser and waits for the
+  // user to come back. Resolves to "connected", "denied" (the user clicked
+  // Deny) or "cancelled" (the user closed the browser).
+  async connect() {
+    // PKCE: a random secret (the verifier) stays in the app, and only its
+    // SHA-256 hash (the challenge) goes into the sign-in link. Whoever
+    // exchanges the code for tokens must know the verifier, so a code
+    // intercepted on the way back to the app is useless to anyone else.
+    const verifier = bytesToBase64Url(Crypto.getRandomBytes(32));
+    const challenge = (await Crypto.digestStringAsync(
+      Crypto.CryptoDigestAlgorithm.SHA256,
+      verifier,
+      { encoding: Crypto.CryptoEncoding.BASE64 }
+    )).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    // "state" ties the reply to this request.
+    const state = bytesToBase64Url(Crypto.getRandomBytes(16));
+
+    const query = {
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      response_type: "code",
+      scope: this.scopes.join(" "),
+      state,
+      code_challenge: challenge,
+      code_challenge_method: "S256"
+    };
+    const authorizeUrl = `${this.baseUrl}/oauth/authorize?` + Object.entries(query)
+      .map(([name, value]) =&gt; `${name}=${encodeURIComponent(value)}`)
+      .join("&amp;");
+
+    // On iOS this is an ASWebAuthenticationSession, on Android a Chrome
+    // Custom Tab. It closes by itself when HashBin redirects to
+    // redirectUri, and hands that link back here.
+    const result = await WebBrowser.openAuthSessionAsync(authorizeUrl, this.redirectUri);
+    if (result.type !== "success") {
+      return "cancelled";
+    }
+
+    const params = queryParams(result.url);
+    if (params.state !== state) {
+      throw new Error("The reply from HashBin doesn't match this sign-in.");
+    }
+    if (params.error === "access_denied") {
+      return "denied";
+    }
+    if (params.error || !params.code) {
+      throw new Error(params.error || "HashBin didn't send an authorization code.");
+    }
+
+    // Trade the one-time code (plus the verifier) for tokens.
+    const response = await fetch(`${this.baseUrl}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        client_id: this.clientId,
+        redirect_uri: this.redirectUri,
+        code: params.code,
+        code_verifier: verifier
+      })
+    });
+    const body = await response.json().catch(() =&gt; ({}));
+    if (!response.ok) {
+      throw new Error(body.message || body.error || `HTTP ${response.status}`);
+    }
+    await this.saveTokens(body);
+    return "connected";
+  }
+
+  // Ends the app's access: forgets the tokens here and revokes the refresh
+  // token on the server, so a copy of it can't be used either.
+  async disconnect() {
+    const refreshToken = this.tokens?.refreshToken;
+    await this.clearTokens();
+    if (refreshToken) {
+      await fetch(`${this.baseUrl}/oauth/revoke`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: refreshToken, token_type_hint: "refresh_token" })
+      }).catch(() =&gt; {});
+    }
+  }
+
+  // --------------------------------------------------------------------
+  // Calling the API
+  // --------------------------------------------------------------------
+
+  // Access tokens last an hour. A refresh token gets a new one, and is
+  // itself replaced: each refresh token works only once. Calls that need a
+  // new token at the same moment share one refresh, because a second
+  // refresh with the same (by then used) token would fail.
+  refreshAccessToken() {
+    if (!this.refreshing) {
+      this.refreshing = this.renewTokens().finally(() =&gt; {
+        this.refreshing = null;
+      });
+    }
+    return this.refreshing;
+  }
+
+  async renewTokens() {
+    const response = await fetch(`${this.baseUrl}/oauth/token`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ grant_type: "refresh_token", refresh_token: this.tokens.refreshToken })
+    });
+    const body = await response.json().catch(() =&gt; ({}));
+    if (body.error === "invalid_grant") {
+      // Expired or revoked: the user has to approve the app again.
+      await this.clearTokens();
+      throw new NotConnectedError();
+    }
+    if (!response.ok) {
+      throw new Error(body.message || body.error || `HTTP ${response.status}`);
+    }
+    await this.saveTokens(body);
+  }
+
+  // fetch() for HashBin API paths, as the signed-in user.
+  async fetch(path, options = {}) {
+    if (!this.isConnected()) {
+      throw new NotConnectedError();
+    }
+    if (Date.now() &gt; this.tokens.expiresAt - EXPIRY_MARGIN_MS) {
+      await this.refreshAccessToken();
+      if (!this.isConnected()) {
+        throw new NotConnectedError(); // Disconnected while renewing.
+      }
+    }
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      ...options,
+      headers: { ...options.headers, authorization: `Bearer ${this.tokens.accessToken}` }
+    });
+    if (response.status === 401) {
+      await this.clearTokens();
+      throw new NotConnectedError();
+    }
+    return response;
+  }
+}
+</code></pre>
+        <h3>App.js</h3>
+        <pre class="full-source"><code class="source" data-file="App.js">// Textpad for Expo: open text from a 256t link, edit it, and save it to
+// the user's HashBin account.
+//
+// A walkthrough of this code is at https://hashbin.org/docs/textpad-expo
+
+import * as Clipboard from "expo-clipboard";
+import { StatusBar } from "expo-status-bar";
+import { useEffect, useRef, useState } from "react";
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  useColorScheme
+} from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { HashBinAccount, NotConnectedError } from "./hashbin";
+import { cidFromText, decodeText, inlineBytes, isValid256t } from "./textpad";
+
+// ----------------------------------------------------------------------
+// 1. Configuration
+// ----------------------------------------------------------------------
+
+// The HashBin service, and the domain that serves published content.
+// Development only: EXPO_PUBLIC_HASHBIN_URL points the app at a local
+// HashBin server (npm run dev:local), which serves content itself.
+const HASHBIN_URL = process.env.EXPO_PUBLIC_HASHBIN_URL || "https://hashbin.org";
+const CONTENT_URL = process.env.EXPO_PUBLIC_HASHBIN_URL || "https://256t.us";
+
+// The client ID from registering Textpad at https://hashbin.org/developers,
+// or EXPO_PUBLIC_TEXTPAD_CLIENT_ID for an app registered on a local server.
+const CLIENT_ID = process.env.EXPO_PUBLIC_TEXTPAD_CLIENT_ID || "app_1a74e62b-d752-4a3c-81af-5c850af18c5b";
+
+// HashBin sends the user back to this link after they approve Textpad. Its
+// scheme is the app's own ("scheme" in app.json), so the system hands the
+// link to this app. It must match a registered redirect URI exactly.
+const REDIRECT_URI = "org.hashbin.textpad.expo://oauth";
+
+// What Textpad asks the user to allow: publishing (billed to their
+// balance) and reading their balance so it can be shown.
+const SCOPES = ["content:write", "balance:read"];
+
+const account = new HashBinAccount({
+  clientId: CLIENT_ID,
+  redirectUri: REDIRECT_URI,
+  baseUrl: HASHBIN_URL,
+  scopes: SCOPES
+});
+
+export default function App() {
+  return (
+    &lt;SafeAreaProvider&gt;
+      &lt;Textpad /&gt;
+    &lt;/SafeAreaProvider&gt;
+  );
+}
+
+function Textpad() {
+  // --------------------------------------------------------------------
+  // 2. Screen state
+  // --------------------------------------------------------------------
+
+  // The text in the editor, and that text exactly as it was opened or last
+  // saved under the 256t string currentCid. Comparing the two tells us
+  // whether there are unsaved changes. savedText and currentCid are null
+  // for a new, unsaved text.
+  const [text, setText] = useState("");
+  const [savedText, setSavedText] = useState(null);
+  const [currentCid, setCurrentCid] = useState(null);
+
+  // Set while a load or save is running, to ignore extra taps.
+  const [busy, setBusy] = useState(false);
+
+  // The message above the editor: { text, error, actions: [{ label, onPress }] }
+  const [message, setMessage] = useState(null);
+
+  const [connected, setConnected] = useState(false);
+  const [accountLabel, setAccountLabel] = useState("");
+  const [linkField, setLinkField] = useState("");
+
+  const hasUnsavedChanges = text !== (savedText ?? "");
+
+  function showMessage(messageText, { error = false, actions = [] } = {}) {
+    setMessage({ text: messageText, error, actions });
+  }
+
+  function clearMessage() {
+    setMessage(null);
+  }
+
+  // Shows text in the editor as the saved version of cid.
+  function setDocument(cid, newText) {
+    setCurrentCid(cid);
+    setText(newText);
+    setSavedText(newText);
+  }
+
+  // --------------------------------------------------------------------
+  // 3. Opening a 256t link
+  // --------------------------------------------------------------------
+
+  // Asks before throwing away unsaved changes. Resolves to true to go on.
+  function confirmDiscard() {
+    if (!hasUnsavedChanges) {
+      return Promise.resolve(true);
+    }
+    return new Promise((resolve) =&gt; {
+      Alert.alert("Discard your unsaved changes?", undefined, [
+        { text: "Keep editing", style: "cancel", onPress: () =&gt; resolve(false) },
+        { text: "Discard", style: "destructive", onPress: () =&gt; resolve(true) }
+      ]);
+    });
+  }
+
+  // Opens a deep link, a web Textpad link, a 256t.us link or a bare 256t
+  // string. fromUser is true when it came from the "Open" field, where a
+  // link without a 256t string deserves a message rather than silence.
+  async function openLink(link, { fromUser = false } = {}) {
+    const cid = cidFromText(link);
+    if (cid === null) {
+      if (fromUser) {
+        showMessage("That link doesn't contain a 256t string.", { error: true });
+      }
+      return;
+    }
+    if (busy || !(await confirmDiscard())) {
+      return;
+    }
+    setLinkField("");
+    await openCid(cid);
+  }
+
+  async function openCid(cid) {
+    // Whatever happens below, don't leave the previous text on screen as if
+    // it belonged to this link.
+    setDocument(null, "");
+    clearMessage();
+
+    if (cid === "") {
+      showMessage("This link has \"256t=\" but no 256t string after it.", { error: true });
+      return;
+    }
+    if (!isValid256t(cid)) {
+      const shown = cid.length &gt; 100 ? `${cid.slice(0, 100)}…` : cid;
+      showMessage(`"${shown}" isn't a valid 256t string. Check that the link was copied completely.`, { error: true });
+      return;
+    }
+
+    // Short texts are inside the 256t string itself.
+    const inline = inlineBytes(cid);
+    if (inline) {
+      showText(cid, inline);
+      return;
+    }
+
+    setBusy(true);
+    showMessage("Loading…");
+    try {
+      let response;
+      try {
+        response = await fetch(`${CONTENT_URL}/${cid}`);
+      } catch {
+        showMessage("Couldn't reach HashBin to load this text. Check your connection and try again.", { error: true });
+        return;
+      }
+
+      if (response.status === 404) {
+        showMessage("Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved.", { error: true });
+        return;
+      }
+      if (response.status === 451) {
+        showMessage("This text is unavailable while a dispute about it is reviewed.", { error: true });
+        return;
+      }
+      // Each stored text has a download allowance; when it runs out, 256t.us answers 429.
+      if (response.status === 429) {
+        showMessage("HashBin is limiting how often this text can be downloaded. Try again later.", { error: true });
+        return;
+      }
+      if (!response.ok) {
+        showMessage(`HashBin couldn't return this text (HTTP ${response.status}). Try again later.`, { error: true });
+        return;
+      }
+
+      showText(cid, new Uint8Array(await response.arrayBuffer()));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function showText(cid, bytes) {
+    try {
+      setDocument(cid, decodeText(bytes));
+      clearMessage();
+    } catch {
+      showMessage("This 256t string points to content that isn't text, so Textpad can't open it.", { error: true });
+    }
+  }
+
+  // --------------------------------------------------------------------
+  // 4. The user's HashBin account
+  // --------------------------------------------------------------------
+
+  async function showAccount() {
+    const isConnected = account.isConnected();
+    setConnected(isConnected);
+    if (!isConnected) {
+      setAccountLabel("Not connected to HashBin");
+      return;
+    }
+    setAccountLabel("Connected to HashBin");
+    try {
+      const response = await account.fetch("/api/balance");
+      if (response.ok) {
+        const { balance_cents } = await response.json();
+        setAccountLabel(`HashBin balance: $${(balance_cents / 100).toFixed(2)}`);
+      }
+    } catch (error) {
+      if (error instanceof NotConnectedError) {
+        showAccount();
+      }
+    }
+  }
+
+  async function disconnect() {
+    await account.disconnect();
+    showAccount();
+  }
+
+  // --------------------------------------------------------------------
+  // 5. Saving text
+  // --------------------------------------------------------------------
+
+  async function save() {
+    if (busy || !hasUnsavedChanges || text === "") {
+      return;
+    }
+    // The editor is read-only while busy, so this is what gets saved.
+    const textToSave = text;
+    setBusy(true);
+    try {
+      // The first save asks the user to approve Textpad. Unlike a web page,
+      // the app keeps running while the browser is open, so nothing has to
+      // be stored to survive the trip.
+      if (!account.isConnected()) {
+        showMessage("Waiting for you to approve Textpad on HashBin…");
+        const outcome = await account.connect();
+        showAccount();
+        if (outcome === "denied") {
+          showMessage("You didn't approve Textpad on HashBin, so nothing was saved.", { error: true });
+          return;
+        }
+        if (outcome === "cancelled") {
+          clearMessage();
+          return;
+        }
+      }
+
+      showMessage("Saving…");
+      // The request body is the text itself. Uploads made with an OAuth
+      // app are kept for the user's default retention period (set on their
+      // HashBin account page) and charged to their balance. Texts of 64
+      // bytes or less are stored inside the 256t string and are free.
+      const response = await account.fetch("/api/content", {
+        method: "POST",
+        headers: { "content-type": "text/plain; charset=utf-8" },
+        body: textToSave
+      });
+      const result = await response.json().catch(() =&gt; ({}));
+
+      if (!response.ok) {
+        if (result.error === "insufficient_balance") {
+          showMessage(result.message || "Your HashBin balance is too low to save this.", {
+            error: true,
+            actions: [{ label: "Add funds", onPress: () =&gt; Linking.openURL(`${HASHBIN_URL}/deposit.html`) }]
+          });
+        } else {
+          showMessage(`Saving failed: ${result.message || result.error || `HTTP ${response.status}`}`, { error: true });
+        }
+        return;
+      }
+
+      setCurrentCid(result.cid);
+      setSavedText(textToSave);
+      const expires = result.expires_at
+        ? ` Kept until ${new Date(result.expires_at).toLocaleDateString()}.`
+        : "";
+      showMessage(`Saved.${expires}`, {
+        actions: [
+          { label: "Copy link", onPress: () =&gt; copyLink(result.cid) },
+          { label: "View raw text", onPress: () =&gt; Linking.openURL(`${CONTENT_URL}/${result.cid}`) }
+        ]
+      });
+      showAccount();
+    } catch (error) {
+      if (error instanceof NotConnectedError) {
+        showAccount();
+        showMessage("Your HashBin connection has ended. Tap Save to connect again.", { error: true });
+      } else {
+        showMessage(`Saving failed: ${error.message}`, { error: true });
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // A link to the web version of Textpad opens the text in any browser,
+  // and pasting it into this app's "Open" field works too.
+  async function copyLink(cid) {
+    await Clipboard.setStringAsync(`${HASHBIN_URL}/docs/textpad/app#256t=${cid}`);
+    showMessage("Link copied. Anyone with it can read this text.");
+  }
+
+  async function newDocument() {
+    if (busy || !(await confirmDiscard())) {
+      return;
+    }
+    setDocument(null, "");
+    clearMessage();
+  }
+
+  // --------------------------------------------------------------------
+  // 6. Wiring it together
+  // --------------------------------------------------------------------
+
+  // The link listener below is set up once, but openLink changes with
+  // every render (it reads the current text). The ref always holds the
+  // latest one.
+  const openLinkRef = useRef(openLink);
+  openLinkRef.current = openLink;
+
+  useEffect(() =&gt; {
+    // Start up: read saved tokens, then open the link that launched the
+    // app, if any.
+    (async () =&gt; {
+      await account.load();
+      showAccount();
+      const initialLink = await Linking.getInitialURL();
+      if (initialLink) {
+        openLinkRef.current(initialLink);
+      }
+    })();
+
+    // A 256t link opened while the app is already running.
+    const subscription = Linking.addEventListener("url", ({ url }) =&gt; openLinkRef.current(url));
+    return () =&gt; subscription.remove();
+  }, []);
+
+  // --------------------------------------------------------------------
+  // 7. The screen
+  // --------------------------------------------------------------------
+
+  const colors = useColorScheme() === "dark" ? darkColors : lightColors;
+  const styles = makeStyles(colors);
+
+  let savedState = "";
+  if (currentCid &amp;&amp; !hasUnsavedChanges) {
+    savedState = `Saved as 256t:${currentCid.slice(0, 12)}…`;
+  } else if (currentCid) {
+    savedState = "Unsaved changes";
+  } else if (text) {
+    savedState = "Not saved yet";
+  }
+
+  return (
+    &lt;SafeAreaView style={styles.screen}&gt;
+      &lt;StatusBar style="auto" /&gt;
+      &lt;KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === "ios" ? "padding" : undefined}&gt;
+        &lt;View style={styles.header}&gt;
+          &lt;Text style={styles.title}&gt;Textpad&lt;/Text&gt;
+          &lt;Text style={styles.muted} numberOfLines={1}&gt;{accountLabel}&lt;/Text&gt;
+          {connected &amp;&amp; &lt;Button styles={styles} label="Disconnect" onPress={disconnect} /&gt;}
+        &lt;/View&gt;
+
+        &lt;View style={styles.row}&gt;
+          &lt;TextInput
+            style={[styles.input, styles.linkField]}
+            value={linkField}
+            onChangeText={setLinkField}
+            placeholder="Paste a 256t string or link"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="go"
+            onSubmitEditing={() =&gt; openLink(linkField, { fromUser: true })}
+          /&gt;
+          &lt;Button
+            styles={styles}
+            label="Open"
+            disabled={busy || !linkField.trim()}
+            onPress={() =&gt; openLink(linkField, { fromUser: true })}
+          /&gt;
+        &lt;/View&gt;
+
+        {message &amp;&amp; (
+          &lt;View style={[styles.message, message.error &amp;&amp; styles.error]} accessibilityLiveRegion="polite"&gt;
+            &lt;Text style={styles.messageText}&gt;{message.text}&lt;/Text&gt;
+            {message.actions.length &gt; 0 &amp;&amp; (
+              &lt;View style={styles.actions}&gt;
+                {message.actions.map((action) =&gt; (
+                  &lt;Pressable key={action.label} onPress={action.onPress} accessibilityRole="link"&gt;
+                    &lt;Text style={styles.link}&gt;{action.label}&lt;/Text&gt;
+                  &lt;/Pressable&gt;
+                ))}
+              &lt;/View&gt;
+            )}
+          &lt;/View&gt;
+        )}
+
+        &lt;TextInput
+          style={[styles.input, styles.editor]}
+          value={text}
+          onChangeText={setText}
+          editable={!busy}
+          multiline
+          textAlignVertical="top"
+          placeholder="Type or paste text here."
+          placeholderTextColor={colors.muted}
+          accessibilityLabel="Text"
+        /&gt;
+
+        &lt;View style={styles.row}&gt;
+          &lt;Text style={[styles.muted, styles.savedState]} numberOfLines={1}&gt;{savedState}&lt;/Text&gt;
+          &lt;Button styles={styles} label="New" disabled={busy} onPress={newDocument} /&gt;
+          &lt;Button
+            styles={styles}
+            label="Save"
+            primary
+            disabled={busy || !hasUnsavedChanges || text === ""}
+            onPress={save}
+          /&gt;
+        &lt;/View&gt;
+      &lt;/KeyboardAvoidingView&gt;
+    &lt;/SafeAreaView&gt;
+  );
+}
+
+function Button({ styles, label, onPress, disabled = false, primary = false }) {
+  return (
+    &lt;Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      style={({ pressed }) =&gt; [
+        styles.button,
+        primary &amp;&amp; styles.primaryButton,
+        (disabled || pressed) &amp;&amp; styles.dimmed
+      ]}
+    &gt;
+      &lt;Text style={[styles.buttonText, primary &amp;&amp; styles.primaryButtonText]}&gt;{label}&lt;/Text&gt;
+    &lt;/Pressable&gt;
+  );
+}
+
+const lightColors = {
+  background: "#ffffff",
+  text: "#1f2328",
+  muted: "#656d76",
+  border: "#d0d7de",
+  accent: "#0969da",
+  error: "#cf222e",
+  errorBackground: "#ffebe9",
+  messageBackground: "#f6f8fa"
+};
+
+const darkColors = {
+  background: "#0d1117",
+  text: "#e6edf3",
+  muted: "#8d96a0",
+  border: "#30363d",
+  accent: "#4493f8",
+  error: "#f85149",
+  errorBackground: "#2d1214",
+  messageBackground: "#161b22"
+};
+
+function makeStyles(colors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.background },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 8 },
+    title: { fontSize: 20, fontWeight: "700", color: colors.text },
+    muted: { flex: 1, color: colors.muted },
+    row: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingVertical: 8 },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      color: colors.text,
+      fontSize: 16
+    },
+    linkField: { flex: 1 },
+    editor: { flex: 1, marginHorizontal: 16, fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace" },
+    message: {
+      marginHorizontal: 16,
+      marginBottom: 8,
+      padding: 10,
+      borderRadius: 6,
+      backgroundColor: colors.messageBackground,
+      gap: 8
+    },
+    error: { backgroundColor: colors.errorBackground },
+    messageText: { color: colors.text },
+    actions: { flexDirection: "row", gap: 16 },
+    link: { color: colors.accent, fontWeight: "600" },
+    savedState: { fontSize: 13 },
+    button: { borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 8 },
+    primaryButton: { backgroundColor: colors.accent, borderColor: colors.accent },
+    buttonText: { color: colors.text, fontWeight: "600" },
+    primaryButtonText: { color: "#ffffff" },
+    dimmed: { opacity: 0.5 }
+  });
+}
+</code></pre>
+        <h3>app.json</h3>
+        <pre class="full-source"><code class="source" data-file="app.json">{
+  "expo": {
+    "name": "Textpad",
+    "slug": "textpad-expo",
+    "version": "1.0.0",
+    "scheme": "org.hashbin.textpad.expo",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "org.hashbin.textpad.expo"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "org.hashbin.textpad.expo"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-web-browser",
+      "expo-secure-store"
+    ]
+  }
+}
+</code></pre>
+        <h3>package.json</h3>
+        <pre class="full-source"><code class="source" data-file="package.json">{
+  "name": "textpad-expo",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "expo": "~57.0.27",
+    "expo-clipboard": "~57.0.2",
+    "expo-crypto": "~57.0.3",
+    "expo-secure-store": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "~57.0.3",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web"
+  },
+  "private": true
+}
+</code></pre>
+      </section>
+    </div>
+  </main>
+
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> |
+      <a href="/docs/index.html">Docs</a> |
+      <a href="/docs/sdk.html">SDK</a> |
+      <a href="/developers">Developers</a> |
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

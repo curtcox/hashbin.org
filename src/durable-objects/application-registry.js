@@ -22,7 +22,7 @@ function validateAppFields(data) {
     }
     for (const uri of data.redirect_uris) {
       if (!isAllowedRedirectUri(uri)) {
-        return fail(`Invalid redirect_uri: must be an https URL (or http://localhost) without a fragment`);
+        return fail(`Invalid redirect_uri: must be an https URL, http://localhost, or a native app scheme such as org.example.app:/oauth, without a fragment`);
       }
     }
   }
@@ -42,14 +42,33 @@ function isHttpsUrl(value) {
   }
 }
 
+// Native apps (iOS, Android, desktop) can't receive a redirect to an https
+// page, so they register a private-use URI scheme named after a domain they
+// control, in reverse order: "org.example.app:/oauth" (RFC 8252 section 7.1).
+// Requiring a dot keeps out schemes such as javascript:, data: and file:.
+const PRIVATE_USE_SCHEME = /^[a-z][a-z0-9+-]*(\.[a-z0-9+-]+)+:$/;
+
 function isAllowedRedirectUri(value) {
   try {
     const url = new URL(value);
     if (url.hash) return false;
     if (url.protocol === 'https:') return true;
-    return url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    if (url.protocol === 'http:') return ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    return PRIVATE_USE_SCHEME.test(url.protocol) && !url.username && !url.password;
   } catch {
     return false;
+  }
+}
+
+// The web origin a redirect URI belongs to, for CORS. Native app schemes have
+// none: their URL origin is the string "null", which is also the Origin that
+// sandboxed iframes and file: pages send, so it must never be trusted.
+function webOrigin(redirectUri) {
+  try {
+    const url = new URL(redirectUri);
+    return ['https:', 'http:'].includes(url.protocol) ? url.origin : null;
+  } catch {
+    return null;
   }
 }
 
@@ -247,13 +266,7 @@ export class ApplicationRegistry {
         return false;
       }
 
-      return app.redirect_uris.some((redirectUri) => {
-        try {
-          return new URL(redirectUri).origin === origin;
-        } catch (_error) {
-          return false;
-        }
-      });
+      return app.redirect_uris.some((redirectUri) => webOrigin(redirectUri) === origin);
     });
 
     return new Response(JSON.stringify({ allowed }), {

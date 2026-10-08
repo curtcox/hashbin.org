@@ -526,7 +526,7 @@ key; OAuth access tokens are refused.
 - `DELETE /api/developers/apps/{app_id}`: delete the app. Users can't authorize it anymore, refresh
   tokens stop working, and issued access tokens expire within an hour.
 
-Redirect URIs must be `https://` (or `http://localhost` for development) and have no fragment; at most 10.
+Redirect URIs must be `https://` (or `http://localhost` / `http://127.0.0.1` for development), or a native app scheme named after a reversed domain such as `org.example.app://oauth` (RFC 8252), and have no fragment; at most 10.
 App names are 1–100 characters. Apps you don't own answer 404.
 
 ---

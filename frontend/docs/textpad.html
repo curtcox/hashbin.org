@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- Generated from scripts/docs/textpad-doc.template.html by scripts/docs/generate-textpad-doc.py; edit those, not this file. -->
+<!-- Generated from scripts/docs/textpad-doc.template.html by scripts/docs/generate-textpad-docs.py; edit those, not this file. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -66,6 +66,10 @@
           <li><strong>Pay with the user's account:</strong> saving is billed to the user's own HashBin balance. They approve Textpad once on hashbin.org and stay connected on later visits.</li>
           <li><strong>Explain problems:</strong> a malformed 256t string, one with nothing stored under it, or content that isn't text each gets its own clear message.</li>
         </ul>
+        <p>
+          Textpad is also available as an iOS and Android app, built with
+          <a href="/docs/textpad-expo">Expo</a> or <a href="/docs/textpad-flutter">Flutter</a>.
+        </p>
         <p><a class="btn btn-primary launch" href="/docs/textpad/app">Open Textpad</a></p>
       </section>
 
@@ -115,6 +119,7 @@
             <tr><td>The URL ends in <code>#256t=</code> with nothing after it</td><td>"This link has "#256t=" but no 256t string after it."</td></tr>
             <tr><td>256t.us answers 404: never saved, expired, or deleted</td><td>"Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved."</td></tr>
             <tr><td>256t.us answers 451: the content is under dispute</td><td>"This text is unavailable while a dispute about it is reviewed."</td></tr>
+            <tr><td>256t.us answers 429: the text has used up its download allowance</td><td>"HashBin is limiting how often this text can be downloaded. Try again later."</td></tr>
             <tr><td>The content isn't valid UTF-8, or contains NUL characters (binary data)</td><td>"This 256t string points to content that isn't text, so Textpad can't open it."</td></tr>
             <tr><td>The network request fails</td><td>"Couldn't reach HashBin to load this text…"</td></tr>
             <tr><td>The user declines on the HashBin approval page</td><td>"You didn't approve Textpad on HashBin, so nothing was saved." Their edits are kept.</td></tr>
@@ -142,8 +147,8 @@
           configuration names the app (its client ID), where HashBin is, and the redirect URI that
           HashBin sends the user back to after they approve Textpad.
         </p>
-        <pre><code class="excerpt">import { HashBinClient } from "/sdk/hashbin.js";</code></pre>
-        <pre><code class="excerpt">// The client ID from registering Textpad at https://hashbin.org/developers
+        <pre><code class="excerpt" data-file="app.html">import { HashBinClient } from "/sdk/hashbin.js";</code></pre>
+        <pre><code class="excerpt" data-file="app.html">// The client ID from registering Textpad at https://hashbin.org/developers
 let CLIENT_ID = "app_1a74e62b-d752-4a3c-81af-5c850af18c5b";
 // The HashBin service, and the domain that serves published content.
 let HASHBIN_URL = "https://hashbin.org";
@@ -189,7 +194,7 @@ const hb = new HashBinClient({
           with the editor tells it whether there are unsaved changes, which decides whether Save is
           enabled and whether to warn before leaving.
         </p>
-        <pre><code class="excerpt">// Shows text in the editor as the saved version of currentCid.
+        <pre><code class="excerpt" data-file="app.html">// Shows text in the editor as the saved version of currentCid.
 function setDocument(cid, text) {
   currentCid = cid;
   editor.value = text;
@@ -205,7 +210,7 @@ function setDocument(cid, text) {
           Textpad keeps the 256t string in the URL fragment: <code>app#256t=&lt;string&gt;</code>. The
           fragment is never sent to a server, and changing it doesn't reload the page.
         </p>
-        <pre><code class="excerpt">function cidFromUrl() {
+        <pre><code class="excerpt" data-file="app.html">function cidFromUrl() {
   const match = location.hash.match(/^#256t=(.*)$/);
   if (!match) {
     return null;
@@ -222,7 +227,7 @@ function setDocument(cid, text) {
           SHA-512 hash, which is always 86 characters. Checking that the two parts agree catches
           typos and truncated links before any network request is made:
         </p>
-        <pre><code class="excerpt">function base64UrlToBytes(text) {
+        <pre><code class="excerpt" data-file="app.html">function base64UrlToBytes(text) {
   const base64 = text.replace(/-/g, "+").replace(/_/g, "/");
   return Uint8Array.from(atob(base64), (char) =&gt; char.charCodeAt(0));
 }
@@ -252,7 +257,7 @@ function isValid256t(cid) {
           HashBin stores bytes, not text. Textpad decodes them as UTF-8 in strict mode, so anything
           that isn't text is refused instead of being shown as garbled characters:
         </p>
-        <pre><code class="excerpt">// Content on HashBin is just bytes. Textpad only opens bytes that are
+        <pre><code class="excerpt" data-file="app.html">// Content on HashBin is just bytes. Textpad only opens bytes that are
 // valid UTF-8 text. "fatal: true" makes the decoder throw on anything
 // else instead of quietly inserting replacement characters, and
 // "ignoreBOM: true" keeps a leading byte order mark so that saving
@@ -271,7 +276,7 @@ function decodeText(bytes) {
           downloads a longer one from <code>https://256t.us/&lt;string&gt;</code>. Downloading needs
           no account and no token. Each failure gets its own message:
         </p>
-        <pre><code class="excerpt">async function loadFromUrl() {
+        <pre><code class="excerpt" data-file="app.html">async function loadFromUrl() {
   const cid = cidFromUrl();
   clearMessage();
 
@@ -321,6 +326,11 @@ function decodeText(bytes) {
       showMessage("This text is unavailable while a dispute about it is reviewed.", { error: true });
       return;
     }
+    // Each stored text has a download allowance; when it runs out, 256t.us answers 429.
+    if (response.status === 429) {
+      showMessage("HashBin is limiting how often this text can be downloaded. Try again later.", { error: true });
+      return;
+    }
     if (!response.ok) {
       showMessage(`HashBin couldn't return this text (HTTP ${response.status}). Try again later.`, { error: true });
       return;
@@ -341,7 +351,7 @@ function decodeText(bytes) {
           trades the one-time code for tokens through the SDK, restores the text, and returns it so
           the save can carry on.
         </p>
-        <pre><code class="excerpt">const DRAFT_KEY = "textpad:draft:";
+        <pre><code class="excerpt" data-file="app.html">const DRAFT_KEY = "textpad:draft:";
 
 function isConnected() {
   return Boolean(hb.getTokens()?.refreshToken);
@@ -399,7 +409,7 @@ async function finishSignIn() {
           401 response means the user revoked Textpad, so Textpad forgets the tokens and asks them to
           connect again.
         </p>
-        <pre><code class="excerpt">// Raised when the stored sign-in no longer works (it expired, or the user
+        <pre><code class="excerpt" data-file="app.html">// Raised when the stored sign-in no longer works (it expired, or the user
 // revoked Textpad on their HashBin account page).
 class NotConnectedError extends Error {}
 
@@ -429,7 +439,7 @@ async function api(path, options) {
           <code>history.pushState</code>, so the browser's Back button returns to the previous
           version.
         </p>
-        <pre><code class="excerpt">async function save() {
+        <pre><code class="excerpt" data-file="app.html">async function save() {
   if (busy || !hasUnsavedChanges() || editor.value === "") {
     return;
   }
@@ -500,7 +510,7 @@ async function api(path, options) {
           URL points to. Listeners, not shown here, handle Back and Forward, pasted links, the
           New button, <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>S</kbd>, and the unsaved-changes warning.
         </p>
-        <pre><code class="excerpt">// Start up: finish a sign-in if HashBin just sent the user back, then
+        <pre><code class="excerpt" data-file="app.html">// Start up: finish a sign-in if HashBin just sent the user back, then
 // either carry on with the save they asked for or load the URL's text.
 const draft = await finishSignIn();
 shownHash = location.hash;

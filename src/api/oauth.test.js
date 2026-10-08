@@ -207,6 +207,50 @@ describe('OAuth API', () => {
     expect(redirectUrl.searchParams.get('code')).toBeTruthy();
   });
 
+  it('signs a native app in through its private-use URI scheme', async () => {
+    const redirectUri = 'org.example.textpad://oauth';
+    const app = await (await handleCreateDeveloperApp(new Request('https://hashbin.test/api/developers/apps', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: 'LocalDev developer_user' },
+      body: JSON.stringify({ app_name: 'Native App', redirect_uris: [redirectUri] })
+    }), env)).json();
+    expect(app.redirect_uris).toEqual([redirectUri]);
+
+    const codeVerifier = 'verifier-value-for-tests-1234567890';
+    const authorizeResponse = await handleOAuthAuthorize(new Request('https://hashbin.test/oauth/authorize', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json', authorization: 'LocalDev user_authorizing' },
+      body: JSON.stringify({
+        client_id: app.client_id,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'content:write',
+        state: 'native-state',
+        code_challenge: await createPkceChallenge(codeVerifier),
+        code_challenge_method: 'S256'
+      })
+    }), env);
+
+    const { redirect_to } = await authorizeResponse.json();
+    expect(redirect_to.startsWith(`${redirectUri}?`)).toBe(true);
+    const params = new URL(redirect_to).searchParams;
+    expect(params.get('state')).toBe('native-state');
+
+    const tokenResponse = await handleOAuthToken(new Request('https://hashbin.test/oauth/token', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        client_id: app.client_id,
+        code: params.get('code'),
+        redirect_uri: redirectUri,
+        code_verifier: codeVerifier
+      })
+    }), env);
+    expect(tokenResponse.status).toBe(200);
+    expect((await tokenResponse.json()).refresh_token).toBeTruthy();
+  });
+
   it('stores a requested spending limit on the grant and rejects invalid ones', async () => {
     const app = await (await handleCreateDeveloperApp(new Request('https://hashbin.test/api/developers/apps', {
       method: 'POST',

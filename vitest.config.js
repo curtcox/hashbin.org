@@ -3,12 +3,21 @@
  * Uses standard Node.js environment for simple unit tests
  */
 
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+
+const expoStubs = fileURLToPath(new URL('./test-utils/expo-stubs.js', import.meta.url));
 
 export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    // The Expo example app's modules only run inside React Native.
+    alias: {
+      'expo-crypto': expoStubs,
+      'expo-secure-store': expoStubs,
+      'expo-web-browser': expoStubs,
+    },
     exclude: [
       '**/node_modules/**',
       '**/dist/**',

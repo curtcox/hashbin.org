@@ -374,6 +374,11 @@
           showMessage("This text is unavailable while a dispute about it is reviewed.", { error: true });
           return;
         }
+        // Each stored text has a download allowance; when it runs out, 256t.us answers 429.
+        if (response.status === 429) {
+          showMessage("HashBin is limiting how often this text can be downloaded. Try again later.", { error: true });
+          return;
+        }
         if (!response.ok) {
           showMessage(`HashBin couldn't return this text (HTTP ${response.status}). Try again later.`, { error: true });
           return;

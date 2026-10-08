@@ -138,9 +138,14 @@
           lets the user edit it, and saves it to their HashBin account through OAuth. The walkthrough
           explains every part of the code, so it makes a good starting point for your own app.
         </p>
-        <p style="margin-bottom: 0;">
+        <p style="margin-bottom: 0.75rem;">
           <a href="/docs/textpad">Read the Textpad walkthrough</a> &middot;
           <a href="/docs/textpad/app">Open Textpad</a>
+        </p>
+        <p style="margin-bottom: 0;">
+          Building a phone app? Textpad is also available for
+          <a href="/docs/textpad-expo">Expo (React Native)</a> and
+          <a href="/docs/textpad-flutter">Flutter</a>, with the same features.
         </p>
       </div>
     </section>
@@ -210,7 +215,7 @@
           <label>
             <span>Redirect URIs</span>
             <textarea id="redirect-uris" required placeholder="https://your-username.github.io/your-repo/callback.html"></textarea>
-            <small>One URI per line. Must be HTTPS, except <code>http://localhost</code> and <code>http://127.0.0.1</code> for development, and must not contain a <code>#</code> fragment. These are the URLs HashBin will redirect to after the user approves your app.</small>
+            <small>One URI per line. Must be HTTPS, except <code>http://localhost</code> and <code>http://127.0.0.1</code> for development, and must not contain a <code>#</code> fragment. Phone and desktop apps can use their own URL scheme named after a domain you control, such as <code>org.example.myapp://oauth</code>. These are the URLs HashBin will redirect to after the user approves your app.</small>
           </label>
           <button type="submit" class="btn btn-primary">Register</button>
           <p id="registration-status" class="developers-status"></p>

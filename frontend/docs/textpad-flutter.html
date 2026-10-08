@@ -1,0 +1,1790 @@
+<!DOCTYPE html>
+<!-- Generated from scripts/docs/textpad-flutter-doc.template.html by scripts/docs/generate-textpad-docs.py; edit those, not this file. -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Textpad for Flutter: a documented Flutter app that opens, edits and saves text on HashBin.org">
+  <title>Textpad for Flutter - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <style>
+    .textpad-doc pre {
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .textpad-doc code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .textpad-doc :not(pre) > code,
+    .textpad-doc td,
+    .textpad-doc th { overflow-wrap: anywhere; }
+    .textpad-doc section.card { margin-bottom: 2rem; }
+    .textpad-doc h3 { margin-top: 1.5rem; }
+    .textpad-doc ul, .textpad-doc ol { margin-left: 1.5rem; line-height: 1.7; }
+    .textpad-doc table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    .textpad-doc th, .textpad-doc td {
+      text-align: left;
+      vertical-align: top;
+      padding: 0.5rem 1rem 0.5rem 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    .textpad-doc .full-source { max-height: 70vh; }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main>
+    <div class="container textpad-doc">
+      <h1>Textpad for Flutter</h1>
+
+      <section class="card">
+        <h2>What it is</h2>
+        <p>
+          This is <a href="/docs/textpad">Textpad</a>, HashBin's example text editor, rebuilt as an
+          iOS and Android app with <a href="https://flutter.dev">Flutter</a>. It does the same things
+          as the web version, and this page explains the parts that work differently on a phone.
+          There is also an <a href="/docs/textpad-expo">Expo version</a>.
+        </p>
+        <ul>
+          <li><strong>Open:</strong> a link such as <code>org.hashbin.textpad.flutter://open?256t=&lt;256t string&gt;</code> opens Textpad with that text. Users can also paste a 256t string, a 256t.us link or a web Textpad link into the <em>Open</em> field.</li>
+          <li><strong>Edit and save:</strong> Save publishes the text to the user's HashBin account. <em>Copy link</em> then copies a link that opens the text in any browser.</li>
+          <li><strong>Pay with the user's account:</strong> the user approves Textpad once on hashbin.org, inside the app, and stays connected.</li>
+          <li><strong>Explain problems:</strong> a malformed 256t string, one with nothing stored under it, or content that isn't text each gets its own message.</li>
+        </ul>
+        <p>
+          The project is in the HashBin repository at
+          <a href="https://github.com/curtcox/hashbin.org/tree/main/examples/textpad-flutter">examples/textpad-flutter</a>.
+          The code is in three files under <code>lib/</code>:
+        </p>
+        <table>
+          <tbody>
+            <tr><td><code>textpad.dart</code></td><td>256t strings, links and text decoding. Plain Dart, tested in <code>test/textpad_test.dart</code>.</td></tr>
+            <tr><td><code>hashbin.dart</code></td><td>A small HashBin OAuth client: sign-in, token storage and renewal, and API calls. Copy it into your own app. Tested in <code>test/hashbin_test.dart</code>.</td></tr>
+            <tr><td><code>main.dart</code></td><td>The screen, and what happens when the user taps something.</td></tr>
+          </tbody>
+        </table>
+        <p>
+          It uses these packages: <code>http</code>, <code>crypto</code> (for PKCE),
+          <code>flutter_web_auth_2</code> (the sign-in browser), <code>flutter_secure_storage</code>
+          (tokens), <code>app_links</code> (incoming links) and <code>url_launcher</code> (opening
+          web pages).
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Try it</h2>
+        <p>
+          <a href="#run">Install the app</a> on a phone or simulator first. These links then open in
+          it; short texts need no account, because they are stored inside the 256t string itself.
+        </p>
+        <table>
+          <thead><tr><th>Link</th><th>What you'll see</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><a href="org.hashbin.textpad.flutter://open?256t=AAAAAAAtSGVsbG8gZnJvbSBUZXh0cGFkISBFZGl0IG1lLCB0aGVuIGNsaWNrIFNhdmUu">A short text</a></td>
+              <td>"Hello from Textpad! Edit me, then click Save." Edit it and tap Save to try saving.</td>
+            </tr>
+            <tr>
+              <td><a href="org.hashbin.textpad.flutter://open?256t=not-a-real-256t-string">A malformed 256t string</a></td>
+              <td>An error saying the string isn't a valid 256t string.</td>
+            </tr>
+            <tr>
+              <td><a href="org.hashbin.textpad.flutter://open?256t=AAAAAAAE__4AAQ">Content that isn't text</a></td>
+              <td>An error saying the content isn't text.</td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          In the simulator you can open a link from a terminal:
+          <code>xcrun simctl openurl booted "org.hashbin.textpad.flutter://open?256t=…"</code> on iOS, or
+          <code>adb shell am start -a android.intent.action.VIEW -d "org.hashbin.textpad.flutter://open?256t=…"</code>
+          on Android.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Signing in from an app</h2>
+        <p>
+          A phone app signs in to HashBin with the same OAuth 2.0 and PKCE flow as a web page. Four
+          things are different:
+        </p>
+        <ul>
+          <li>
+            <strong>The approval page opens in an in-app browser.</strong> On iOS this is an
+            <code>ASWebAuthenticationSession</code>, on Android a Custom Tab. The user sees the real
+            hashbin.org address, and it shares the browser's sign-in, so they often don't need to
+            sign in again. iOS first asks "Textpad Wants to Use hashbin.org to Sign In"; that
+            prompt comes from the system, not from HashBin.
+          </li>
+          <li>
+            <strong>The redirect URI uses the app's own URL scheme:</strong>
+            <code>org.hashbin.textpad.flutter://oauth</code>. HashBin accepts redirect URIs like this
+            when the scheme is named after a domain, written backwards (RFC 8252). A plain name such
+            as <code>textpad://</code> is refused, because any app could claim it.
+          </li>
+          <li>
+            <strong>Tokens are kept in secure storage</strong>, the iOS Keychain or the Android
+            Keystore, through <code>flutter_secure_storage</code>. A web page has to use
+            <code>localStorage</code>.
+          </li>
+          <li>
+            <strong>Nothing has to survive a page change.</strong> The app keeps running while the
+            browser is open, so unlike the web version it doesn't save the user's text before
+            signing in.
+          </li>
+        </ul>
+        <p>
+          Everything else matches the web version. Textpad asks for <code>content:write</code> and
+          <code>balance:read</code>. Each save is charged to the user's balance and kept for the
+          default retention period set on their <a href="/account.html">account page</a>, and texts
+          of 64 bytes or less are free. <strong>Disconnect</strong> revokes the app's access on the
+          server, and users can also revoke Textpad from their account page.
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Messages and what causes them</h2>
+        <table>
+          <thead><tr><th>Situation</th><th>Textpad shows</th></tr></thead>
+          <tbody>
+            <tr><td>The string has characters outside <code>A–Z a–z 0–9 - _</code>, or its length doesn't match the length it encodes (for example, a link cut off when copied)</td><td>"… isn't a valid 256t string. Check that the link was copied completely."</td></tr>
+            <tr><td>The link ends in <code>256t=</code> with nothing after it</td><td>"This link has "256t=" but no 256t string after it."</td></tr>
+            <tr><td>Something pasted into <em>Open</em> is a link with no 256t string in it</td><td>"That link doesn't contain a 256t string."</td></tr>
+            <tr><td>256t.us answers 404: never saved, expired, or deleted</td><td>"Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved."</td></tr>
+            <tr><td>256t.us answers 451: the content is under dispute</td><td>"This text is unavailable while a dispute about it is reviewed."</td></tr>
+            <tr><td>256t.us answers 429: the text has used up its download allowance</td><td>"HashBin is limiting how often this text can be downloaded. Try again later."</td></tr>
+            <tr><td>The content isn't valid UTF-8, or contains NUL characters (binary data)</td><td>"This 256t string points to content that isn't text, so Textpad can't open it."</td></tr>
+            <tr><td>The network request fails</td><td>"Couldn't reach HashBin to load this text…"</td></tr>
+            <tr><td>The user taps Deny on the HashBin approval page</td><td>"You didn't approve Textpad on HashBin, so nothing was saved." Their edits are kept.</td></tr>
+            <tr><td>The user closes the approval page</td><td>Nothing; the text stays as it was, unsaved.</td></tr>
+            <tr><td>The balance is too low to save</td><td>HashBin's explanation, with an <em>Add funds</em> button.</td></tr>
+            <tr><td>The connection was revoked or has expired</td><td>"Your HashBin connection has ended. Tap Save to connect again."</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="card">
+        <h2>The code, step by step</h2>
+        <p>The excerpts below are copied exactly from the app; the <a href="#source">full source</a> is at the end of this page.</p>
+
+        <h3>1. Configuration</h3>
+        <p>
+          <code>main.dart</code> starts by naming the app (its client ID), where HashBin is, and the
+          redirect URI. <code>--dart-define</code> values let a developer point the app at a local
+          HashBin server without editing the code; they are fixed when the app is built.
+        </p>
+        <pre><code class="excerpt" data-file="lib/main.dart">// The HashBin service, and the domain that serves published content.
+// Development only: --dart-define=HASHBIN_URL=... points the app at a local
+// HashBin server (npm run dev:local), which serves content itself.
+const hashbinUrl = String.fromEnvironment('HASHBIN_URL', defaultValue: 'https://hashbin.org');
+const contentUrl = String.fromEnvironment('HASHBIN_URL', defaultValue: 'https://256t.us');
+
+// The client ID from registering Textpad at https://hashbin.org/developers,
+// or --dart-define=TEXTPAD_CLIENT_ID=... for an app registered on a local
+// server.
+const clientId = String.fromEnvironment(
+  'TEXTPAD_CLIENT_ID',
+  defaultValue: 'app_1a74e62b-d752-4a3c-81af-5c850af18c5b',
+);
+
+// HashBin sends the user back to this link after they approve Textpad. Its
+// scheme is the app's own, so the system hands the link to this app. It
+// must match a registered redirect URI exactly.
+const redirectUri = 'org.hashbin.textpad.flutter://oauth';
+
+// What Textpad asks the user to allow: publishing (billed to their
+// balance) and reading their balance so it can be shown.
+const scopes = ['content:write', 'balance:read'];
+
+final account = HashBinAccount(
+  clientId: clientId,
+  redirectUri: redirectUri,
+  baseUrl: hashbinUrl,
+  scopes: scopes,
+);</code></pre>
+
+        <h3>2. The app's URL scheme</h3>
+        <p>
+          On iOS, <code>ios/Runner/Info.plist</code> claims the scheme with a
+          <code>CFBundleURLTypes</code> entry (see the <a href="#source">full source</a>). On
+          Android, two activities share it. Links whose host is <code>open</code> go to the app:
+        </p>
+        <pre><code class="excerpt" data-file="android/app/src/main/AndroidManifest.xml">&lt;!-- Links to a text, org.hashbin.textpad.flutter://open?256t=...,
+     open Textpad. The app_links package passes them to the app. --&gt;
+&lt;intent-filter&gt;
+    &lt;action android:name="android.intent.action.VIEW"/&gt;
+    &lt;category android:name="android.intent.category.DEFAULT"/&gt;
+    &lt;category android:name="android.intent.category.BROWSABLE"/&gt;
+    &lt;data android:scheme="org.hashbin.textpad.flutter" android:host="open"/&gt;
+&lt;/intent-filter&gt;
+&lt;!-- The app_links package handles incoming links, not Flutter's router. --&gt;
+&lt;meta-data android:name="flutter_deeplinking_enabled" android:value="false"/&gt;</code></pre>
+        <p>and links whose host is <code>oauth</code> go to <code>flutter_web_auth_2</code>, which is waiting for the end of a sign-in:</p>
+        <pre><code class="excerpt" data-file="android/app/src/main/AndroidManifest.xml">&lt;!-- Catches org.hashbin.textpad.flutter://oauth?code=... at the end of
+     signing in to HashBin and hands it to flutter_web_auth_2. --&gt;
+&lt;activity
+    android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+    android:exported="true"
+    android:taskAffinity=""&gt;
+    &lt;intent-filter android:label="flutter_web_auth_2"&gt;
+        &lt;action android:name="android.intent.action.VIEW"/&gt;
+        &lt;category android:name="android.intent.category.DEFAULT"/&gt;
+        &lt;category android:name="android.intent.category.BROWSABLE"/&gt;
+        &lt;data android:scheme="org.hashbin.textpad.flutter" android:host="oauth"/&gt;
+    &lt;/intent-filter&gt;
+&lt;/activity&gt;</code></pre>
+        <p>
+          Both platforms also turn off Flutter's own link handling
+          (<code>FlutterDeepLinkingEnabled</code> and <code>flutter_deeplinking_enabled</code>),
+          because <code>app_links</code> handles the links instead.
+        </p>
+
+        <h3>3. Finding the 256t string in a link</h3>
+        <p>
+          Textpad accepts its own deep links, and also the links people are likely to have: a web
+          Textpad link, a raw 256t.us link, or just the string. It ignores links that hold no 256t
+          string.
+        </p>
+        <pre><code class="excerpt" data-file="lib/textpad.dart">/// Finds the 256t string in any of these:
+///   - Textpad's own deep link: `org.hashbin.textpad.flutter://open?256t=&lt;cid&gt;`
+///   - a web Textpad link:      `https://hashbin.org/docs/textpad/app#256t=&lt;cid&gt;`
+///   - a raw content link:      `https://256t.us/&lt;cid&gt;`
+///   - the bare 256t string:    `&lt;cid&gt;`
+/// Returns null for a link that holds no 256t string.
+String? cidFromText(String text) {
+  final trimmed = text.trim();
+  final param = RegExp(r'[#?&amp;]256t=([^&amp;#]*)').firstMatch(trimmed);
+  if (param != null) {
+    try {
+      return Uri.decodeComponent(param[1]!);
+    } on ArgumentError {
+      return param[1]; // A stray "%" can't be decoded; isValid256t rejects it.
+    }
+  }
+  final contentLink = RegExp(r'^https://256t\.us/([^/?#]*)').firstMatch(trimmed);
+  if (contentLink != null) {
+    return contentLink[1];
+  }
+  return trimmed.contains('://') ? null : trimmed;
+}</code></pre>
+
+        <h3>4. Checking a 256t string</h3>
+        <p>
+          A 256t string has two parts, both in base64url. The first 8 characters hold the content's
+          length in bytes. The rest is the content itself when it is 64 bytes or less, or else its
+          SHA-512 hash, which is always 86 characters. Checking that the two parts agree catches
+          typos and truncated links before any network request is made:
+        </p>
+        <pre><code class="excerpt" data-file="lib/textpad.dart">/// A 256t string is base64url text in two parts:
+///   - 8 characters holding the content's length in bytes
+///     (a 6-byte big-endian number);
+///   - then the content itself if it is 64 bytes or less, or else the
+///     content's SHA-512 hash (always 86 characters).
+/// Checking this up front gives a clear message for a mistyped or cut-off
+/// link instead of a confusing "not found".
+int contentLength(String cid) =&gt;
+    base64UrlToBytes(cid.substring(0, 8)).fold(0, (total, byte) =&gt; total * 256 + byte);
+
+bool isValid256t(String cid) {
+  if (!RegExp(r'^[A-Za-z0-9_-]{8,94}$').hasMatch(cid)) {
+    return false;
+  }
+  final length = contentLength(cid);
+  final expectedRest = length &lt;= 64 ? (length * 4 / 3).ceil() : 86;
+  return cid.length - 8 == expectedRest;
+}</code></pre>
+
+        <h3>5. Turning bytes into text</h3>
+        <p>
+          HashBin stores bytes, not text. Dart's <code>utf8.decode</code> refuses anything that isn't
+          valid UTF-8, but it quietly drops a leading byte order mark, so Textpad puts it back.
+          Otherwise saving an unchanged file would store different bytes under a new 256t string.
+        </p>
+        <pre><code class="excerpt" data-file="lib/textpad.dart">/// Content on HashBin is just bytes. Textpad only opens bytes that are valid
+/// UTF-8 text: utf8.decode throws a FormatException on anything else
+/// instead of inserting replacement characters.
+String decodeText(List&lt;int&gt; bytes) {
+  // utf8.decode drops a leading byte order mark. Put it back, so saving
+  // unchanged text gives back exactly the same bytes and 256t string.
+  final hasBom = bytes.length &gt;= 3 &amp;&amp; bytes[0] == 0xef &amp;&amp; bytes[1] == 0xbb &amp;&amp; bytes[2] == 0xbf;
+  final text = (hasBom ? '\uFEFF' : '') + utf8.decode(hasBom ? bytes.sublist(3) : bytes);
+  // Valid UTF-8 can still be binary data; a NUL character is a reliable
+  // sign of that, and real text practically never contains one.
+  if (text.contains('\u0000')) {
+    throw const FormatException('Content contains NUL characters');
+  }
+  return text;
+}</code></pre>
+
+        <h3>6. Opening a text</h3>
+        <p>
+          Opening checks the string, then either decodes a short text straight from it or downloads a
+          longer one from <code>https://256t.us/&lt;string&gt;</code>. Downloading needs no account.
+          Each failure gets its own message, and the editor is emptied first, so nothing on screen
+          can be mistaken for the content of a broken link.
+        </p>
+        <pre><code class="excerpt" data-file="lib/main.dart">Future&lt;void&gt; openCid(String cid) async {
+  // Whatever happens below, don't leave the previous text on screen as if
+  // it belonged to this link.
+  setDocument(null, '');
+  clearMessage();
+
+  if (cid.isEmpty) {
+    showMessage('This link has "256t=" but no 256t string after it.', error: true);
+    return;
+  }
+  if (!isValid256t(cid)) {
+    final shown = cid.length &gt; 100 ? '${cid.substring(0, 100)}…' : cid;
+    showMessage('"$shown" isn\'t a valid 256t string. Check that the link was copied completely.', error: true);
+    return;
+  }
+
+  // Short texts are inside the 256t string itself.
+  final inline = inlineBytes(cid);
+  if (inline != null) {
+    showText(cid, inline);
+    return;
+  }
+
+  setBusy(true);
+  showMessage('Loading…');
+  try {
+    final http.Response response;
+    try {
+      response = await http.get(Uri.parse('$contentUrl/$cid'));
+    } catch (_) {
+      showMessage("Couldn't reach HashBin to load this text. Check your connection and try again.", error: true);
+      return;
+    }
+
+    switch (response.statusCode) {
+      case 200:
+        showText(cid, response.bodyBytes);
+      case 404:
+        showMessage('Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved.', error: true);
+      case 451:
+        showMessage('This text is unavailable while a dispute about it is reviewed.', error: true);
+      // Each stored text has a download allowance; when it runs out, 256t.us answers 429.
+      case 429:
+        showMessage('HashBin is limiting how often this text can be downloaded. Try again later.', error: true);
+      default:
+        showMessage("HashBin couldn't return this text (HTTP ${response.statusCode}). Try again later.", error: true);
+    }
+  } finally {
+    setBusy(false);
+  }
+}</code></pre>
+
+        <h3>7. Signing in</h3>
+        <p>
+          <code>connect()</code> in <code>hashbin.dart</code> builds the authorization link with a PKCE
+          challenge and opens it with <code>FlutterWebAuth2.authenticate</code>. When HashBin
+          redirects to <code>org.hashbin.textpad.flutter://oauth?code=…</code>, the browser closes and
+          hands that link back. The app checks the <code>state</code>, then trades the code for
+          tokens.
+        </p>
+        <pre><code class="excerpt" data-file="lib/hashbin.dart">/// Opens HashBin's approval page in an in-app browser and waits for the
+/// user to come back.
+Future&lt;ConnectResult&gt; connect() async {
+  // PKCE: a random secret (the verifier) stays in the app, and only its
+  // SHA-256 hash (the challenge) goes into the sign-in link. Whoever
+  // exchanges the code for tokens must know the verifier, so a code
+  // intercepted on the way back to the app is useless to anyone else.
+  final random = Random.secure();
+  String randomString(int bytes) =&gt;
+      bytesToBase64Url(List.generate(bytes, (_) =&gt; random.nextInt(256)));
+  final verifier = randomString(32);
+  final challenge = bytesToBase64Url(sha256.convert(utf8.encode(verifier)).bytes);
+  // "state" ties the reply to this request.
+  final state = randomString(16);
+
+  final authorizeUrl = Uri.parse('$baseUrl/oauth/authorize').replace(queryParameters: {
+    'client_id': clientId,
+    'redirect_uri': redirectUri,
+    'response_type': 'code',
+    'scope': scopes.join(' '),
+    'state': state,
+    'code_challenge': challenge,
+    'code_challenge_method': 'S256',
+  });
+
+  // On iOS this is an ASWebAuthenticationSession, on Android a Custom
+  // Tab. It closes by itself when HashBin redirects to a link with the
+  // redirect URI's scheme, and hands that link back here.
+  final String result;
+  try {
+    result = await FlutterWebAuth2.authenticate(
+      url: authorizeUrl.toString(),
+      callbackUrlScheme: Uri.parse(redirectUri).scheme,
+    );
+  } on PlatformException catch (error) {
+    if (error.code == 'CANCELED') return ConnectResult.cancelled;
+    rethrow;
+  }
+
+  final params = Uri.parse(result).queryParameters;
+  if (params['state'] != state) {
+    throw Exception("The reply from HashBin doesn't match this sign-in.");
+  }
+  if (params['error'] == 'access_denied') {
+    return ConnectResult.denied;
+  }
+  final code = params['code'];
+  if (params['error'] != null || code == null) {
+    throw Exception(params['error'] ?? "HashBin didn't send an authorization code.");
+  }
+
+  // Trade the one-time code (plus the verifier) for tokens.
+  final response = await _http.post(
+    Uri.parse('$baseUrl/oauth/token'),
+    headers: {'content-type': 'application/json'},
+    body: jsonEncode({
+      'grant_type': 'authorization_code',
+      'client_id': clientId,
+      'redirect_uri': redirectUri,
+      'code': code,
+      'code_verifier': verifier,
+    }),
+  );
+  final body = _jsonObject(response);
+  if (response.statusCode != 200) {
+    throw Exception(body['message'] ?? body['error'] ?? 'HTTP ${response.statusCode}');
+  }
+  await _saveTokens(body);
+  return ConnectResult.connected;
+}</code></pre>
+
+        <h3>8. Renewing access</h3>
+        <p>
+          Access tokens last an hour. Every API call goes through <code>account.send()</code>, which
+          renews an expired token first. Refresh tokens work only once, so calls that need a new
+          token at the same moment share a single renewal. A refused refresh token, or a 401 from
+          the API, means the user has to approve Textpad again.
+        </p>
+        <pre><code class="excerpt" data-file="lib/hashbin.dart">/// Access tokens last an hour. A refresh token gets a new one, and is
+/// itself replaced: each refresh token works only once. Calls that need a
+/// new token at the same moment share one refresh, because a second
+/// refresh with the same (by then used) token would fail.
+Future&lt;void&gt; _refreshAccessToken() {
+  return _refreshing ??= _renewTokens().whenComplete(() =&gt; _refreshing = null);
+}
+
+Future&lt;void&gt; _renewTokens() async {
+  final response = await _http.post(
+    Uri.parse('$baseUrl/oauth/token'),
+    headers: {'content-type': 'application/json'},
+    body: jsonEncode({'grant_type': 'refresh_token', 'refresh_token': _refreshToken}),
+  );
+  final body = _jsonObject(response);
+  if (body['error'] == 'invalid_grant') {
+    // Expired or revoked: the user has to approve the app again.
+    await _clearTokens();
+    throw NotConnectedException();
+  }
+  if (response.statusCode != 200) {
+    throw Exception(body['message'] ?? body['error'] ?? 'HTTP ${response.statusCode}');
+  }
+  await _saveTokens(body);
+}</code></pre>
+        <pre><code class="excerpt" data-file="lib/hashbin.dart">/// Sends a request to a HashBin API path as the signed-in user.
+Future&lt;http.Response&gt; send(String method, String path,
+    {Map&lt;String, String&gt; headers = const {}, String? body}) async {
+  if (!isConnected) {
+    throw NotConnectedException();
+  }
+  if (DateTime.now().isAfter(_expiresAt.subtract(_expiryMargin))) {
+    await _refreshAccessToken();
+    if (!isConnected) {
+      throw NotConnectedException(); // Disconnected while renewing.
+    }
+  }
+  final request = http.Request(method, Uri.parse('$baseUrl$path'))
+    ..headers.addAll(headers)
+    ..headers['authorization'] = 'Bearer $_accessToken';
+  if (body != null) {
+    request.bodyBytes = utf8.encode(body);
+  }
+  final response = await http.Response.fromStream(await _http.send(request));
+  if (response.statusCode == 401) {
+    await _clearTokens();
+    throw NotConnectedException();
+  }
+  return response;
+}</code></pre>
+
+        <h3>9. Saving text</h3>
+        <p>
+          Save connects first if needed, then sends one <code>POST /api/content</code> whose body is
+          the text. The response holds the new 256t string (<code>cid</code>).
+        </p>
+        <pre><code class="excerpt" data-file="lib/main.dart">Future&lt;void&gt; save() async {
+  if (busy || !hasUnsavedChanges || editor.text.isEmpty) {
+    return;
+  }
+  // The editor is read-only while busy, so this is what gets saved.
+  final textToSave = editor.text;
+  setBusy(true);
+  try {
+    // The first save asks the user to approve Textpad. Unlike a web page,
+    // the app keeps running while the browser is open, so nothing has to
+    // be stored to survive the trip.
+    if (!account.isConnected) {
+      showMessage('Waiting for you to approve Textpad on HashBin…');
+      final outcome = await account.connect();
+      showAccount();
+      if (outcome == ConnectResult.denied) {
+        showMessage("You didn't approve Textpad on HashBin, so nothing was saved.", error: true);
+        return;
+      }
+      if (outcome == ConnectResult.cancelled) {
+        clearMessage();
+        return;
+      }
+    }
+
+    showMessage('Saving…');
+    // The request body is the text itself. Uploads made with an OAuth
+    // app are kept for the user's default retention period (set on their
+    // HashBin account page) and charged to their balance. Texts of 64
+    // bytes or less are stored inside the 256t string and are free.
+    final response = await account.send(
+      'POST',
+      '/api/content',
+      headers: {'content-type': 'text/plain; charset=utf-8'},
+      body: textToSave,
+    );
+    Map&lt;String, dynamic&gt; result;
+    try {
+      result = jsonDecode(utf8.decode(response.bodyBytes)) as Map&lt;String, dynamic&gt;;
+    } catch (_) {
+      result = {};
+    }
+
+    if (response.statusCode != 200 &amp;&amp; response.statusCode != 201) {
+      if (result['error'] == 'insufficient_balance') {
+        showMessage(
+          result['message'] as String? ?? 'Your HashBin balance is too low to save this.',
+          error: true,
+          actions: [('Add funds', () =&gt; launchUrl(Uri.parse('$hashbinUrl/deposit.html')))],
+        );
+      } else {
+        showMessage('Saving failed: ${result['message'] ?? result['error'] ?? 'HTTP ${response.statusCode}'}', error: true);
+      }
+      return;
+    }
+
+    final cid = result['cid'] as String;
+    setState(() {
+      currentCid = cid;
+      savedText = textToSave;
+    });
+    final expiresAt = DateTime.tryParse(result['expires_at'] as String? ?? '');
+    final expires = expiresAt == null || !mounted
+        ? ''
+        : ' Kept until ${MaterialLocalizations.of(context).formatMediumDate(expiresAt.toLocal())}.';
+    showMessage('Saved.$expires', actions: [
+      ('Copy link', () =&gt; copyLink(cid)),
+      ('View raw text', () =&gt; launchUrl(Uri.parse('$contentUrl/$cid'))),
+    ]);
+    showAccount();
+  } on NotConnectedException {
+    showAccount();
+    showMessage('Your HashBin connection has ended. Tap Save to connect again.', error: true);
+  } catch (error) {
+    showMessage('Saving failed: $error', error: true);
+  } finally {
+    setBusy(false);
+  }
+}</code></pre>
+
+        <h3>10. Receiving links</h3>
+        <p>
+          On start-up the app reads any saved tokens, then listens to <code>app_links</code>, which
+          delivers the link that launched the app followed by every link opened while it runs.
+        </p>
+        <pre><code class="excerpt" data-file="lib/main.dart">Future&lt;void&gt; start() async {
+  await account.load();
+  showAccount();
+  // app_links delivers the link that launched the app, then every link
+  // opened while it runs. Links without a 256t string are ignored.
+  linkSubscription = AppLinks().stringLinkStream.listen(openLink);
+}</code></pre>
+      </section>
+
+      <section class="card" id="run">
+        <h2>Run it</h2>
+        <p>You need the <a href="https://docs.flutter.dev/get-started/install">Flutter SDK</a>, plus Xcode for iOS or Android Studio for Android.</p>
+        <pre><code>git clone https://github.com/curtcox/hashbin.org.git
+cd hashbin.org/examples/textpad-flutter
+flutter run
+flutter test             # the unit tests</code></pre>
+
+        <h3>Make your own app from it</h3>
+        <ol>
+          <li>
+            Pick a URL scheme from a domain you control, written backwards, for example
+            <code>com.example.notes</code>. Replace <code>org.hashbin.textpad.flutter</code> with it in
+            <code>ios/Runner/Info.plist</code> and <code>android/app/src/main/AndroidManifest.xml</code>.
+            Change the bundle identifier (in Xcode) and <code>applicationId</code> (in
+            <code>android/app/build.gradle.kts</code>) to match.
+          </li>
+          <li>
+            Register an app on the <a href="/developers">Developers page</a> with the redirect URI
+            <code>com.example.notes://oauth</code>.
+          </li>
+          <li>In <code>lib/main.dart</code>, set <code>redirectUri</code> to that address and the default <code>clientId</code> to your app's client ID.</li>
+        </ol>
+
+        <h3>Against a local HashBin server</h3>
+        <p>
+          Start the server with <code>npm run dev:local</code> in the repository root. On its
+          <a href="http://127.0.0.1:8787/developers">Developers page</a>, register an app with the
+          redirect URI <code>org.hashbin.textpad.flutter://oauth</code>. Then run:
+        </p>
+        <pre><code>flutter run \
+  --dart-define=HASHBIN_URL=http://127.0.0.1:8787 \
+  --dart-define=TEXTPAD_CLIENT_ID=&lt;client ID&gt;</code></pre>
+        <p>
+          In the Android emulator, the computer is <code>10.0.2.2</code> instead of
+          <code>127.0.0.1</code>. Android normally refuses plain <code>http</code>; the project allows it in
+          debug builds only (<code>android/app/src/debug/AndroidManifest.xml</code>).
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>Things to know</h2>
+        <ul>
+          <li><strong>Copied links point to the web.</strong> <em>Copy link</em> copies a link to the web version of Textpad, which opens in any browser on any device; pasting it into this app's <em>Open</em> field works too.</li>
+          <li><strong>Saving the same text again.</strong> Save stays disabled until the text changes. If edited text happens to match something already on HashBin, HashBin keeps the existing copy and extends how long it is kept, which is charged like a new save.</li>
+          <li><strong>Saves use the account's default retention.</strong> Apps cannot choose how long content is kept; users set their default on the account page.</li>
+          <li><strong>Android can close a backgrounded app.</strong> If the phone is very short of memory while the approval page is open, Android may close Textpad, and unsaved text would be lost. A production app could keep a draft in storage to guard against this.</li>
+        </ul>
+      </section>
+
+      <section class="card" id="source">
+        <h2>Full source</h2>
+        <h3>lib/textpad.dart</h3>
+        <pre class="full-source"><code class="source" data-file="lib/textpad.dart">// 256t strings, links and text decoding for Textpad.
+//
+// Nothing in this file uses Flutter, so it can be tested with plain Dart
+// (see test/textpad_test.dart).
+
+import 'dart:convert';
+import 'dart:typed_data';
+
+// ----------------------------------------------------------------------
+// Finding a 256t string in a link
+// ----------------------------------------------------------------------
+
+/// Finds the 256t string in any of these:
+///   - Textpad's own deep link: `org.hashbin.textpad.flutter://open?256t=&lt;cid&gt;`
+///   - a web Textpad link:      `https://hashbin.org/docs/textpad/app#256t=&lt;cid&gt;`
+///   - a raw content link:      `https://256t.us/&lt;cid&gt;`
+///   - the bare 256t string:    `&lt;cid&gt;`
+/// Returns null for a link that holds no 256t string.
+String? cidFromText(String text) {
+  final trimmed = text.trim();
+  final param = RegExp(r'[#?&amp;]256t=([^&amp;#]*)').firstMatch(trimmed);
+  if (param != null) {
+    try {
+      return Uri.decodeComponent(param[1]!);
+    } on ArgumentError {
+      return param[1]; // A stray "%" can't be decoded; isValid256t rejects it.
+    }
+  }
+  final contentLink = RegExp(r'^https://256t\.us/([^/?#]*)').firstMatch(trimmed);
+  if (contentLink != null) {
+    return contentLink[1];
+  }
+  return trimmed.contains('://') ? null : trimmed;
+}
+
+// ----------------------------------------------------------------------
+// Checking a 256t string
+// ----------------------------------------------------------------------
+
+Uint8List base64UrlToBytes(String text) =&gt; base64Url.decode(base64Url.normalize(text));
+
+String bytesToBase64Url(List&lt;int&gt; bytes) =&gt; base64UrlEncode(bytes).replaceAll('=', '');
+
+/// A 256t string is base64url text in two parts:
+///   - 8 characters holding the content's length in bytes
+///     (a 6-byte big-endian number);
+///   - then the content itself if it is 64 bytes or less, or else the
+///     content's SHA-512 hash (always 86 characters).
+/// Checking this up front gives a clear message for a mistyped or cut-off
+/// link instead of a confusing "not found".
+int contentLength(String cid) =&gt;
+    base64UrlToBytes(cid.substring(0, 8)).fold(0, (total, byte) =&gt; total * 256 + byte);
+
+bool isValid256t(String cid) {
+  if (!RegExp(r'^[A-Za-z0-9_-]{8,94}$').hasMatch(cid)) {
+    return false;
+  }
+  final length = contentLength(cid);
+  final expectedRest = length &lt;= 64 ? (length * 4 / 3).ceil() : 86;
+  return cid.length - 8 == expectedRest;
+}
+
+/// Short texts are inside the 256t string itself, so there is nothing to
+/// download: this returns their bytes, or null for longer content.
+Uint8List? inlineBytes(String cid) =&gt;
+    contentLength(cid) &lt;= 64 ? base64UrlToBytes(cid.substring(8)) : null;
+
+// ----------------------------------------------------------------------
+// Turning bytes into text
+// ----------------------------------------------------------------------
+
+/// Content on HashBin is just bytes. Textpad only opens bytes that are valid
+/// UTF-8 text: utf8.decode throws a FormatException on anything else
+/// instead of inserting replacement characters.
+String decodeText(List&lt;int&gt; bytes) {
+  // utf8.decode drops a leading byte order mark. Put it back, so saving
+  // unchanged text gives back exactly the same bytes and 256t string.
+  final hasBom = bytes.length &gt;= 3 &amp;&amp; bytes[0] == 0xef &amp;&amp; bytes[1] == 0xbb &amp;&amp; bytes[2] == 0xbf;
+  final text = (hasBom ? '\uFEFF' : '') + utf8.decode(hasBom ? bytes.sublist(3) : bytes);
+  // Valid UTF-8 can still be binary data; a NUL character is a reliable
+  // sign of that, and real text practically never contains one.
+  if (text.contains('\u0000')) {
+    throw const FormatException('Content contains NUL characters');
+  }
+  return text;
+}
+</code></pre>
+        <h3>lib/hashbin.dart</h3>
+        <pre class="full-source"><code class="source" data-file="lib/hashbin.dart">// A small HashBin OAuth client for Flutter.
+//
+// It signs the user in with OAuth 2.0 and PKCE in the system browser, keeps
+// the tokens in the device's secure storage (the iOS Keychain or Android
+// Keystore), renews the access token when it expires, and calls the HashBin
+// API as the user. Copy this file into your own app and change the
+// arguments passed to the constructor.
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_web_auth_2/flutter_web_auth_2.dart';
+import 'package:http/http.dart' as http;
+
+import 'textpad.dart';
+
+/// Thrown when the stored sign-in no longer works: it expired, or the user
+/// revoked the app on their HashBin account page.
+class NotConnectedException implements Exception {}
+
+/// How a sign-in ended: approved, declined with Deny, or the browser closed.
+enum ConnectResult { connected, denied, cancelled }
+
+class HashBinAccount {
+  HashBinAccount({
+    required this.clientId,
+    required this.redirectUri,
+    required this.baseUrl,
+    required this.scopes,
+    http.Client? httpClient,
+  }) : _http = httpClient ?? http.Client();
+
+  final String clientId;
+  final String redirectUri;
+  final String baseUrl;
+  final List&lt;String&gt; scopes;
+
+  // Tests pass a fake client; the app uses a real one.
+  final http.Client _http;
+
+  static const _tokensKey = 'hashbin.tokens';
+  static const _storage = FlutterSecureStorage();
+
+  // Renew the access token this long before it expires, so a request never
+  // sets out with a token that runs out on the way.
+  static const _expiryMargin = Duration(minutes: 1);
+
+  String? _accessToken;
+  String? _refreshToken;
+  DateTime _expiresAt = DateTime.fromMillisecondsSinceEpoch(0);
+  Future&lt;void&gt;? _refreshing;
+
+  bool get isConnected =&gt; _refreshToken != null;
+
+  /// Reads the tokens saved by an earlier run of the app.
+  Future&lt;void&gt; load() async {
+    final saved = await _storage.read(key: _tokensKey);
+    if (saved == null) return;
+    final tokens = jsonDecode(saved) as Map&lt;String, dynamic&gt;;
+    _accessToken = tokens['accessToken'] as String;
+    _refreshToken = tokens['refreshToken'] as String;
+    _expiresAt = DateTime.fromMillisecondsSinceEpoch(tokens['expiresAt'] as int);
+  }
+
+  Future&lt;void&gt; _saveTokens(Map&lt;String, dynamic&gt; response) async {
+    _accessToken = response['access_token'] as String;
+    _refreshToken = response['refresh_token'] as String;
+    _expiresAt = DateTime.now().add(Duration(seconds: response['expires_in'] as int));
+    await _storage.write(
+      key: _tokensKey,
+      value: jsonEncode({
+        'accessToken': _accessToken,
+        'refreshToken': _refreshToken,
+        'expiresAt': _expiresAt.millisecondsSinceEpoch,
+      }),
+    );
+  }
+
+  Future&lt;void&gt; _clearTokens() async {
+    _accessToken = null;
+    _refreshToken = null;
+    await _storage.delete(key: _tokensKey);
+  }
+
+  // ----------------------------------------------------------------------
+  // Signing in
+  // ----------------------------------------------------------------------
+
+  /// Opens HashBin's approval page in an in-app browser and waits for the
+  /// user to come back.
+  Future&lt;ConnectResult&gt; connect() async {
+    // PKCE: a random secret (the verifier) stays in the app, and only its
+    // SHA-256 hash (the challenge) goes into the sign-in link. Whoever
+    // exchanges the code for tokens must know the verifier, so a code
+    // intercepted on the way back to the app is useless to anyone else.
+    final random = Random.secure();
+    String randomString(int bytes) =&gt;
+        bytesToBase64Url(List.generate(bytes, (_) =&gt; random.nextInt(256)));
+    final verifier = randomString(32);
+    final challenge = bytesToBase64Url(sha256.convert(utf8.encode(verifier)).bytes);
+    // "state" ties the reply to this request.
+    final state = randomString(16);
+
+    final authorizeUrl = Uri.parse('$baseUrl/oauth/authorize').replace(queryParameters: {
+      'client_id': clientId,
+      'redirect_uri': redirectUri,
+      'response_type': 'code',
+      'scope': scopes.join(' '),
+      'state': state,
+      'code_challenge': challenge,
+      'code_challenge_method': 'S256',
+    });
+
+    // On iOS this is an ASWebAuthenticationSession, on Android a Custom
+    // Tab. It closes by itself when HashBin redirects to a link with the
+    // redirect URI's scheme, and hands that link back here.
+    final String result;
+    try {
+      result = await FlutterWebAuth2.authenticate(
+        url: authorizeUrl.toString(),
+        callbackUrlScheme: Uri.parse(redirectUri).scheme,
+      );
+    } on PlatformException catch (error) {
+      if (error.code == 'CANCELED') return ConnectResult.cancelled;
+      rethrow;
+    }
+
+    final params = Uri.parse(result).queryParameters;
+    if (params['state'] != state) {
+      throw Exception("The reply from HashBin doesn't match this sign-in.");
+    }
+    if (params['error'] == 'access_denied') {
+      return ConnectResult.denied;
+    }
+    final code = params['code'];
+    if (params['error'] != null || code == null) {
+      throw Exception(params['error'] ?? "HashBin didn't send an authorization code.");
+    }
+
+    // Trade the one-time code (plus the verifier) for tokens.
+    final response = await _http.post(
+      Uri.parse('$baseUrl/oauth/token'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({
+        'grant_type': 'authorization_code',
+        'client_id': clientId,
+        'redirect_uri': redirectUri,
+        'code': code,
+        'code_verifier': verifier,
+      }),
+    );
+    final body = _jsonObject(response);
+    if (response.statusCode != 200) {
+      throw Exception(body['message'] ?? body['error'] ?? 'HTTP ${response.statusCode}');
+    }
+    await _saveTokens(body);
+    return ConnectResult.connected;
+  }
+
+  /// Ends the app's access: forgets the tokens here and revokes the refresh
+  /// token on the server, so a copy of it can't be used either.
+  Future&lt;void&gt; disconnect() async {
+    final refreshToken = _refreshToken;
+    await _clearTokens();
+    if (refreshToken == null) return;
+    try {
+      await _http.post(
+        Uri.parse('$baseUrl/oauth/revoke'),
+        headers: {'content-type': 'application/json'},
+        body: jsonEncode({'token': refreshToken, 'token_type_hint': 'refresh_token'}),
+      );
+    } catch (_) {
+      // Offline: the token still expires on its own within 30 days.
+    }
+  }
+
+  // ----------------------------------------------------------------------
+  // Calling the API
+  // ----------------------------------------------------------------------
+
+  /// Access tokens last an hour. A refresh token gets a new one, and is
+  /// itself replaced: each refresh token works only once. Calls that need a
+  /// new token at the same moment share one refresh, because a second
+  /// refresh with the same (by then used) token would fail.
+  Future&lt;void&gt; _refreshAccessToken() {
+    return _refreshing ??= _renewTokens().whenComplete(() =&gt; _refreshing = null);
+  }
+
+  Future&lt;void&gt; _renewTokens() async {
+    final response = await _http.post(
+      Uri.parse('$baseUrl/oauth/token'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'grant_type': 'refresh_token', 'refresh_token': _refreshToken}),
+    );
+    final body = _jsonObject(response);
+    if (body['error'] == 'invalid_grant') {
+      // Expired or revoked: the user has to approve the app again.
+      await _clearTokens();
+      throw NotConnectedException();
+    }
+    if (response.statusCode != 200) {
+      throw Exception(body['message'] ?? body['error'] ?? 'HTTP ${response.statusCode}');
+    }
+    await _saveTokens(body);
+  }
+
+  /// Sends a request to a HashBin API path as the signed-in user.
+  Future&lt;http.Response&gt; send(String method, String path,
+      {Map&lt;String, String&gt; headers = const {}, String? body}) async {
+    if (!isConnected) {
+      throw NotConnectedException();
+    }
+    if (DateTime.now().isAfter(_expiresAt.subtract(_expiryMargin))) {
+      await _refreshAccessToken();
+      if (!isConnected) {
+        throw NotConnectedException(); // Disconnected while renewing.
+      }
+    }
+    final request = http.Request(method, Uri.parse('$baseUrl$path'))
+      ..headers.addAll(headers)
+      ..headers['authorization'] = 'Bearer $_accessToken';
+    if (body != null) {
+      request.bodyBytes = utf8.encode(body);
+    }
+    final response = await http.Response.fromStream(await _http.send(request));
+    if (response.statusCode == 401) {
+      await _clearTokens();
+      throw NotConnectedException();
+    }
+    return response;
+  }
+}
+
+/// The JSON object in a response body, or an empty map if there isn't one.
+Map&lt;String, dynamic&gt; _jsonObject(http.Response response) {
+  try {
+    final decoded = jsonDecode(utf8.decode(response.bodyBytes));
+    return decoded is Map&lt;String, dynamic&gt; ? decoded : {};
+  } on FormatException {
+    return {};
+  }
+}
+</code></pre>
+        <h3>lib/main.dart</h3>
+        <pre class="full-source"><code class="source" data-file="lib/main.dart">// Textpad for Flutter: open text from a 256t link, edit it, and save it to
+// the user's HashBin account.
+//
+// A walkthrough of this code is at https://hashbin.org/docs/textpad-flutter
+
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:app_links/app_links.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
+
+import 'hashbin.dart';
+import 'textpad.dart';
+
+// ----------------------------------------------------------------------
+// 1. Configuration
+// ----------------------------------------------------------------------
+
+// The HashBin service, and the domain that serves published content.
+// Development only: --dart-define=HASHBIN_URL=... points the app at a local
+// HashBin server (npm run dev:local), which serves content itself.
+const hashbinUrl = String.fromEnvironment('HASHBIN_URL', defaultValue: 'https://hashbin.org');
+const contentUrl = String.fromEnvironment('HASHBIN_URL', defaultValue: 'https://256t.us');
+
+// The client ID from registering Textpad at https://hashbin.org/developers,
+// or --dart-define=TEXTPAD_CLIENT_ID=... for an app registered on a local
+// server.
+const clientId = String.fromEnvironment(
+  'TEXTPAD_CLIENT_ID',
+  defaultValue: 'app_1a74e62b-d752-4a3c-81af-5c850af18c5b',
+);
+
+// HashBin sends the user back to this link after they approve Textpad. Its
+// scheme is the app's own, so the system hands the link to this app. It
+// must match a registered redirect URI exactly.
+const redirectUri = 'org.hashbin.textpad.flutter://oauth';
+
+// What Textpad asks the user to allow: publishing (billed to their
+// balance) and reading their balance so it can be shown.
+const scopes = ['content:write', 'balance:read'];
+
+final account = HashBinAccount(
+  clientId: clientId,
+  redirectUri: redirectUri,
+  baseUrl: hashbinUrl,
+  scopes: scopes,
+);
+
+void main() =&gt; runApp(const TextpadApp());
+
+class TextpadApp extends StatelessWidget {
+  const TextpadApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Textpad',
+      theme: ThemeData(colorSchemeSeed: Colors.blue),
+      darkTheme: ThemeData(colorSchemeSeed: Colors.blue, brightness: Brightness.dark),
+      home: const TextpadScreen(),
+    );
+  }
+}
+
+/// The message above the editor, with optional buttons such as "Add funds".
+class Message {
+  const Message(this.text, {this.error = false, this.actions = const []});
+  final String text;
+  final bool error;
+  final List&lt;(String, VoidCallback)&gt; actions;
+}
+
+class TextpadScreen extends StatefulWidget {
+  const TextpadScreen({super.key});
+
+  @override
+  State&lt;TextpadScreen&gt; createState() =&gt; _TextpadScreenState();
+}
+
+class _TextpadScreenState extends State&lt;TextpadScreen&gt; {
+  // --------------------------------------------------------------------
+  // 2. Screen state
+  // --------------------------------------------------------------------
+
+  final editor = TextEditingController();
+  final linkField = TextEditingController();
+
+  // The 256t string of the text in the editor, and that text exactly as it
+  // was opened or last saved. Comparing it with the editor tells us whether
+  // there are unsaved changes. Both are null for a new, unsaved text.
+  String? currentCid;
+  String? savedText;
+
+  // Set while a load or save is running, to ignore extra taps.
+  bool busy = false;
+
+  Message? message;
+  bool connected = false;
+  String accountLabel = '';
+  StreamSubscription&lt;String&gt;? linkSubscription;
+
+  bool get hasUnsavedChanges =&gt; editor.text != (savedText ?? '');
+
+  void showMessage(String text, {bool error = false, List&lt;(String, VoidCallback)&gt; actions = const []}) {
+    setState(() =&gt; message = Message(text, error: error, actions: actions));
+  }
+
+  void clearMessage() =&gt; setState(() =&gt; message = null);
+
+  void setBusy(bool value) =&gt; setState(() =&gt; busy = value);
+
+  /// Shows text in the editor as the saved version of cid.
+  void setDocument(String? cid, String text) {
+    editor.text = text;
+    setState(() {
+      currentCid = cid;
+      savedText = text;
+    });
+  }
+
+  // --------------------------------------------------------------------
+  // 3. Opening a 256t link
+  // --------------------------------------------------------------------
+
+  /// Asks before throwing away unsaved changes. Returns true to go on.
+  Future&lt;bool&gt; confirmDiscard() async {
+    if (!hasUnsavedChanges) return true;
+    final discard = await showDialog&lt;bool&gt;(
+      context: context,
+      builder: (context) =&gt; AlertDialog(
+        title: const Text('Discard your unsaved changes?'),
+        actions: [
+          TextButton(onPressed: () =&gt; Navigator.pop(context, false), child: const Text('Keep editing')),
+          TextButton(onPressed: () =&gt; Navigator.pop(context, true), child: const Text('Discard')),
+        ],
+      ),
+    );
+    return discard ?? false;
+  }
+
+  /// Opens a deep link, a web Textpad link, a 256t.us link or a bare 256t
+  /// string. fromUser is true when it came from the "Open" field, where a
+  /// link without a 256t string deserves a message rather than silence.
+  Future&lt;void&gt; openLink(String link, {bool fromUser = false}) async {
+    final cid = cidFromText(link);
+    if (cid == null) {
+      if (fromUser) {
+        showMessage("That link doesn't contain a 256t string.", error: true);
+      }
+      return;
+    }
+    if (busy || !await confirmDiscard()) {
+      return;
+    }
+    linkField.clear();
+    await openCid(cid);
+  }
+
+  Future&lt;void&gt; openCid(String cid) async {
+    // Whatever happens below, don't leave the previous text on screen as if
+    // it belonged to this link.
+    setDocument(null, '');
+    clearMessage();
+
+    if (cid.isEmpty) {
+      showMessage('This link has "256t=" but no 256t string after it.', error: true);
+      return;
+    }
+    if (!isValid256t(cid)) {
+      final shown = cid.length &gt; 100 ? '${cid.substring(0, 100)}…' : cid;
+      showMessage('"$shown" isn\'t a valid 256t string. Check that the link was copied completely.', error: true);
+      return;
+    }
+
+    // Short texts are inside the 256t string itself.
+    final inline = inlineBytes(cid);
+    if (inline != null) {
+      showText(cid, inline);
+      return;
+    }
+
+    setBusy(true);
+    showMessage('Loading…');
+    try {
+      final http.Response response;
+      try {
+        response = await http.get(Uri.parse('$contentUrl/$cid'));
+      } catch (_) {
+        showMessage("Couldn't reach HashBin to load this text. Check your connection and try again.", error: true);
+        return;
+      }
+
+      switch (response.statusCode) {
+        case 200:
+          showText(cid, response.bodyBytes);
+        case 404:
+          showMessage('Nothing is stored under this 256t string. It may have expired or been deleted, or it was never saved.', error: true);
+        case 451:
+          showMessage('This text is unavailable while a dispute about it is reviewed.', error: true);
+        // Each stored text has a download allowance; when it runs out, 256t.us answers 429.
+        case 429:
+          showMessage('HashBin is limiting how often this text can be downloaded. Try again later.', error: true);
+        default:
+          showMessage("HashBin couldn't return this text (HTTP ${response.statusCode}). Try again later.", error: true);
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  void showText(String cid, List&lt;int&gt; bytes) {
+    try {
+      setDocument(cid, decodeText(bytes));
+      clearMessage();
+    } on FormatException {
+      showMessage("This 256t string points to content that isn't text, so Textpad can't open it.", error: true);
+    }
+  }
+
+  // --------------------------------------------------------------------
+  // 4. The user's HashBin account
+  // --------------------------------------------------------------------
+
+  Future&lt;void&gt; showAccount() async {
+    setState(() {
+      connected = account.isConnected;
+      accountLabel = connected ? 'Connected to HashBin' : 'Not connected to HashBin';
+    });
+    if (!connected) return;
+    try {
+      final response = await account.send('GET', '/api/balance');
+      if (response.statusCode == 200) {
+        final balanceCents = jsonDecode(utf8.decode(response.bodyBytes))['balance_cents'] as num;
+        setState(() =&gt; accountLabel = 'HashBin balance: \$${(balanceCents / 100).toStringAsFixed(2)}');
+      }
+    } on NotConnectedException {
+      showAccount();
+    } catch (_) {
+      // Offline: keep showing "Connected to HashBin".
+    }
+  }
+
+  Future&lt;void&gt; disconnect() async {
+    await account.disconnect();
+    showAccount();
+  }
+
+  // --------------------------------------------------------------------
+  // 5. Saving text
+  // --------------------------------------------------------------------
+
+  Future&lt;void&gt; save() async {
+    if (busy || !hasUnsavedChanges || editor.text.isEmpty) {
+      return;
+    }
+    // The editor is read-only while busy, so this is what gets saved.
+    final textToSave = editor.text;
+    setBusy(true);
+    try {
+      // The first save asks the user to approve Textpad. Unlike a web page,
+      // the app keeps running while the browser is open, so nothing has to
+      // be stored to survive the trip.
+      if (!account.isConnected) {
+        showMessage('Waiting for you to approve Textpad on HashBin…');
+        final outcome = await account.connect();
+        showAccount();
+        if (outcome == ConnectResult.denied) {
+          showMessage("You didn't approve Textpad on HashBin, so nothing was saved.", error: true);
+          return;
+        }
+        if (outcome == ConnectResult.cancelled) {
+          clearMessage();
+          return;
+        }
+      }
+
+      showMessage('Saving…');
+      // The request body is the text itself. Uploads made with an OAuth
+      // app are kept for the user's default retention period (set on their
+      // HashBin account page) and charged to their balance. Texts of 64
+      // bytes or less are stored inside the 256t string and are free.
+      final response = await account.send(
+        'POST',
+        '/api/content',
+        headers: {'content-type': 'text/plain; charset=utf-8'},
+        body: textToSave,
+      );
+      Map&lt;String, dynamic&gt; result;
+      try {
+        result = jsonDecode(utf8.decode(response.bodyBytes)) as Map&lt;String, dynamic&gt;;
+      } catch (_) {
+        result = {};
+      }
+
+      if (response.statusCode != 200 &amp;&amp; response.statusCode != 201) {
+        if (result['error'] == 'insufficient_balance') {
+          showMessage(
+            result['message'] as String? ?? 'Your HashBin balance is too low to save this.',
+            error: true,
+            actions: [('Add funds', () =&gt; launchUrl(Uri.parse('$hashbinUrl/deposit.html')))],
+          );
+        } else {
+          showMessage('Saving failed: ${result['message'] ?? result['error'] ?? 'HTTP ${response.statusCode}'}', error: true);
+        }
+        return;
+      }
+
+      final cid = result['cid'] as String;
+      setState(() {
+        currentCid = cid;
+        savedText = textToSave;
+      });
+      final expiresAt = DateTime.tryParse(result['expires_at'] as String? ?? '');
+      final expires = expiresAt == null || !mounted
+          ? ''
+          : ' Kept until ${MaterialLocalizations.of(context).formatMediumDate(expiresAt.toLocal())}.';
+      showMessage('Saved.$expires', actions: [
+        ('Copy link', () =&gt; copyLink(cid)),
+        ('View raw text', () =&gt; launchUrl(Uri.parse('$contentUrl/$cid'))),
+      ]);
+      showAccount();
+    } on NotConnectedException {
+      showAccount();
+      showMessage('Your HashBin connection has ended. Tap Save to connect again.', error: true);
+    } catch (error) {
+      showMessage('Saving failed: $error', error: true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /// A link to the web version of Textpad opens the text in any browser,
+  /// and pasting it into this app's "Open" field works too.
+  Future&lt;void&gt; copyLink(String cid) async {
+    await Clipboard.setData(ClipboardData(text: '$hashbinUrl/docs/textpad/app#256t=$cid'));
+    showMessage('Link copied. Anyone with it can read this text.');
+  }
+
+  Future&lt;void&gt; newDocument() async {
+    if (busy || !await confirmDiscard()) {
+      return;
+    }
+    setDocument(null, '');
+    clearMessage();
+  }
+
+  // --------------------------------------------------------------------
+  // 6. Wiring it together
+  // --------------------------------------------------------------------
+
+  @override
+  void initState() {
+    super.initState();
+    // Rebuild as the user types, so the Save button and the "Unsaved
+    // changes" label stay current.
+    editor.addListener(() =&gt; setState(() {}));
+    linkField.addListener(() =&gt; setState(() {}));
+    start();
+  }
+
+  Future&lt;void&gt; start() async {
+    await account.load();
+    showAccount();
+    // app_links delivers the link that launched the app, then every link
+    // opened while it runs. Links without a 256t string are ignored.
+    linkSubscription = AppLinks().stringLinkStream.listen(openLink);
+  }
+
+  @override
+  void dispose() {
+    linkSubscription?.cancel();
+    editor.dispose();
+    linkField.dispose();
+    super.dispose();
+  }
+
+  // --------------------------------------------------------------------
+  // 7. The screen
+  // --------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final muted = TextStyle(color: colors.onSurfaceVariant);
+
+    var savedState = '';
+    if (currentCid != null &amp;&amp; !hasUnsavedChanges) {
+      savedState = 'Saved as 256t:${currentCid!.substring(0, 12)}…';
+    } else if (currentCid != null) {
+      savedState = 'Unsaved changes';
+    } else if (editor.text.isNotEmpty) {
+      savedState = 'Not saved yet';
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Textpad'),
+        actions: [
+          if (connected) TextButton(onPressed: busy ? null : disconnect, child: const Text('Disconnect')),
+        ],
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(accountLabel, style: muted),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: linkField,
+                      decoration: const InputDecoration(
+                        hintText: 'Paste a 256t string or link',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      autocorrect: false,
+                      textInputAction: TextInputAction.go,
+                      onSubmitted: (text) =&gt; openLink(text, fromUser: true),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton.tonal(
+                    onPressed: busy || linkField.text.trim().isEmpty
+                        ? null
+                        : () =&gt; openLink(linkField.text, fromUser: true),
+                    child: const Text('Open'),
+                  ),
+                ],
+              ),
+              if (message != null) ...[
+                const SizedBox(height: 8),
+                Semantics(
+                  liveRegion: true,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: message!.error ? colors.errorContainer : colors.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(message!.text),
+                        if (message!.actions.isNotEmpty)
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              for (final (label, onPressed) in message!.actions)
+                                TextButton(onPressed: onPressed, child: Text(label)),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Expanded(
+                child: TextField(
+                  controller: editor,
+                  readOnly: busy,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
+                  keyboardType: TextInputType.multiline,
+                  style: const TextStyle(fontFamily: 'monospace', fontFamilyFallback: ['Menlo', 'Courier']),
+                  decoration: const InputDecoration(
+                    hintText: 'Type or paste text here.',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Expanded(child: Text(savedState, style: muted, overflow: TextOverflow.ellipsis)),
+                    OutlinedButton(onPressed: busy ? null : newDocument, child: const Text('New')),
+                    const SizedBox(width: 8),
+                    FilledButton(
+                      onPressed: busy || !hasUnsavedChanges || editor.text.isEmpty ? null : save,
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+</code></pre>
+        <h3>pubspec.yaml</h3>
+        <pre class="full-source"><code class="source" data-file="pubspec.yaml">name: textpad
+description: "Textpad: edit text stored on HashBin"
+# The following line prevents the package from being accidentally published to
+# pub.dev using `flutter pub publish`. This is preferred for private packages.
+publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+
+# The following defines the version and build number for your application.
+# A version number is three numbers separated by dots, like 1.2.43
+# followed by an optional build number separated by a +.
+# Both the version and the builder number may be overridden in flutter
+# build by specifying --build-name and --build-number, respectively.
+# In Android, build-name is used as versionName while build-number used as versionCode.
+# Read more about Android versioning at https://developer.android.com/studio/publish/versioning
+# In iOS, build-name is used as CFBundleShortVersionString while build-number is used as CFBundleVersion.
+# Read more about iOS versioning at
+# https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
+# In Windows, build-name is used as the major, minor, and patch parts
+# of the product and file versions while build-number is used as the build suffix.
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # The following adds the Cupertino Icons font to your application.
+  # Use with the CupertinoIcons class for iOS style icons.
+  cupertino_icons: ^1.0.8
+  http: ^1.6.0
+  crypto: ^3.0.7
+  flutter_secure_storage: ^11.2.0
+  flutter_web_auth_2: ^5.1.0
+  app_links: ^7.2.2
+  url_launcher: ^6.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # The "flutter_lints" package below contains a set of recommended lints to
+  # encourage good coding practices. The lint set provided by the package is
+  # activated in the `analysis_options.yaml` file located at the root of your
+  # package. See that file for information about deactivating specific lint
+  # rules and activating additional ones.
+  flutter_lints: ^6.0.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+
+  # The following line ensures that the Material Icons font is
+  # included with your application, so that you can use the icons in
+  # the material Icons class.
+  uses-material-design: true
+
+  # To add assets to your application, add an assets section, like this:
+  # assets:
+  #   - images/a_dot_burr.jpeg
+  #   - images/a_dot_ham.jpeg
+
+  # An image asset can refer to one or more resolution-specific "variants", see
+  # https://flutter.dev/to/resolution-aware-images
+
+  # For details regarding adding assets from package dependencies, see
+  # https://flutter.dev/to/asset-from-package
+
+  # To add custom fonts to your application, add a fonts section here,
+  # in this "flutter" section. Each entry in this list should have a
+  # "family" key with the font family name, and a "fonts" key with a
+  # list giving the asset and other descriptors for the font. For
+  # example:
+  # fonts:
+  #   - family: Schyler
+  #     fonts:
+  #       - asset: fonts/Schyler-Regular.ttf
+  #       - asset: fonts/Schyler-Italic.ttf
+  #         style: italic
+  #   - family: Trajan Pro
+  #     fonts:
+  #       - asset: fonts/TrajanPro.ttf
+  #       - asset: fonts/TrajanPro_Bold.ttf
+  #         weight: 700
+  #
+  # For details regarding fonts from package dependencies,
+  # see https://flutter.dev/to/font-from-package
+</code></pre>
+        <h3>android/app/src/main/AndroidManifest.xml</h3>
+        <pre class="full-source"><code class="source" data-file="android/app/src/main/AndroidManifest.xml">&lt;manifest xmlns:android="http://schemas.android.com/apk/res/android"&gt;
+    &lt;!-- Textpad loads and saves text over the network. --&gt;
+    &lt;uses-permission android:name="android.permission.INTERNET"/&gt;
+    &lt;application
+        android:label="Textpad"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"&gt;
+        &lt;activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"&gt;
+            &lt;!-- Specifies an Android theme to apply to this Activity as soon as
+                 the Android process has started. This theme is visible to the user
+                 while the Flutter UI initializes. After that, this theme continues
+                 to determine the Window background behind the Flutter UI. --&gt;
+            &lt;meta-data
+              android:name="io.flutter.embedding.android.NormalTheme"
+              android:resource="@style/NormalTheme"
+              /&gt;
+            &lt;intent-filter&gt;
+                &lt;action android:name="android.intent.action.MAIN"/&gt;
+                &lt;category android:name="android.intent.category.LAUNCHER"/&gt;
+            &lt;/intent-filter&gt;
+            &lt;!-- Links to a text, org.hashbin.textpad.flutter://open?256t=...,
+                 open Textpad. The app_links package passes them to the app. --&gt;
+            &lt;intent-filter&gt;
+                &lt;action android:name="android.intent.action.VIEW"/&gt;
+                &lt;category android:name="android.intent.category.DEFAULT"/&gt;
+                &lt;category android:name="android.intent.category.BROWSABLE"/&gt;
+                &lt;data android:scheme="org.hashbin.textpad.flutter" android:host="open"/&gt;
+            &lt;/intent-filter&gt;
+            &lt;!-- The app_links package handles incoming links, not Flutter's router. --&gt;
+            &lt;meta-data android:name="flutter_deeplinking_enabled" android:value="false"/&gt;
+        &lt;/activity&gt;
+        &lt;!-- Catches org.hashbin.textpad.flutter://oauth?code=... at the end of
+             signing in to HashBin and hands it to flutter_web_auth_2. --&gt;
+        &lt;activity
+            android:name="com.linusu.flutter_web_auth_2.CallbackActivity"
+            android:exported="true"
+            android:taskAffinity=""&gt;
+            &lt;intent-filter android:label="flutter_web_auth_2"&gt;
+                &lt;action android:name="android.intent.action.VIEW"/&gt;
+                &lt;category android:name="android.intent.category.DEFAULT"/&gt;
+                &lt;category android:name="android.intent.category.BROWSABLE"/&gt;
+                &lt;data android:scheme="org.hashbin.textpad.flutter" android:host="oauth"/&gt;
+            &lt;/intent-filter&gt;
+        &lt;/activity&gt;
+        &lt;!-- Don't delete the meta-data below.
+             This is used by the Flutter tool to generate GeneratedPluginRegistrant.java --&gt;
+        &lt;meta-data
+            android:name="flutterEmbedding"
+            android:value="2" /&gt;
+    &lt;/application&gt;
+    &lt;!-- Required to query activities that can process text, see:
+         https://developer.android.com/training/package-visibility and
+         https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
+
+         In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. --&gt;
+    &lt;queries&gt;
+        &lt;intent&gt;
+            &lt;action android:name="android.intent.action.PROCESS_TEXT"/&gt;
+            &lt;data android:mimeType="text/plain"/&gt;
+        &lt;/intent&gt;
+    &lt;/queries&gt;
+&lt;/manifest&gt;
+</code></pre>
+        <h3>ios/Runner/Info.plist</h3>
+        <pre class="full-source"><code class="source" data-file="ios/Runner/Info.plist">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"&gt;
+&lt;plist version="1.0"&gt;
+&lt;dict&gt;
+	&lt;key&gt;CADisableMinimumFrameDurationOnPhone&lt;/key&gt;
+	&lt;true/&gt;
+	&lt;key&gt;CFBundleDevelopmentRegion&lt;/key&gt;
+	&lt;string&gt;$(DEVELOPMENT_LANGUAGE)&lt;/string&gt;
+	&lt;key&gt;CFBundleDisplayName&lt;/key&gt;
+	&lt;string&gt;Textpad&lt;/string&gt;
+	&lt;key&gt;CFBundleExecutable&lt;/key&gt;
+	&lt;string&gt;$(EXECUTABLE_NAME)&lt;/string&gt;
+	&lt;key&gt;CFBundleIdentifier&lt;/key&gt;
+	&lt;string&gt;$(PRODUCT_BUNDLE_IDENTIFIER)&lt;/string&gt;
+	&lt;key&gt;CFBundleInfoDictionaryVersion&lt;/key&gt;
+	&lt;string&gt;6.0&lt;/string&gt;
+	&lt;key&gt;CFBundleName&lt;/key&gt;
+	&lt;string&gt;Textpad&lt;/string&gt;
+	&lt;key&gt;CFBundlePackageType&lt;/key&gt;
+	&lt;string&gt;APPL&lt;/string&gt;
+	&lt;key&gt;CFBundleShortVersionString&lt;/key&gt;
+	&lt;string&gt;$(FLUTTER_BUILD_NAME)&lt;/string&gt;
+	&lt;key&gt;CFBundleSignature&lt;/key&gt;
+	&lt;string&gt;????&lt;/string&gt;
+	&lt;key&gt;CFBundleURLTypes&lt;/key&gt;
+	&lt;array&gt;
+		&lt;dict&gt;
+			&lt;!-- Links starting org.hashbin.textpad.flutter:// open this app:
+			     "open?256t=..." links to a text, and "oauth?code=..." at the
+			     end of signing in to HashBin. --&gt;
+			&lt;key&gt;CFBundleURLName&lt;/key&gt;
+			&lt;string&gt;org.hashbin.textpad.flutter&lt;/string&gt;
+			&lt;key&gt;CFBundleURLSchemes&lt;/key&gt;
+			&lt;array&gt;
+				&lt;string&gt;org.hashbin.textpad.flutter&lt;/string&gt;
+			&lt;/array&gt;
+		&lt;/dict&gt;
+	&lt;/array&gt;
+	&lt;key&gt;CFBundleVersion&lt;/key&gt;
+	&lt;string&gt;$(FLUTTER_BUILD_NUMBER)&lt;/string&gt;
+	&lt;!-- The app_links package handles incoming links, not Flutter's router. --&gt;
+	&lt;key&gt;FlutterDeepLinkingEnabled&lt;/key&gt;
+	&lt;false/&gt;
+	&lt;key&gt;LSRequiresIPhoneOS&lt;/key&gt;
+	&lt;true/&gt;
+	&lt;key&gt;UIApplicationSceneManifest&lt;/key&gt;
+	&lt;dict&gt;
+		&lt;key&gt;UIApplicationSupportsMultipleScenes&lt;/key&gt;
+		&lt;false/&gt;
+		&lt;key&gt;UISceneConfigurations&lt;/key&gt;
+		&lt;dict&gt;
+			&lt;key&gt;UIWindowSceneSessionRoleApplication&lt;/key&gt;
+			&lt;array&gt;
+				&lt;dict&gt;
+					&lt;key&gt;UISceneClassName&lt;/key&gt;
+					&lt;string&gt;UIWindowScene&lt;/string&gt;
+					&lt;key&gt;UISceneConfigurationName&lt;/key&gt;
+					&lt;string&gt;flutter&lt;/string&gt;
+					&lt;key&gt;UISceneDelegateClassName&lt;/key&gt;
+					&lt;string&gt;$(PRODUCT_MODULE_NAME).SceneDelegate&lt;/string&gt;
+					&lt;key&gt;UISceneStoryboardFile&lt;/key&gt;
+					&lt;string&gt;Main&lt;/string&gt;
+				&lt;/dict&gt;
+			&lt;/array&gt;
+		&lt;/dict&gt;
+	&lt;/dict&gt;
+	&lt;key&gt;UIApplicationSupportsIndirectInputEvents&lt;/key&gt;
+	&lt;true/&gt;
+	&lt;key&gt;UILaunchStoryboardName&lt;/key&gt;
+	&lt;string&gt;LaunchScreen&lt;/string&gt;
+	&lt;key&gt;UIMainStoryboardFile&lt;/key&gt;
+	&lt;string&gt;Main&lt;/string&gt;
+	&lt;key&gt;UISupportedInterfaceOrientations&lt;/key&gt;
+	&lt;array&gt;
+		&lt;string&gt;UIInterfaceOrientationPortrait&lt;/string&gt;
+		&lt;string&gt;UIInterfaceOrientationLandscapeLeft&lt;/string&gt;
+		&lt;string&gt;UIInterfaceOrientationLandscapeRight&lt;/string&gt;
+	&lt;/array&gt;
+	&lt;key&gt;UISupportedInterfaceOrientations~ipad&lt;/key&gt;
+	&lt;array&gt;
+		&lt;string&gt;UIInterfaceOrientationPortrait&lt;/string&gt;
+		&lt;string&gt;UIInterfaceOrientationPortraitUpsideDown&lt;/string&gt;
+		&lt;string&gt;UIInterfaceOrientationLandscapeLeft&lt;/string&gt;
+		&lt;string&gt;UIInterfaceOrientationLandscapeRight&lt;/string&gt;
+	&lt;/array&gt;
+&lt;/dict&gt;
+&lt;/plist&gt;
+</code></pre>
+      </section>
+    </div>
+  </main>
+
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> |
+      <a href="/docs/index.html">Docs</a> |
+      <a href="/docs/sdk.html">SDK</a> |
+      <a href="/developers">Developers</a> |
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

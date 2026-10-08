@@ -37,7 +37,8 @@ describe('frontend module imports', () => {
   it('only imports names that the target module exports', () => {
     const problems = [];
     for (const file of walk(FRONTEND)) {
-      const source = readFileSync(file, 'utf8');
+      // Code listings on documentation pages aren't run, so skip them.
+      const source = readFileSync(file, 'utf8').replace(/<pre[\s\S]*?<\/pre>/g, '');
       for (const match of source.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"]([^'"]+)['"]/g)) {
         const specifier = match[2];
         if (/^https?:/.test(specifier)) continue;

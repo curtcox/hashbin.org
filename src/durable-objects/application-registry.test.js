@@ -123,6 +123,24 @@ describe('ApplicationRegistry Durable Object', () => {
       expect((await patch(appId, { owner_user_id: 'user_123', redirect_uris: ['http://localhost:3000/cb'] })).status).toBe(200);
     });
 
+    it('accepts native app schemes named after a domain, and nothing riskier', async () => {
+      const appId = await create();
+      for (const uri of ['org.hashbin.textpad://oauth', 'com.example.app:/oauth2redirect']) {
+        expect((await patch(appId, { owner_user_id: 'user_123', redirect_uris: [uri] })).status, uri).toBe(200);
+      }
+      for (const uri of ['myapp://oauth', 'data:text/html,hi', 'file:///etc/passwd', 'vbscript:x', 'org.example.app://user:pw@oauth', 'org.example.app://oauth#x']) {
+        expect((await patch(appId, { owner_user_id: 'user_123', redirect_uris: [uri] })).status, uri).toBe(400);
+      }
+    });
+
+    it('never treats the "null" origin of a native app scheme as a CORS origin', async () => {
+      const appId = await create();
+      await patch(appId, { owner_user_id: 'user_123', redirect_uris: ['org.hashbin.textpad://oauth', 'https://example.com/cb'] });
+      const check = async (origin) => (await (await registry.fetch(new Request(`http://internal/origins/check?origin=${encodeURIComponent(origin)}`))).json()).allowed;
+      expect(await check('null')).toBe(false);
+      expect(await check('https://example.com')).toBe(true);
+    });
+
     it('soft-deletes: hidden from lists, inactive for authorization and CORS', async () => {
       const appId = await create();
       expect((await remove(appId, 'user_123')).status).toBe(200);
