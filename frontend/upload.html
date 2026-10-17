@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Upload content to HashBin.org">
+  <meta name="description" content="Upload a group of files to HashBin.org with a shared retention period.">
   <title>Upload Content - HashBin.org</title>
   <link rel="icon" href="/img/hashbin-logo.png">
   
@@ -28,7 +28,7 @@
       <h1>Upload Content</h1>
       
       <!-- Error Message -->
-      <div id="error-message" class="alert alert-error" style="display: none;"></div>
+      <div id="error-message" role="alert" class="alert alert-error" style="display: none;"></div>
       
       <!-- Balance Display -->
       <div class="card" style="margin-bottom: 1rem;">
@@ -42,58 +42,39 @@
       
       <!-- File Selection -->
       <div class="card">
-        <h2>Select File</h2>
-        
-        <div id="drop-zone" class="drop-zone">
+        <h2>Select Files</h2>
+
+        <div id="drop-zone" class="drop-zone" role="button" tabindex="0" aria-label="Choose files to upload">
           <div class="drop-zone-content">
-            <p class="drop-zone-text">Drop file here or click to browse</p>
-            <p class="drop-zone-hint">Maximum file size: 90 MB</p>
+            <p class="drop-zone-text">Drop files here or click to browse</p>
+            <p class="drop-zone-hint">Choose multiple files at once. Maximum size: 90 MB per file.</p>
           </div>
-          <input type="file" id="file-input" style="display: none;">
         </div>
-        
-        <!-- File Info -->
+        <input type="file" id="file-input" multiple aria-label="Files to upload" hidden>
+
         <div id="file-info" style="display: none; margin-top: 1rem;">
-          <div class="file-info">
-            <div><strong>File:</strong> <span id="file-name"></span></div>
-            <div><strong>Size:</strong> <span id="file-size"></span></div>
-          </div>
+          <p id="file-summary"></p>
+          <ul id="file-list" class="file-list" aria-label="Selected files"></ul>
+          <p class="form-text">Add more files above or remove files from the list. Identical content is uploaded and charged once per group.</p>
         </div>
-        
-        <!-- Hashing Progress -->
-        <div id="hashing-progress" style="display: none; margin-top: 1rem;">
+
+        <div id="hashing-progress" style="display: none; margin-top: 1rem;" role="status">
           <div class="progress-section">
-            <p><strong>Calculating hash...</strong></p>
+            <p><strong>Preparing files...</strong></p>
             <div class="progress-bar">
               <div id="hash-progress-bar" class="progress-bar-fill"></div>
             </div>
             <div class="progress-text" id="hash-progress-text">0%</div>
           </div>
         </div>
-        
-        <!-- CID Display -->
-        <div id="cid-display" style="display: none; margin-top: 1rem;">
-          <div class="cid-box">
-            <strong>Content ID (CID):</strong>
-            <div class="cid-value" id="calculated-cid"></div>
-          </div>
-        </div>
-        
-        <!-- Duplicate Message -->
-        <div id="duplicate-message" class="alert alert-info" style="display: none; margin-top: 1rem;">
-          <strong>Content Already Exists</strong>
-          <p>This content is already stored with CID: <code id="duplicate-cid"></code></p>
-          <p>Current expiration: <span id="duplicate-expires"></span></p>
-          <p>You can extend the retention period by uploading again.</p>
-        </div>
-        
-        <!-- Inline Content Notice -->
+
         <div id="inline-notice" class="alert alert-info" style="display: none; margin-top: 1rem;">
-          <strong>Free Storage!</strong>
-          <p>This content is small enough (≤64 bytes) to be stored inline within the CID itself. No storage fees apply.</p>
+          Files of 64 bytes or less are stored free within their CID and remain available indefinitely.
         </div>
       </div>
-      
+
+      <div id="upload-results" class="alert alert-info" role="status" style="display: none;"></div>
+
       <!-- Upload Form -->
       <div id="upload-section" style="display: none;">
         <form id="upload-form" class="card">
@@ -101,10 +82,10 @@
           
           <!-- Retention Picker -->
           <div class="form-group">
-            <label for="retention-slider">Retention Period</label>
+            <label for="retention-slider">Retention Period for All Files</label>
             <div class="retention-summary">
               <div class="retention-value" id="retention-value">1 month</div>
-              <div class="retention-subtext" id="retention-subtext">30 days</div>
+              <div class="retention-subtext" id="retention-subtext">About 30 days</div>
             </div>
             <input
               type="range"
@@ -126,13 +107,13 @@
               <button type="button" class="btn btn-secondary btn-small" data-retention="60">5 years</button>
               <button type="button" class="btn btn-secondary btn-small" data-retention="120">10 years</button>
             </div>
-            <p class="retention-hint">Choose any multiple of 30 days or jump to full-year milestones.</p>
+            <p class="retention-hint">Applies to every file in this upload. Choose a duration in months or jump to full-year milestones. Existing content has this period added to its current expiration.</p>
           </div>
           
           <!-- Cost Display -->
           <div class="cost-display">
             <div class="cost-row">
-              <span><strong>Cost:</strong></span>
+              <span><strong>Total cost:</strong></span>
               <span class="cost-amount" id="cost-amount">$0.00</span>
             </div>
             <div class="cost-breakdown" id="cost-breakdown"></div>
@@ -154,10 +135,10 @@
         <!-- Upload Progress -->
         <div id="upload-progress" class="card" style="display: none;">
           <div class="progress-section">
-            <p><strong>Uploading content...</strong></p>
+            <p><strong id="upload-progress-text" role="status">Uploading files...</strong></p>
             <div class="spinner"></div>
             <button type="button" id="cancel-upload" class="btn btn-secondary" style="margin-top: 1rem;">
-              Cancel Upload
+              Stop Uploads
             </button>
           </div>
         </div>

@@ -1,459 +1,347 @@
 /**
- * Upload Page Logic
- * Handles file upload with 256t hashing, duplicate detection, and payment
+ * Upload a group of files with one shared retention period.
+ * Each unique CID uses the existing single-file API and is charged once.
  */
-
-import { generate256tHash, getContentSize, formatFileSize, isInlineContent } from './hash256t.js';
+import { generate256tHash, formatFileSize, isInlineContent } from './hash256t.js';
 import { authenticatedFetch } from './utils.js';
 import { getAuthHeaders } from './auth-loader.js';
 
-// Constants
-// Keep in sync with MAX_UPLOAD_BYTES in src/utils/upload-limits.js
-const MAX_FILE_SIZE = 90 * 1024 * 1024; // 90 MB
+// Keep in sync with MAX_UPLOAD_BYTES in src/utils/upload-limits.js.
+const MAX_FILE_SIZE = 90 * 1024 * 1024;
 const BASE_RATE_PER_GB_PER_MONTH = 0.03;
-
-// State
-let selectedFile = null;
-let calculatedCID = null;
+let files = [];
+let busy = false;
+let currentBalance = null;
 let uploadAbortController = null;
-let currentBalance = 0;
 
-/**
- * Initialize upload page
- */
 async function init() {
-  // Get DOM elements
-  const fileInput = document.getElementById('file-input');
+  const input = document.getElementById('file-input');
   const dropZone = document.getElementById('drop-zone');
-  const uploadForm = document.getElementById('upload-form');
-  const cancelButton = document.getElementById('cancel-upload');
-  const retentionSlider = document.getElementById('retention-slider');
-  const retentionButtons = document.querySelectorAll('[data-retention]');
-  
-  // Set up file input
-  fileInput.addEventListener('change', handleFileSelect);
-  
-  // Set up drag and drop
-  dropZone.addEventListener('click', () => fileInput.click());
-  dropZone.addEventListener('dragover', handleDragOver);
-  dropZone.addEventListener('dragleave', handleDragLeave);
-  dropZone.addEventListener('drop', handleDrop);
-  
-  // Set up form submission
-  uploadForm.addEventListener('submit', handleUpload);
-  
-  // Set up cancel button
-  cancelButton.addEventListener('click', handleCancel);
-  
-  // Set up retention picker
-  retentionSlider.addEventListener('input', handleRetentionChange);
-  retentionButtons.forEach((button) => {
+  input.addEventListener('change', async () => {
+    const selected = Array.from(input.files);
+    input.value = '';
+    await addFiles(selected);
+  });
+  dropZone.addEventListener('click', () => { if (!busy) input.click(); });
+  dropZone.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (!busy) input.click();
+    }
+  });
+  dropZone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    if (!busy) dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (!busy) addFiles(Array.from(event.dataTransfer.files));
+  });
+  document.getElementById('upload-form').addEventListener('submit', handleUpload);
+  document.getElementById('cancel-upload').addEventListener('click', handleCancel);
+  document.getElementById('retention-slider').addEventListener('input', updateCostDisplay);
+  document.querySelectorAll('[data-retention]').forEach((button) => {
     button.addEventListener('click', () => {
-      retentionSlider.value = button.dataset.retention;
-      handleRetentionChange();
+      document.getElementById('retention-slider').value = button.dataset.retention;
+      updateCostDisplay();
     });
   });
-  updateRetentionDisplay();
-  
-  // Load user balance
+  updateCostDisplay();
   await loadBalance();
 }
 
-/**
- * Load user balance
- */
 async function loadBalance() {
   try {
     const response = await authenticatedFetch('/api/balance');
-    
     if (response.ok) {
       const data = await response.json();
       currentBalance = data.balance_cents;
-      updateBalanceDisplay();
+      document.getElementById('current-balance').textContent = formatCents(currentBalance);
+      updateCostDisplay();
+    } else {
+      document.getElementById('current-balance').textContent = 'Unavailable';
     }
   } catch (error) {
     console.error('Failed to load balance:', error);
+    document.getElementById('current-balance').textContent = 'Unavailable';
   }
 }
 
-/**
- * Update balance display
- */
-function updateBalanceDisplay() {
-  const balanceElement = document.getElementById('current-balance');
-  if (balanceElement) {
-    balanceElement.textContent = formatCents(currentBalance);
-  }
+// Entries with identical content share their upload state, even under different names.
+function uniqueContents() {
+  return [...new Set(files.map(entry => entry.content).filter(content => content.cid))];
 }
 
-/**
- * Handle file selection
- */
-async function handleFileSelect(event) {
-  const file = event.target.files[0];
-  if (file) {
-    await processFile(file);
-  }
+function pendingContents() {
+  return uniqueContents().filter(content => content.status !== 'uploaded');
 }
 
-/**
- * Handle drag over
- */
-function handleDragOver(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  event.currentTarget.classList.add('drag-over');
-}
-
-/**
- * Handle drag leave
- */
-function handleDragLeave(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  event.currentTarget.classList.remove('drag-over');
-}
-
-/**
- * Handle drop
- */
-async function handleDrop(event) {
-  event.preventDefault();
-  event.stopPropagation();
-  event.currentTarget.classList.remove('drag-over');
-  
-  const files = event.dataTransfer.files;
-  
-  if (files.length === 0) {
-    return;
-  }
-  
-  if (files.length > 1) {
-    showError('Please drop only one file at a time');
-    return;
-  }
-  
-  await processFile(files[0]);
-}
-
-/**
- * Process selected file
- */
-async function processFile(file) {
-  // Validate file size
-  if (file.size > MAX_FILE_SIZE) {
-    showError(`File too large. Maximum size is 90 MB. Your file is ${formatFileSize(file.size)}.`);
-    return;
-  }
-  
-  selectedFile = file;
-  calculatedCID = null;
-  
-  // Update UI
-  document.getElementById('file-info').style.display = 'block';
-  document.getElementById('file-name').textContent = file.name;
-  document.getElementById('file-size').textContent = formatFileSize(file.size);
-  
-  // Show hashing progress
-  showHashingProgress();
-  
-  try {
-    // Calculate hash
-    const cid = await generate256tHash(file, (progress) => {
-      updateHashProgress(progress);
-    });
-    
-    calculatedCID = cid;
-    
-    // Hide hashing progress
-    hideHashingProgress();
-    
-    // Show CID
-    document.getElementById('calculated-cid').textContent = cid;
-    document.getElementById('cid-display').style.display = 'block';
-    
-    // Check if content already exists
-    await checkDuplicate(cid);
-    
-    // Update cost display
-    updateCostDisplay();
-    
-    // Enable upload button
-    document.getElementById('upload-button').disabled = false;
-    
-  } catch (error) {
-    hideHashingProgress();
-    showError(`Failed to calculate hash: ${error.message}`);
-  }
-}
-
-/**
- * Show hashing progress
- */
-function showHashingProgress() {
+async function addFiles(selected) {
+  if (busy || selected.length === 0) return;
+  setBusy(true);
+  document.getElementById('error-message').style.display = 'none';
+  document.getElementById('upload-results').style.display = 'none';
   document.getElementById('hashing-progress').style.display = 'block';
-  document.getElementById('upload-section').style.display = 'none';
-}
+  document.getElementById('hash-progress-bar').style.width = '0%';
+  document.getElementById('hash-progress-text').textContent = '0%';
+  const added = selected.map(file => ({ file, content: { status: 'waiting' } }));
+  files.push(...added);
+  renderFiles();
 
-/**
- * Update hash progress
- */
-function updateHashProgress(percent) {
-  const progressBar = document.getElementById('hash-progress-bar');
-  const progressText = document.getElementById('hash-progress-text');
-  
-  progressBar.style.width = percent + '%';
-  progressText.textContent = Math.round(percent) + '%';
-}
-
-/**
- * Hide hashing progress
- */
-function hideHashingProgress() {
-  document.getElementById('hashing-progress').style.display = 'none';
-  document.getElementById('upload-section').style.display = 'block';
-}
-
-/**
- * Check if content is duplicate
- */
-async function checkDuplicate(cid) {
-  try {
-    const response = await fetch(`/api/content/${cid}/exists`);
-    
-    if (response.ok) {
-      const data = await response.json();
-      
-      if (data.exists) {
-        // Show duplicate message
-        document.getElementById('duplicate-message').style.display = 'block';
-        document.getElementById('duplicate-cid').textContent = cid;
-        document.getElementById('duplicate-expires').textContent = new Date(data.expires_at).toLocaleString();
+  for (const [index, entry] of added.entries()) {
+    const { file } = entry;
+    if (file.size === 0 || file.size > MAX_FILE_SIZE) {
+      entry.content = {
+        status: 'invalid',
+        message: file.size === 0 ? 'Empty files cannot be uploaded.' : 'File too large. Maximum size is 90 MB per file.'
+      };
+      renderFiles();
+      continue;
+    }
+    entry.content.status = 'hashing';
+    renderFiles();
+    try {
+      const cid = await generate256tHash(file, percent => {
+        const total = (index + percent / 100) / added.length * 100;
+        document.getElementById('hash-progress-bar').style.width = `${total}%`;
+        document.getElementById('hash-progress-text').textContent = `${index + 1} of ${added.length} files — ${Math.round(total)}%`;
+      });
+      const matching = uniqueContents().find(content => content.cid === cid);
+      if (matching) {
+        entry.content = matching;
       } else {
-        document.getElementById('duplicate-message').style.display = 'none';
+        entry.content = { file, cid, status: 'ready', exists: false };
+        try {
+          const response = await fetch(`/api/content/${cid}/exists`);
+          if (response.ok) {
+            const data = await response.json();
+            entry.content.exists = data.exists;
+            entry.content.expiresAt = data.expires_at;
+          }
+        } catch {
+          // Duplicate detection is advisory; the upload API also checks it.
+        }
+      }
+    } catch (error) {
+      entry.content = { status: 'invalid', message: `Failed to calculate hash: ${error.message}` };
+    }
+    renderFiles();
+  }
+  document.getElementById('hashing-progress').style.display = 'none';
+  setBusy(false);
+  renderFiles();
+}
+
+function renderFiles() {
+  const list = document.getElementById('file-list');
+  list.replaceChildren();
+  document.getElementById('file-info').style.display = files.length ? 'block' : 'none';
+  document.getElementById('upload-section').style.display = files.length ? 'block' : 'none';
+  const size = files.reduce((sum, entry) => sum + entry.file.size, 0);
+  document.getElementById('file-summary').textContent = `${files.length} file${files.length === 1 ? '' : 's'} selected · ${formatFileSize(size)}`;
+  const seen = new Set();
+  files.forEach((entry) => {
+    const { file, content } = entry;
+    const row = document.createElement('li');
+    row.className = `file-row file-${content.status}`;
+    const details = document.createElement('div');
+    details.className = 'file-details';
+    const name = document.createElement('strong');
+    name.textContent = file.name;
+    const sizeLabel = document.createElement('span');
+    sizeLabel.textContent = formatFileSize(file.size);
+    const status = document.createElement('p');
+    status.className = 'file-status';
+    const labels = {
+      waiting: 'Waiting to prepare', hashing: 'Calculating hash...', ready: 'Ready',
+      uploading: 'Uploading...', uploaded: 'Uploaded', failed: 'Upload failed', cancelled: 'Stopped', invalid: 'Cannot upload'
+    };
+    status.textContent = content.message || labels[content.status];
+    if (content.status === 'ready' && content.exists) {
+      status.textContent = 'Already stored — uploading adds the selected retention period.';
+      if (content.expiresAt) status.textContent += ` Current expiration: ${new Date(content.expiresAt).toLocaleString()}`;
+    }
+    if (content.cid && isInlineContent(content.cid)) status.textContent += ' Free inline storage.';
+    if (content.cid && seen.has(content)) status.textContent += ' Identical content — uploaded once for this group.';
+    seen.add(content);
+    details.append(name, sizeLabel, status);
+    if (content.cid) {
+      const cid = document.createElement('code');
+      cid.className = 'file-cid';
+      cid.textContent = content.cid;
+      details.append(cid);
+      if (content.status === 'cancelled' || content.status === 'failed') {
+        const check = document.createElement('a');
+        check.href = `/info.html?cid=${encodeURIComponent(content.cid)}`;
+        check.textContent = 'Check content before retrying';
+        details.append(check);
       }
     }
-  } catch (error) {
-    console.error('Failed to check duplicate:', error);
-    // Continue with upload on error
-  }
-}
-
-/**
- * Handle retention change
- */
-function handleRetentionChange() {
-  updateRetentionDisplay();
+    if (content.result) {
+      const result = document.createElement('p');
+      const link = document.createElement('a');
+      link.href = `/info.html?cid=${encodeURIComponent(content.result.cid)}&uploaded=1`;
+      link.textContent = 'View content';
+      result.append(link);
+      result.append(isInlineContent(content.cid) ? ' · Available indefinitely' : ` · Retained until ${new Date(content.result.expires_at).toLocaleString()}`);
+      details.append(result);
+    }
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'btn btn-secondary btn-small';
+    remove.textContent = 'Remove';
+    remove.setAttribute('aria-label', `Remove ${file.name}`);
+    remove.disabled = busy;
+    remove.addEventListener('click', () => {
+      files = files.filter(item => item !== entry);
+      document.getElementById('upload-results').style.display = 'none';
+      renderFiles();
+    });
+    row.append(details, remove);
+    list.append(row);
+  });
   updateCostDisplay();
 }
 
-/**
- * Get selected retention months
- */
 function getRetentionMonths() {
-  const sliderValue = parseInt(document.getElementById('retention-slider').value, 10);
-  return Number.isNaN(sliderValue) || sliderValue < 1 ? 1 : sliderValue;
+  return Math.min(120, Math.max(1, parseInt(document.getElementById('retention-slider').value, 10) || 1));
 }
 
-/**
- * Update retention display
- */
-function updateRetentionDisplay() {
-  const months = getRetentionMonths();
-  const valueElement = document.getElementById('retention-value');
-  const subtextElement = document.getElementById('retention-subtext');
-
-  if (valueElement) {
-    valueElement.textContent = formatRetentionLabel(months);
-  }
-
-  if (subtextElement) {
-    subtextElement.textContent = `${months * 30} days`;
-  }
-}
-
-/**
- * Update cost display
- */
 function updateCostDisplay() {
-  if (!selectedFile) return;
-  
   const months = getRetentionMonths();
-  const costCents = calculateCost(selectedFile.size, months);
-  
-  // Update cost display
+  document.getElementById('retention-value').textContent = formatRetentionLabel(months);
+  document.getElementById('retention-subtext').textContent = `About ${months * 30} days`;
+  const pending = pendingContents();
+  // Round each file's charge before summing, just as the API does.
+  const costCents = pending.reduce((sum, content) => sum + calculateCost(content.file.size, months), 0);
   document.getElementById('cost-amount').textContent = formatCents(costCents);
-  const retentionLabel = formatRetentionLabel(months);
-  document.getElementById('cost-breakdown').textContent = 
-    `${formatFileSize(selectedFile.size)} × ${retentionLabel} @ $${BASE_RATE_PER_GB_PER_MONTH}/GB/month`;
-  
-  // Check if inline content (free)
-  if (calculatedCID && isInlineContent(calculatedCID)) {
-    document.getElementById('inline-notice').style.display = 'block';
-    document.getElementById('cost-amount').textContent = '$0.00 (Free)';
-  } else {
-    document.getElementById('inline-notice').style.display = 'none';
-  }
-  
-  // Check balance sufficiency
-  const sufficient = currentBalance >= costCents;
+  document.getElementById('cost-breakdown').textContent = `${pending.length} unique file${pending.length === 1 ? '' : 's'} remaining × ${formatRetentionLabel(months)} @ $${BASE_RATE_PER_GB_PER_MONTH}/GB/month. Each file's charge is rounded up to a whole cent.`;
+  document.getElementById('inline-notice').style.display = uniqueContents().some(content => isInlineContent(content.cid)) ? 'block' : 'none';
+  const sufficient = costCents === 0 || (currentBalance !== null && currentBalance >= costCents);
   const balanceStatus = document.getElementById('balance-status');
-  
+  balanceStatus.className = `balance-status ${sufficient ? 'sufficient' : 'insufficient'}`;
+  balanceStatus.replaceChildren();
   if (sufficient) {
-    balanceStatus.className = 'balance-status sufficient';
-    balanceStatus.innerHTML = '✓ Sufficient balance';
-    document.getElementById('upload-button').disabled = false;
+    balanceStatus.textContent = '✓ Sufficient balance';
+  } else if (currentBalance === null) {
+    balanceStatus.textContent = 'Balance unavailable. Reload the page to check your balance before uploading.';
   } else {
-    const shortfall = costCents - currentBalance;
-    balanceStatus.className = 'balance-status insufficient';
-    balanceStatus.innerHTML = `⚠ Need ${formatCents(shortfall)} more. <a href="/deposit.html">Add funds</a>`;
-    document.getElementById('upload-button').disabled = true;
+    balanceStatus.textContent = `⚠ Need ${formatCents(costCents - currentBalance)} more. `;
+    const link = document.createElement('a');
+    link.href = '/deposit.html';
+    link.textContent = 'Add funds';
+    balanceStatus.append(link);
   }
+  const button = document.getElementById('upload-button');
+  button.disabled = busy || !pending.length || !sufficient;
+  const retrying = pending.some(content => ['failed', 'cancelled'].includes(content.status));
+  button.textContent = retrying ? 'Retry Remaining Files' : `Upload ${pending.length} File${pending.length === 1 ? '' : 's'}`;
 }
 
-/**
- * Calculate upload cost
- */
 function calculateCost(sizeBytes, months) {
-  // Mirrors calculateRetentionCost in src/utils/pricing.js: inline content is free,
-  // otherwise no minimum and partial cents round up
   if (sizeBytes <= 64) return 0;
-  const sizeGB = sizeBytes / (1024 * 1024 * 1024);
-  const costDollars = sizeGB * months * BASE_RATE_PER_GB_PER_MONTH;
+  const costDollars = sizeBytes / (1024 * 1024 * 1024) * months * BASE_RATE_PER_GB_PER_MONTH;
   return Math.max(1, Math.ceil(costDollars * 100 - 1e-9));
 }
 
-/**
- * Format cents as dollars
- */
 function formatCents(cents) {
   return '$' + (cents / 100).toFixed(2);
 }
 
-/**
- * Format retention label
- */
 function formatRetentionLabel(months) {
-  if (months === 1) {
-    return '1 month';
-  }
-
+  if (months === 1) return '1 month';
   if (months % 12 === 0) {
     const years = months / 12;
     return `${years} year${years === 1 ? '' : 's'} (${months} months)`;
   }
-
   return `${months} months`;
 }
 
-/**
- * Handle upload
- */
+function setBusy(value) {
+  busy = value;
+  document.getElementById('file-input').disabled = value;
+  document.getElementById('drop-zone').setAttribute('aria-disabled', String(value));
+  document.getElementById('retention-slider').disabled = value;
+  document.querySelectorAll('[data-retention]').forEach(button => { button.disabled = value; });
+  updateCostDisplay();
+}
+
 async function handleUpload(event) {
   event.preventDefault();
-  
-  if (!selectedFile || !calculatedCID) {
-    showError('Please select a file first');
-    return;
-  }
-  
-  // Show upload progress
-  showUploadProgress();
-  
-  try {
-    // Create form data
-    const formData = new FormData();
-    formData.append('content', selectedFile);
-    formData.append('retention_months', getRetentionMonths());
-    
-    // Create abort controller
-    uploadAbortController = new AbortController();
-    
-    // Get auth token
-    const authHeaders = await getAuthHeaders();
-    if (!authHeaders) {
-      hideUploadProgress();
-      showError('Not authenticated. Please sign in again.');
-      return;
-    }
-    
-    // Upload
-    const response = await fetch('/api/content', {
-      method: 'POST',
-      body: formData,
-      headers: authHeaders,
-      signal: uploadAbortController.signal
-    });
-    
-    if (response.ok) {
-      const data = await response.json();
-      
-      // Redirect to info page
-      window.location.href = `/info.html?cid=${data.cid}&uploaded=1`;
-    } else {
-      const error = await response.json();
-      hideUploadProgress();
-      
-      if (error.error === 'insufficient_balance') {
-        showError(`Insufficient balance. ${error.message}`);
-      } else {
-        showError(error.message || 'Upload failed');
-      }
-    }
-  } catch (error) {
-    hideUploadProgress();
-    
-    if (error.name === 'AbortError') {
-      showError('Upload cancelled');
-    } else {
-      showError(`Upload failed: ${error.message}`);
-    }
-  }
-}
-
-/**
- * Handle cancel
- */
-function handleCancel() {
-  if (uploadAbortController) {
-    uploadAbortController.abort();
-    uploadAbortController = null;
-  }
-  
-  hideUploadProgress();
-}
-
-/**
- * Show upload progress
- */
-function showUploadProgress() {
+  if (busy || document.getElementById('upload-button').disabled) return;
+  const pending = pendingContents();
+  if (!pending.length) return;
+  // Capture once so every request in this group uses the same duration.
+  const months = getRetentionMonths();
+  const controller = new AbortController();
+  uploadAbortController = controller;
+  setBusy(true);
+  renderFiles();
   document.getElementById('upload-progress').style.display = 'block';
   document.getElementById('upload-form').style.display = 'none';
+  document.getElementById('upload-results').style.display = 'none';
+  document.getElementById('cancel-upload').disabled = false;
+
+  try {
+    for (const [index, content] of pending.entries()) {
+      if (controller.signal.aborted) break;
+      content.status = 'uploading';
+      content.message = '';
+      renderFiles();
+      document.getElementById('upload-progress-text').textContent = `Uploading ${index + 1} of ${pending.length}: ${content.file.name}`;
+      try {
+        const authHeaders = await getAuthHeaders();
+        if (!authHeaders) throw new Error('Not authenticated. Please sign in again.');
+        if (controller.signal.aborted) break;
+        const formData = new FormData();
+        formData.append('content', content.file);
+        formData.append('retention_months', months);
+        const response = await fetch('/api/content', {
+          method: 'POST', body: formData, headers: authHeaders, signal: controller.signal
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.error || 'Upload failed');
+        content.result = data;
+        content.status = 'uploaded';
+        if (currentBalance !== null) {
+          currentBalance = Math.max(0, currentBalance - data.cost_cents);
+          document.getElementById('current-balance').textContent = formatCents(currentBalance);
+        }
+      } catch (error) {
+        content.status = controller.signal.aborted ? 'cancelled' : 'failed';
+        content.message = controller.signal.aborted
+          ? 'Stopped. This file may have reached the server; check its content page before retrying.'
+          : `Upload failed: ${error.message}`;
+      }
+      renderFiles();
+    }
+  } finally {
+    // Cancellation while waiting for authentication has not sent a request.
+    pending.filter(content => content.status === 'uploading').forEach(content => { content.status = 'ready'; });
+    uploadAbortController = null;
+    await loadBalance();
+    setBusy(false);
+    renderFiles();
+    document.getElementById('upload-progress').style.display = 'none';
+    document.getElementById('upload-form').style.display = 'block';
+    const completed = files.filter(entry => entry.content.status === 'uploaded').length;
+    const results = document.getElementById('upload-results');
+    results.textContent = `${completed} of ${files.length} files uploaded. ${controller.signal.aborted ? 'Uploads stopped. ' : ''}See the file list for individual results. Successful files will not be uploaded again when retrying.`;
+    results.style.display = 'block';
+  }
+  if (files.length === 1 && files[0].content.status === 'uploaded') {
+    window.location.href = `/info.html?cid=${encodeURIComponent(files[0].content.result.cid)}&uploaded=1`;
+  }
 }
 
-/**
- * Hide upload progress
- */
-function hideUploadProgress() {
-  document.getElementById('upload-progress').style.display = 'none';
-  document.getElementById('upload-form').style.display = 'block';
+function handleCancel() {
+  uploadAbortController?.abort();
+  document.getElementById('cancel-upload').disabled = true;
+  document.getElementById('upload-progress-text').textContent = 'Stopping uploads...';
 }
 
-/**
- * Show error message
- */
-function showError(message) {
-  const errorDiv = document.getElementById('error-message');
-  errorDiv.textContent = message;
-  errorDiv.style.display = 'block';
-  
-  // Hide after 10 seconds
-  setTimeout(() => {
-    errorDiv.style.display = 'none';
-  }, 10000);
-}
-
-// Initialize on load
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
