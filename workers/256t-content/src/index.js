@@ -46,7 +46,9 @@ function textResponse(status, message, extraHeaders = {}) {
     status,
     headers: baseHeaders({
       'content-type': 'text/plain; charset=utf-8',
-      ...extraHeaders
+      ...extraHeaders,
+      // A temporary failure must not become an immutable cached content response.
+      ...(status >= 400 ? { 'Cache-Control': 'no-store' } : {})
     })
   });
 }
@@ -103,7 +105,8 @@ function enforceRateLimit(request) {
   if (existing.count >= MAX_REQUESTS_PER_WINDOW) {
     const retryAfter = Math.max(1, Math.ceil((existing.resetAt - now) / 1000));
     return textResponse(429, 'Rate limited', {
-      'Retry-After': String(retryAfter)
+      'Retry-After': String(retryAfter),
+      'Access-Control-Expose-Headers': 'Retry-After'
     });
   }
 

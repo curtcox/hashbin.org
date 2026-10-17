@@ -65,6 +65,12 @@ Rate limits are enforced per authentication context:
 | Authenticated User | 1,000 requests/minute |
 | Per API Key | 500 requests/minute (within user limit) |
 
+The content download host (`256t.us`) separately allows 30 requests per IP per
+minute. An HTTP 429 means the request was throttled, not that the content is
+missing. Bulk download and verification clients should wait for the `Retry-After`
+header, then retry the same CID. Error responses are not cacheable; HTTP 404
+indicates missing, deleted, or expired content.
+
 When rate limit is exceeded, the API returns:
 ```http
 HTTP/1.1 429 Too Many Requests
