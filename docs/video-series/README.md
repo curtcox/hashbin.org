@@ -218,6 +218,11 @@ tools/contact_sheet.sh build/videos/U2-what-it-costs.mp4 sheet.png 12  # frames 
   (`self.at("the phrase", ...)`) instead of guessing durations. Each beat is as long as its
   narration plus a 1.2 s tail. The renderer prints `CUE MISSING` if a phrase isn't found and
   `OVERRUN` if animations run late, so rerun it after editing narration.
+- **Soundtrack:** each episode's audio is assembled from the Kokoro clips, each placed at the exact
+  frame its scene starts, then brought to -16 LUFS with one fixed gain and a peak limiter. (Joining
+  the scenes' own audio with ffmpeg's concat demuxer drops each beat's silent tail, so narration
+  drifts ahead of the picture by about a second per beat.) To rebuild the joined videos without
+  re-rendering scenes, add `--join-only`.
 - **Rebuilding:** unchanged beats aren't re-voiced. `build/` is ignored by git.
 - **No LaTeX needed:** math is set with `Text` (exponents are composed by `Expr`), so the scenes
   render without a TeX installation.
