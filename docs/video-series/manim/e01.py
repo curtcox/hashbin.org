@@ -229,7 +229,7 @@ class E01_Base64url(Ep):
         self.at("base64url", Write(name), rt=0.8)
 
         strip = VGroup(*[M(ch, 20, GREY_A) for ch in ALPHABET]).arrange(RIGHT, buff=0.06).move_to(DOWN * 2.2)
-        idx = VGroup(*[T(str(i), 14, GREY_C).next_to(strip[i], UP, buff=0.12) for i in (0, 26, 52, 62, 63)])
+        idx = VGroup(*[T(str(i), 14, GREY_C).next_to(strip[i], UP, buff=0.12) for i in (0, 26, 52, 63)])
         strip_label = T("64 symbols", 22, GREY_A).next_to(strip, DOWN, buff=0.2)
         self.at("groups of six", rt=0.1)
         braces = VGroup(*[Brace(bits[i * 6:(i + 1) * 6], DOWN, buff=0.08, color=GREY_B) for i in range(6)])
@@ -324,6 +324,7 @@ class E01_LengthPrefix(Ep):
         cells_live = always_redraw(live_cells)
         self.add(cells_live)
         mb = T("90 MB", 26, GREY_A).next_to(bytes_label, RIGHT, buff=0.6)
+        mb.add_updater(lambda m: m.next_to(bytes_label, RIGHT, buff=0.6))
         self.at("ninety-megabyte file", value.animate.set_value(90 * 1024 * 1024), FadeIn(mb), rate_func=rate_functions.ease_in_expo,
                 rt=2.0)
         self.at("the largest number six bytes can hold", FadeOut(mb), value.animate.set_value(2 ** 48 - 1),
@@ -413,7 +414,7 @@ class E01_Inline(Ep):
         self.at("at most eighty-six characters", size.animate.set_value(64), rt=2.4)
         edge = live.get_right()[0]
         dashed = DashedLine([edge + 0.05, 1.6, 0], [edge + 0.05, -0.6, 0], color=GREY_B)
-        same = T("same length either way", 20, GREY_B).next_to(dashed, DOWN, buff=0.1)
+        same = T("same length either way", 20, GREY_B).next_to(dashed, DOWN, buff=0.1).align_to(dashed, RIGHT)
         self.go(Create(dashed), FadeIn(same), rt=0.6)
         self.at("either way", size.animate.set_value(65), rt=0.6)
         self.go(Indicate(live, color=BLUE_C, scale_factor=1.03), rt=0.8)

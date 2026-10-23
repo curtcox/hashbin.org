@@ -35,11 +35,14 @@ class X2_Popular(Ep):
         one = Person(GREEN, height=0.5).move_to(RIGHT * 3.6 + UP * 1.6)
         self.at("Every time someone downloads it", FadeIn(one), rt=0.5)
         crowd = VGroup()
-        for i in range(120):
+        keep_clear = [(-3.0, -1.9, 3.9, 2.1), (-7.1, -3.6, -1.4, -1.7), (3.1, 1.1, 4.1, 2.1)]  # sandbox and labels, uploader, first reader
+        while len(crowd) < 120:
             angle = rng.uniform(0, TAU)
             radius = rng.uniform(2.6, 6.5)
-            p = Person(GREEN, height=0.28).move_to([radius * np.cos(angle) * 1.1, radius * np.sin(angle) * 0.6, 0])
-            crowd.add(p)
+            x, y = radius * np.cos(angle) * 1.1, radius * np.sin(angle) * 0.6
+            if abs(x) > 6.8 or abs(y) > 3.75 or any(l < x < r and b < y < t for l, b, r, t in keep_clear):
+                continue
+            crowd.add(Person(GREEN, height=0.28).move_to([x, y, 0]))
         meter = VGroup(T("bytes sent", 20, GREY_A), Number(0, size=30, color=TEAL_B)).arrange(RIGHT, buff=0.2).next_to(sandbox, DOWN, buff=0.25)
         self.at("a million people", LaggedStart(*[FadeIn(p, scale=0.5) for p in crowd], lag_ratio=0.01), FadeIn(meter), rt=1.6)
         self.go(counting(meter[1], 987_654_321_000), rt=2.0)

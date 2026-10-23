@@ -250,7 +250,7 @@ class D3_Connection(Ep):
         phones.arrange(RIGHT, buff=0.5).move_to(RIGHT * 4.2 + UP * 0.4)
         self.at("building for phones", FadeIn(phones[0]), rt=0.5)
         self.at("Expo and in Flutter", FadeIn(phones[1]), rt=0.5)
-        self.at("system browser", Indicate(VGroup(phones[0][-2], phones[1][-2]), color=WHITE), rt=0.5)
+        self.at("system browser", Indicate(VGroup(*phones[0][-2:], *phones[1][-2:]), color=WHITE), rt=0.5)
         secure = VGroup(padlock(GREY_A, 0.35), T("secure storage", 18, GREY_A)).arrange(RIGHT, buff=0.15).next_to(phones, DOWN, buff=0.3)
         self.at("secure storage", FadeIn(secure), rt=0.5)
 

@@ -18,6 +18,8 @@ SERIES_DIR = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SERIES_DIR / "tools"))
 from extract_narration import load_replacements  # noqa: E402
 
+from .audit import layout_findings  # noqa: E402
+
 AUDIO_DIR = SERIES_DIR / "build" / "audio"
 REPLACEMENTS = load_replacements()
 
@@ -33,6 +35,8 @@ TAIL = 1.2  # seconds of picture after the narration ends
 FADE = 0.6
 
 DIM = 0.3
+
+AUDIT = __import__("os").environ.get("HB_AUDIT") == "1"
 
 
 # ---------------------------------------------------------------------------- text
@@ -318,14 +322,18 @@ class Timeline(VGroup):
             group.add(T(label, size, RED).next_to(line, UP, buff=0.08))
         return group
 
-    def playhead(self, month=0, label="today", height=1.2):
+    def playhead(self, month=0, label="today", height=1.2, side=UP):
         tri = Triangle(color=WHITE, fill_opacity=1).scale(0.09).rotate(PI)
         line = DashedLine(ORIGIN, UP * height, color=WHITE, stroke_width=2)
         tri.next_to(line, UP, buff=0)
-        text = T(label, 18, WHITE).next_to(tri, UP, buff=0.05)
+        text = T(label, 18, WHITE).next_to(tri, side, buff=0.05 if side is UP else 0.1)
         head = VGroup(line, tri, text)
-        head.move_to(self.x(month), aligned_edge=DOWN)
+        head.shift(self.x(month) - line.get_bottom())
         return head
+
+    def head_to(self, head, month):
+        """Move a playhead so its line, not the middle of its label, stands on `month`."""
+        return head.animate.shift(self.x(month) - head[0].get_bottom())
 
 
 def cost_area(axes, width_value, height_value, color=GOLD, opacity=0.4):
@@ -578,6 +586,7 @@ def pointer(color=WHITE):
     """Mouse pointer; its tip is the mobject's top-left corner."""
     arrow = Polygon([0, 0, 0], [0, -0.5, 0], [0.13, -0.37, 0], [0.24, -0.6, 0], [0.32, -0.56, 0], [0.21, -0.33, 0],
                     [0.37, -0.33, 0], color=BG, stroke_width=2, fill_color=color, fill_opacity=1)
+    arrow.audit_ignore = True  # it is meant to sit on what it clicks
     return arrow
 
 
@@ -736,6 +745,7 @@ class Beat(Scene):
         self.word_starts = starts
         self.cursor = 0
         self.overruns = []
+        self.layout_seen = set()
         self.wav = str(meta_path.with_suffix(".wav"))
 
     def construct(self):
@@ -745,6 +755,14 @@ class Beat(Scene):
 
     def build(self):
         raise NotImplementedError
+
+    def play(self, *args, **kwargs):
+        super().play(*args, **kwargs)
+        if AUDIT:
+            for kind, description in layout_findings(self):
+                if (kind, description) not in self.layout_seen:
+                    self.layout_seen.add((kind, description))
+                    print(f"LAYOUT {type(self).__name__} t={self.time:.1f} {kind}: {description}", flush=True)
 
     # -- cues
 

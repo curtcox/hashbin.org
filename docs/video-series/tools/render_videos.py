@@ -47,7 +47,7 @@ def render_scene(module_name, scene, quality_args, quality_dir):
     with log.open("w") as handle:
         result = subprocess.run(command, cwd=MANIM_DIR, stdout=handle, stderr=subprocess.STDOUT)
     output = MEDIA_DIR / "videos" / module_name / quality_dir / f"{scene}.mp4"
-    notes = [line.strip() for line in log.read_text().splitlines() if line.startswith(("OVERRUN", "CUE MISSING"))]
+    notes = [line.strip() for line in log.read_text().splitlines() if line.startswith(("OVERRUN", "CUE MISSING", "LAYOUT"))]
     if result.returncode != 0 or not output.exists():
         return scene, None, notes + [f"FAILED, see {log}"]
     return scene, output, notes
@@ -123,7 +123,11 @@ def main():
     parser.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 4) - 2))
     parser.add_argument("--scenes", nargs="*", help="only these scene names (no joining)")
     parser.add_argument("--join-only", action="store_true", help="don't render; rejoin the scenes already rendered")
+    parser.add_argument("--audit", action="store_true", help="report layout problems (text off the frame, overlapping, "
+                        "covered or crossed); no joining")
     args = parser.parse_args()
+    if args.audit:
+        os.environ["HB_AUDIT"] = "1"
 
     if args.low:
         quality_args, quality_dir = ["-ql"], "480p15"
@@ -149,7 +153,7 @@ def main():
             for note in notes:
                 print(f"    {note}", flush=True)
 
-    if args.scenes:
+    if args.scenes or args.audit:
         return
     for module, episode, scenes in plan:
         parts = {beat: results.get(scene) for beat, scene in scenes}

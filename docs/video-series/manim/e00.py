@@ -69,7 +69,7 @@ class E00_WhatItIs(Ep):
         self.at("place to publish files", FadeIn(uploader), FadeIn(file), FadeIn(desk), FadeIn(bins), rt=1.0)
         self.at("You upload a file", file.animate.move_to(desk.box.get_center() + DOWN * 0.2), rt=1.2)
         drawer = bins.drawer(5)
-        label = S256(EXAMPLE_CID, 13, truncate=8).move_to(drawer[2])
+        label = S256(EXAMPLE_CID, 11, truncate=7).move_to(drawer[2])
         self.at("works out its name", file.animate.scale(0.55).move_to(drawer[0]), rt=1.0)
         self.at("256t string", FadeTransform(drawer[2], label), Indicate(drawer, color=YELLOW), rt=1.0)
 
@@ -133,14 +133,15 @@ class E00_WhoPays(Ep):
 
         self.at("When the time you paid for runs out", FadeOut(tiny), FadeOut(price), FadeOut(cap), rt=0.6)
         timeline = Timeline(14, 5.0, size=14).move_to(LEFT * 3.6 + DOWN * 3.0)
-        expiry = timeline.expiry(12, height=0.7, size=16)
-        head = timeline.playhead(0, height=0.6)
+        expiry = timeline.expiry(12, height=0.9, size=16)
+        head = timeline.playhead(0, height=0.6, side=RIGHT)
         bins = Bins(2, 3, width=0.7, height=0.36).move_to(RIGHT * 3.6 + DOWN * 2.0)
         stored = FileIcon(width=0.25, height=0.32, lines=False).move_to(bins.drawer(1)[0])
+        bins.drawer(1)[2].set_opacity(0)
         self.go(FadeIn(timeline), Create(expiry), FadeIn(head), FadeIn(bins), FadeIn(stored), rt=0.8)
-        self.at("the file is deleted", head.animate.move_to(timeline.x(12.3), aligned_edge=DOWN), rt=1.6)
+        self.at("the file is deleted", timeline.head_to(head, 12.3), rt=1.6)
         self.go(stored.animate.set_opacity(0), rt=0.6)
-        self.at("unless someone extends it", head.animate.move_to(timeline.x(0), aligned_edge=DOWN), stored.animate.set_opacity(1),
+        self.at("unless someone extends it", timeline.head_to(head, 0), stored.animate.set_opacity(1),
                 rt=0.8)
         helper = Person(GREEN, height=0.6).next_to(expiry, UP, buff=0.1).shift(RIGHT * 0.8)
         self.at("doesn't have to be you", FadeIn(helper), expiry.animate.shift(timeline.x(14) - timeline.x(12)), rt=1.2)
@@ -181,7 +182,8 @@ class E00_ThreePromises(Ep):
         self.go(Create(no), rt=0.4)
         key = S256(EXAMPLE_CID, 14, truncate=12).next_to(bins, DOWN, buff=0.3)
         self.at("already have its string", FadeIn(key, shift=UP * 0.2), rt=0.6)
-        self.go(key.animate.scale(0.6).move_to(bins.drawer(4)), bins.drawer(4)[0].animate.set_fill(YELLOW_E, 0.6), rt=0.8)
+        self.go(key.animate.scale(0.5).move_to(bins.drawer(4)), bins.drawer(4)[0].animate.set_fill(YELLOW_E, 0.6),
+                bins.drawer(4)[2].animate.set_opacity(0), rt=0.8)
         hidden = T("uploader: hidden", 20, GREY_B).next_to(bins, DOWN, buff=0.35)
         self.at("Uploaders aren't shown", FadeIn(hidden), rt=0.6)
 
@@ -191,8 +193,8 @@ class E00_ThreePromises(Ep):
         for i, (c, what) in enumerate(ledger_rows):
             row = VGroup(M(c, 14, YELLOW), T(what, 16, WHITE), T("uploader: hidden", 12, GREY_C)).arrange(RIGHT, buff=0.2)
             ledger.add(row)
-        ledger.arrange(DOWN, aligned_edge=LEFT, buff=0.3).move_to([4.7, 0.5, 0])
-        frame = SurroundingRectangle(ledger, color=GREY_C, buff=0.25, corner_radius=0.1)
+        ledger.arrange(DOWN, aligned_edge=LEFT, buff=0.3).move_to([4.45, 0.5, 0])
+        frame = SurroundingRectangle(ledger, color=GREY_C, buff=0.2, corner_radius=0.1)
         self.at("Every deletion is recorded", Create(frame), LaggedStart(*[FadeIn(r, shift=UP * 0.2) for r in ledger[:2]],
                                                                           lag_ratio=0.4), rt=1.2)
         self.at("When someone reports a file", FadeIn(ledger[2], shift=UP * 0.2), rt=0.8)
@@ -234,7 +236,7 @@ class E00_TwoDoors(Ep):
         user_labels.next_to(left_frame, DOWN, buff=0.25)
         self.at("drop in some files", LaggedStart(*[FadeIn(l, shift=DOWN * 0.3) for l in user_labels], lag_ratio=0.2), rt=1.0)
 
-        term = terminal(["$ curl -X POST …/api/content"], width=3.8, size=16).move_to([3.9, 0.7, 0])
+        term = terminal(["$ curl -X POST …/api/content"], width=3.8, size=14).move_to([3.9, 0.7, 0])
         phone = AppWindow("Textpad", 1.4, 2.0, phone=True, size=16).move_to([4.7, -1.4, 0])
         save = button("Save", PURPLE_B, 14).move_to(phone.frame).shift(DOWN * 0.5)
         phone.add(save)

@@ -207,7 +207,7 @@ class U2_MentalMath(Ep):
             width = {1.0: 0.6, 12: 4.0, 120: 6.4}[w]
             height = 0.6 * 1.0 / (width / 0.6) * 3.0 if False else {1.0: 3.0, 12: 0.45, 120: 0.28}[w]
             rect = Rectangle(width=width, height=height, stroke_color=GOLD, fill_color=GOLD, fill_opacity=0.8).move_to(target_pos, aligned_edge=UL)
-            rect.shift(LEFT * 1.2)
+            rect.shift(LEFT * 2.2)
             new_label = VGroup(T(text, 22), T("1¢", 22, GOLD, weight=BOLD)).arrange(RIGHT, buff=0.3).next_to(rect, DOWN, buff=0.15).align_to(rect, LEFT)
             if caption_mob is None:
                 self.at(cue, Transform(piece[0], rect), FadeOut(piece[1]), rt=0.8)

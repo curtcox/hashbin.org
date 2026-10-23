@@ -128,7 +128,7 @@ class U4_EncryptFirst(Ep):
         self.at("anyone with the link gets the file back", Indicate(server, color=WHITE), rt=0.8)
 
         lock = padlock(GOLD, 0.7).move_to(computer).shift(RIGHT * 1.0)
-        self.at("encrypt it yourself", FadeIn(lock), file.animate.move_to(lock).scale(0.6), rt=0.8)
+        self.at("encrypt it yourself", FadeIn(lock), file.animate.move_to(lock).scale(0.3).set_opacity(0), rt=0.8)
         scrambled = ByteGrid(bytes(random.Random(1).randrange(256) for _ in range(12)), cols=4, cell=0.3, text_size=10, color=GREY_B)
         scrambled.move_to(computer).shift(RIGHT * 1.0)
         self.go(FadeOut(file), FadeOut(lock), FadeIn(scrambled), rt=0.6)

@@ -17,15 +17,15 @@ class U3_Clock(Ep):
 
     def build(self):
         timeline = Timeline(14, 11, size=16).move_to(DOWN * 1.2)
-        expiry = timeline.expiry(12, height=2.2)
+        expiry = timeline.expiry(12, height=3.0)
         file = FileIcon(width=0.7, height=0.9).move_to(timeline.x(0) + UP * 1.0)
-        head = timeline.playhead(0, height=1.8)
+        head = timeline.playhead(0, height=2.4)
         chip = StatusChip(200).next_to(file, UP, buff=0.3)
         self.at("Every file on HashBin has a clock", FadeIn(timeline), FadeIn(file), FadeIn(head), rt=0.8)
         self.at("sets an expiration date", Create(expiry), FadeIn(chip), rt=0.8)
         group = VGroup(file, chip)
-        self.at("Let's follow one file", head.animate.move_to(timeline.x(11.7), aligned_edge=DOWN),
-                group.animate.shift(timeline.x(11.2) - timeline.x(0)), rate_func=linear, rt=4.0)
+        self.at("Let's follow one file", head.animate.move_to(timeline.x(11.5), aligned_edge=DOWN),
+                group.animate.shift(timeline.x(11.0) - timeline.x(0)), rate_func=linear, rt=4.0)
         title = title_text("The Life of a File", 52).to_edge(UP, buff=0.6)
         self.go(Write(title), rt=1.0)
 
@@ -147,6 +147,7 @@ class U3_Delete(Ep):
         bins = Bins(3, 4, width=0.85, height=0.45).move_to(LEFT * 3.8 + UP * 0.8)
         drawer = bins.drawer(5)
         file = FileIcon(width=0.28, height=0.36, lines=False).move_to(drawer[0])
+        drawer[2].set_opacity(0)
         chip = StatusChip(200).next_to(bins, UP, buff=0.3)
         self.go(FadeIn(bins), FadeIn(file), FadeIn(chip), rt=0.6)
         card = panel(4.6, 1.8, "Delete").move_to(RIGHT * 3.4 + UP * 1.8)
@@ -190,11 +191,11 @@ class U3_Expiry(Ep):
     def build(self):
         timeline = Timeline(14, 10, size=16).move_to(UP * 1.4)
         expiry = timeline.expiry(12, height=1.4)
-        head = timeline.playhead(11, height=1.2)
-        file = FileIcon(width=0.5, height=0.65).move_to(timeline.x(10) + UP * 0.6)
+        head = timeline.playhead(11, height=0.8, side=LEFT)
+        file = FileIcon(width=0.5, height=0.65).move_to(timeline.x(9) + UP * 0.6)
         chip = StatusChip(200).next_to(file, UP, buff=0.25)
         self.go(FadeIn(timeline), FadeIn(expiry), FadeIn(head), FadeIn(file), FadeIn(chip), rt=0.6)
-        self.at("reaches its expiration date", head.animate.move_to(timeline.x(12), aligned_edge=DOWN), rt=1.2)
+        self.at("reaches its expiration date", timeline.head_to(head, 12), rt=1.2)
         grace = T("no grace period", 22, RED).next_to(expiry, RIGHT, buff=0.3)
         self.at("no grace period", FadeIn(grace), rt=0.5)
         clock = VGroup(clock_icon(WHITE, 0.4, 2), T("nightly", 20, GREY_A)).arrange(DOWN, buff=0.1).move_to(LEFT * 4.6 + DOWN * 0.8)

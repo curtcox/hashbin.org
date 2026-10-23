@@ -89,6 +89,7 @@ class X1_Blocked(Ep):
     def build(self):
         bins = Bins(3, 4, width=0.85, height=0.45).move_to(LEFT * 4.2 + UP * 1.6)
         band = Rectangle(width=0.85, height=0.45, stroke_width=0, fill_color=RED, fill_opacity=0.6).move_to(bins.drawer(6))
+        bins.drawer(6)[2].set_z_index(1)
         self.go(FadeIn(bins), rt=0.5)
         self.at("As soon as a report is submitted", FadeIn(band), rt=0.5)
         readers = VGroup(*[Person(GREEN, height=0.6) for _ in range(2)]).arrange(DOWN, buff=0.4).move_to(LEFT * 1.0 + UP * 1.6)
@@ -144,7 +145,7 @@ class X1_Review(Ep):
         record = T('public record: "removed by admin" + short reason', 18, GREY_A).next_to(upheld, DOWN, buff=0.15).align_to(upheld, LEFT)
         self.at("short public reason", FadeIn(record), rt=0.6)
         strike = T("copyright → strike against the uploader", 16, ORANGE).next_to(record, DOWN, buff=0.08).align_to(record, LEFT)
-        never = T("410: can't be uploaded again", 16, GREY_B).next_to(c2, RIGHT, buff=0.2)
+        never = T("410: can't be uploaded again", 16, GREY_B).next_to(c2, UP, buff=0.12).align_to(c2, LEFT)
         self.at("can't be uploaded again", FadeIn(never), FadeIn(strike), rt=0.6)
         clock = clock_icon(GREY_A, 0.3).next_to(expired, LEFT, buff=0.2)
         c3 = VGroup(StatusChip(451, short=True), T("→", 22), StatusChip(200, short=True)).arrange(RIGHT, buff=0.1).scale(0.8).next_to(expired, RIGHT, buff=0.3)

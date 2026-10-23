@@ -204,11 +204,12 @@ class U1_Upload(Ep):
             self.at(word, selected.animate.move_to(choices[i]), price.tracker.animate.set_value(total(months)), rt=0.5)
         self.at("The total updates", selected.animate.move_to(choices[1]), price.tracker.animate.set_value(total(12)), rt=0.6)
 
-        already = VGroup(RoundedRectangle(corner_radius=0.12, width=6.4, height=1.0, color=BLUE_B, fill_color=PANEL_BG, fill_opacity=1),
-                         T("Already on HashBin? Your months are added\nto the existing copy's expiration.", 20, BLUE_B))
-        already[1].move_to(already[0])
-        already.move_to(RIGHT * 2.6 + DOWN * 1.6)
-        self.at("already on HashBin", FadeIn(already, shift=UP * 0.2), rt=0.8)
+        note = T("Already on HashBin? Your months are added\nto the existing copy's expiration.", 18, BLUE_B)
+        already = VGroup(RoundedRectangle(corner_radius=0.12, width=note.width + 0.5, height=note.height + 0.4, color=BLUE_B,
+                                          fill_color=PANEL_BG, fill_opacity=1), note)
+        note.move_to(already[0])
+        already.move_to(dup[3], aligned_edge=LEFT).shift(LEFT * 0.15 + UP * 0.2)
+        self.at("already on HashBin", FadeOut(free), FadeOut(dup[3]), FadeIn(already, shift=UP * 0.2), rt=0.8)
         self.at("at the same price", Indicate(price, color=GOLD), rt=0.8)
 
 

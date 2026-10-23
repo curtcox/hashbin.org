@@ -223,6 +223,11 @@ tools/contact_sheet.sh build/videos/U2-what-it-costs.mp4 sheet.png 12  # frames 
   the scenes' own audio with ffmpeg's concat demuxer drops each beat's silent tail, so narration
   drifts ahead of the picture by about a second per beat.) To rebuild the joined videos without
   re-rendering scenes, add `--join-only`.
+- **Layout check:** `--audit` (best with `--low`) renders the scenes and, after every animation,
+  prints a `LAYOUT` line for text past the frame edge, text on text, text sticking out of its
+  box, and text under a filled shape or crossed by a line. Most remaining findings are deliberate
+  (closed doors, cross-outs, a redaction bar), so look at the frame before changing anything.
+  A pointer marks itself `audit_ignore`, since it's meant to sit on what it clicks.
 - **Rebuilding:** unchanged beats aren't re-voiced. `build/` is ignored by git.
 - **No LaTeX needed:** math is set with `Text` (exponents are composed by `Expr`), so the scenes
   render without a TeX installation.
