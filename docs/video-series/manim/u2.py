@@ -13,6 +13,10 @@ class Ep(Beat):
     EPISODE = "U2-what-it-costs"
 
 
+class U2_Intro(Intro, Ep):
+    BEAT = 0
+
+
 def axes_gb(x_max=12, y_max=1.0, x_len=8.0, y_len=4.2, y_step=0.25, x_step=1):
     axes = Axes(x_range=[0, x_max, x_step], y_range=[0, y_max, y_step], x_length=x_len, y_length=y_len,
                 axis_config={"color": GREY_B, "include_tip": False, "stroke_width": 2})

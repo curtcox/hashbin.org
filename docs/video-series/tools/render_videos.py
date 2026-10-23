@@ -76,10 +76,11 @@ def soundtrack(episode, parts, output):
     for part in parts.values():
         starts.append(total)
         total += video_seconds(part)
-    clips = [sf.read(AUDIO_DIR / episode / f"{beat:02d}.wav", dtype="float32") for beat in parts]
-    rate = clips[0][1]
+    clips = [(start, sf.read(path, dtype="float32")) for start, path in zip(starts, (AUDIO_DIR / episode / f"{beat:02d}.wav" for beat in parts))
+             if path.exists()]  # the intro card (beat 0) has no narration
+    rate = clips[0][1][1]
     track = np.zeros(int(round(total * rate)), dtype=np.float32)
-    for start, (clip, _) in zip(starts, clips):
+    for start, (clip, _) in clips:
         offset = int(round(start * rate))
         clip = clip[:len(track) - offset]
         track[offset:offset + len(clip)] += clip

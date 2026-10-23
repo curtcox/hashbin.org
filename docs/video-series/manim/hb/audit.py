@@ -1,4 +1,4 @@
-"""Layout checks for a rendered beat: text off the frame, text on text, text hidden or crossed by shapes.
+"""Layout checks for a rendered beat: text off the frame, text on text or on an image, text hidden or crossed by shapes.
 
 Beat runs these after every play when HB_AUDIT=1 (render_videos.py --audit) and prints one LAYOUT
 line per new problem. The checks use bounding boxes, so treat a finding as a frame to look at,
@@ -6,7 +6,7 @@ not proof of a bug.
 """
 
 import numpy as np
-from manim import DecimalNumber, MarkupText, Rectangle, Text, VMobject, config
+from manim import DecimalNumber, ImageMobject, MarkupText, Rectangle, Text, VMobject, config
 from manim.utils.family import extract_mobject_family_members
 
 EDGE_TOLERANCE = 0.03  # scene units a mobject may poke past the frame edge
@@ -28,6 +28,10 @@ def _text_leaves(mobject):
 def _drawn(mobject):
     """The parts of a mobject that put ink on the frame (ValueTrackers have points but draw nothing)."""
     return [m for m in mobject.family_members_with_points() if isinstance(m, VMobject)]
+
+
+def _images(mobject):
+    return [m for m in mobject.get_family() if isinstance(m, ImageMobject) and m.stroke_opacity > VISIBLE]
 
 
 def _opacity(mobject):
@@ -73,7 +77,7 @@ def layout_findings(scene):
 
     # Anything visible past the frame edge.
     for mobject in top_level:
-        members = [m for m in _drawn(mobject) if _opacity(m) > VISIBLE]
+        members = [m for m in _drawn(mobject) if _opacity(m) > VISIBLE] + _images(mobject)
         if not members:
             continue
         boxes = np.array([_box(m) for m in members])
@@ -102,6 +106,14 @@ def layout_findings(scene):
                 continue  # an exact copy left underneath: invisible
             if shared / min(_area(boxes[i]), _area(boxes[j])) > TEXT_OVERLAP:
                 yield "TEXT-OVERLAP", f"{_label(texts[i])} and {_label(texts[j])}"
+
+    # Text on a picture (whichever is on top, one of them is hard to see).
+    images = [image for mobject in top_level for image in _images(mobject)]
+    for image in images:
+        image_box = _box(image)
+        for t, box in zip(texts, boxes):
+            if _shared(image_box, box) / _area(box) > TEXT_OVERLAP:
+                yield "ON-IMAGE", f"{_label(t)} on an image"
 
     # Shapes drawn over text, or lines through it.
     order = extract_mobject_family_members(top_level, use_z_index=True, only_those_with_points=True)

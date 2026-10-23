@@ -7,6 +7,10 @@ class Ep(Beat):
     EPISODE = "U3-the-life-of-a-file"
 
 
+class U3_Intro(Intro, Ep):
+    BEAT = 0
+
+
 def chip_swap(chip, code):
     new = StatusChip(code).move_to(chip)
     return Transform(chip, new)

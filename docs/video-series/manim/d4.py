@@ -9,6 +9,10 @@ class Ep(Beat):
     EPISODE = "D4-under-the-hood"
 
 
+class D4_Intro(Intro, Ep):
+    BEAT = 0
+
+
 def cube(label, color=BLUE_D, size=0.9, text_size=13):
     face = Square(size, color=color, fill_color=color, fill_opacity=0.25)
     top = Polygon(face.get_corner(UL), face.get_corner(UL) + [0.25, 0.2, 0], face.get_corner(UR) + [0.25, 0.2, 0], face.get_corner(UR),

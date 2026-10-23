@@ -7,6 +7,10 @@ class Ep(Beat):
     EPISODE = "X1-disputes-and-public-records"
 
 
+class X1_Intro(Intro, Ep):
+    BEAT = 0
+
+
 def node(text, color=GREY_B, width=2.6):
     box = RoundedRectangle(corner_radius=0.15, width=width, height=0.8, color=color, fill_color=PANEL_BG, fill_opacity=1)
     label = T(text, 22, color).move_to(box)

@@ -37,7 +37,7 @@
 **Scene:** `E00_WhatItIs`
 
 **Visual**
-- Title card fades in: "HashBin" with a small `BINS` icon. Fades to the corner.
+- The HashBin logo fades in, then shrinks to the corner.
 - An uploader (BLUE person) holds a `FILE`. An arrow carries it into `HASHBIN`; the file drops into a
   drawer in `BINS`. The drawer gets a label: a truncated `256T STRING`.
 - The 256t string lifts out of the label and flies to the uploader, who passes it along a chain of

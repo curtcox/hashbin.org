@@ -7,10 +7,18 @@ class Ep(Beat):
     EPISODE = "X3-alternate-suppliers"
 
 
-def server(label, color=GREY_B, width=2.4, height=1.4, mono=False):
+class X3_Intro(Intro, Ep):
+    BEAT = 0
+
+
+def server(label, color=GREY_B, width=2.4, height=1.4, mono=False, mark=False):
+    """mark: put the 256t logo beside the label."""
     box = RoundedRectangle(corner_radius=0.15, width=width, height=height, color=color, fill_color=PANEL_BG, fill_opacity=1)
-    text = (M if mono else T)(label, 18, color).next_to(box.get_top(), DOWN, buff=0.12)
-    group = VGroup(box, text)
+    text = (M if mono else T)(label, 18, color)
+    if mark:
+        text = Group(logo("256t", 0.42), text).arrange(RIGHT, buff=0.12)
+    text.next_to(box.get_top(), DOWN, buff=0.12)
+    group = Group(box, text) if mark else VGroup(box, text)
     group.box = box
     return group
 
@@ -25,12 +33,12 @@ class X3_NotAnAddress(Ep):
         self.at("tells you where to go", FadeIn(url), FadeIn(one), GrowArrow(arrow), rt=0.8)
         cid = S256(EXAMPLE_CID, 18, truncate=30).move_to(UP * 2.8 + RIGHT * 1.0)
         self.at("tells you what you're looking for", FadeOut(VGroup(url, one, arrow)), FadeIn(cid), rt=0.8)
-        hosts = VGroup(Sandbox(2.6, 1.6), server("256t.org", mono=True, width=2.6, height=1.6),
+        hosts = Group(Sandbox(2.6, 1.6), server("256t.org", mono=True, width=2.6, height=1.6, mark=True),
                        server("a GitHub folder", width=2.6, height=1.6), server("your own server", width=2.6, height=1.6))
         hosts.arrange(RIGHT, buff=0.35).move_to(DOWN * 0.6)
         files = VGroup(*[FileIcon(width=0.4, height=0.5).move_to(h).shift(DOWN * 0.2) for h in hosts])
         self.at("doesn't really belong to HashBin", cid.animate.move_to(UP * 2.4), FadeIn(hosts[0]), FadeIn(files[0]), rt=0.8)
-        self.at("Any server that has the file", LaggedStart(*[FadeIn(VGroup(h, f)) for h, f in zip(hosts[1:], files[1:])], lag_ratio=0.25), rt=1.0)
+        self.at("Any server that has the file", LaggedStart(*[FadeIn(Group(h, f)) for h, f in zip(hosts[1:], files[1:])], lag_ratio=0.25), rt=1.0)
         lines = VGroup(*[DashedLine(cid.get_bottom(), h.get_top(), color=YELLOW, stroke_width=2) for h in hosts])
         self.go(Create(lines), rt=0.6)
         outs = VGroup(*[S256(EXAMPLE_CID, 10, truncate=10).next_to(h, DOWN, buff=0.15) for h in hosts])
@@ -45,7 +53,7 @@ class X3_Supplier(Ep):
     BEAT = 2
 
     def build(self):
-        box = server("256t.org", mono=True, width=6.4, height=1.4).move_to(UP * 2.2)
+        box = server("256t.org", mono=True, width=6.4, height=1.4, mark=True).move_to(UP * 2.2)
         pattern = VGroup(M("https://256t.org/", 22), M("{cid}", 22, YELLOW)).arrange(RIGHT, buff=0.02).move_to(box.box).shift(DOWN * 0.2)
         self.at("A supplier is any other place", FadeIn(box), AddTextLetterByLetter(pattern[0]), FadeIn(pattern[1]), rt=1.0)
         filled = S256(EXAMPLE_CID, 14, truncate=14).move_to(pattern[1], aligned_edge=LEFT)
@@ -120,7 +128,7 @@ class X3_Public(Ep):
         api = M("GET /api/content/{cid}/suppliers", 20, TEAL_B).next_to(card, DOWN, buff=0.4)
         self.go(AddTextLetterByLetter(api), rt=0.8)
         reader = Person(GREEN, label="reader").move_to(RIGHT * 4.6 + UP * 1.6)
-        other = server("256t.org", mono=True).move_to(RIGHT * 4.6 + DOWN * 1.4)
+        other = server("256t.org", mono=True, mark=True).move_to(RIGHT * 4.6 + DOWN * 1.4)
         self.at("go fetch it there directly", FadeIn(reader), FadeIn(other), rt=0.5)
         file = FileIcon(width=0.35, height=0.45).move_to(other)
         self.go(file.animate.next_to(reader, LEFT, buff=0.2), rt=0.8)
@@ -173,7 +181,7 @@ class X3_Recap(Ep):
 
     def build(self):
         cid = S256(EXAMPLE_CID, 18, truncate=30).move_to(UP * 2.6)
-        hosts = VGroup(Sandbox(2.4, 1.4), server("256t.org", mono=True), server("a GitHub folder"), server("your own server"))
+        hosts = Group(Sandbox(2.4, 1.4), server("256t.org", mono=True, mark=True), server("a GitHub folder"), server("your own server"))
         hosts.arrange(RIGHT, buff=0.35).move_to(UP * 0.6)
         lines = VGroup(*[DashedLine(cid.get_bottom(), h.get_top(), color=YELLOW, stroke_width=2) for h in hosts])
         self.at("names content, not a place", FadeIn(cid), FadeIn(hosts), Create(lines), rt=0.8)

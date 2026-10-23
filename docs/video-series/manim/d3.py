@@ -24,6 +24,10 @@ class Ep(Beat):
     EPISODE = "D3-building-textpad"
 
 
+class D3_Intro(Intro, Ep):
+    BEAT = 0
+
+
 def textpad(text="Hello from Textpad! Edit me, then click Save.", width=6.0, height=3.2):
     window = AppWindow("Textpad", width, height)
     area = RoundedRectangle(corner_radius=0.08, width=width - 0.6, height=height - 1.4, color=GREY_C, fill_color=BG, fill_opacity=1)

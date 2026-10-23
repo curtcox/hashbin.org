@@ -23,6 +23,10 @@ class Ep(Beat):
     EPISODE = "01-a-name-made-of-content"
 
 
+class E01_Intro(Intro, Ep):
+    BEAT = 0
+
+
 def bit_grid(bits, cols=32, cell=0.13, on=BLUE_C):
     cells = VGroup(*[Square(cell, stroke_width=0.6, stroke_color=GREY_D, fill_color=on if b == "1" else "#1A1E27",
                             fill_opacity=1) for b in bits])

@@ -107,6 +107,8 @@ name in SMALL CAPS-style labels like `FILE` or `256T STRING`.
 | `APP` | A phone or browser window frame with the app name in the title bar. | PURPLE_B |
 | `STATUS CHIP` | Rounded pill with an HTTP status code: 200, 404, 410, 429, 451. | 200 GREEN, 404/410 GREY, 429 ORANGE, 451 RED |
 | `NEXT CARD` | End card: two or three episode thumbnails with titles, the recommended one larger. | |
+| `INTRO CARD` | A silent 3.6 s card before every episode: the HashBin logo, the episode code and title, and the 256t logo with "an open standard: 256t.org". | code in its track color |
+| Logos | The HashBin logo (`logo("hashbin")`) and the 256t logo (`logo("256t")`), drawn light for the dark background. The 256t logo also marks the 256t.org supplier in X3. | as drawn |
 
 ### Manim conventions
 
@@ -224,10 +226,13 @@ tools/contact_sheet.sh build/videos/U2-what-it-costs.mp4 sheet.png 12  # frames 
   drifts ahead of the picture by about a second per beat.) To rebuild the joined videos without
   re-rendering scenes, add `--join-only`.
 - **Layout check:** `--audit` (best with `--low`) renders the scenes and, after every animation,
-  prints a `LAYOUT` line for text past the frame edge, text on text, text sticking out of its
-  box, and text under a filled shape or crossed by a line. Most remaining findings are deliberate
+  prints a `LAYOUT` line for text past the frame edge, text on text or on a logo, text sticking
+  out of its box, and text under a filled shape or crossed by a line. Most remaining findings are deliberate
   (closed doors, cross-outs, a redaction bar), so look at the frame before changing anything.
   A pointer marks itself `audit_ignore`, since it's meant to sit on what it clicks.
+- **Logos:** `manim/assets/` holds the logos the scenes use. `tools/make_logos.py` makes them from
+  `frontend/img/hashbin-logo.png` and the 256t logo in a sibling checkout of `256t.org`
+  (`examples/256t_logo.png`, or pass its path). Rerun it only if a source logo changes.
 - **Rebuilding:** unchanged beats aren't re-voiced. `build/` is ignored by git.
 - **No LaTeX needed:** math is set with `Text` (exponents are composed by `Expr`), so the scenes
   render without a TeX installation.

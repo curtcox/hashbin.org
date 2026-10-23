@@ -9,6 +9,10 @@ class Ep(Beat):
     EPISODE = "U4-who-can-see-what"
 
 
+class U4_Intro(Intro, Ep):
+    BEAT = 0
+
+
 class U4_Unlisted(Ep):
     BEAT = 1
 

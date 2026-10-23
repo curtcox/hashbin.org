@@ -22,6 +22,10 @@ class Ep(Beat):
     EPISODE = "U1-your-first-upload"
 
 
+class U1_Intro(Intro, Ep):
+    BEAT = 0
+
+
 class U1_Goal(Ep):
     BEAT = 1
 

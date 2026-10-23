@@ -9,6 +9,10 @@ class Ep(Beat):
     EPISODE = "X2-paying-for-popularity"
 
 
+class X2_Intro(Intro, Ep):
+    BEAT = 0
+
+
 def turnstile(label="1 min"):
     post = Rectangle(width=0.3, height=1.4, color=GREY_A, fill_color=GREY_D, fill_opacity=1)
     arms = VGroup(*[Line(ORIGIN, RIGHT * 0.6, color=GREY_A, stroke_width=6).rotate(a, about_point=ORIGIN) for a in (0, 2.1, 4.2)])

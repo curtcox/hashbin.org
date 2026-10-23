@@ -21,6 +21,7 @@ from extract_narration import load_replacements  # noqa: E402
 from .audit import layout_findings  # noqa: E402
 
 AUDIO_DIR = SERIES_DIR / "build" / "audio"
+ASSETS_DIR = SERIES_DIR / "manim" / "assets"  # made by tools/make_logos.py
 REPLACEMENTS = load_replacements()
 
 BG = "#0F1117"
@@ -37,6 +38,26 @@ FADE = 0.6
 DIM = 0.3
 
 AUDIT = __import__("os").environ.get("HB_AUDIT") == "1"
+
+
+def _fix_image_canvas():
+    """Manim 0.22 draws every ImageMobject onto Image.fromarray(np.zeros((h, w)), mode="RGBA"), a float array
+    Pillow 12 and later refuse. Give its camera an Image module whose fromarray makes that blank canvas itself."""
+    import types
+
+    import manim.camera.camera as camera_module
+    from PIL import Image
+
+    def fromarray(array, mode=None):
+        if mode == "RGBA" and array.ndim == 2:
+            return Image.new("RGBA", (array.shape[1], array.shape[0]))
+        return Image.fromarray(array, mode)
+
+    camera_module.Image = types.SimpleNamespace(**{name: getattr(Image, name) for name in dir(Image) if not name.startswith("__")})
+    camera_module.Image.fromarray = fromarray
+
+
+_fix_image_canvas()
 
 
 # ---------------------------------------------------------------------------- text
@@ -108,6 +129,11 @@ def caption(text, size=26, color=GREY_A):
 
 def title_text(text, size=44):
     return T(text, size, WHITE, weight=BOLD)
+
+
+def logo(name, height=1.0):
+    """The HashBin ("hashbin") or 256t ("256t") logo."""
+    return ImageMobject(str(ASSETS_DIR / f"{name}-logo.png")).scale_to_fit_height(height)
 
 
 # ---------------------------------------------------------------------------- 256t strings
@@ -438,6 +464,11 @@ def thumbnail(code, tag=None, big=False):
     if tag:
         group.add(T(tag, 18 * scale, GREY_B).next_to(title, DOWN, buff=0.08))
     return group
+
+
+def episode_code(episode):
+    """'U1-your-first-upload' -> 'U1'"""
+    return episode.split("-")[0].upper()
 
 
 def NextCard(*items, heading="Next"):
@@ -827,3 +858,37 @@ class Beat(Scene):
         mobjects = [m for m in self.mobjects if m not in keep]
         if mobjects:
             self.play(*[FadeOut(m) for m in mobjects], run_time=rt)
+
+
+class Intro(Beat):
+    """A silent title card before an episode's first beat: the HashBin logo, the episode, and the 256t mark.
+
+    Each episode module declares one with BEAT = 0, so the renderer puts it first.
+    """
+
+    LENGTH = 3.6
+
+    def setup(self):
+        self.layout_seen = set()
+
+    def construct(self):
+        code = episode_code(self.EPISODE)
+        mark = logo("hashbin", 4.2)
+        number = T(code, 72, TRACK_COLORS.get(code[0], WHITE), weight=BOLD)
+        name = T(EPISODES[code], 44, WHITE, weight=BOLD)
+        if name.width > 6.4:
+            name.scale_to_fit_width(6.4)
+        heading = VGroup(number, name).arrange(DOWN, aligned_edge=LEFT, buff=0.3)
+        heading.next_to(mark, RIGHT, buff=0.9).align_to(mark, UP).shift(DOWN * 0.9)
+        standard = VGroup(T("Every link is a 256t string,", 20, GREY_A), T("an open standard:", 20, GREY_A))
+        standard.arrange(DOWN, aligned_edge=LEFT, buff=0.08)
+        standard[1].add(M("256t.org", 20, TEAL_B).next_to(standard[1], RIGHT, buff=0.12))
+        t256 = logo("256t", 0.9)
+        footer = Group(t256, standard).arrange(RIGHT, buff=0.3).next_to(heading, DOWN, buff=0.8).align_to(heading, LEFT)
+        Group(mark, heading, footer).move_to(ORIGIN)
+
+        self.play(FadeIn(mark, scale=0.92), run_time=0.8)
+        self.play(FadeIn(heading, shift=RIGHT * 0.3), run_time=0.6)
+        self.play(FadeIn(footer), run_time=0.5)
+        self.wait(self.LENGTH - 0.8 - 0.6 - 0.5 - FADE)
+        self.play(FadeOut(Group(mark, heading, footer)), run_time=FADE)

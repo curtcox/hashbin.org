@@ -31,6 +31,10 @@ class Ep(Beat):
     EPISODE = "D1-first-api-calls"
 
 
+class D1_Intro(Intro, Ep):
+    BEAT = 0
+
+
 class D1_Hook(Ep):
     BEAT = 1
 

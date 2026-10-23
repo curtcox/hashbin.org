@@ -22,6 +22,10 @@ class Ep(Beat):
     EPISODE = "D2-oauth-and-pkce"
 
 
+class D2_Intro(Intro, Ep):
+    BEAT = 0
+
+
 def ticket(text="code", timer="10 min", color=GOLD):
     body = RoundedRectangle(corner_radius=0.08, width=1.3, height=0.6, color=color, fill_color=PANEL_BG, fill_opacity=1)
     label = M(text, 16, color).move_to(body).shift(UP * 0.08)

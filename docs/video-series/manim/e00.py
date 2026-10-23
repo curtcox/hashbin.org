@@ -7,6 +7,10 @@ class Ep(Beat):
     EPISODE = "00-hashbin-in-five-minutes"
 
 
+class E00_Intro(Intro, Ep):
+    BEAT = 0
+
+
 class E00_TwoLinks(Ep):
     BEAT = 1
 
@@ -57,10 +61,9 @@ class E00_WhatItIs(Ep):
     BEAT = 2
 
     def build(self):
-        title = title_text("HashBin", 72)
-        mini_bins = Bins(2, 3, width=0.5, height=0.28, label_size=6).next_to(title, LEFT, buff=0.4)
-        self.go(Write(title), FadeIn(mini_bins), rt=1.2)
-        self.go(VGroup(title, mini_bins).animate.scale(0.4).to_corner(UL, buff=0.4), rt=1.0)
+        title = logo("hashbin", 3.6)
+        self.go(FadeIn(title, scale=0.9), rt=1.2)
+        self.go(title.animate.scale(0.3).to_corner(UL, buff=0.3), rt=1.0)
 
         uploader = Person(BLUE, label="uploader").move_to(LEFT * 5.6 + UP * 0.6)
         file = FileIcon(width=0.5, height=0.65).next_to(uploader, RIGHT, buff=0.15)
