@@ -1,0 +1,37 @@
+Hash Bin is two small programs running on Cloudflare's network, close to wherever the request comes from. One runs hash bin dot org: the website, the API, sign-in, payments, and oh-auth. The other runs two-fifty-six-tee dot U S, and it does exactly one thing: serve files.
+
+Let's see what's behind each of them, starting with the simple one.
+
+<break time="1.5s" />
+
+The file server's whole job fits on one screen. It checks that the string is well formed, and applies the per-address rate limit. Then it looks at a few small marker files stored next to the content: one if the file was deleted, one if it's under dispute, and one recording when it expires.
+
+If the content is sixty-four bytes or less, it decodes it straight from the string. Otherwise, it streams the bytes from storage, which is Cloudflare's object store, R two, where each file is kept under its own two-fifty-six-tee string.
+
+Everything leaves with strict headers: no scripts, no guessing the type, and readable from any website. Because the download path only reads storage, it has very little that can go wrong, and it never touches anyone's account.
+
+<break time="1.5s" />
+
+The main worker keeps its records in Durable Objects. Instead of one big database, each thing gets its own tiny one. Every file has an object holding its metadata. Every user has one holding their balance, keys, and authorizations. Disputes, payments, registered apps, and suppliers each have their own.
+
+The useful property is that each object handles requests one at a time. So if two uploads try to spend the same balance at the same instant, they can't both see the old balance. One goes first, and the second sees what's left. No overspending, and no complicated locking.
+
+<break time="1.5s" />
+
+Two jobs are handed to specialists. Sign-in goes through Clerk, which is why Hash Bin never holds passwords. Card payments go through Stripe, which is why Hash Bin never sees card numbers. When a payment completes, Stripe sends Hash Bin a signed message, and only then is the balance credited.
+
+<break time="1.5s" />
+
+Once a day, at two in the morning U T C, a scheduled job does the housekeeping. It deletes content whose retention has run out, closes disputes nobody resolved within thirty days, and removes the stored bytes of deleted files a day after they were deleted. It computes statistics, and raises an alert to the operator if something looks wrong.
+
+And it takes a snapshot of every record, every user, payment, file, and dispute, into a separate backup bucket, keeping the last thirty nights.
+
+<break time="1.5s" />
+
+All of this is open source. The repository has both workers, the website, which is plain HTML, CSS, and JavaScript with no build step, and a status file listing what's finished and what's next.
+
+You can run the whole thing on your own machine, with local stand-ins for sign-in and payments, using one command. And every change to the main branch is tested, deployed, and then checked to make sure the version running is the version that was pushed.
+
+<break time="1.5s" />
+
+Two programs at the edge, a store of files named by their content, one small database per thing, and a night shift that keeps it tidy, all in the open. That's Hash Bin. Thanks for watching, and we'd love to see what you build.

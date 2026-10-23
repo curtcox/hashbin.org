@@ -1,0 +1,49 @@
+Storage on Hash Bin is paid for up front, by size and time. But storage isn't the only cost of keeping a file online. Every time someone downloads it, those bytes have to be sent somewhere. A file read once a month and a file read by a million people cost the same to store, but not the same to serve.
+
+So Hash Bin has a second, separate idea: a download allowance. It's a limit on how often a file can be served, and anyone who wants a file to be served more often can pay to raise it.
+
+<break time="1.5s" />
+
+The allowance is expressed in a simple way: the minimum time between requests. If a file's minimum is one minute, then after it's served, the next request has to come at least a minute later. A request that arrives too soon is turned away with status code four twenty-nine, "too many requests", along with the time when it can be served again.
+
+Shrink that minimum, and the file can be served more often. The smallest allowed is a tenth of a second, so at most ten requests a second. And if a file has no allowance at all, the minimum is effectively infinite, and every request is turned away.
+
+The limit is per file, shared by everyone who asks for it. Tiny files, sixty-four bytes or less, are exempt: there's nothing to send that isn't already in the link.
+
+<break time="1.5s" />
+
+How do you price an allowance? Hash Bin's answer is to charge for the most it could possibly cost.
+
+Say you want a one-megabyte file to be servable once a minute for thirty days. Thirty days has forty-three thousand two hundred minutes, so that's at most forty-three thousand two hundred downloads. Each one sends a megabyte, so the most this allowance could ever send is about forty-two gigabytes.
+
+The price is two cents per gigabyte of that maximum, rounded up to the cent. Here, eighty-five cents.
+
+It's the same picture as storage pricing, a rectangle whose area is the price. This time it's file size times the number of possible requests. Once an hour costs two cents. Once a minute, eighty-five cents. Once a second, about fifty dollars, because that's sixty times as many possible downloads.
+
+Notice you're paying for what could be sent, not what is. If the allowance goes unused, it isn't refunded. In exchange, the price is known in advance, and nobody gets a surprise bill because a file went viral.
+
+<break time="1.5s" />
+
+A few rules. Anyone with a Hash Bin account can buy an allowance for any file, paid from their balance. The uploader can do it from the file's page under My Uploads. It doesn't have to be the uploader, the same way anyone can donate to keep a file stored.
+
+Each allowance covers a span of time, and it can't extend past the file's expiration date. If several allowances overlap, they don't add together. At any moment, the fastest one that's active is the one that applies.
+
+And as with everything else on Hash Bin, purchases are final.
+
+<break time="1.5s" />
+
+Every new upload starts with a default allowance for its first thirty days. Today that default is one request every thirty days. After the first thirty days, a file has no allowance of its own, and it stays that way until someone buys one.
+
+You can always see where a file stands. Its content page shows the current allowance and how long it lasts.
+
+<break time="1.5s" />
+
+Don't confuse the allowance with a second limit you might run into. two-fifty-six-tee dot U S also limits how fast any single network address can make requests: thirty a minute, across all files. That one isn't for sale. It's there so one busy script can't crowd out everyone else, and it tells you how many seconds to wait.
+
+So if you see a four twenty-nine, there are two possible reasons: the file's allowance, or your own request rate.
+
+<break time="1.5s" />
+
+Storage buys time. An allowance buys downloads. Both are priced as an area, up front, for the most they could cost, and anyone can pay for either one.
+
+But Hash Bin doesn't have to be the only place a file is served from. Because the name comes from the content, any server can hand out a copy, and anyone can check it. That's next.

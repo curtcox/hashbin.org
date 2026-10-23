@@ -1,0 +1,49 @@
+Any service that lets people publish has to answer a hard question. What happens when someone says a file shouldn't be there? Maybe it's their copyrighted work. Maybe it's illegal. Or maybe they just don't like it, and they're hoping a complaint will make it disappear.
+
+Act too slowly, and real harm stays online. Act too quickly, and anyone can take down anything with a complaint. Hash Bin's approach is to block quickly, decide carefully, and do the whole thing in public, so that everyone can see how it's being used.
+
+<break time="1.5s" />
+
+Anyone can report a file, with or without an account. There's a "Report this content" link on every content page, which opens a form.
+
+You choose a reason: copyright infringement, illegal content, a privacy violation, harassment, malware, or something else. You explain the problem in at least fifty characters, and you can add up to ten supporting links. For copyright, that means identifying the original work, how this file infringes it, and whether you hold the rights.
+
+Then you leave a way to reach you, and confirm that the report is made in good faith.
+
+<break time="1.5s" />
+
+As soon as a report is submitted, the file is blocked. Anyone who tries to download it gets a special status code: four fifty-one, "unavailable for legal reasons". That's the number from Fahrenheit four fifty-one, and it means the file exists but is being withheld.
+
+At the same moment, the report becomes public. It's listed on the disputes page with the reason, the explanation, and the links. Your contact details aren't shown to the public, but signed-in Hash Bin users can see them, so the person who uploaded the file can get in touch with you.
+
+Publishing the report is what keeps this honest. If someone files a baseless report to silence something, the baseless report is on the record for everyone to read.
+
+<break time="1.5s" />
+
+Then an administrator reviews the report. There are three ways it can end.
+
+If the report doesn't hold up, it's denied, and the file is available again.
+
+If it does hold up, it's upheld, and the file is removed, the same way as any other deletion. The public records note that an administrator removed it, with a short public reason. And just like when an uploader deletes something, that exact content can't be uploaded again.
+
+And if nobody resolves the report within thirty days, it expires, and the file becomes available again. A report can block a file for a while, but not forever by being ignored.
+
+Once a dispute closes, the same file can't be reported again for thirty days. That stops anyone from keeping a file blocked by filing the same report over and over.
+
+<break time="1.5s" />
+
+Blocking first is a real trade-off, so there are limits on how it can be used. One network address can file at most ten reports an hour. A file can only have one open dispute at a time. And there's that thirty-day pause before the same file can be reported again.
+
+The limits run the other way too. When a copyright report is upheld, the uploader gets a strike. Hash Bin keeps track of repeat infringers, and three strikes within a year flags the account for the operator. The D M C A policy page lays out what a formal copyright notice has to include, and how a counter-notice works.
+
+<break time="1.5s" />
+
+All of this ends up in the public records. Every deletion is recorded permanently: the content's string, when it was deleted, and why. It expired. Its uploader deleted it. Or an administrator removed it. There are running totals, and you can filter the list, export it, or pull the same data from the API.
+
+What's not in the records is anyone's identity. The question the records answer isn't "who uploaded this", it's "what has Hash Bin removed, and why". If the service ever started quietly removing things, the gap would show.
+
+<break time="1.5s" />
+
+Anyone can report a file. It's blocked right away, the report is public, and a person reviews it: denied, upheld, or expired after thirty days. Limits keep reports from being used as a weapon, strikes keep repeat infringers in check, and every removal lands in the public record.
+
+Next, a different kind of limit: not on whether a file can be read, but on how often.

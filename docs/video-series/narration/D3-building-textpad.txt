@@ -1,0 +1,55 @@
+Here's a puzzle for app design. Content on Hash Bin can never change. Once something is published under a name, that name means exactly those bytes, forever. So how do you build a text editor on top of it?
+
+Text Pad is Hash Bin's example answer. It's a complete editor in a single HTML file of plain JavaScript, with no build step, written to be read. Let's walk through the decisions that make it work.
+
+<break time="1.5s" />
+
+The first decision is where to keep the document's name. Text Pad puts it in the address bar, after a hash sign: pound two-fifty-six-tee equals, then the string. That part of a URL is called the fragment, and browsers never send it to any server. The page can also change it without reloading.
+
+So the rule is simple: the address bar always names exactly what's on screen. Open a link, and you see that text. Save, and the address bar switches to the new text's string.
+
+And because each save is a new entry in the browser's history, the Back button takes you to the previous version. Version history, for free, just from the fact that content never changes.
+
+<break time="1.5s" />
+
+When a link opens, Text Pad doesn't immediately ask Hash Bin for it. It first checks the string itself. Only the base sixty-four U R L alphabet is allowed. And, thanks to the length prefix, the string tells you how long it should be: eighty-six more characters if the content is over sixty-four bytes, or just enough to hold the content if it's smaller.
+
+That one check catches the most common real-world problem, a link that got cut off when someone copied it, and it gives a useful message instead of a confusing "not found".
+
+And if the content is sixty-four bytes or less, Text Pad doesn't fetch anything. The text is already in the string, so it decodes it right there.
+
+<break time="1.5s" />
+
+For longer texts, Text Pad fetches the bytes from two-fifty-six-tee dot U S, and it treats every outcome as something to explain. No network: say so. Four oh four: nothing is stored under this name, it may have expired or been deleted. Four fifty-one: it's blocked while a dispute is reviewed. Four twenty-nine: try again later.
+
+Even a success needs checking, because Hash Bin stores bytes, not text. Text Pad decodes them strictly as U T F eight, and refuses anything that contains a null character, which real text practically never does.
+
+One more detail: it clears the editor before loading. If a link fails, you see an empty editor and a message, never the previous document sitting under the wrong name.
+
+<break time="1.5s" />
+
+The oh-auth flow from the last episode sends the user away to Hash Bin and back. That's a full page navigation, and anything only in memory is gone. For an editor, that would be a disaster: you'd click Save and lose what you just wrote.
+
+So before leaving, Text Pad saves a draft in the browser's session storage, labeled with the state value from the authorization request. When the user comes back, the same state value finds the draft, and the editor is restored exactly as it was before the save continues.
+
+And if the user declines, their text is still there, with a message saying nothing was saved.
+
+<break time="1.5s" />
+
+Saving is one request: post the text as the body, with the access token. The upload uses the retention period the user chose on their Hash Bin account, and it's billed to their balance. Short texts, sixty-four bytes or less, are free.
+
+If the balance is too low, Hash Bin's response explains how much is needed, and Text Pad shows that message with a link to add funds.
+
+On success, Text Pad puts the new string in the address bar. And here's a nice property of content addressing: if two people write exactly the same text, they get exactly the same link.
+
+<break time="1.5s" />
+
+Once connected, Text Pad shows the user's balance, which is what the balance read scope is for, and the SDK renews access in the background. A Disconnect button revokes the tokens. And if the user revokes Text Pad from their Hash Bin account instead, Text Pad notices on the next save and offers to reconnect.
+
+If you're building for phones, the same app exists in Expo and in Flutter. They sign in through the system browser, return through the app's own URL scheme, and keep tokens in the phone's secure storage.
+
+<break time="1.5s" />
+
+Text Pad's lessons carry over to any app on Hash Bin. A link names a version, not a document. Check strings before you fetch them. Turn every status into a sentence a person can act on. And never let a sign-in redirect cost someone their work.
+
+The whole source, with a walkthrough of every part, is on the docs site. Last in this track, we'll look at the machinery behind Hash Bin itself.

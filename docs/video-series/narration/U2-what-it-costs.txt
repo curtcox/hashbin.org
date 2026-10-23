@@ -1,0 +1,59 @@
+How much should it cost to keep a file online? There are really only two questions: how big is it, and how long do you want it kept?
+
+There's a third question you might expect, which is how many people download it. On Hash Bin, that one doesn't affect the price. Reading is free. So everything comes down to size and time, and there's a nice way to picture that.
+
+<break time="1.5s" />
+
+Draw size going up and time going across. A file kept for some number of months is a rectangle, and its area is the amount of storage you're buying.
+
+The unit is one gigabyte kept for one month, and on Hash Bin that square costs three cents. A gigabyte for a year is twelve squares: thirty-six cents.
+
+Most files are much thinner than a gigabyte. A hundred-megabyte file for a year is a thin strip with about a tenth of the area, which works out to three and a half cents. Hash Bin rounds up to the next whole cent, so that's four cents.
+
+That's the whole formula. Size, times months, times three cents, rounded up to the cent. Retention is bought in whole months, so the rectangle always ends on a month boundary.
+
+<break time="1.5s" />
+
+Rounding up has a consequence worth seeing. Here's the price of keeping a file for one year, by size. For anything from a few bytes up to about twenty-eight megabytes, the true cost is less than a cent, so you pay one cent. Then it steps up, to four cents for the largest file you can upload, ninety megabytes.
+
+For a single month, it's even simpler. Every file you can upload costs exactly one cent.
+
+And at the far left there's a little green sliver: files of sixty-four bytes or less. Those cost nothing, because, as we saw in the episode on the two-fifty-six-tee string, the content lives inside the link itself. There's nothing to store.
+
+<break time="1.5s" />
+
+Because the price grows in a straight line with time, long horizons are surprisingly affordable. A two-megabyte document for ten years: one cent. A twenty-five-megabyte slide deck for a decade: nine cents. The largest file you can upload, kept for a full century, costs about three dollars and seventeen cents.
+
+The upload page lets you choose up to ten years at a time, and you can always extend later. Extending works the same way: you're just adding more width to the rectangle.
+
+<break time="1.5s" />
+
+Here's a way to estimate any price in your head. One cent buys a third of that gigabyte-month square. In megabytes, that's about three hundred and forty megabyte-months. You can spend it as three hundred and forty megabytes for one month, or about twenty-eight megabytes for a year, or under three megabytes for a decade. Same area, same cent.
+
+So the rule of thumb is: multiply the size in megabytes by the number of months, divide by three hundred and forty, and round up. Twenty-five megabytes for ten years is three thousand megabyte-months. Divide by three-forty and you get a bit under nine, so nine cents, which is exactly what the table said.
+
+Try one yourself. <break time="0.5s" /> A forty-megabyte video, kept for five years. Pause the video if you like. <break time="2.0s" /> Forty times sixty months is two thousand four hundred. Divided by three-forty, that's a little over seven, and since Hash Bin always rounds up, the answer is eight cents.
+
+<break time="1.5s" />
+
+Here's where the rounding matters in practice. Every file is priced on its own. So twenty photos of three megabytes each, kept for a year, cost one cent apiece: twenty cents. Put the same twenty photos in a single sixty-megabyte zip file, and the whole thing costs three cents.
+
+That's not always the right choice. With the zip, a reader has to download all of it to see one photo, and you only get one link instead of twenty. But if you're archiving many small files together, bundling them is cheaper.
+
+<break time="1.5s" />
+
+The only other cost is the card fee when you add funds: two point nine percent plus thirty cents per deposit, charged on top of your credit. The thirty cents is fixed, so it's a big share of a small deposit. A one-dollar deposit pays a third again in fees. Ten dollars pays about six percent. Twenty, a bit over four.
+
+Since your balance never expires, it's usually better to add funds less often, in larger amounts, if you know you'll use them.
+
+<break time="1.5s" />
+
+Notice what's missing from the bill. There's no subscription, and nothing renews by itself. You pay once, up front, for exactly the months you chose, and you see the price before you pay. Downloads don't cost you anything, however popular the file gets.
+
+The flip side is that payments are final. If you delete a file early, you don't get the unused months back. So choose a retention period you actually need. You can always add more later.
+
+<break time="1.5s" />
+
+Size times months times three cents, rounded up to a cent. Tiny files are free. The only other cost is the card fee when you add funds. There's a calculator on the pricing page if you'd rather not do the arithmetic.
+
+Next: what actually happens to a file over its lifetime. How it's extended, how strangers can help keep it alive, and what happens on the day it expires.

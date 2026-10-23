@@ -1,0 +1,37 @@
+Here are two links. The first one is the kind you use every day. It names a place, and whoever controls that place can change what's there. Today it's the report you expected. Tomorrow it could be something else, and the link would look exactly the same.
+
+The second link is different. It isn't named after a place. It's named after the content itself. Change even one byte of the file, and the name changes too. <break time="0.8s" /> So if this link gives you anything at all, it gives you exactly what it was named after.
+
+<break time="1.5s" />
+
+Hash Bin is a place to publish files under names like that second one. You upload a file, Hash Bin works out its name, which we call its two-fifty-six-tee string, and stores the file under it. Then you share the string however you like: in a message, on a web page, inside an app.
+
+Anyone who has the string can fetch the file. They don't need an account, and they don't need to know who uploaded it. And because the name comes from the content, they can check that what they got is exactly what was published.
+
+<break time="1.5s" />
+
+Hash Bin's rule is simple: publishing costs money, reading is free.
+
+When you upload, you choose how long the file should be kept, in whole months, and you pay for that time up front: three cents per gigabyte per month. A hundred-megabyte file kept for a full year costs four cents. Files of sixty-four bytes or less are free, for a reason you'll see in the episode on how the links work.
+
+When the time you paid for runs out, the file is deleted, unless someone extends it first. And that someone doesn't have to be you.
+
+<break time="1.5s" />
+
+Hash Bin is built around three promises.
+
+First, what you get is verifiable. The name is computed from the content, so anyone can recompute it and compare.
+
+Second, there's no browsing. Hash Bin has no search box and no list of files. The only way to reach a file is to already have its string. Uploaders aren't shown to readers either.
+
+And third, what Hash Bin itself does, it does in public. Every deletion is recorded on a public page, with the reason. When someone reports a file, the report and its evidence are public too. The code that runs the service is open source.
+
+<break time="1.5s" />
+
+You can use Hash Bin in two ways. Most people will use the website: sign in, add funds, drop in some files, and copy the links.
+
+Developers can do the same things from code. You can upload with an API key from a script. Or you can build an app that publishes on behalf of its users, paid from the user's own Hash Bin balance, without your app ever holding their password or a key. That's a standard sign-in flow called oh-auth, and it has its own episode.
+
+<break time="1.5s" />
+
+This series is split so you can follow what you care about. If you want to publish files, go to Your First Upload. If you're a developer, or just curious, watch A Name Made of Content next. It takes that strange string apart, one character at a time, and shows why a name made of content can't lie.

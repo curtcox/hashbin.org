@@ -1,0 +1,71 @@
+Here's a string of ninety-four characters. It's the name of a file on Hash Bin, and it would be just as long if the file were a single sentence or two hundred and fifty-six terabytes.
+
+That should bother you a little. There are only so many ninety-four character strings, a huge number, but a fixed one. And there's no limit to the number of different files. So there must be two different files that end up with the same name. You can't fit infinitely many pigeons into a finite number of holes without doubling up.
+
+And yet, the whole promise of Hash Bin is that the name tells you exactly what the content is. In this episode, let's take the string apart, and see how both of those things can be true at once.
+
+<break time="1.5s" />
+
+The core of the name is something called a hash function. Think of it as a fingerprint machine. Feed it any data at all, and it produces a fixed-size fingerprint. Hash Bin uses one called shah five-twelve, which always produces five hundred and twelve bits.
+
+Three properties matter. First, it's deterministic: the same input always gives exactly the same fingerprint, on any computer, anywhere.
+
+Second, it's chaotic. Change a single letter, and roughly half of the output bits flip. There's no sense in which similar files get similar fingerprints. <break time="0.6s" />
+
+And third, it only runs one way. Given a fingerprint, there's no known way to work backwards to a file that produces it, other than guessing files and checking.
+
+<break time="1.5s" />
+
+So back to our puzzle. Collisions, two files with the same fingerprint, definitely exist. The question is whether anyone could ever find one.
+
+There are two to the five hundred twelfth possible fingerprints. Because of a quirk of probability called the birthday paradox, you don't need to try anywhere near that many files to find two that match. You only need about the square root: two to the two hundred fifty-sixth tries.
+
+That still sounds like a number with no meaning, so let's give it one. Suppose you could compute a sextillion fingerprints every second, which is about what the entire Bitcoin network does today. And suppose you'd been running since the Big Bang. You'd have tried roughly two to the hundred twenty-eighth files. <break time="0.6s" /> Which sounds close, until you notice it's a fraction of the job of about one in ten to the thirty-eighth. You haven't started.
+
+So the pigeonhole argument is right: collisions exist. But they're hidden in a space so large that, for every practical purpose, a fingerprint identifies exactly one file. That's the bet every content-addressed system makes, and shah five-twelve gives it a very wide margin.
+
+<break time="1.5s" />
+
+Five hundred and twelve bits is a long row of ones and zeros, so we need a compact way to write it down. Hash Bin uses an encoding called base sixty-four U R L.
+
+Cut the bits into groups of six. Six bits can count from zero to sixty-three, so each group picks one symbol from an alphabet of sixty-four: the capital letters, the lowercase letters, the ten digits, a dash, and an underscore.
+
+Five hundred twelve divided by six is a little over eighty-five, so the fingerprint takes eighty-six characters.
+
+Why that particular alphabet? Ordinary base sixty-four uses a plus sign and a slash, and both of those mean something in a web address. Swapping them for a dash and an underscore means the string can sit in a URL exactly as it is.
+
+<break time="1.5s" />
+
+Now look at the beginning of the string. Before the fingerprint, there are eight more characters. They aren't part of the hash. They're the file's length, in bytes.
+
+The length is stored as a six-byte number. Six bytes is forty-eight bits, and forty-eight bits is exactly eight groups of six, so it fits in eight characters with nothing left over.
+
+This file is sixty-five bytes long. Here's what the prefix looks like for a ninety-megabyte file. And here's the largest number six bytes can hold: every character is an underscore, the last symbol in the alphabet.
+
+That maximum is two to the forty-eighth bytes, minus one. Two to the forty-eighth is two hundred and fifty-six tebibytes. Two hundred fifty-six, T. <break time="0.6s" /> That's the biggest file a two-fifty-six-tee string can describe, and it's where the format gets its name.
+
+Putting the length up front is useful. Before you download anything, you know how big the file is. And if a server hands you the wrong number of bytes, you can reject it without even computing a hash.
+
+<break time="1.5s" />
+
+Here's a short message: "Hello, Hash Bin!" It's fifteen bytes. Its fingerprint is sixty-four bytes. The fingerprint is bigger than the thing it's supposed to summarize. <break time="0.6s" />
+
+So for small content, Hash Bin doesn't hash at all. It puts the content itself in the string. The prefix says fifteen bytes, and the rest is just the message, encoded in the same base sixty-four U R L alphabet. You can even see the word "Hello" in there, in disguise.
+
+The cutoff is sixty-four bytes, exactly the size of a fingerprint. Up to that size, the content takes at most eighty-six characters, the same room a hash would take. So no string is ever longer than ninety-four characters, either way.
+
+This has a lovely consequence. When the content is inside the name, there's nothing to store. That's why these tiny files are free, and why they never expire: as long as someone has the string, they have the content. It also means you should treat the string itself as the content. If you share it, you've shared the message.
+
+<break time="1.5s" />
+
+Now we can see what "a name that can't lie" means in practice. When you fetch a file by its two-fifty-six-tee string, you can check it yourself, in two steps. Does it have the number of bytes the prefix says? And does its fingerprint match the rest of the string?
+
+If both checks pass, you have the exact file the name was made from. If someone tampered with it, or a download got corrupted, the fingerprint won't match, and you'll know.
+
+Notice that this check doesn't care where the file came from. It could come from Hash Bin, from a friend, or from a completely different server. That idea, that the source doesn't matter as long as the fingerprint matches, comes back later in the series.
+
+<break time="1.5s" />
+
+So here's the whole string. Eight characters for the length. Then either the content itself, if it's sixty-four bytes or less, or its shah five-twelve fingerprint if it's longer. Never more than ninety-four characters, and safe to paste into any link.
+
+If you're here to publish files, the next episode is your first upload. If you're a developer, head to First API Calls, where we'll compute one of these strings in code and upload a file with it.

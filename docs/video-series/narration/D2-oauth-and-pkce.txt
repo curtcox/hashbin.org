@@ -1,0 +1,69 @@
+Suppose you're building a notes app, and your users want a button that saves a note to Hash Bin, paid from their own balance. How does your app get permission to do that?
+
+You can't ask for their Hash Bin password, because there isn't one. You could ask them to paste in an API key. But an API key is their whole account. It can delete everything they've uploaded and spend their entire balance. Once it's in your app's code, anything else running in that page could read it. And if your app misbehaves, the only way for them to stop it is to find and revoke that key, and hope they haven't pasted it anywhere else.
+
+What you want is a different kind of key: one that only opens one door, that the user can take back, and that never shows your app anything it doesn't need. That's what a protocol called oh-auth is for.
+
+<break time="1.5s" />
+
+First, you register your app on the developers page. Anyone can do this, and it takes effect immediately. You give it a name, which users will see, and a list of redirect U R Is: the exact addresses Hash Bin is allowed to send users back to.
+
+Those have to be HTTPS, or local host while you're developing. Phone apps can use their own URL scheme, named after a domain you control.
+
+You get back a client ID, which identifies your app. You'll also see a client secret, but a browser app or a phone app can't keep a secret, since anyone can read its code. So the flow we're about to see doesn't use one.
+
+<break time="1.5s" />
+
+Here's how it works. When the user clicks save for the first time, your app sends their browser to Hash Bin's authorize page, with a few parameters: your client ID, where to come back to, which permissions you want, a random value called state, and something called a code challenge, which we'll come back to.
+
+Hash Bin makes sure the user is signed in, and then shows them a consent screen, with your app's name and exactly what it's asking for, in plain words. Your app can also propose a monthly spending limit, and if it does, the screen shows that too.
+
+If they approve, Hash Bin sends the browser back to your redirect U R I with an authorization code. Think of it as a claim ticket. It's only good for ten minutes, and it can't do anything by itself.
+
+Your app takes the ticket to Hash Bin's token endpoint and exchanges it for two tokens: an access token, which works for one hour, and a refresh token, which lasts thirty days and is used to get new access tokens. Now your app can publish, with the access token in the authorization header.
+
+The state value is your app's way of making sure the user coming back is the one it sent. If it doesn't match what you sent, ignore the response.
+
+<break time="1.5s" />
+
+There's a weak spot in that dance. The authorization code travels through the browser, in a URL. URLs end up in history, in logs, and on phones, a malicious app can register the same custom URL scheme as yours and catch the redirect itself.
+
+If an attacker gets the code before your app uses it, they could exchange it for tokens. A server-side app would prove its identity at the token endpoint with its client secret. But we just said browser and phone apps can't keep one. So how can Hash Bin tell that the app redeeming the ticket is the same one that started the flow?
+
+<break time="1.5s" />
+
+The answer is a small addition called pixie, short for proof key for code exchange.
+
+Before your app redirects the user, it makes up a long random secret, called the code verifier, and keeps it to itself. It runs the verifier through a hash function, shah two-fifty-six, to get a fingerprint called the code challenge. Only the challenge goes into the authorize URL.
+
+Hash Bin remembers that challenge with the authorization code it issues. Then, at the token endpoint, your app has to present both the code and the original verifier. Hash Bin hashes the verifier and checks that it matches the challenge.
+
+An attacker who intercepted the code never saw the verifier. They saw the challenge, maybe, but a hash only runs one way, so the challenge doesn't help them work out the verifier. Without it, the stolen code is useless.
+
+If this feels familiar, it should. It's the same idea as the two-fifty-six-tee string. Publish a fingerprint now, and anyone can check the real thing against it later. In two-fifty-six-tee, the fingerprint commits to a file. Here, it commits to a secret that only your app knows.
+
+Hash Bin requires pixie, with shah two-fifty-six, for every app, with no exceptions.
+
+<break time="1.5s" />
+
+Now let's look at what that access token actually allows. There are three permissions, called scopes. Content write lets the app publish, billed to the user. Content read lets it check whether content exists and read its metadata. And balance read lets it see the balance, so it can warn the user before an upload fails.
+
+That's all. An app can never delete anything, extend retention, or touch the account through oh-auth. Publishing is the only write it can do, and published content can't be changed.
+
+Two more limits are in the user's hands. The app doesn't choose how long content is kept. Every publish uses the user's own default retention, which they set on their account page. And if a spending limit was approved, Hash Bin enforces it: once the app has spent its monthly limit, further publishes are refused.
+
+Finally, the user can revoke your app at any time from their account settings. And if you delete your app registration, refresh tokens stop working immediately, and any access tokens still out there expire within the hour.
+
+<break time="1.5s" />
+
+Access tokens expire after an hour on purpose, so a leaked one isn't useful for long. When it runs out, your app uses the refresh token to get a new one.
+
+Hash Bin rotates refresh tokens: each time you use one, you get a new one, and the old one stops working. If someone copied an old refresh token, it's already dead by the time they try it. One consequence for you: always store the new refresh token from each response, or the next renewal will fail and the user will have to approve your app again.
+
+<break time="1.5s" />
+
+All of that, the verifier, the challenge, the state check, the token exchange, and the refresh rotation, is handled by Hash Bin's hosted SDK. You give it your client ID and redirect U R I. Call authorize to start, handle callback when the user comes back, and then publish. It keeps the tokens, renews them when they expire, and gives you back the two-fifty-six-tee string and the URL of what you published.
+
+<break time="1.5s" />
+
+So: register, send the user to consent, trade the ticket for tokens, and prove with pixie that you're the one who asked. The token can publish and read, nothing more, within limits the user controls. Next, we'll build a complete app this way, and see what it means to design around content that can never change.

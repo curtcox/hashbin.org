@@ -1,0 +1,23 @@
+{
+  "_comment": "Applied in order, as whole-word, case-sensitive replacements, to narration only. Edit here and rerun extract_narration.py.",
+  "replacements": [
+    ["256t", "two-fifty-six-tee"],
+    ["SHA-512", "shah five-twelve"],
+    ["SHA-256", "shah two-fifty-six"],
+    ["base64url", "base sixty-four U R L"],
+    ["PKCE", "pixie"],
+    ["OAuth", "oh-auth"],
+    ["UTF-8", "U T F eight"],
+    ["UTC", "U T C"],
+    ["R2", "R two"],
+    ["DMCA", "D M C A"],
+    ["URIs", "U R Is"],
+    ["URI", "U R I"],
+    ["HashBin's", "Hash Bin's"],
+    ["HashBin", "Hash Bin"],
+    ["Textpad's", "Text Pad's"],
+    ["Textpad", "Text Pad"],
+    ["hashbin", "hash bin"],
+    ["localhost", "local host"]
+  ]
+}

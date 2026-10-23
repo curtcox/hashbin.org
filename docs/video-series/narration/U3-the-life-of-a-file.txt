@@ -1,0 +1,41 @@
+Every file on Hash Bin has a clock. The day you upload it, you've paid for a certain number of months, and that sets an expiration date. Let's follow one file through its life, and look at the ways that clock can change.
+
+<break time="1.5s" />
+
+Retention is counted in calendar months from the day you upload. Keep a file for a year, and it expires on the same date next year. If that date doesn't exist, say, one month after January thirty-first, it ends on the last day of the shorter month.
+
+You can always see the date. It's on the file's content page, and every file you've uploaded is listed under My Uploads with how long it has left.
+
+<break time="1.5s" />
+
+To keep a file longer, open it from My Uploads and use Extend Retention. Choose how many months to add, and you'll see the price and the new expiration date before you confirm. The new months are added to the end of the time you already have, so extending early doesn't waste anything.
+
+There's a second way that works just as well. Uploading the identical file again doesn't store a second copy. It adds the months you choose to the existing one.
+
+<break time="1.5s" />
+
+Here's something unusual. Extending a file isn't limited to the person who uploaded it. Anyone can do it, right from the content page, without an account. It's called a donation.
+
+You choose an amount, at least a dollar, and pay by card. The page shows how much time that buys before you pay. Because the price is size times time, a dollar goes further for smaller files. For the largest file you can upload, a dollar buys more than thirty-one years. For a ten-megabyte file, it would buy far more than a century, so each donation is capped at a hundred years.
+
+So a file that matters to people doesn't depend on the original uploader remembering to pay. If readers care about it, they can keep it alive themselves.
+
+<break time="1.5s" />
+
+If you uploaded something by mistake, you can delete it from its detail page. Only the account that uploaded a file can delete it.
+
+Deleting is final in a few ways. The link stops working. The months you'd paid for aren't refunded. The deletion is listed on the public records page, with the date and the reason, but not with who you are. And that exact content can't be uploaded to Hash Bin again. Otherwise a file that was taken down for a good reason could simply be put back.
+
+One thing deleting can't do is reach into other people's computers. Anyone who already downloaded the file still has their copy.
+
+<break time="1.5s" />
+
+And if no one extends it, the file reaches its expiration date. There's no grace period. A job runs every night, finds files whose time is up, and deletes them. After that, the link answers "not found", and the public records page notes that it expired.
+
+The exception, as always, is the tiny files: sixty-four bytes or less. They live inside their own links, so there's nothing to delete. They don't have an expiration date at all.
+
+<break time="1.5s" />
+
+So a file's life is a clock you can wind forward: by extending it, re-uploading it, or by someone else donating. Deleting it or letting it run out ends it, in public, for good.
+
+There's one more thing that can pause a file: if someone reports it, it's blocked while the report is reviewed. That has its own episode. Next, though, the question people ask most: who can actually see what you upload?

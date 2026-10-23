@@ -1,0 +1,37 @@
+An ordinary web address tells you where to go. A two-fifty-six-tee string doesn't. It tells you what you're looking for. That means it doesn't really belong to Hash Bin. Any server that has the file can hand it out under the same name, and as we saw in the episode on the string itself, you can check that what you got is right, no matter who gave it to you.
+
+Hash Bin builds on that with a feature called alternate suppliers.
+
+<break time="1.5s" />
+
+A supplier is any other place on the web that serves files by their two-fifty-six-tee string. There are two kinds.
+
+A single-file supplier is just one URL that serves one file. A group supplier holds many files, each named by its own string: a web server with an address pattern like this one, where the string goes at the end, or even a folder in a GitHub repository full of files named that way.
+
+You register suppliers from your dashboard, up to twenty per account.
+
+<break time="1.5s" />
+
+When you add a supplier, Hash Bin doesn't take its word for anything. It scans it. For each file the supplier claims to have, Hash Bin downloads it and runs the same two checks you'd run yourself. Is it the size the string says? And does its fingerprint match?
+
+Only files that pass both checks are listed. A file with the right name and the wrong contents simply isn't counted, and neither is one that's even a byte too long or too short.
+
+Scanning happens when you register a supplier, and again whenever you ask for a rescan. Hash Bin doesn't keep re-checking in the background, so if a supplier's files change, rescan it.
+
+<break time="1.5s" />
+
+Suppliers are always public. For any file, anyone can ask Hash Bin which registered suppliers have a verified copy, and go fetch it there directly. And since every copy can be checked against the string, it doesn't matter whether you trust the supplier. You only have to trust the math.
+
+<break time="1.5s" />
+
+Here's where suppliers really pay off. When Hash Bin can't serve a file itself, for instance because its time ran out, it can fall back to a supplier instead of answering "not found".
+
+It picks one of the file's verified suppliers at random, and does one of two things. It can send you straight to the supplier. Or it can fetch the file from the supplier and pass it along, checking the contents every hundredth time. Suppliers earn the direct route by being reliable: at least ninety-five of their last hundred requests succeeding.
+
+Content served this way isn't copied back into Hash Bin's storage, and Hash Bin's download allowances don't apply to it. The supplier is the one doing the serving.
+
+<break time="1.5s" />
+
+A two-fifty-six-tee string names content, not a place. Suppliers make that practical: other servers can carry the same files, Hash Bin checks every one before listing it, and anyone can fetch from them and verify for themselves.
+
+If you're a developer, that's the last of the deep dives on how content moves. Next, let's start writing code.
