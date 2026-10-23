@@ -213,10 +213,10 @@ search the scripts for the value.
 ## Before recording
 
 The scripts describe how HashBin is meant to work. In these places production doesn't match yet.
-Items 1–4 and 8 are marked in the scripts with a ⚠ note under the affected beat. Fix the code
+Items 1, 2, 4, and 8 are marked in the scripts with a ⚠ note under the affected beat. Fix the code
 or change the narration before recording that episode.
 
-1. **X2 (Paying for Popularity): per-content allowances aren't enforced on 256t.us.** The MTBR
+1. **X2 (Paying for Popularity): per-content allowances aren't enforced on 256t.us** (STATUS B9). The MTBR
    check and the purchase API exist, and the info page shows the allowance, but the 256t.us
    worker that serves every production download only applies the per-IP limit (30 a minute). The
    MTBR check runs only in hashbin.org's own download handler (`handleDownloadContent`), which
@@ -225,14 +225,13 @@ or change the narration before recording that episode.
    file globally, and the 256t.us worker runs on every request (it doesn't use Cloudflare's cache),
    so once enforced, a new file could be downloaded about once a month in total.
    **Recommendation:** hold X2 until the intended model is settled and enforced.
-2. **X3 (Anyone Can Serve It): fallback to alternate suppliers isn't live.** Registering, scanning,
+2. **X3 (Anyone Can Serve It): fallback to alternate suppliers isn't live** (STATUS B10). Registering, scanning,
    and listing suppliers work in production. Redirecting or proxying a download to a supplier when
    HashBin can't serve it is in the same local-only download handler, so 256t.us doesn't do it.
    Beat 5 is marked; the rest of the episode is accurate today.
-3. **X1 and U3: an expired dispute doesn't unblock content.** When a dispute expires after 30
-   days, the nightly job closes it, but nothing deletes the `.disputed` marker in R2, so 256t.us
-   keeps answering 451. (Denying a dispute does remove it.) X1 Beat 4 says expired disputes
-   unblock the content.
+3. **Fixed: expired disputes now unblock content** (STATUS S15). Before the fix, closing an
+   expired dispute left the `.disputed` marker in R2, so 256t.us kept answering 451. X1 Beat 4 is
+   accurate once the fix is deployed.
 4. **X1 and U3: cached copies outlive a block or deletion.** 256t.us sends every successful
    response with `Cache-Control: public, max-age=31536000, immutable`. The worker doesn't use
    Cloudflare's cache, so the network itself won't keep serving a removed file, but a browser or shared
@@ -240,13 +239,10 @@ or change the narration before recording that episode.
    or blocked link "stops working", which is true for anyone without a cached copy, and U3 notes that
    people who downloaded a file keep it. Also confirm no Cloudflare Cache Rule caches 256t.us at the
    edge; if one does, purge `https://256t.us/{cid}` on deletion, takedown, and new disputes.
-5. **Pricing page and FAQ examples disagree with the code.** `frontend/docs/pricing.html`
-   lists 100 MB for a year at $0.36 (the code charges $0.04) and 1 MB for a month at $0.00 (the code
-   charges $0.01), and its 5 GB examples exceed the 90 MB upload limit. The FAQ says $0.036 for the
-   same 100 MB example. The scripts use the code's values; fix the pages so viewers who check
-   them find the same numbers.
-6. **Docs say retention is "multiples of 30 days" and "1 year (365 days)".** Billing and
-   expiration use calendar months (12 months for a year). The scripts say "whole months".
+5. **Fixed: pricing page and FAQ examples** (STATUS S16) now match billing, and use only sizes
+   that can be uploaded.
+6. **Fixed: retention wording.** The docs now say whole calendar months, matching billing, as
+   the scripts do.
 7. **Sign-in providers.** The scripts avoid listing providers ("an account you already have,
    such as Google"). If you'd rather name them, confirm which are enabled in the production
    Clerk instance first.

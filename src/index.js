@@ -554,7 +554,7 @@ export default {
             const disputeRecordId = env.DISPUTE_RECORD.idFromName(`dispute:${dispute.cid}`);
             const disputeRecordStub = env.DISPUTE_RECORD.get(disputeRecordId);
             
-            await disputeRecordStub.fetch(new Request('http://internal/dispute', {
+            const closeResponse = await disputeRecordStub.fetch(new Request('http://internal/dispute', {
               method: 'PATCH',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -564,7 +564,13 @@ export default {
                 resolved_by: 'system'
               })
             }));
-            
+            if (!closeResponse.ok) {
+              throw new Error(`DisputeRecord returned ${closeResponse.status}`);
+            }
+
+            // An expired dispute no longer blocks the content: 256t.us serves 451 while this marker exists
+            await env.CONTENT_BUCKET.delete(`${dispute.cid}.disputed`);
+
             // Remove from DisputeIndex
             await indexStub.fetch(new Request('http://internal/remove', {
               method: 'POST',

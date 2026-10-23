@@ -103,7 +103,7 @@
 >
 > Once a dispute closes, the same file can't be reported again for thirty days. That stops anyone from keeping a file blocked by filing the same report over and over.
 
-**⚠ Before recording:** today an expired dispute doesn't unblock the content (README, Before recording #3), and browsers that already fetched a file may keep showing their cached copy (#4).
+**⚠ Before recording:** browsers that already fetched a file may keep showing their cached copy (README, Before recording #4). Expired disputes unblock content once the STATUS S15 fix is deployed.
 
 ---
 
