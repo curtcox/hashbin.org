@@ -4,7 +4,7 @@ The second link is different. It isn't named after a place. It's named after the
 
 <break time="1.5s" />
 
-Hash Bin is a place to publish files under names like that second one. You upload a file, Hash Bin works out its name, which we call its two-fifty-six-tee string, and stores the file under it. Then you share the string however you like: in a message, on a web page, inside an app.
+Hash Bin is a place to publish files under names like that second one. You upload a file, Hash Bin works out its name, which we call its two-fifty-six T string, and stores the file under it. Then you share the string however you like: in a message, on a web page, inside an app.
 
 Anyone who has the string can fetch the file. They don't need an account, and they don't need to know who uploaded it. And because the name comes from the content, they can check that what they got is exactly what was published.
 

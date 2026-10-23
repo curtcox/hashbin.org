@@ -18,7 +18,7 @@ Payments are final, and a balance can't be withdrawn. But it doesn't expire, eit
 
 Now the upload page. You can drop in several files at once, up to ninety megabytes each.
 
-The first thing that happens is that your browser works out each file's two-fifty-six-tee string, on your own computer, before the file itself is sent. That's how the page knows a few things right away. The text note is so small that it fits inside its own link, so it's free. If you add the same photo twice, the page notices they're identical and uploads it once.
+The first thing that happens is that your browser works out each file's two-fifty-six T string, on your own computer, before the file itself is sent. That's how the page knows a few things right away. The text note is so small that it fits inside its own link, so it's free. If you add the same photo twice, the page notices they're identical and uploads it once.
 
 Next, choose how long to keep the files. Retention is bought in whole months, and one period applies to every file in this upload. Pick a month, a year, five years, ten. The total updates as you go.
 
@@ -28,11 +28,11 @@ And if one of these files was already on Hash Bin, maybe because someone else up
 
 Click upload, and the cost comes out of your balance: for a few ordinary files kept for a year, a few cents.
 
-Each file gets a content page. It shows the two-fifty-six-tee string, which Hash Bin also calls the content ID, with a button to copy it. You'll also see the file's size, when it expires, and a download link. Everything you've uploaded is listed under My Uploads, so you don't need to keep track of the strings yourself.
+Each file gets a content page. It shows the two-fifty-six T string, which Hash Bin also calls the content ID, with a button to copy it. You'll also see the file's size, when it expires, and a download link. Everything you've uploaded is listed under My Uploads, so you don't need to keep track of the strings yourself.
 
 <break time="1.5s" />
 
-To share a file, share its link. There are two kinds. The two-fifty-six-tee dot U S link is the file itself. Add an extension to the end, like dot P D F, and browsers will know what kind of file to expect. The hash bin dot org info link is the content's page, where people can see how long it will be kept, and help keep it around.
+To share a file, share its link. There are two kinds. The two-fifty-six T dot U S link is the file itself. Add an extension to the end, like dot P D F, and browsers will know what kind of file to expect. The hash bin dot org info link is the content's page, where people can see how long it will be kept, and help keep it around.
 
 Whoever you send it to just opens it. No account, no sign-in, no fee.
 

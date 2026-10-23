@@ -1,10 +1,10 @@
-An ordinary web address tells you where to go. A two-fifty-six-tee string doesn't. It tells you what you're looking for. That means it doesn't really belong to Hash Bin. Any server that has the file can hand it out under the same name, and as we saw in the episode on the string itself, you can check that what you got is right, no matter who gave it to you.
+An ordinary web address tells you where to go. A two-fifty-six T string doesn't. It tells you what you're looking for. That means it doesn't really belong to Hash Bin. Any server that has the file can hand it out under the same name, and as we saw in the episode on the string itself, you can check that what you got is right, no matter who gave it to you.
 
 Hash Bin builds on that with a feature called alternate suppliers.
 
 <break time="1.5s" />
 
-A supplier is any other place on the web that serves files by their two-fifty-six-tee string. There are two kinds.
+A supplier is any other place on the web that serves files by their two-fifty-six T string. There are two kinds.
 
 A single-file supplier is just one URL that serves one file. A group supplier holds many files, each named by its own string: a web server with an address pattern like this one, where the string goes at the end, or even a folder in a GitHub repository full of files named that way.
 
@@ -32,6 +32,6 @@ Content served this way isn't copied back into Hash Bin's storage, and Hash Bin'
 
 <break time="1.5s" />
 
-A two-fifty-six-tee string names content, not a place. Suppliers make that practical: other servers can carry the same files, Hash Bin checks every one before listing it, and anyone can fetch from them and verify for themselves.
+A two-fifty-six T string names content, not a place. Suppliers make that practical: other servers can carry the same files, Hash Bin checks every one before listing it, and anyone can fetch from them and verify for themselves.
 
 If you're a developer, that's the last of the deep dives on how content moves. Next, let's start writing code.

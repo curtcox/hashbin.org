@@ -42,7 +42,7 @@ The length is stored as a six-byte number. Six bytes is forty-eight bits, and fo
 
 This file is sixty-five bytes long. Here's what the prefix looks like for a ninety-megabyte file. And here's the largest number six bytes can hold: every character is an underscore, the last symbol in the alphabet.
 
-That maximum is two to the forty-eighth bytes, minus one. Two to the forty-eighth is two hundred and fifty-six tebibytes. Two hundred fifty-six, T. <break time="0.6s" /> That's the biggest file a two-fifty-six-tee string can describe, and it's where the format gets its name.
+That maximum is two to the forty-eighth bytes, minus one. Two to the forty-eighth is two hundred and fifty-six tebibytes. Two hundred fifty-six, T. <break time="0.6s" /> That's the biggest file a two-fifty-six T string can describe, and it's where the format gets its name.
 
 Putting the length up front is useful. Before you download anything, you know how big the file is. And if a server hands you the wrong number of bytes, you can reject it without even computing a hash.
 
@@ -58,7 +58,7 @@ This has a lovely consequence. When the content is inside the name, there's noth
 
 <break time="1.5s" />
 
-Now we can see what "a name that can't lie" means in practice. When you fetch a file by its two-fifty-six-tee string, you can check it yourself, in two steps. Does it have the number of bytes the prefix says? And does its fingerprint match the rest of the string?
+Now we can see what "a name that can't lie" means in practice. When you fetch a file by its two-fifty-six T string, you can check it yourself, in two steps. Does it have the number of bytes the prefix says? And does its fingerprint match the rest of the string?
 
 If both checks pass, you have the exact file the name was made from. If someone tampered with it, or a download got corrupted, the fingerprint won't match, and you'll know.
 

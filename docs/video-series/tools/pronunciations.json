@@ -1,7 +1,7 @@
 {
   "_comment": "Applied in order, as whole-word, case-sensitive replacements, to narration only. Edit here and rerun extract_narration.py.",
   "replacements": [
-    ["256t", "two-fifty-six-tee"],
+    ["256t", "two-fifty-six T"],
     ["SHA-512", "shah five-twelve"],
     ["SHA-256", "shah two-fifty-six"],
     ["base64url", "base sixty-four U R L"],

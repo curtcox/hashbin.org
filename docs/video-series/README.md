@@ -2,12 +2,16 @@
 
 Scripts for an animated explainer series about HashBin.org, in the style of 3Blue1Brown:
 curious, precise narration over clean Manim animation, where every idea is built up on screen
-rather than asserted. Narration is voiced with ElevenLabs; graphics are made with Manim.
+rather than asserted. Graphics are made with Manim. Narration can be voiced with ElevenLabs, or
+locally with Kokoro-82M, which the included render pipeline uses.
 
 - **Scripts:** [`episodes/`](episodes/), one Markdown file per episode. Each beat has scene
   directions for Manim and the narration for that beat.
 - **Narration files:** [`narration/`](narration/), plain text for ElevenLabs, generated from the
   scripts by [`tools/extract_narration.py`](tools/extract_narration.py). Don't edit them by hand.
+- **Scenes and rendering:** [`manim/`](manim/), one module per episode, one scene class per beat,
+  built on the shared vocabulary in [`manim/hb/common.py`](manim/hb/common.py). See
+  [Rendering the videos locally](#rendering-the-videos-locally).
 - **Fact check:** [Before recording](#before-recording) lists places where the scripts describe
   intended behavior that production doesn't match yet. Resolve those first.
 
@@ -170,7 +174,7 @@ That rewrites `narration/<episode>.txt` for every script. Options:
 
 The scripts write a few terms the way they appear on screen (`256t`, `256t.us`, `PKCE`). The
 extractor replaces them with spoken forms from `tools/pronunciations.json`, for example
-`256t` → "two-fifty-six-tee" and `PKCE` → "pixie". If the project says "256t" differently, change
+`256t` → "two-fifty-six T" and `PKCE` → "pixie". If the project says "256t" differently, change
 it there once and regenerate. The same table can be loaded into an ElevenLabs pronunciation
 dictionary instead.
 
@@ -181,6 +185,42 @@ like questions, style exaggeration low. Generate per beat, keep the same voice a
 whole series, and regenerate a beat rather than splicing words.
 
 ---
+
+## Rendering the videos locally
+
+The repository can produce finished, narrated videos with no cloud services: Kokoro-82M voices
+each beat, Manim draws it, and ffmpeg joins the beats into one MP4 per episode.
+
+One-time setup (macOS; needs Homebrew, `uv`, and `ffmpeg`):
+
+```bash
+brew install espeak-ng cairo pango pkgconf ffmpeg
+brew install --cask font-jetbrains-mono
+cd docs/video-series
+uv venv --python 3.12 .venv
+uv pip install --python .venv/bin/python kokoro soundfile manim pip \
+  "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl"
+```
+
+Then, from `docs/video-series`:
+
+```bash
+.venv/bin/python tools/voice_kokoro.py           # build/audio/<episode>/<NN>.wav + word timings
+.venv/bin/python tools/render_videos.py          # build/videos/<episode>.mp4 at 1080p30
+.venv/bin/python tools/render_videos.py u2 --low # quick 480p preview of one episode
+tools/contact_sheet.sh build/videos/U2-what-it-costs.mp4 sheet.png 12  # frames for review
+```
+
+- **Voice:** Kokoro's `af_heart` at speed 0.9 (about 150 words a minute). Change it with
+  `--voice` and `--speed`. The same `pronunciations.json` applies. `[[pause N]]` becomes N seconds
+  of silence, and paragraphs are separated by 0.7 s.
+- **Timing:** Kokoro reports when each word is spoken, so scenes cue animations to phrases
+  (`self.at("the phrase", ...)`) instead of guessing durations. Each beat is as long as its
+  narration plus a 1.2 s tail. The renderer prints `CUE MISSING` if a phrase isn't found and
+  `OVERRUN` if animations run late, so rerun it after editing narration.
+- **Rebuilding:** unchanged beats aren't re-voiced. `build/` is ignored by git.
+- **No LaTeX needed:** math is set with `Text` (exponents are composed by `Expr`), so the scenes
+  render without a TeX installation.
 
 ## Facts the scripts rely on
 

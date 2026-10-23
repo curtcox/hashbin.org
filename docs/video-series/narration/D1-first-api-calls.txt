@@ -4,7 +4,7 @@ Everything the Hash Bin website does, it does by calling the same public API you
 
 There are two hosts to know about. Everything that involves an account, like uploading, checking your balance, or deleting, goes to the API at hash bin dot org.
 
-Downloads come from two-fifty-six-tee dot U S, and nothing else does. It's a plain file server: it ignores cookies and doesn't need authentication, and it allows requests from any website, so a web page anywhere can fetch Hash Bin content directly.
+Downloads come from two-fifty-six T dot U S, and nothing else does. It's a plain file server: it ignores cookies and doesn't need authentication, and it allows requests from any website, so a web page anywhere can fetch Hash Bin content directly.
 
 <break time="1.5s" />
 
@@ -22,7 +22,7 @@ You can have up to twenty-five keys, say one per machine or project, and revoke 
 
 Here's the upload. It's a POST to slash API slash content. The query string says how many months to keep it. The key goes in the authorization header. The content type is stored with the file, so browsers know what it is later. And the body is just the file's bytes.
 
-The response tells you everything you need: the file's two-fifty-six-tee string, its size, when it expires, what it cost in cents, your new balance, and the download URL.
+The response tells you everything you need: the file's two-fifty-six T string, its size, when it expires, what it cost in cents, your new balance, and the download URL.
 
 If something's wrong, the errors are specific. Not enough balance, and you'll be told how much is required and how far short you are. Over ninety megabytes, and you'll get a four-thirteen with the current limit. Content that was deleted can't be uploaded again, so that's a four-ten.
 
@@ -30,13 +30,13 @@ If the file is already on Hash Bin, the same call adds your months to its expira
 
 <break time="1.5s" />
 
-Because the name is computed from the content, you don't have to upload a file to know its name. These few lines of Python are the whole algorithm from the episode on the two-fifty-six-tee string. Eight characters of length. Then the content itself if it's sixty-four bytes or less, or its shah five-twelve hash. All of it in base sixty-four U R L, without padding.
+Because the name is computed from the content, you don't have to upload a file to know its name. These few lines of Python are the whole algorithm from the episode on the two-fifty-six T string. Eight characters of length. Then the content itself if it's sixty-four bytes or less, or its shah five-twelve hash. All of it in base sixty-four U R L, without padding.
 
 That's useful in a few ways. You can ask the API whether a file already exists before sending it. You can build links before an upload finishes. And, most importantly, you can check downloads.
 
 <break time="1.5s" />
 
-Downloading is a plain GET to two-fifty-six-tee dot U S. Then compute the name of what you received, and compare. If they match, you have exactly what was published, whichever server it came from.
+Downloading is a plain GET to two-fifty-six T dot U S. Then compute the name of what you received, and compare. If they match, you have exactly what was published, whichever server it came from.
 
 When a download fails, the status code tells you why. Four oh four means nothing is stored under that name: it was never uploaded, it expired, or it was deleted. Four twenty-nine means slow down and retry. Four fifty-one means it's blocked while a report is reviewed.
 

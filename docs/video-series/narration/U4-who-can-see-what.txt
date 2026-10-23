@@ -2,7 +2,7 @@ The most common question about Hash Bin is whether uploads are private. The hone
 
 <break time="1.5s" />
 
-Hash Bin has no search, no directory, and no list of recent uploads. That's a deliberate design choice. The only way in is the two-fifty-six-tee string.
+Hash Bin has no search, no directory, and no list of recent uploads. That's a deliberate design choice. The only way in is the two-fifty-six T string.
 
 And you can't guess one. For anything bigger than sixty-four bytes, the string contains a five-hundred-twelve-bit fingerprint of the file. Guessing a valid one at random is hopeless, for the same reason we saw in the episode on the string itself: the space is unimaginably large.
 
@@ -30,7 +30,7 @@ Hash Bin also doesn't scan or inspect what you upload. It treats every file as o
 
 <break time="1.5s" />
 
-Last, a word about safety for the people opening your links. Files are served from a separate address, two-fifty-six-tee dot U S, not from hash bin dot org, where accounts live. Browsers keep the two completely apart. On top of that, files are served with strict rules that stop scripts from running at all. So even if someone uploads a booby-trapped web page, opening it can't touch anyone's Hash Bin account.
+Last, a word about safety for the people opening your links. Files are served from a separate address, two-fifty-six T dot U S, not from hash bin dot org, where accounts live. Browsers keep the two completely apart. On top of that, files are served with strict rules that stop scripts from running at all. So even if someone uploads a booby-trapped web page, opening it can't touch anyone's Hash Bin account.
 
 <break time="1.5s" />
 

@@ -18,7 +18,7 @@ Rounding up has a consequence worth seeing. Here's the price of keeping a file f
 
 For a single month, it's even simpler. Every file you can upload costs exactly one cent.
 
-And at the far left there's a little green sliver: files of sixty-four bytes or less. Those cost nothing, because, as we saw in the episode on the two-fifty-six-tee string, the content lives inside the link itself. There's nothing to store.
+And at the far left there's a little green sliver: files of sixty-four bytes or less. Those cost nothing, because, as we saw in the episode on the two-fifty-six T string, the content lives inside the link itself. There's nothing to store.
 
 <break time="1.5s" />
 

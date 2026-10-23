@@ -38,7 +38,7 @@ You can always see where a file stands. Its content page shows the current allow
 
 <break time="1.5s" />
 
-Don't confuse the allowance with a second limit you might run into. two-fifty-six-tee dot U S also limits how fast any single network address can make requests: thirty a minute, across all files. That one isn't for sale. It's there so one busy script can't crowd out everyone else, and it tells you how many seconds to wait.
+Don't confuse the allowance with a second limit you might run into. two-fifty-six T dot U S also limits how fast any single network address can make requests: thirty a minute, across all files. That one isn't for sale. It's there so one busy script can't crowd out everyone else, and it tells you how many seconds to wait.
 
 So if you see a four twenty-nine, there are two possible reasons: the file's allowance, or your own request rate.
 

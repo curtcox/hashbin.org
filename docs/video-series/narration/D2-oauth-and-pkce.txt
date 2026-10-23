@@ -40,7 +40,7 @@ Hash Bin remembers that challenge with the authorization code it issues. Then, a
 
 An attacker who intercepted the code never saw the verifier. They saw the challenge, maybe, but a hash only runs one way, so the challenge doesn't help them work out the verifier. Without it, the stolen code is useless.
 
-If this feels familiar, it should. It's the same idea as the two-fifty-six-tee string. Publish a fingerprint now, and anyone can check the real thing against it later. In two-fifty-six-tee, the fingerprint commits to a file. Here, it commits to a secret that only your app knows.
+If this feels familiar, it should. It's the same idea as the two-fifty-six T string. Publish a fingerprint now, and anyone can check the real thing against it later. In two-fifty-six T, the fingerprint commits to a file. Here, it commits to a secret that only your app knows.
 
 Hash Bin requires pixie, with shah two-fifty-six, for every app, with no exceptions.
 
@@ -62,7 +62,7 @@ Hash Bin rotates refresh tokens: each time you use one, you get a new one, and t
 
 <break time="1.5s" />
 
-All of that, the verifier, the challenge, the state check, the token exchange, and the refresh rotation, is handled by Hash Bin's hosted SDK. You give it your client ID and redirect U R I. Call authorize to start, handle callback when the user comes back, and then publish. It keeps the tokens, renews them when they expire, and gives you back the two-fifty-six-tee string and the URL of what you published.
+All of that, the verifier, the challenge, the state check, the token exchange, and the refresh rotation, is handled by Hash Bin's hosted SDK. You give it your client ID and redirect U R I. Call authorize to start, handle callback when the user comes back, and then publish. It keeps the tokens, renews them when they expire, and gives you back the two-fifty-six T string and the URL of what you published.
 
 <break time="1.5s" />
 

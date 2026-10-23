@@ -4,7 +4,7 @@ Text Pad is Hash Bin's example answer. It's a complete editor in a single HTML f
 
 <break time="1.5s" />
 
-The first decision is where to keep the document's name. Text Pad puts it in the address bar, after a hash sign: pound two-fifty-six-tee equals, then the string. That part of a URL is called the fragment, and browsers never send it to any server. The page can also change it without reloading.
+The first decision is where to keep the document's name. Text Pad puts it in the address bar, after a hash sign: pound two-fifty-six T equals, then the string. That part of a URL is called the fragment, and browsers never send it to any server. The page can also change it without reloading.
 
 So the rule is simple: the address bar always names exactly what's on screen. Open a link, and you see that text. Save, and the address bar switches to the new text's string.
 
@@ -20,7 +20,7 @@ And if the content is sixty-four bytes or less, Text Pad doesn't fetch anything.
 
 <break time="1.5s" />
 
-For longer texts, Text Pad fetches the bytes from two-fifty-six-tee dot U S, and it treats every outcome as something to explain. No network: say so. Four oh four: nothing is stored under this name, it may have expired or been deleted. Four fifty-one: it's blocked while a dispute is reviewed. Four twenty-nine: try again later.
+For longer texts, Text Pad fetches the bytes from two-fifty-six T dot U S, and it treats every outcome as something to explain. No network: say so. Four oh four: nothing is stored under this name, it may have expired or been deleted. Four fifty-one: it's blocked while a dispute is reviewed. Four twenty-nine: try again later.
 
 Even a success needs checking, because Hash Bin stores bytes, not text. Text Pad decodes them strictly as U T F eight, and refuses anything that contains a null character, which real text practically never does.
 
