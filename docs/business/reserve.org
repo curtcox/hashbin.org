@@ -1,0 +1,33 @@
+#+TITLE: HashBin: cash reserve
+
+Every number is an input you can change: the =#+CONSTANTS:= lines in the source and the input
+columns of each table. Guesses are marked "guess". Prices checked October 2026. A planning aid, not
+legal, tax, or insurance advice. Calc rule: =*= binds tighter than =/=, so write =(a/b)*c=.
+
+#+CONSTANTS: price=0.03 minDeposit=1 depositSize=10 passThrough=0 lossBudget=500
+#+CONSTANTS: workersBase=5 r2=0.015 r2Free=10 clsA=4.5 clsAFree=1 clsB=0.36 clsBFree=10
+#+CONSTANTS: wReq=0.30 wFree=10 doReq=0.15 doFree=1 clerkFree=50000 clerkBase=25 clerkPer=0.02
+#+CONSTANTS: reqPerUpload=6 doPerUpload=10 cacheHit=0.5
+#+CONSTANTS: stripePct=0.029 stripeFix=0.30 disputeFee=15
+#+CONSTANTS: domainOrg=11 domainUs=8 dmca=2 agent=0 insurance=0 otherFixed=0
+#+CONSTANTS: llcAssets=500
+
+* Reserve: cash to keep in the LLC's account
+
+Inputs: paid GB, months owed, unspent balances, chargeback count, and the buffer. Prepaid storage is what it costs you
+to keep serving everything users have already paid for if no new money came in.
+
+#+NAME: reserve
+| Component                                        | Amount | Note                                             |
+|--------------------------------------------------+--------+--------------------------------------------------|
+| 12 months of fixed costs                         |      0 | from the constants                               |
+| Paid GB currently stored                         |      2 | from /api/admin/stats                            |
+| Average months of retention still owed           |     24 | guess; longer retention means a bigger reserve   |
+| Unspent user balances                            |     20 | from PaymentRecord totals                        |
+| Prepaid storage you still owe (R2 cost)          |      0 | GB × months × R2 price                           |
+| Chargebacks you could absorb (count)             |      3 | guess                                            |
+| Bill-spike and incident buffer                   |    300 | guess; one bad month or one lawyer consult       |
+| Chargeback buffer                                |      0 | count × (dispute fee + typical deposit)          |
+|--------------------------------------------------+--------+--------------------------------------------------|
+| Reserve                                          |      0 |                                                  |
+#+TBLFM: @2$2=(12*$workersBase)+$domainOrg+$domainUs+$dmca+$agent+$insurance+$otherFixed;%.2f::@6$2=@3$2*@4$2*$r2;%.2f::@9$2=@7$2*($disputeFee+$depositSize);%.2f::@>$2=@2$2+@5$2+@6$2+@8$2+@9$2;%.2f

@@ -1,0 +1,101 @@
+#+TITLE: HashBin: pricing and scenarios
+
+Every number is an input you can change: the =#+CONSTANTS:= lines in the source and the input
+columns of each table. Guesses are marked "guess". Prices checked October 2026. A planning aid, not
+legal, tax, or insurance advice. Calc rule: =*= binds tighter than =/=, so write =(a/b)*c=.
+
+#+CONSTANTS: price=0.03 minDeposit=1 depositSize=10 passThrough=0 lossBudget=500
+#+CONSTANTS: workersBase=5 r2=0.015 r2Free=10 clsA=4.5 clsAFree=1 clsB=0.36 clsBFree=10
+#+CONSTANTS: wReq=0.30 wFree=10 doReq=0.15 doFree=1 clerkFree=50000 clerkBase=25 clerkPer=0.02
+#+CONSTANTS: reqPerUpload=6 doPerUpload=10 cacheHit=0.5
+#+CONSTANTS: stripePct=0.029 stripeFix=0.30 disputeFee=15
+#+CONSTANTS: domainOrg=11 domainUs=8 dmca=2 agent=0 insurance=0 otherFixed=0
+#+CONSTANTS: llcAssets=500
+
+* Inputs
+
+
+#+NAME: inputs
+| Input                                         | Value | Unit             | Source                                         |
+|-----------------------------------------------+-------+------------------+------------------------------------------------|
+| Storage price you charge                      |     0 | $/GB-month       | src/utils/pricing.js                           |
+| Typical deposit                               |     0 | $                | guess                                          |
+| Card fee passed to user (1) or absorbed (0)   |     0 | flag             | today: 1; this model defaults to 0             |
+| Acceptable loss                               |     0 | $/year           | your answer                                    |
+| Cloudflare Workers Paid                       |     0 | $/month          | developers.cloudflare.com/workers/platform/pricing |
+| R2 storage                                    |     0 | $/GB-month       | developers.cloudflare.com/r2/pricing           |
+| R2 free storage                               |     0 | GB-month         | same                                           |
+| Worker requests over 10M/month                |     0 | $/million        | same                                           |
+| R2 reads (class B) over 10M/month             |     0 | $/million        | same                                           |
+| Clerk free monthly retained users             |     0 | users            | clerk.com pricing (Feb 2026 change)            |
+| Stripe percentage                             |     0 | fraction         | stripe.com/pricing                             |
+| Stripe fixed fee                              |     0 | $                | same                                           |
+| Stripe dispute fee                            |     0 | $                | same                                           |
+| hashbin.org renewal                           |     0 | $/year           | guess; check registrar invoice                 |
+| 256t.us renewal                               |     0 | $/year           | guess; check registrar invoice                 |
+| DMCA agent ($6 per 3 years)                   |     0 | $/year           | copyright.gov/dmca-directory                   |
+| Registered agent                              |     0 | $/year           | 0 if you act as your own                       |
+| Insurance                                     |     0 | $/year           | 0 = none; see the legal sheet             |
+| Money the LLC holds (what a judgment can reach) |   0 | $                | ≈ the reserve                                  |
+#+TBLFM: @2$2=$price::@3$2=$depositSize::@4$2=$passThrough::@5$2=$lossBudget::@6$2=$workersBase::@7$2=$r2::@8$2=$r2Free::@9$2=$wReq::@10$2=$clsB::@11$2=$clerkFree::@12$2=$stripePct::@13$2=$stripeFix::@14$2=$disputeFee::@15$2=$domainOrg::@16$2=$domainUs::@17$2=$dmca::@18$2=$agent::@19$2=$insurance::@20$2=$llcAssets
+
+* 1. Unit economics
+
+#+NAME: units
+| Thing                                     | You charge | It costs you | Margin |
+|-------------------------------------------+------------+--------------+--------|
+| 1 GB stored for 1 month                   |          0 |            0 |      0 |
+| 1 upload (requests, writes; past free tier) |        0.01 |            0 |      0 |
+| 1 million downloads (past free tier)      |          0 |            0 |      0 |
+| Card fee on a typical deposit             |          0 |            0 |      0 |
+#+TBLFM: @2$2=$price::@2$3=$r2::@3$3=(($reqPerUpload*$wReq)+($doPerUpload*$doReq)+$clsA)/1000000;%.6f::@4$2=0::@4$3=$wReq+((1-$cacheHit)*$clsB);%.2f::@5$2=$passThrough*(($stripePct*$depositSize)+$stripeFix);%.2f::@5$3=($stripePct*$depositSize)+$stripeFix;%.2f::$4=$2-$3;%.4f
+
+* 2. Card fees by deposit size
+
+Visa caps a credit card surcharge at 3%, bans it on debit cards, and needs 30 days' notice to
+Stripe. Today's checkout adds the Stripe fee as a "card processing fee", which is a surcharge.
+
+#+NAME: deposits
+| Deposit | Stripe fee | Fee as % of deposit | Charged if passed through | Credit kept if absorbed |
+|---------+------------+---------------------+---------------------------+-------------------------|
+|       1 |          0 |                   0 |                         0 |                       0 |
+|       5 |          0 |                   0 |                         0 |                       0 |
+|      10 |          0 |                   0 |                         0 |                       0 |
+|      20 |          0 |                   0 |                         0 |                       0 |
+|      50 |          0 |                   0 |                         0 |                       0 |
+#+TBLFM: $2=($stripePct*$1)+$stripeFix;%.2f::$3=100*($2/$1);%.1f::$4=$1+$2;%.2f::$5=$1-$2;%.2f
+
+* 3. Scenarios: one year of operation
+
+Columns 2–7 are inputs (guesses). "Free GB" is storage given away by a free tier. Card fees assume
+users top up in deposits of =depositSize= and that you absorb the fee (passThrough = 0).
+Fixed = Workers + domains + DMCA + agent + insurance + other.
+
+#+NAME: scenarios
+| Scenario                     | Accounts | Paid GB | Free GB | Uploads/mo | Downloads M/mo | Revenue | Card fees | R2 storage | Requests | Clerk | Fixed | Net per year |
+|------------------------------+----------+---------+---------+------------+----------------+---------+-----------+------------+----------+-------+-------+--------------|
+| Today (friends and testing)  |       20 |       2 |       0 |         50 |           0.01 |       0 |         0 |          0 |        0 |     0 |     0 |            0 |
+| Small                        |      500 |      50 |       0 |       2000 |            0.5 |       0 |         0 |          0 |        0 |     0 |     0 |            0 |
+| Growing                      |     5000 |    1000 |       0 |      30000 |              5 |       0 |         0 |          0 |        0 |     0 |     0 |            0 |
+| Busy                         |    50000 |   20000 |       0 |     300000 |             50 |       0 |         0 |          0 |        0 |     0 |     0 |            0 |
+| Today + one viral file       |       20 |       2 |       0 |         50 |            200 |       0 |         0 |          0 |        0 |     0 |     0 |            0 |
+| Growing + 100 MB free tier   |     5000 |    1000 |     200 |      30000 |              5 |       0 |         0 |          0 |        0 |     0 |     0 |            0 |
+| Growing + 1 GB free tier     |     5000 |    1000 |    2000 |      30000 |              5 |       0 |         0 |          0 |        0 |     0 |     0 |            0 |
+| Free tier only, no payers    |     5000 |       0 |    2000 |      30000 |              5 |       0 |         0 |          0 |        0 |     0 |     0 |            0 |
+#+TBLFM: $7=12*$price*$3;%.2f::$8=(1-$passThrough)*(ceil($7/$depositSize)*(($stripePct*$depositSize)+$stripeFix));%.2f::$9=12*$r2*max(0,$3+$4-$r2Free);%.2f::$10=12*((max(0,((($5*$reqPerUpload)/1000000)+$6)-$wFree)*$wReq)+(max(0,($6*(1-$cacheHit))-$clsBFree)*$clsB)+(max(0,(($5*$doPerUpload)/1000000)-$doFree)*$doReq)+(max(0,($5/1000000)-$clsAFree)*$clsA));%.2f::$11=12*((min(1,max(0,$2-$clerkFree))*$clerkBase)+(max(0,$2-$clerkFree)*$clerkPer));%.2f::$12=(12*$workersBase)+$domainOrg+$domainUs+$dmca+$agent+$insurance+$otherFixed;%.2f::$13=$7-$8-$9-$10-$11-$12;%.2f
+
+* 4. Break-even: paid storage needed
+
+GB of paid storage you must hold all year to cover fixed costs, at different prices. "Within
+budget" lets the loss you said you'd accept cover part of it. Margin is after R2 and after
+absorbing the card fee on a typical deposit.
+
+#+NAME: breakeven
+| Price $/GB-month | Margin $/GB-month | Fixed $/yr | GB to break even | GB within loss budget |
+|------------------+-------------------+------------+------------------+-----------------------|
+|             0.02 |                 0 |          0 |                0 |                     0 |
+|             0.03 |                 0 |          0 |                0 |                     0 |
+|             0.04 |                 0 |          0 |                0 |                     0 |
+|             0.05 |                 0 |          0 |                0 |                     0 |
+|             0.10 |                 0 |          0 |                0 |                     0 |
+#+TBLFM: $2=($1*(1-((($stripePct*$depositSize)+$stripeFix)/$depositSize)))-$r2;%.4f::$3=(12*$workersBase)+$domainOrg+$domainUs+$dmca+$agent+$insurance+$otherFixed;%.2f::$4=ceil($3/(12*$2))::$5=ceil(max(0,$3-$lossBudget)/(12*$2))

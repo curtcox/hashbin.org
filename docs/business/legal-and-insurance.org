@@ -1,0 +1,70 @@
+#+TITLE: HashBin: legal structure, risk, insurance
+
+Every number is an input you can change: the =#+CONSTANTS:= lines in the source and the input
+columns of each table. Guesses are marked "guess". Prices checked October 2026. A planning aid, not
+legal, tax, or insurance advice. Calc rule: =*= binds tighter than =/=, so write =(a/b)*c=.
+
+#+CONSTANTS: price=0.03 minDeposit=1 depositSize=10 passThrough=0 lossBudget=500
+#+CONSTANTS: workersBase=5 r2=0.015 r2Free=10 clsA=4.5 clsAFree=1 clsB=0.36 clsBFree=10
+#+CONSTANTS: wReq=0.30 wFree=10 doReq=0.15 doFree=1 clerkFree=50000 clerkBase=25 clerkPer=0.02
+#+CONSTANTS: reqPerUpload=6 doPerUpload=10 cacheHit=0.5
+#+CONSTANTS: stripePct=0.029 stripeFix=0.30 disputeFee=15
+#+CONSTANTS: domainOrg=11 domainUs=8 dmca=2 agent=0 insurance=0 otherFixed=0
+#+CONSTANTS: llcAssets=500
+
+* 1. Legal structure: what each option costs
+
+Columns 2, 6 and 7 are inputs. Workers, domains and DMCA come from the constants.
+
+#+NAME: structure
+| Option                                  | Setup | Workers | Domains | DMCA | Agent | Insurance | Year 1 | Later years | What a lawsuit can reach                 |
+|-----------------------------------------+-------+---------+---------+------+-------+-----------+--------+-------------+------------------------------------------|
+| Sole proprietor (today)                 |     0 |       0 |       0 |    0 |     0 |         0 |      0 |           0 | Everything you own                       |
+| Sole proprietor + MO fictitious name    |     7 |       0 |       0 |    0 |     0 |         0 |      0 |           0 | Everything you own                       |
+| Missouri LLC, you as agent              |    50 |       0 |       0 |    0 |     0 |         0 |      0 |           0 | LLC money (if you keep it separate)      |
+| Missouri LLC, commercial agent          |    50 |       0 |       0 |    0 |   100 |         0 |      0 |           0 | Same; keeps your home address private    |
+| MO LLC + lawyer reviews ToS and privacy |   810 |       0 |       0 |    0 |     0 |         0 |      0 |           0 | Same, with better-tested terms           |
+| MO LLC + general liability only         |    50 |       0 |       0 |    0 |     0 |       400 |      0 |           0 | Same; GL rarely covers content claims    |
+| MO LLC + tech E&O, cyber, media bundle  |    50 |       0 |       0 |    0 |     0 |      2500 |      0 |           0 | Same, plus insurer pays defense          |
+| Wyoming LLC registered in Missouri      |   205 |       0 |       0 |    0 |   110 |         0 |      0 |           0 | Same as MO LLC, costs more               |
+#+TBLFM: $3=12*$workersBase::$4=$domainOrg+$domainUs::$5=$dmca::$8=$2+$3+$4+$5+$6+$7;%.2f::$9=$3+$4+$5+$6+$7;%.2f
+
+* 2. Risks: what could go wrong in a year
+
+All chances and costs are guesses for you to tune. "With LLC" caps each loss at the money the
+LLC holds; it does not cover things you do personally, unpaid taxes, or anything you guarantee.
+
+#+NAME: risks
+| Event                                              | Chance/yr | Cost if it happens | Expected, no LLC | Expected, LLC |
+|----------------------------------------------------+-----------+--------------------+------------------+---------------|
+| Copyright suit, safe harbor in place (defense)     |     0.005 |              15000 |                0 |             0 |
+| Copyright damages, safe harbor lost (agent lapsed) |     0.001 |             150000 |                0 |             0 |
+| Defamation/privacy claim over user content (230)   |     0.005 |              10000 |                0 |             0 |
+| Subpoena or police request needing a lawyer        |      0.05 |                500 |                0 |             0 |
+| Data breach response (emails, account data)        |      0.01 |               5000 |                0 |             0 |
+| FTC action, no TAKE IT DOWN removal process        |     0.002 |              20000 |                0 |             0 |
+| Cloudflare bill spike (abuse or bug; no hard cap)  |      0.05 |                300 |                0 |             0 |
+| Chargeback or card-testing fraud wave              |      0.03 |                300 |                0 |             0 |
+| Knowing failure to report CSAM to NCMEC            |    0.0001 |             600000 |                0 |             0 |
+|----------------------------------------------------+-----------+--------------------+------------------+---------------|
+| Total                                              |           |                    |                0 |             0 |
+#+TBLFM: $4=$2*$3;%.2f::$5=$2*min($3,$llcAssets);%.2f::@>$4=vsum(@2..@-1);%.2f::@>$5=vsum(@2..@-1);%.2f
+
+* 3. Insurance: what each policy would cost and cover
+
+Premiums are published small-business medians and averages (2025–2026), not quotes. Compare them
+with the expected yearly loss in section 2: roughly what an insurer expects to pay out, before its
+own costs and profit.
+
+#+NAME: insurance
+| Policy                              | Premium/yr | Years of loss budget | Covers                                       | Verdict for now                         |
+|-------------------------------------+------------+----------------------+----------------------------------------------+-----------------------------------------|
+| General liability                   |        400 |                    0 | Injury, property damage; little else         | Skip: hashbin has no premises or visits |
+| Media liability                     |       1000 |                    0 | Copyright, defamation, privacy claims        | Later: the main risk, but UGC is priced up |
+| Tech E&O                            |        800 |                    0 | Service failure, lost data claims            | Later: ToS disclaimer and cap first     |
+| Cyber                               |       2000 |                    0 | Breach response, notification, extortion     | Skip: Clerk and Stripe hold the secrets |
+| Tech E&O + cyber + media bundle     |       2500 |                    0 | All three                                    | Buy when profit ≥ 3× premium            |
+| Personal umbrella                   |        300 |                    0 | Your personal liability                      | Doesn't help: excludes business         |
+|-------------------------------------+------------+----------------------+----------------------------------------------+-----------------------------------------|
+| Expected yearly loss with LLC (§2)  |          0 |                    0 |                                              |                                         |
+#+TBLFM: $3=$2/$lossBudget;%.1f::@>$2=remote(risks,@>$5);%.2f::@>$3=@>$2/$lossBudget;%.2f
