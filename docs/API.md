@@ -526,7 +526,7 @@ Download content (public, no cookies). Returns 451 for disputed content and 404 
 Manage OAuth apps for third-party publishing (see `/developers`). Require a signed-in session or API
 key; OAuth access tokens are refused.
 
-- `POST /api/developers/apps`: register `{app_name, redirect_uris[]}` and get `client_id` and `client_secret` (shown once)
+- `POST /api/developers/apps`: register `{app_name, redirect_uris[]}` and get `client_id` (the response also has a `client_secret`, which nothing checks: every app uses PKCE)
 - `GET /api/developers/apps`: your apps
 - `PATCH /api/developers/apps/{app_id}`: change `app_name`, `redirect_uris`, `logo_url`, or `website_url`
 - `DELETE /api/developers/apps/{app_id}`: delete the app. Users can't authorize it anymore, refresh

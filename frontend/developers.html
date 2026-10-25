@@ -74,65 +74,13 @@
       <h2 style="margin-bottom: 1.5rem;">Integration overview</h2>
       <div class="card" style="max-width: 48rem;">
         <ol style="line-height: 1.8; padding-left: 1.25rem;">
-          <li><strong>Register your app</strong> below to get a <code>client_id</code>. Apps use PKCE and don't need the <code>client_secret</code> that is also shown (<a href="#client-credentials">what's the difference?</a>).</li>
+          <li><strong>Register your app</strong> below to get a <code>client_id</code>. That's the only credential your app needs, because it proves who it is with PKCE (<a href="#client-credentials">why no client secret?</a>).</li>
           <li><strong>Redirect</strong> users to <code>/oauth/authorize</code> with PKCE parameters.</li>
           <li>The user <strong>signs in</strong> (via their existing HashBin account) and <strong>approves</strong> your app.</li>
           <li>HashBin redirects back to your <code>redirect_uri</code> with an authorization <strong>code</strong>.</li>
           <li>Exchange the code at <code>/oauth/token</code> for an <strong>access token</strong> (1 hr) and <strong>refresh token</strong> (30 days).</li>
           <li>Use the access token to <strong>publish content</strong> via <code>POST /api/content</code>. Uploads use the user's default retention period, are billed to their balance, and return a content URL on <code>https://256t.us/{cid}</code>.</li>
         </ol>
-      </div>
-    </section>
-
-    <!-- Client ID vs client secret -->
-    <section id="client-credentials" style="margin-bottom: 2rem;">
-      <h2 style="margin-bottom: 1.5rem;">Client ID and client secret</h2>
-      <p style="max-width: 48rem; margin-bottom: 1.5rem;">
-        When you register an app, HashBin gives you two values. They look alike, but they do
-        different jobs and need different handling.
-      </p>
-      <div class="grid grid-cols-2" style="gap: 1.5rem; max-width: 48rem;">
-        <div class="card">
-          <h3>Client ID</h3>
-          <p><strong>What it is:</strong> your app's public name, starting with <code>app_</code>.
-            It isn't a secret, so it can sit in your page source, your phone app, or a public repo.</p>
-          <p><strong>Where it's used:</strong> as <code>client_id</code> in the
-            <code>/oauth/authorize</code> request and again in the
-            <code>/oauth/token</code> request. In the SDK it is the <code>clientId</code> option.</p>
-          <p style="margin-bottom: 0;"><strong>What it's for:</strong> it tells HashBin which app
-            is asking. HashBin uses it to show your app name on the consent screen, check that
-            the <code>redirect_uri</code> is one you registered, apply the user's spending limit
-            for your app, and confirm that the app trading in a code is the one it was issued to.</p>
-        </div>
-        <div class="card">
-          <h3>Client secret</h3>
-          <p><strong>What it is:</strong> a random password for your app, starting with
-            <code>hbs_</code>. HashBin shows it once, when you register, and keeps only a hash.</p>
-          <p><strong>Where it's used:</strong> nowhere at the moment. HashBin's
-            <code>/oauth/token</code> endpoint doesn't ask for or check a
-            <code>client_secret</code>, and the SDK has no option for one.</p>
-          <p style="margin-bottom: 0;"><strong>What it's for:</strong> in standard OAuth, a server
-            app sends its secret to the token endpoint to prove it is the real app. Browser and
-            phone apps can't keep a secret, because anyone can read their code, so HashBin has
-            every app prove itself with <a href="https://oauth.net/2/pkce/" target="_blank" rel="noopener noreferrer">PKCE</a>
-            instead. If you keep the secret, treat it like a password: keep it on a server and
-            never put it in page source, a phone app, or a repo.</p>
-        </div>
-      </div>
-      <div class="card" style="max-width: 48rem; margin-top: 1.5rem;">
-        <h3>Further reading</h3>
-        <ul style="line-height: 1.8; padding-left: 1.25rem; margin-bottom: 0;">
-          <li><a href="/docs/sdk.html">HashBin SDK documentation</a>: where <code>clientId</code> goes</li>
-          <li><a href="/docs/textpad">Textpad walkthrough</a>: a full app that uses only the client ID and PKCE</li>
-          <li><a href="https://www.rfc-editor.org/rfc/rfc6749#section-2.1" target="_blank" rel="noopener noreferrer">RFC 6749 §2.1</a>:
-            confidential clients (servers that can keep a secret) and public clients (browser and phone apps that can't)</li>
-          <li><a href="https://www.rfc-editor.org/rfc/rfc6749#section-2.2" target="_blank" rel="noopener noreferrer">RFC 6749 §2.2</a> and
-            <a href="https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1" target="_blank" rel="noopener noreferrer">§2.3.1</a>:
-            the client identifier and the client password</li>
-          <li><a href="https://www.rfc-editor.org/rfc/rfc7636" target="_blank" rel="noopener noreferrer">RFC 7636</a>: PKCE, how public clients prove who they are without a secret</li>
-          <li><a href="https://www.rfc-editor.org/rfc/rfc8252" target="_blank" rel="noopener noreferrer">RFC 8252</a>: OAuth for phone and desktop apps</li>
-          <li><a href="https://oauth.net/2/client-types/" target="_blank" rel="noopener noreferrer">oauth.net: Client Types</a>: a short summary of the same ideas</li>
-        </ul>
       </div>
     </section>
 
@@ -271,8 +219,46 @@
           </label>
           <button type="submit" class="btn btn-primary">Register</button>
           <p id="registration-status" class="developers-status"></p>
-          <div id="new-app-output" class="developers-secret hidden"></div>
+          <div id="new-app-output" class="developers-new-app hidden"></div>
         </form>
+
+        <div id="client-credentials" class="developers-credentials">
+          <h3>About your client ID</h3>
+          <p>Registering gives you a client ID that starts with <code>app_</code>. It's your app's
+            public name, not a secret, so it can sit in your page source, your phone app, or a public repo.</p>
+          <p>Send it as <code>client_id</code> to <code>/oauth/authorize</code> and
+            <code>/oauth/token</code>, or pass it as the <code>clientId</code> option in the
+            <a href="/docs/sdk.html">SDK</a>. HashBin uses it to show your app name on the consent
+            screen, check that the <code>redirect_uri</code> is one you registered, apply the user's
+            spending limit for your app, and make sure a code is redeemed by the app it was issued to.</p>
+
+          <details class="developers-details">
+            <summary>Where's the client secret?</summary>
+            <p>Many OAuth providers give you a client secret too. In standard OAuth, a server app
+              sends its secret to the token endpoint to prove it is the real app
+              (<a href="https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1" target="_blank" rel="noopener noreferrer">RFC 6749 §2.3.1</a>).</p>
+            <p>Browser and phone apps can't keep a secret, because anyone can read their code. OAuth
+              calls these public clients
+              (<a href="https://www.rfc-editor.org/rfc/rfc6749#section-2.1" target="_blank" rel="noopener noreferrer">RFC 6749 §2.1</a>).
+              Instead of a secret, they use
+              <a href="https://www.rfc-editor.org/rfc/rfc7636" target="_blank" rel="noopener noreferrer">PKCE</a>:
+              before sending the user to HashBin, your app makes up a random code verifier and sends
+              only its SHA-256 hash. When it trades the code for tokens, it sends the verifier itself,
+              and HashBin checks that it matches. Someone who steals the code doesn't have the verifier,
+              so they can't use it.</p>
+            <p>HashBin uses PKCE for every app, including apps that run on a server, so there is no
+              secret to keep. The <code>/api/developers/apps</code> response still includes a
+              <code>client_secret</code> field, but <code>/oauth/token</code> never asks for or checks
+              it, and the SDK has no option for one. You can ignore it.</p>
+            <p>Further reading:</p>
+            <ul>
+              <li><a href="https://oauth.net/2/client-types/" target="_blank" rel="noopener noreferrer">oauth.net: Client Types</a>: confidential and public clients in brief</li>
+              <li><a href="https://oauth.net/2/pkce/" target="_blank" rel="noopener noreferrer">oauth.net: PKCE</a>: a short overview</li>
+              <li><a href="https://www.rfc-editor.org/rfc/rfc8252" target="_blank" rel="noopener noreferrer">RFC 8252</a>: OAuth for phone and desktop apps</li>
+              <li><a href="/docs/textpad">Textpad walkthrough</a>: a full app that signs in with only a client ID and PKCE</li>
+            </ul>
+          </details>
+        </div>
       </div>
 
       <div class="developers-panel">

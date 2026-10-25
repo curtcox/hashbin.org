@@ -133,14 +133,11 @@ form.addEventListener('submit', async (event) => {
     await handleApiError(response);
 
     const app = await response.json();
-    statusEl.textContent = 'Application created. Copy the client secret now.';
+    statusEl.textContent = 'Application created.';
     outputEl.classList.remove('hidden');
     outputEl.innerHTML = `
       <strong>${escapeHtml(app.app_name)}</strong>
       <div>Client ID <code>${escapeHtml(app.client_id)}</code></div>
-      <div>Client Secret <code>${escapeHtml(app.client_secret)}</code></div>
-      <small>Put the client ID in your app. The secret is shown only once and isn't needed for PKCE.
-        <a href="#client-credentials">What's the difference?</a></small>
     `;
     form.reset();
     showToast('Application registered', 'success');
