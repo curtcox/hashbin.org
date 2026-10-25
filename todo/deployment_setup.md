@@ -1,217 +1,108 @@
-# Deployment Setup Instructions
+# Deployment setup: API and CLI first
 
-**Type:** Quick Reference Guide
-**Status:** Active - use for new deployments
+**Type:** active quick reference, updated 2026-10-25.
 
-This document describes how to configure GitHub secrets and Cloudflare for automated deployment. For the complete deployment guide, see `docs/deployment.md`.
+Prefer supported provider APIs/SDKs, repo-pinned Wrangler, GitHub CLI and Actions
+for inspection, configuration, deployment and verification. Read existing state,
+apply the intended change and read it back. Record IDs and non-secret evidence.
+Use browser configuration only for a specific operation without documented API
+support or the required entitlement; record that limitation and manual action.
+Missing API credentials are an access prerequisite, not a blanket dashboard path.
 
-## Prerequisites
+The detailed external checklists take precedence over older browser recipes:
+[Cloudflare](cost_safety_cloudflare.md), [Stripe](cost_safety_stripe.md) and
+[Clerk](clerk_remaining.md). Real login/Checkout/cookie browser acceptance is
+still required. Full deployment context: [docs/deployment.md](../docs/deployment.md).
 
-1. **Cloudflare Account** with Workers Paid plan ($5/month minimum)
-   - Durable Objects enabled
-   - R2 storage enabled
+## 1. Discover Cloudflare account, zones and access
 
-2. **Domain Control** of hashbin.org
-   - Domain added to Cloudflare
-   - Nameservers pointed to Cloudflare
+Use an existing authorized API credential or approved secret source. Through the
+Cloudflare API, list accounts (`GET /accounts`) and zones (`GET /zones`, filtered
+by the domain) to identify the target IDs. Verify the intended account and both
+`hashbin.org` and `256t.us` zones; do not infer IDs from a hostname. API paths here
+are relative to `https://api.cloudflare.com/client/v4`.
 
-## Step 1: Get Your Cloudflare Account ID
+For token provisioning, prefer the token API with an authorized bootstrap
+credential, discover permission groups and create a resource-scoped token.
+[Token API](https://developers.cloudflare.com/api/resources/user/subresources/tokens/methods/create/).
+Use a browser only for initial account/token bootstrap when no supported API
+credential can perform it; retain that as a specific access exception.
 
-1. Log into [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. Click on "Workers & Pages" in the left sidebar
-3. Copy your **Account ID** from the right sidebar
-   - It looks like: `1234567890abcdef1234567890abcdef`
+Keep deployment access separate from read-only analytics access. Review actual
+permissions needed by the current workflow, including Workers scripts, R2,
+account settings, Workers routes and zone cache purge. Grant only the target
+account/zones and required operations. WAF/notification configuration may require
+separate scoped write access; an analytics token must not be reused for it.
+Verify billing entitlements through available account APIs before any plan change.
 
-## Step 2: Create Cloudflare API Token
+## 2. Set GitHub secrets and variables with CLI
 
-1. Go to [API Tokens](https://dash.cloudflare.com/profile/api-tokens)
-2. Click "Create Token"
-3. Click "Create Custom Token"
-4. Configure the token:
-   - **Token name:** `GitHub Actions - HashBin Deploy`
-   - **Permissions:**
-     - Account → Workers Scripts → Edit
-     - Account → Workers KV Storage → Edit
-     - Account → Workers R2 Storage → Edit
-     - Account → Account Settings → Read
-     - Zone → Workers Routes → Edit *(for custom domain routing)*
-     - Zone → Cache Purge → Purge *(for cache invalidation on deploy)*
-   - **Account Resources:**
-     - Include → Your Account
-   - **Zone Resources:** (required for custom domain and cache purge)
-     - Include → hashbin.org
-5. Click "Continue to summary"
-6. Click "Create Token"
-7. **Copy the token** - you won't be able to see it again!
-   - Looks like: `abc123def456ghi789...`
-
-## Step 3: Add Secrets to GitHub Repository
-
-1. Go to your GitHub repository: `https://github.com/curtcox/hashbin.org`
-2. Click **Settings** → **Secrets and variables** → **Actions**
-3. Click **New repository secret**
-4. Add the following secrets:
-
-### Required Secrets
-
-| Secret Name | Value | Where to Find |
-|-------------|-------|---------------|
-| `CLOUDFLARE_API_TOKEN` | Your API token from Step 2 | Cloudflare Profile → API Tokens |
-| `CLOUDFLARE_ACCOUNT_ID` | Your account ID from Step 1 | Cloudflare Dashboard → Workers |
-| `CLOUDFLARE_ZONE_ID` | Your zone ID for hashbin.org | Cloudflare Dashboard → Domain → API section (right sidebar) |
-
-### Adding Each Secret
-
-For each secret:
-1. Click "New repository secret"
-2. Enter the **Name** (exactly as shown above)
-3. Paste the **Value**
-4. Click "Add secret"
-
-## Step 4: Verify Setup
-
-Once secrets are added, the GitHub Actions workflow will automatically run when you push to:
-- `develop` branch → Deploys to **development** environment
-- `main` branch → Deploys to **production** environment
-
-### Test the Deployment
-
-1. Push any change to the `develop` branch
-2. Go to **Actions** tab in GitHub
-3. Watch the "Deploy to Cloudflare" workflow run
-4. If successful, your Worker will be deployed!
-
-## Step 5: Configure Custom Domain (Production Only)
-
-For the production environment to work on `hashbin.org`:
-
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com/)
-2. Select your **hashbin.org** domain
-3. Go to **DNS** → **Records**
-4. The Worker route is already configured in `wrangler.toml`
-5. Once deployed to `main`, your site will be live at `https://hashbin.org`
-
-## Testing URLs
-
-After deployment, your Workers will be available at:
-
-- **Development:** `https://hashbin-worker-dev.<account-id>.workers.dev`
-- **Production (Workers URL):** `https://hashbin-worker-prod.<account-id>.workers.dev`
-- **Production (Custom Domain):** `https://hashbin.org` (once DNS is configured)
-
-## Testing the Deployment
-
-### Automated Verification
-
-The GitHub Actions workflow automatically verifies each deployment by testing:
-- Root endpoint functionality
-- Health check endpoint
-- Service operational status
-- 404 error handling
-
-If any verification fails, the deployment is marked as failed.
-
-### Manual Verification
-
-You can also verify deployments manually using the included verification script:
+Under Decision 21, GitHub is the configuration source of truth. Use
+`gh secret set NAME --repo curtcox/hashbin.org` with secure stdin or its hidden
+interactive prompt. Do not put secret values in arguments, committed files or
+logs. Verify names with:
 
 ```bash
-# Verify development
-./scripts/verify-deployment.sh development <your-account-id>
-
-# Verify production
-./scripts/verify-deployment.sh production <your-account-id>
-
-# Verify custom domain
-./scripts/verify-deployment.sh https://hashbin.org
+gh secret list --repo curtcox/hashbin.org
 ```
 
-Or using npm scripts:
+Required names and exact use are in `.github/workflows/deploy.yml`. They include
+Cloudflare deployment IDs/token, Clerk and Stripe credentials, API-key encryption
+and shared download/OAuth signing keys. Follow the provider plans for webhook,
+analytics and alert secrets; verify optional settings needed for launch rather
+than assuming the workflow's minimum list establishes production readiness.
+Use `gh variable set` for supported non-secret configuration where the workflow
+actually reads it. Secret listing cannot reveal/verify stored secret values.
+
+## 3. Deploy the existing main release workflow
+
+Install the repository's pinned dependencies with `npm ci`; use `npx wrangler`
+instead of installing a different global version. Deploy the intended reviewed
+revision through the existing workflow:
 
 ```bash
-# Verify development
-npm run verify:dev -- <your-account-id>
-
-# Verify production
-npm run verify:prod -- <your-account-id>
-
-# Verify custom domain
-npm run verify:custom
+gh workflow run deploy.yml --repo curtcox/hashbin.org --ref main
+gh run list --repo curtcox/hashbin.org --workflow deploy.yml --limit 5
+gh run view RUN_ID --repo curtcox/hashbin.org
 ```
 
-### Quick Manual Test
+The current workflow deploys production on a push to `main` or manual dispatch;
+it does not deploy a separate development Worker from `develop`. Verify the
+exact run/revision and CI test result. The workflow deploys the main Worker
+before the content Worker and provisions secrets from GitHub. Do not assume a
+successful push means the deployment completed.
 
-Test your deployment with curl:
+## 4. Verify routes, domains, DNS and integration state
+
+Prefer Workers/Routes and DNS APIs plus deployed Wrangler metadata to inspect
+bindings, domains/routes and cron schedules. Apply necessary DNS changes through
+the DNS API using the current config and provider-returned records. Preserve
+unrelated routes/records. Do not build a workers.dev URL from an account ID;
+read the actual subdomain/deployed URL from the API or deployment output.
+
+Run the repository verification and production smoke checks:
 
 ```bash
-# Test development
-curl https://hashbin-worker-dev.<your-account-id>.workers.dev/health
-
-# Test production (workers.dev URL)
-curl https://hashbin-worker-prod.<your-account-id>.workers.dev/health
-
-# Test production (custom domain, once DNS configured)
-curl https://hashbin.org/health
+npm run verify:prod
+curl -fsS https://hashbin.org/health | jq '{status,environment,checks}'
+gh workflow run smoke-test.yml --repo curtcox/hashbin.org --ref main --field environment=production
 ```
 
-Expected response:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-01-12T...",
-  "environment": "production",
-  "services": {
-    "worker": "operational",
-    "durableObjects": "operational",
-    "r2": "operational"
-  }
-}
-```
+The health response reports configuration/binding checks; it does not prove
+OAuth, payment or webhook delivery. A degraded production integration needs
+investigation even when deployment itself succeeded. Complete CF/ST/CL live
+acceptance and retain their evidence before claiming readiness.
 
-### Verification Script Output
+## Troubleshooting and fallback evidence
 
-The verification script provides detailed test results:
-- ✅ All tests passed: Deployment successful
-- ❌ Test failed: Shows which test failed and why
-- Exit code 0 = success, 1 = failure
+- Authentication/authorization: inspect API status/error and token scope; obtain
+  the needed access rather than automatically repeating setup in the browser.
+- Missing feature: record the documented API/plan limitation. Use a dashboard
+  only for that specific field/artifact, with read-back verification if possible.
+- Deployment failure: inspect the exact GitHub run and Wrangler/Workers logs.
+- Domain failure: inspect API DNS/route state and DNS resolution before changing
+  records. Treat provider-specific records as authoritative.
 
-See `scripts/README.md` for complete documentation on the verification tools.
-
-## Troubleshooting
-
-### "Unauthorized" Error
-- Check that `CLOUDFLARE_API_TOKEN` is correct
-- Verify token has the required permissions
-- Token may have expired - create a new one
-
-### "Account ID not found"
-- Check that `CLOUDFLARE_ACCOUNT_ID` is correct
-- Verify it matches your Cloudflare account
-
-### R2 Bucket Creation Fails
-- Ensure R2 is enabled on your account
-- Check you're on Workers Paid plan
-- Buckets may already exist (this is okay)
-
-### Deployment Succeeds but Site Not Accessible
-- Check DNS records in Cloudflare
-- Verify nameservers are pointed to Cloudflare
-- DNS propagation can take up to 24 hours (usually <1 hour)
-- Try the workers.dev URL first
-
-### Need Help?
-- Check GitHub Actions logs for detailed error messages
-- Review Cloudflare Workers logs in dashboard
-- Consult `todo/site_creation.md` for detailed setup steps
-
-## Next Steps
-
-Once deployment is working:
-1. Verify both development and production environments
-2. Test the health endpoint
-3. Proceed with Phase 2: Content Operations
-4. Implement 256t hash generation library
-
----
-
-**Note:** Never commit secrets to the repository. Always use GitHub Secrets for sensitive data.
+For each browser configuration exception, record provider, setting, unavailable
+API/entitlement, date, manual action and non-secret verification in the relevant
+provider plan. Do not store secrets, management URLs or customer data as evidence.

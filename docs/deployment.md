@@ -2,6 +2,16 @@
 
 This guide provides complete instructions for deploying a fork of HashBin.org to a new domain using Cloudflare Workers, Durable Objects, and R2 Storage.
 
+For the current repository, use the [API/CLI deployment checklist](../todo/deployment_setup.md)
+and the current [Cloudflare](../todo/cost_safety_cloudflare.md),
+[Stripe](../todo/cost_safety_stripe.md) and [Clerk](../todo/clerk_remaining.md)
+plans first. Prefer documented APIs/SDKs, Wrangler and GitHub CLI/Actions for
+configuration and verification. Dashboard recipes below are fallbacks for
+specific operations unavailable through supported APIs; record the missing
+capability/entitlement before using them. Older environment examples must be
+checked against the current workflow/config. Browser login/payment acceptance
+still tests the real customer journey.
+
 ## Table of Contents
 
 - [Architecture Overview](#architecture-overview)
@@ -231,7 +241,9 @@ Also set, from GitHub secrets of the same name (the deploy workflow publishes th
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: payments (Stripe Tax must be activated; checkouts use automatic tax)
 - `API_KEY_ENCRYPTION_KEY`: API key reveal
 - `ADMIN_SECRET_TOKEN`: admin API, dispute moderation, backups (`ADMIN_USER_ID` is optional)
-- `CLERK_WEBHOOK_SECRET`: Clerk webhook signing secret. In the Clerk dashboard add the endpoint
+- `CLERK_WEBHOOK_SECRET`: Clerk webhook signing secret. Use authorized webhook management APIs
+  where available; the [Clerk plan](../todo/clerk_remaining.md#2-webhook-and-secret-provisioning)
+  documents the managed Svix access check and specific UI fallback. Configure the endpoint
   `https://hashbin.org/api/webhooks/clerk` with events `user.created`, `user.updated`, `user.deleted`.
   Deleting a user in Clerk then deletes their HashBin profile and disables their API keys.
 - `ALERT_WEBHOOK_URL`: where operator alerts are pushed (a Slack or Discord incoming webhook works

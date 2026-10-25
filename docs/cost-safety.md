@@ -146,6 +146,10 @@ Track external work and non-secret completion evidence separately:
 [Cloudflare checklist](../todo/cost_safety_cloudflare.md) (CF1–CF10) and
 [Stripe checklist](../todo/cost_safety_stripe.md) (ST1–ST5). Both apply to cost
 safety and funded downloads. These steps have not been verified in production.
+Both checklists prefer documented provider APIs/SDKs, Wrangler and GitHub
+CLI/Actions for configuration and verification. Record any unsupported API or
+account entitlement before using a browser configuration fallback; real browser
+cookie/Checkout acceptance remains part of live testing.
 
 1. Create a read-only Account Analytics token with GraphQL and Analytics Engine
    SQL read access. Set main-Worker secrets `CLOUDFLARE_ANALYTICS_TOKEN` and

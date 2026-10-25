@@ -9,6 +9,36 @@ does not complete them. Covers [cost_safety.md](cost_safety.md) and
 Record completion date, deployment/rule IDs and non-secret evidence alongside
 each checkbox. Keep credentials out of this file and out of command output.
 
+## Access preference: API and CLI first
+
+Use authenticated Cloudflare APIs, the repo-pinned Wrangler (`npx wrangler`),
+and GitHub CLI/Actions before browser configuration. Start by reading the current
+account, zone and resource IDs; update existing resources and read them back to
+verify the result. Keep GitHub as the configuration source of truth (Decision 21),
+using `gh secret set` via stdin and the existing deployment workflow for secrets.
+Use the dashboard only for a specific task without a supported API or without
+the required account entitlement. Record that limitation and the smallest manual
+step; missing API credentials are an access prerequisite, not a reason to move
+all configuration into the browser. Actual sign-in/cookie browser acceptance
+remains necessary even when setup is automated.
+
+| Work | Preferred access and verification |
+| --- | --- |
+| CF1 analytics/token | Cloudflare token API to provision scoped access when an authorized bootstrap credential exists; GraphQL and Analytics Engine SQL for dataset/access checks. Initial account login or token bootstrap is a browser fallback only when necessary. |
+| CF2 secrets/bindings | `gh secret set`, GitHub Actions and Wrangler; inspect deployed binding/configuration metadata through the Workers API. Verify secret names, never values. |
+| CF3 deploy/domains/cron | Existing deploy workflow via `gh workflow run deploy.yml --ref main`, then `gh run view`; Wrangler/Workers API for deployment revision, domains/routes and schedules; HTTP health checks. |
+| CF4 alert destination | GitHub secret/CI deployment and `POST /api/admin/alerts/test`; verify delivery through the destination's API where available. |
+| CF5 WAF | Rulesets API: read `/zones/{zone_id}/rulesets/phases/http_ratelimit/entrypoint`, update the existing rule by ID, and read back its expression/rate settings. Create only if absent; preserve unrelated rules. API rejection is evidence of unsupported configuration, not a reason to bypass plan limits. |
+| CF6 notifications | Read `/accounts/{account_id}/alerting/v3/available_alerts` and `/destinations/eligible`; list/create/update policies under `/alerting/v3/policies` using the returned alert types and account-supported filters. Read back policy IDs/recipients and verify delivery. |
+| CF7–CF9 acceptance | Scripted HTTP requests, admin APIs, GraphQL/SQL and the export tool; real browser checks only for the cookie/login journey. Use regional HTTP probes for cache/takedown evidence. |
+| CF10 invoices/evidence | Billing/usage APIs and retained exports where available. Download an invoice in the browser only if its required fields/artifact are unavailable through the account's documented API. |
+
+API references checked 2026-10-25:
+[token creation](https://developers.cloudflare.com/api/resources/user/subresources/tokens/methods/create/),
+[zone rate-rule API](https://developers.cloudflare.com/waf/rate-limiting-rules/create-api/),
+[notification discovery and policies](https://developers.cloudflare.com/api/resources/alerting/),
+[Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/).
+
 ## Setup and deployment
 
 - [ ] **CF1 — Analytics access.** Create the read-only account analytics token and

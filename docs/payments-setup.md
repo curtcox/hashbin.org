@@ -2,6 +2,14 @@
 
 This guide explains how to configure the HashBin.org payment system for development and production environments.
 
+Prefer the API/CLI procedures in the [Stripe plan](../todo/cost_safety_stripe.md)
+and [deployment setup](../todo/deployment_setup.md). Configure webhook endpoints
+with the Stripe API, test/replay with Stripe CLI, and provision secrets through
+GitHub CLI/Actions. Dashboard steps below are fallbacks only for specific
+settings or credential bootstrap unavailable through supported APIs. Record the
+limitation and verification; hosted Checkout acceptance still uses a browser.
+Check older environment commands against the current workflow before use.
+
 ## Prerequisites
 
 1. Cloudflare Workers account with Paid plan ($5/month minimum)

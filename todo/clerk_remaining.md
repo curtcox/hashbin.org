@@ -1,210 +1,132 @@
-# Clerk Production Setup - Remaining Work
+# Clerk production setup: remaining work
 
 ## Status
 
-**Phase:** Phase 3 - Production Deployment
-**Dependencies:** Backend complete (see `done/clerk.md`)
+**Phase:** production configuration and acceptance; not verified in the production
+account. Backend implementation is in [done/clerk.md](../done/clerk.md).
+Updated 2026-10-25. This plan takes precedence over older dashboard recipes in
+[deployment_checklist.md](deployment_checklist.md).
 
----
+## Access preference: API and CLI first
 
-## Remaining Tasks
+Use documented Clerk APIs/SDKs, GitHub CLI and deployment CI before browser
+configuration. Read the current application/instance and schema first, apply a
+minimal change, then read back and verify it. Record non-secret IDs, dates and
+outcomes. Keep secret values and generated management URLs out of committed
+files, command arguments and logs; transfer secrets through stdin to GitHub.
 
-All remaining work is related to **production deployment and configuration**, not implementation.
+Clerk's **Platform API is currently private beta**. Check workspace entitlement
+and access to a Platform API token first. It is distinct from the instance
+`CLERK_SECRET_KEY` used by the Backend API. If unavailable, use supported Backend
+API operations and record exactly which remaining setup requires the Dashboard.
+Do not substitute undocumented Dashboard endpoints. Browser-based login/consent
+acceptance remains necessary regardless of how configuration is applied.
+[Platform API reference](https://clerk.com/docs/reference/platform-api),
+[Backend API reference](https://clerk.com/docs/reference/backend-api).
 
-### 1. Clerk Production Dashboard Configuration 🔴
+## 1. Production instance, domain and providers
 
-**Status:** Not started
+- [ ] **CL1 — Discover access.** Identify the existing workspace/application and
+  production instance. With Platform API access, list applications at
+  `GET /v1/platform/applications` and inspect the target application before
+  creating anything. Record API availability, application/instance IDs and mode.
+- [ ] **CL2 — Instance configuration.** Prefer Platform API instance creation at
+  `POST /v1/platform/applications/{applicationID}/instances` when needed. Read
+  `/v1/platform/applications/{applicationID}/instances/{envOrInsID}/config/schema`
+  and `/config`, then PATCH only required supported settings. Configure the
+  intended social providers, account-linking/verification policy and minimal
+  profile fields using the schema, without silently changing existing policy.
+  Backend `GET/PATCH /v1/instance` covers only its documented subset.
+- [ ] **CL3 — Production providers.** Configure Google, Apple and Microsoft with
+  production credentials; GitHub remains optional unless selected for launch.
+  Prefer Platform config API fields available to this workspace. Provider-side
+  credential creation/verification may require that provider's API or console;
+  record each unavoidable manual step. Clerk's Backend `/oauth_applications`
+  resource configures Clerk as an OAuth server and is not a replacement for
+  social sign-in provider configuration.
+- [ ] **CL4 — Domain and origins.** Prefer Platform domain operations under
+  `/v1/platform/applications/{applicationID}/domains` and schema-supported
+  settings for `hashbin.org`. Apply the returned DNS records via Cloudflare's
+  DNS API, then verify resolution and Clerk's status. Inspect documented origin/
+  redirect restrictions rather than inventing generic CORS settings. Only fall
+  back to the Dashboard for fields/verification absent from available APIs.
 
-**What's Needed:**
-1. Log into [Clerk Dashboard](https://dashboard.clerk.com)
-2. Select/create production instance for hashbin.org
-3. Configure OAuth providers with production credentials:
-   - Google OAuth credentials
-   - Apple Sign-In credentials
-   - Microsoft OAuth credentials
-   - GitHub OAuth credentials (optional)
-4. Add `hashbin.org` as allowed domain
-5. Configure CORS settings for `https://hashbin.org`
-6. Set up webhook endpoint: `https://hashbin.org/api/webhooks/clerk`
-7. Subscribe to webhook events:
-   - `user.created`
-   - `user.updated`
-   - `user.deleted`
-8. Copy production keys and secrets
+If Platform access or a required field is unavailable, the documented fallback
+is Clerk's production-instance/social-connection setup in the Dashboard. Record
+that access/field limitation alongside CL1–CL4; a fallback does not mark any
+acceptance check complete.
+[Production setup](https://clerk.com/docs/guides/development/deployment/production),
+[social connections](https://clerk.com/docs/guides/configure/auth-strategies/social-connections/overview),
+[Backend instance settings](https://clerk.com/docs/reference/backend/instance/update).
 
-**Deliverables:**
-- [ ] Production Clerk instance configured
-- [ ] OAuth providers configured with production credentials
-- [ ] Domain `hashbin.org` whitelisted
-- [ ] Webhook endpoint configured
-- [ ] Production keys documented:
-  - `CLERK_SECRET_KEY` (`sk_live_XXXXX`)
-  - `CLERK_PUBLISHABLE_KEY` (`pk_live_XXXXX`)
-  - `CLERK_WEBHOOK_SECRET` (`whsec_XXXXX`)
+## 2. Webhook and secret provisioning
 
----
+- [ ] **CL5 — Webhook.** Inspect available documented webhook management first.
+  The Backend API exposes `POST /v1/webhooks/svix` to provision the associated
+  Svix app and `POST /v1/webhooks/svix_url` for a management URL; neither is a
+  generic endpoint-configuration API. If this Clerk instance provides an
+  authorized Svix management token, prefer Svix's endpoint API to inspect/update
+  the endpoint and event filters and retrieve its signing secret. A webhook
+  signing secret is not a management API token, and a separate Svix account does
+  not grant access to Clerk's managed app. If management API access is absent,
+  record that limitation and use Clerk's embedded webhook UI for this step only.
+  Configure `https://hashbin.org/api/webhooks/clerk` for `user.created`,
+  `user.updated` and `user.deleted`; verify existing endpoints before creating
+  duplicates. Record endpoint ID and delivery evidence without secrets.
+  [Clerk webhooks](https://clerk.com/docs/guides/development/webhooks/overview),
+  [Svix endpoint API](https://api.svix.com/docs).
+- [ ] **CL6 — Secrets.** Obtain production credentials through the supported
+  provisioning response or secret-management surface; use a browser only for
+  credential bootstrap/reveal not exposed by an authorized API. Store
+  `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` and `CLERK_WEBHOOK_SECRET` in GitHub
+  using `gh secret set NAME --repo curtcox/hashbin.org` with a secure stdin
+  source. `gh secret list` verifies names, never values. GitHub remains the
+  source of truth under Decision 21; deploy through the existing workflow,
+  which already publishes these values to Cloudflare when configured.
+- [ ] **CL7 — Deploy and inspect.** Use `gh workflow run deploy.yml --ref main`
+  and `gh run view` to deploy/inspect the result. Verify the intended revision,
+  production instance and secret names using CI/Workers API metadata. This step
+  deploys the repository revision and must follow the normal release process.
 
-### 2. GitHub Secrets Configuration 🔴
+## 3. API and browser acceptance
 
-**Status:** Not started
+- [ ] **CL8 — HTTP checks.** Check `/health` and `/api/config` via HTTP. Current
+  `/health` Clerk details expose `secretKeyConfigured`,
+  `publishableKeyConfigured` and `usingTestKeysInProduction`; these validate
+  configuration presence/mode and do not establish authentication or webhook
+  delivery. `/api/config` must return `authMode: "clerk"`, `isLocalMode: false`
+  and a production `clerkPublishableKey`. Frontend initialization already reads
+  this endpoint; no new HTML injection/config.js implementation is needed.
 
-**What's Needed:**
+  ```bash
+  curl -fsS https://hashbin.org/health | jq '.checks.clerk'
+  curl -fsS https://hashbin.org/api/config | jq '{authMode,isLocalMode,productionKey:(.clerkPublishableKey | startswith("pk_live_"))}'
+  ```
 
-Per Architectural Decision #21, all secrets must be stored in GitHub and deployed via CI/CD.
+- [ ] **CL9 — Webhook acceptance.** Use Backend API/SDK calls to create, update
+  and delete designated test users. Verify signed delivery creates/updates the
+  HashBin profile and deletion disables its keys. Prefer authorized Svix API
+  delivery inspection/replay when available; otherwise use the embedded UI
+  only for delivery details/replay. Retain event IDs and observed application
+  results. Never delete real users to test the integration.
+- [ ] **CL10 — Real authentication.** In a browser, exercise each enabled launch
+  provider's login/consent, callback, account linking, session and logout flow.
+  Verify `/api/auth/session`, dashboard state and `/api/balance` through the
+  authenticated session. API-created users alone do not verify OAuth/browser
+  redirects or cookies. Test mobile layout and Clerk SDK initialization too.
+- [ ] **CL11 — Smoke test.** Run and inspect the production smoke workflow via
+  CLI; record its successful run ID. Smoke checks supplement CL9/CL10.
 
-1. Add secrets in GitHub repository settings:
-   - Go to Settings > Secrets and variables > Actions
-   - Add repository secrets:
+  ```bash
+  gh workflow run smoke-test.yml --ref main --field environment=production
+  gh run list --workflow smoke-test.yml --limit 5
+  ```
 
-| Secret Name | Value Source | Example Format |
-|-------------|--------------|----------------|
-| `CLERK_SECRET_KEY` | Clerk Dashboard > API Keys | `sk_live_...` |
-| `CLERK_PUBLISHABLE_KEY` | Clerk Dashboard > API Keys | `pk_live_...` |
-| `CLERK_WEBHOOK_SECRET` | Clerk Dashboard > Webhooks | `whsec_...` |
+## Completion criteria and manual exceptions
 
-2. Verify deployment workflow deploys these secrets
-
-**Current deployment workflow** (`.github/workflows/deploy.yml`) must include secret deployment step.
-
-**Acceptance Criteria:**
-- [ ] All three Clerk secrets added to GitHub
-- [ ] Deployment workflow deploys secrets to Cloudflare
-- [ ] Health endpoint confirms secrets configured: `curl -s https://hashbin.org/health | jq '.checks.clerk.details'`
-
----
-
-### 3. End-to-End Production Testing 🟡
-
-**Status:** Not started - depends on #1 and #2
-
-**What's Needed:**
-
-### 3.1 Health Endpoint Verification
-
-```bash
-# Test health endpoint includes Clerk
-curl -s https://hashbin.org/health | jq '.checks.clerk'
-```
-
-Expected:
-```json
-{
-  "status": "operational",
-  "message": "Clerk integration operational",
-  "details": {
-    "secretKeyConfigured": true,
-    "publishableKeyConfigured": true,
-    "webhookSecretConfigured": true
-  }
-}
-```
-
-### 3.2 Authentication Flow Tests
-
-| Test | Expected | Status |
-|------|----------|--------|
-| Visit https://hashbin.org | Landing page loads | [ ] |
-| Click "Login" | Redirects to Clerk | [ ] |
-| Complete OAuth (Google) | Returns to hashbin.org | [ ] |
-| Check session | `/api/auth/session` returns user info | [ ] |
-| Visit dashboard | Shows authenticated state | [ ] |
-| Check balance | `/api/balance` returns balance | [ ] |
-| Logout | Session cleared, returns to landing | [ ] |
-
-### 3.3 Webhook Tests
-
-| Test | Expected | Status |
-|------|----------|--------|
-| Create new user | Webhook creates UserProfile | [ ] |
-| Update user profile | Webhook updates UserProfile | [ ] |
-| Delete user | Webhook soft-deletes profile | [ ] |
-
-### 3.4 Smoke Test Verification
-
-```bash
-# Manually trigger smoke test workflow
-gh workflow run smoke-test.yml --field environment=production
-```
-
-Expected: All tests pass
-
-**Acceptance Criteria:**
-- [ ] Health endpoint shows Clerk operational
-- [ ] Login flow works end-to-end in production
-- [ ] Session management works correctly
-- [ ] Webhooks create/update/delete UserProfiles
-- [ ] Smoke tests pass for production environment
-- [ ] All OAuth providers work (Google, Apple, Microsoft, GitHub)
-
----
-
-### 4. Frontend Configuration Verification 🟡
-
-**Status:** Not verified
-
-**What's Needed:**
-
-Verify publishable key is correctly injected into frontend. Current options:
-1. Worker injects it into HTML responses
-2. Use a `/config.js` endpoint that returns runtime config
-3. Environment-specific builds
-
-**Verification:**
-```bash
-# Check if key is available in frontend
-curl -s https://hashbin.org/index.html | grep CLERK_PUBLISHABLE_KEY
-```
-
-**Acceptance Criteria:**
-- [ ] `CLERK_PUBLISHABLE_KEY` is available to frontend JavaScript
-- [ ] Clerk SDK initializes correctly
-- [ ] Login/logout flows work in browser
-
----
-
-## Priority
-
-1. **Critical:** Clerk dashboard configuration (#1) - Required for production auth
-2. **Critical:** GitHub secrets configuration (#2) - Required for deployment
-3. **High:** End-to-end testing (#3) - Verify production readiness
-4. **Medium:** Frontend verification (#4) - Ensure user experience works
-
----
-
-## Completion Criteria
-
-All items below must be completed before marking Clerk implementation fully done:
-
-- [ ] Clerk production instance configured in dashboard
-- [ ] OAuth providers configured with production credentials
-- [ ] Webhook endpoint configured and tested
-- [ ] GitHub secrets added (CLERK_SECRET_KEY, CLERK_PUBLISHABLE_KEY, CLERK_WEBHOOK_SECRET)
-- [ ] Deployment workflow deploys secrets to Cloudflare
-- [ ] Health endpoint shows Clerk operational in production
-- [ ] End-to-end login flow tested and working
-- [ ] Smoke tests pass in production
-- [ ] All OAuth providers verified (Google, Apple, Microsoft, GitHub)
-
----
-
-## Notes
-
-- Backend implementation is 100% complete (see `done/clerk.md`)
-- All remaining work is deployment and configuration
-- No code changes required
-- Smoke test workflow already in place for ongoing monitoring
-
----
-
-## References
-
-- Backend implementation: `done/clerk.md`
-- [Clerk Documentation](https://clerk.com/docs)
-- [Clerk Dashboard](https://dashboard.clerk.com)
-- [Cloudflare Workers Secrets](https://developers.cloudflare.com/workers/configuration/secrets/)
-
----
-
-**Document Version:** 1.0
-**Created:** 2026-01-23
-**Last Updated:** 2026-01-23
+Complete CL1–CL11 with evidence before marking production readiness done. For
+any browser configuration fallback, record the exact setting, missing documented
+API/entitlement, manual action and verification. Missing credentials are an API
+access prerequisite, not a blanket browser-configuration requirement. Product
+browser acceptance is recorded separately from manual configuration exceptions.
+If live API responses reveal a repo mismatch, record the required code follow-up.

@@ -2,6 +2,12 @@
 
 This guide provides step-by-step instructions for manually testing the user authorization system with actual Clerk OAuth providers.
 
+Configure providers through the API/CLI paths in [clerk_remaining.md](clerk_remaining.md)
+first. Browser steps here exercise the customer journey. Prefer Backend API/SDK
+operations for test-user lifecycle and authorized webhook management APIs for
+delivery inspection; record a specific dashboard fallback only when the
+documented API or required entitlement is unavailable.
+
 ## Prerequisites
 
 - Clerk application configured with OAuth providers
@@ -421,16 +427,16 @@ curl https://hashbin.org/api/auth/session \
 # Expected: 401 with AUTH_USER_DELETED
 ```
 
-### Test 5.3: Account Deletion via Clerk Dashboard
+### Test 5.3: Account Deletion via Clerk Backend API
 
 **Objective:** Verify webhook handles Clerk-initiated deletion
 
 **Steps:**
-1. Log in to Clerk Dashboard
-2. Navigate to Users
-3. Find test user
-4. Click "Delete User"
-5. Confirm deletion
+1. Identify a designated disposable test user's Clerk ID and instance.
+2. Delete that user with the authenticated Backend API/SDK (`DELETE /v1/users/{user_id}`).
+3. Verify the signed `user.deleted` delivery using authorized webhook APIs, or
+   the documented embedded-UI fallback when management API access is unavailable.
+4. Verify the HashBin profile state and rejected authentication below.
 
 **Expected Results:**
 - ✅ `user.deleted` webhook fires
@@ -604,7 +610,7 @@ Copy and fill out after completing manual tests:
 **Symptom:** After OAuth login, repeatedly redirected to OAuth provider
 
 **Solution:**
-1. Check Clerk Dashboard redirect URLs configuration
+1. Inspect redirect/domain configuration through the available Clerk APIs; use the documented Dashboard fallback only for unavailable fields
 2. Verify CORS settings in Worker
 3. Clear browser cookies and try again
 
@@ -613,7 +619,7 @@ Copy and fill out after completing manual tests:
 **Symptom:** UserProfile not created after signup
 
 **Solution:**
-1. Check Clerk Dashboard webhook logs
+1. Inspect authorized webhook delivery API/logs; use the embedded UI only when management API access is unavailable
 2. Verify webhook URL is correct: `https://hashbin.org/api/webhooks/clerk`
 3. Verify CLERK_WEBHOOK_SECRET is set correctly
 4. Check Worker logs for webhook processing

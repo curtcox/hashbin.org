@@ -2,6 +2,13 @@
 
 This checklist ensures the user authorization system is properly configured and deployed to production.
 
+Use documented APIs/SDKs and CLI tools before browser configuration. The current
+[Clerk plan](clerk_remaining.md), [Cloudflare plan](cost_safety_cloudflare.md) and
+[Stripe plan](cost_safety_stripe.md) define access checks and task-specific API
+routes. Record the exact missing API/entitlement before using a dashboard
+fallback; browser acceptance of real login/payment journeys remains required.
+[Deployment setup](deployment_setup.md) provides the CLI release path.
+
 ## Prerequisites
 
 - [ ] Cloudflare Workers Paid plan ($5/month) - Required for Durable Objects and R2
@@ -13,58 +20,19 @@ This checklist ensures the user authorization system is properly configured and 
 
 ## Clerk Application Setup
 
-### 1. Create Clerk Application
+Follow [CL1–CL11](clerk_remaining.md) as the authoritative production checklist:
 
-- [ ] Log in to Clerk Dashboard (https://dashboard.clerk.com)
-- [ ] Create new application named "HashBin.org"
-- [ ] Select application type: **Production**
-- [ ] Note the Application ID
+- [ ] Check Platform API entitlement and identify the application/production instance.
+- [ ] Configure instance, social providers, linking and domain using the available
+  Platform config schema/APIs; use supported Backend API settings where applicable.
+- [ ] Provision the webhook through authorized management APIs where available;
+  otherwise record the specific embedded webhook UI exception.
+- [ ] Store all three Clerk secrets with `gh secret set` and deploy through CI.
+- [ ] Verify API state and signed webhook delivery, then run browser login tests.
 
-### 2. Configure OAuth Providers
-
-Enable the following OAuth providers in Clerk Dashboard:
-
-- [ ] **Google** - Configure OAuth 2.0 credentials
-- [ ] **Apple** - Configure Sign in with Apple
-- [ ] **Microsoft** - Configure Microsoft Identity Platform
-- [ ] **GitHub** - Configure GitHub OAuth App
-
-For each provider:
-1. Navigate to "Configure" → "Authentication" → "Social connections"
-2. Enable the provider
-3. Follow provider-specific setup instructions
-4. Test the OAuth flow in Clerk's test mode
-
-### 3. Configure Account Linking
-
-- [ ] Enable "Allow users to link multiple accounts" in Clerk Dashboard
-- [ ] Configure account linking mode: **Automatic** (link accounts with same email)
-- [ ] Set account verification requirements
-
-### 4. Configure User Profile
-
-- [ ] Enable "User profile" feature
-- [ ] Configure allowed fields: email, profile image (optional)
-- [ ] Disable unnecessary fields to maintain minimal data collection
-
-### 5. Generate API Keys
-
-- [ ] Navigate to "API Keys" in Clerk Dashboard
-- [ ] Copy **Publishable Key** (starts with `pk_`)
-- [ ] Copy **Secret Key** (starts with `sk_`)
-- [ ] Store securely - these will be added as Cloudflare secrets
-
-### 6. Configure Webhooks
-
-- [ ] Navigate to "Webhooks" in Clerk Dashboard
-- [ ] Click "Add Endpoint"
-- [ ] Enter endpoint URL: `https://hashbin.org/api/webhooks/clerk`
-- [ ] Subscribe to events:
-  - [x] `user.created`
-  - [x] `user.updated`
-  - [x] `user.deleted`
-- [ ] Copy the **Signing Secret** (starts with `whsec_`)
-- [ ] Save webhook configuration
+Dashboard configuration is limited to CL1–CL6 settings unavailable through the
+account's documented APIs. The Clerk plan distinguishes the private-beta
+Platform API, instance Backend API and managed Svix access.
 
 ---
 
@@ -73,70 +41,44 @@ For each provider:
 ### 1. Verify Wrangler Installation
 
 ```bash
-npm install -g wrangler
-wrangler --version
+npm ci
+npx wrangler --version
 ```
 
 ### 2. Authenticate with Cloudflare
 
-```bash
-wrangler login
-```
+Use a scoped `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the
+approved secret source. Prefer token APIs for scoped token provisioning when a
+bootstrap credential exists. `npx wrangler login` is a browser bootstrap fallback
+only when API access cannot yet be established; it is not the default CI path.
 
-### 3. Configure Environment Variables
+### 3. Verify Repository Configuration
 
-Set environment variables in `wrangler.toml` (already configured):
+Read the current `wrangler.toml` and content Worker configuration; the current
+production deployment uses the top-level config. Inspect deployed settings via
+Wrangler/Workers API and preserve GitHub as the configuration source of truth.
+Do not introduce an obsolete `--env production` target from older recipes.
 
-```toml
-[env.production]
-name = "hashbin-worker-prod"
-vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
-```
+### 4. Provision Secrets Through GitHub and CI
 
-### 4. Set Production Secrets
-
-Add Clerk secrets to Cloudflare Workers:
-
-```bash
-# Set Clerk secret key
-wrangler secret put CLERK_SECRET_KEY --env production
-# Paste your Clerk secret key (sk_live_...)
-
-# Set Clerk publishable key
-wrangler secret put CLERK_PUBLISHABLE_KEY --env production
-# Paste your Clerk publishable key (pk_live_...)
-
-# Set Clerk webhook secret
-wrangler secret put CLERK_WEBHOOK_SECRET --env production
-# Paste your Clerk webhook signing secret (whsec_...)
-```
-
-Verify secrets are set:
-
-```bash
-wrangler secret list --env production
-```
-
-Expected output:
-- `CLERK_SECRET_KEY`
-- `CLERK_PUBLISHABLE_KEY`
-- `CLERK_WEBHOOK_SECRET`
+Use `gh secret set` with secure stdin for `CLERK_SECRET_KEY`,
+`CLERK_PUBLISHABLE_KEY` and `CLERK_WEBHOOK_SECRET`. Verify names with
+`gh secret list`, deploy via the existing Actions workflow, and verify deployed
+names with `npx wrangler secret list`. Do not expose values in output or perform
+routine manual Worker-secret writes that drift from GitHub (Decision 21).
+See [deployment setup](deployment_setup.md) for release commands.
 
 ### 5. Verify Durable Objects Bindings
 
-Ensure `wrangler.toml` includes all Durable Objects:
-
-- [x] `CONTENT_METADATA`
-- [x] `USER_PROFILES`
-- [x] `PAYMENT_RECORDS`
-- [x] `CONTEST_RECORDS`
-- [x] `MESSAGE_THREADS`
-- [x] `KEY_REGISTRY`
+Read all binding names and namespace targets from the current main/content
+Worker configs and compare with deployed Workers API metadata. Verify shared
+ContentMetadata, UserProfile and safety namespaces resolve to the intended main
+Worker; use the config rather than historical binding-name lists.
 
 ### 6. Verify R2 Bucket Bindings
 
 - [ ] Create production R2 buckets (if not already created):
-  - `hashbin-content-prod`
+  - `hashbin-content-256t-prod`
   - `hashbin-backups-prod`
 - [ ] Verify bindings in `wrangler.toml`
 
@@ -220,14 +162,14 @@ Manual testing steps:
    - [ ] Verify UserProfile Durable Object created
    - [ ] Link new OAuth provider
    - [ ] Check logs for `user.updated` webhook
-   - [ ] Delete account via Clerk Dashboard
+   - [ ] Delete designated test user via Clerk Backend API/SDK
    - [ ] Check logs for `user.deleted` webhook
 
 ### 5. Monitor Initial Traffic
 
 - [ ] Monitor Cloudflare Workers analytics
 - [ ] Check Worker logs for errors
-- [ ] Verify webhook deliveries in Clerk Dashboard
+- [ ] Verify webhook delivery through authorized Svix API; record an embedded-UI fallback only if management API access is unavailable
 - [ ] Monitor Durable Objects usage
 - [ ] Check R2 storage metrics
 
@@ -296,12 +238,12 @@ If deployment fails or critical issues are found:
    ```
 
 2. **Disable Webhooks**
-   - Disable webhook endpoint in Clerk Dashboard
+   - Disable the specific endpoint through authorized webhook management API; use the embedded UI only if that API is unavailable
    - This prevents user creation/update/deletion from affecting Worker
 
 3. **Investigate Issues**
    - Check Cloudflare Worker logs
-   - Review Clerk Dashboard for errors
+   - Inspect Clerk API errors and authorized webhook delivery API/logs; use the recorded UI fallback only for unavailable delivery details
    - Check Durable Objects state
    - Review R2 bucket access
 
@@ -331,7 +273,7 @@ If deployment fails or critical issues are found:
 
 ### Cloudflare Alerts
 
-Configure alerts in Cloudflare Dashboard:
+Discover supported alert types/eligibility and configure policies with the Cloudflare Alerting API (CF6), then verify delivery:
 
 - [ ] Worker error rate > 5%
 - [ ] Worker CPU time > 80% of limit
@@ -340,7 +282,7 @@ Configure alerts in Cloudflare Dashboard:
 
 ### Clerk Monitoring
 
-Monitor in Clerk Dashboard:
+Prefer documented Clerk usage/configuration APIs and authorized webhook delivery APIs. Record a dashboard fallback only for metrics unavailable through those APIs:
 
 - [ ] Daily active users
 - [ ] OAuth provider success rates
