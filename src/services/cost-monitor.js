@@ -1,9 +1,8 @@
 import { DOWNLOAD_COST_DOLLARS } from '../utils/cost-policy.js';
-import { COST_POLICY as P } from '../utils/cost-policy.js';
 import { costPeriodBounds } from '../utils/cost-period.js';
+import { COST_USAGE_UNITS, priceCostUsage } from '../utils/cost-measurements.js';
 
 const API = 'https://api.cloudflare.com/client/v4';
-const MILLION = 1e6;
 
 async function graphql(env, query, variables) {
   const response = await fetch(`${API}/graphql`, {
@@ -71,38 +70,39 @@ function sum(rows, field, group = 'sum') {
   }, 0);
 }
 
-export function priceUsage(account, fractionOfMonth) {
+export function measureUsage(account, fractionOfMonth) {
+  if (!Number.isFinite(fractionOfMonth) || fractionOfMonth < 0 || fractionOfMonth > 1) throw new Error('Invalid storage interval');
   for (const key of ['workers', 'operations', 'r2', 'invocations', 'periodic', 'storage']) {
     if (!Array.isArray(account[key]) || account[key].length >= (['operations', 'r2', 'storage'].includes(key) ? 1000 : 10)) {
       throw new Error(`Incomplete or truncated ${key} analytics`);
     }
   }
-  let operations = 0;
+  let classA = 0, classB = 0, free = 0;
   for (const row of account.operations) {
     const action = row.dimensions?.actionType;
     if (!CLASS_A.has(action) && !CLASS_B.has(action) && !FREE.has(action)) throw new Error(`Unpriced R2 operation ${action}`);
-    operations += sum([row], 'requests') / MILLION * (CLASS_A.has(action) ? P.r2ClassAPerMillion : CLASS_B.has(action) ? P.r2ClassBPerMillion : 0);
+    const count = sum([row], 'requests');
+    if (CLASS_A.has(action)) classA += count; else if (CLASS_B.has(action)) classB += count; else free += count;
   }
   return {
-    workers: (sum(account.workers, 'requests') * P.workerPerMillion +
-      sum(account.workers, 'cpuTimeUs') / 1000 * P.workerCpuPerMillionMs) / MILLION * 100,
-    r2_operations: operations * 100,
-    // Daily maximum storage is a conservative integral, includes sidecars/backups.
-    r2_storage: (sum(account.r2, 'payloadSize', 'max') + sum(account.r2, 'metadataSize', 'max')) / 1e9 * fractionOfMonth * P.r2StoragePerGBMonth * 100,
-    durable_objects: (sum(account.invocations, 'requests') * P.doPerMillion +
-      sum(account.periodic, 'duration') * P.doDurationPerMillionGBSeconds +
-      sum(account.periodic, 'rowsRead') * P.doRowsReadPerMillion +
-      sum(account.periodic, 'rowsWritten') * P.doRowsWrittenPerMillion) / MILLION * 100 +
-      sum(account.storage, 'storedBytes', 'max') / 1e9 * fractionOfMonth * P.doStoragePerGBMonth * 100
+    worker_requests: sum(account.workers, 'requests'), worker_cpu_ms: sum(account.workers, 'cpuTimeUs') / 1000,
+    r2_class_a_operations: classA, r2_class_b_operations: classB, r2_free_operations: free,
+    r2_gb_months: (sum(account.r2, 'payloadSize', 'max') + sum(account.r2, 'metadataSize', 'max')) / 1e9 * fractionOfMonth,
+    do_requests: sum(account.invocations, 'requests'), do_gb_seconds: sum(account.periodic, 'duration'),
+    do_rows_read: sum(account.periodic, 'rowsRead'), do_rows_written: sum(account.periodic, 'rowsWritten'),
+    do_gb_months: sum(account.storage, 'storedBytes', 'max') / 1e9 * fractionOfMonth
   };
 }
 
-export async function collectMonthUsage(env, now, period = now.toISOString().slice(0, 7)) {
+export function priceUsage(account, fractionOfMonth) { return priceCostUsage(measureUsage(account, fractionOfMonth)); }
+
+export async function collectMonthMeasurement(env, now, period = now.toISOString().slice(0, 7)) {
   const { start, end: next } = costPeriodBounds(period);
   if (start > now) throw new Error('Future cost period');
   const through = Math.min(now.getTime(), next.getTime());
   await verifyAnalyticsSchema(env);
   const costs = { workers: 0, r2_operations: 0, r2_storage: 0, durable_objects: 0 };
+  const usage = Object.fromEntries(Object.keys(COST_USAGE_UNITS).map(key => [key, 0]));
   const scripts = (env.COST_SAFETY_WORKERS || 'hashbin-worker-prod,256t-content-prod').split(',').map(s => s.trim());
   // Daily windows fit dataset range limits and avoid grouping/storage truncation.
   for (let from = start.getTime(); from < through; from += 86400000) {
@@ -111,11 +111,15 @@ export async function collectMonthUsage(env, now, period = now.toISOString().sli
       start: new Date(from).toISOString(), end: new Date(to).toISOString(), scripts });
     const account = data.viewer?.accounts?.[0];
     if (!account) throw new Error('Account analytics unavailable');
-    const daily = priceUsage(account, (to - from) / (next - start));
+    const dailyUsage = measureUsage(account, (to - from) / (next - start));
+    const daily = priceCostUsage(dailyUsage);
     for (const key of Object.keys(costs)) costs[key] += daily[key];
+    for (const key of Object.keys(usage)) usage[key] += dailyUsage[key];
   }
-  return costs;
+  return { costs, usage };
 }
+
+export async function collectMonthUsage(env, now, period) { return (await collectMonthMeasurement(env, now, period)).costs; }
 
 async function queryDownloadRows(env, now, aggregate = false) {
   const start = new Date(now.getTime() - 3600000).toISOString().replace('T', ' ').slice(0, 19);
@@ -166,6 +170,11 @@ async function monthlyRevenue(env, period) {
   return revenue_cents;
 }
 
+async function observeRevenue(env, period) {
+  try { return { revenue_cents: await monthlyRevenue(env, period), revenue_error: null }; }
+  catch (error) { return { revenue_cents: null, revenue_error: String(error.message || 'Revenue unavailable').slice(0, 500) }; }
+}
+
 async function saveSnapshot(env, data) {
   const response = await env.INFRASTRUCTURE_COST.get(env.INFRASTRUCTURE_COST.idFromName('global'))
     .fetch(new Request('https://internal/snapshot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) }));
@@ -178,7 +187,7 @@ async function reportCostAlerts(env, report, topFiles, closed = false) {
     const files = topFiles.map(f => `${f.cid} (${f.downloads}, HTTP ${f.status})`).join(', ') || 'no sampled downloads';
     await createCostAlert(env, `${closed ? 'closed_month_' : ''}${alert.type}`,
       `${closed ? `Completed month ${report.period}: ` : ''}${alert.message}. Top files in the last hour: ${files}`,
-      report, report.brake ? 'critical' : 'warning');
+      report, report.brake || alert.type === 'cost_revenue_unavailable' ? 'critical' : 'warning');
   }
 }
 
@@ -199,21 +208,21 @@ async function refreshCompletedMonth(env, now) {
     if (snapshot.closed_month) {
       // A funding outbox can recover after the cost correction window. Keep
       // its original month's net revenue current without re-querying all usage.
-      const revenue = await monthlyRevenue(env, period);
-      if (revenue !== snapshot.revenue_cents) {
-        const updated = await saveSnapshot(env, { ...snapshot, recorded_at: now.toISOString(), revenue_cents: revenue });
+      const revenue = await observeRevenue(env, period);
+      if (revenue.revenue_cents !== snapshot.revenue_cents || revenue.revenue_error !== (snapshot.revenue_error || null)) {
+        const updated = await saveSnapshot(env, { ...snapshot, recorded_at: now.toISOString(), ...revenue });
         await reportCostAlerts(env, updated, snapshot.top_files || [], true);
       }
       return;
     }
   }
-  const costs = await collectMonthUsage(env, now, period);
-  const revenue = await monthlyRevenue(env, period);
+  const { costs, usage } = await collectMonthMeasurement(env, now, period);
+  const revenue = await observeRevenue(env, period);
   let topFiles = [], topFilesError = null;
   try { topFiles = await queryTopDownloads(env, currentStart); }
   catch (error) { topFilesError = error.message; }
   const report = await saveSnapshot(env, { period, recorded_at: now.toISOString(), usage_end: currentStart.toISOString(),
-    costs, revenue_cents: revenue, top_files: topFiles, top_files_error: topFilesError });
+    costs, usage, ...revenue, top_files: topFiles, top_files_error: topFilesError });
   // Separate alert types preserve the existing per-type hourly deduplication
   // without suppressing a current-month warning in the same monitor run.
   if (topFilesError) await createCostAlert(env, 'closed_month_download_analytics_unavailable',
@@ -233,7 +242,7 @@ export async function runCostMonitor(env, now = new Date()) {
       try { await createCostAlert(env, 'closed_month_cost_monitor_unavailable', `Completed month ${period}: ${error.message}`, { period }, 'critical'); }
       catch (alertError) { console.error('Completed-month cost alert unavailable', alertError.message); }
     }
-    const costs = await collectMonthUsage(env, now);
+    const { costs, usage } = await collectMonthMeasurement(env, now);
     let topFiles = [];
     let topFilesError = null;
     let fundedTotals = [];
@@ -249,8 +258,8 @@ export async function runCostMonitor(env, now = new Date()) {
     try { marginAlerts = fundedTotals.filter(fundedMarginExceeded); }
     catch (error) { attributionErrors.push(error.message); }
     topFilesError = attributionErrors.join('; ') || null;
-    const revenue_cents = await monthlyRevenue(env, now.toISOString().slice(0, 7));
-    const report = await saveSnapshot(env, { recorded_at: now.toISOString(), costs, revenue_cents,
+    const revenue = await observeRevenue(env, now.toISOString().slice(0, 7));
+    const report = await saveSnapshot(env, { recorded_at: now.toISOString(), costs, usage, ...revenue,
       top_files: topFiles, top_files_error: topFilesError });
     for (const row of marginAlerts) await createCostAlert(env, 'funded_download_margin',
       'Funded download cost estimate exceeds 50% of its price', row, 'critical');

@@ -14,6 +14,7 @@ async function load(brake) {
     const report = await response.json();
     byId('cost-report').hidden = false;
     status.textContent = report.stale ? 'Cost data is missing or more than two hours old. Check the cost monitor alerts.'
+      : report.revenue_error ? 'Costs are reporting; revenue is unavailable. Projection and brake checks remain active.'
       : report.top_files_error ? 'Costs are reporting; download analytics are unavailable. Check the alerts.' : 'Hourly monitor is reporting.';
     byId('cost-mtd').textContent = money(report.costs_cents);
     byId('cost-revenue').textContent = money(report.revenue_kept_cents);

@@ -29,6 +29,12 @@ jobs:
       - name: Run tests with reporter
         run: bash scripts/test-reporter.sh
 
+      - name: Run unit and cost safety tests
+        run: npm run test:unit
+
+      - name: Verify native funded downloads with isolated local Workers
+        run: npm run test:funded:local
+
   deploy:
     name: Deploy to Production
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')

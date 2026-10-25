@@ -28,6 +28,10 @@ cat > "$TEST_DIR/frontend/test2.html" << 'EOF'
 </html>
 EOF
 
+# A recursive path with spaces must be treated as one filename.
+mkdir -p "$TEST_DIR/frontend/nested pages"
+cp "$TEST_DIR/frontend/test1.html" "$TEST_DIR/frontend/nested pages/test page.html"
+
 # Copy the injection script
 cp scripts/inject-git-sha.sh "$TEST_DIR/"
 
@@ -120,12 +124,27 @@ else
   exit 1
 fi
 
+if grep -q "<!-- git-sha: $NEW_SHA -->" "frontend/nested pages/test page.html"; then
+  echo "✅ PASS: Nested filename with spaces is updated"
+else
+  echo "❌ FAIL: Nested filename with spaces was not updated"
+  exit 1
+fi
+
+# Refuse arbitrary HTML in a revision before touching files.
+if bash inject-git-sha.sh '<script>invalid</script>' > /dev/null 2>&1; then
+  echo "❌ FAIL: Invalid SHA accepted"
+  exit 1
+fi
+grep -q "<!-- git-sha: $NEW_SHA -->" frontend/test1.html
+echo "✅ PASS: Invalid SHA rejected without changing the revision"
+
 echo ""
 echo "=========================================="
 echo "Test Summary"
 echo "=========================================="
-echo "Total tests: 6"
-echo "Passed: 6"
+echo "Total tests: 8"
+echo "Passed: 8"
 echo "Failed: 0"
 echo ""
 echo "✅ All git SHA injection tests passed!"

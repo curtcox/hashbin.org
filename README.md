@@ -218,6 +218,12 @@ npm run dev
 Unit tests: `npm run test:unit`. Browser tests: `npm run test:e2e` (starts `npm run dev:local` if
 needed). Full suite: `npm test` (its supplier checks call the API, so run `npm run dev:local` first).
 Local API suites: `npm run test:api` against `npm run dev:local`.
+Native funded-download acceptance: `npm run test:funded:local` starts and cleans
+up two isolated local Workers, without provider credentials. Deployment CI
+requires this check and the unit suite. Cost history export/invoice reconciliation:
+`npm run cost-safety:report -- ...`; see [the runbook](docs/cost-safety.md#export-and-invoice-reconciliation)
+and the separate [Cloudflare](todo/cost_safety_cloudflare.md) /
+[Stripe](todo/cost_safety_stripe.md) operator checklists.
 
 Test categories:
 - Anonymous access to public endpoints

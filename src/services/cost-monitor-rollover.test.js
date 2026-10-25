@@ -35,7 +35,7 @@ async function fixture(options = {}) {
     } }),
     PLATFORM_STATS: binding({ fetch: async request => {
       const period = new URL(request.url).searchParams.get('period'); revenuePeriods.push(period);
-      return flags.fail === 'revenue' && period === '2026-10' ? new Response('', { status: 503 }) : stats.fetch(request);
+      return flags.fail === 'all_revenue' || (flags.fail === 'revenue' && period === '2026-10') ? new Response('', { status: 503 }) : stats.fetch(request);
     } }),
     ALERT_STORE: binding({ fetch: async request => { alerts.push(await request.json()); return Response.json({}); } }) };
   vi.stubGlobal('fetch', async (url, init) => {
@@ -88,6 +88,8 @@ describe('month boundary cost monitoring', () => {
     expect(report.brake).toBe(true);
     const previous = (await get(f.costs, '/snapshot?period=2026-10')).snapshot;
     expect(previous.costs_cents).toBe(6000); expect(previous.hourly_cost_cents).toBe(5998);
+    expect(previous.usage.worker_requests).toBe(2e8);
+    expect(previous.usage_units.worker_requests).toBe('requests');
     expect(previous.revenue_cents).toBe(1); expect(previous.revenue_kept_cents).toBe(0.92);
     expect(previous.usage_end).toBe('2026-11-01T00:00:00.000Z');
     expect(f.alerts.find(alert => alert.type === 'closed_month_cost_brake').message).toContain('tail-burst');
@@ -102,7 +104,7 @@ describe('month boundary cost monitoring', () => {
     expect((await get(f.costs, '/snapshot?period=2026-10')).snapshot.revenue_cents).toBe(0.5);
   });
 
-  it.each(['analytics', 'revenue', 'snapshot'])('continues the current monitor when completed-month %s fails', async fail => {
+  it.each(['analytics', 'snapshot'])('continues the current monitor when completed-month %s fails', async fail => {
     const f = await fixture({ fail });
     const report = await runCostMonitor(f.env, new Date('2026-11-01T01:00:00Z'));
     expect(report.period).toBe('2026-11'); expect(report.error).toBeUndefined();
@@ -184,4 +186,30 @@ it('does not make failed live monitoring appear fresh when the completed-month r
   expect(live.brake).toBe(true);
   expect((await get(f.costs, '/snapshot?period=2026-10')).snapshot.closed_month).toBe(true);
   expect(f.alerts.some(alert => alert.type === 'cost_monitor_unavailable')).toBe(true);
+});
+
+it('keeps both cost projections and brakes active when the revenue service is down', async () => {
+  const f = await fixture({ fail: 'all_revenue', currentRequests: 1e8 });
+  const report = await runCostMonitor(f.env, new Date('2026-11-01T01:00:00Z'));
+  expect(report.costs_cents).toBe(3000); expect(report.brake).toBe(true);
+  expect(report.revenue_cents).toBeNull(); expect(report.revenue_kept_cents).toBeNull();
+  expect(report.revenue_known).toBe(false); expect(report.revenue_error).toContain('Revenue');
+  expect(f.alerts.some(alert => alert.type === 'cost_revenue_unavailable' && alert.severity === 'critical')).toBe(true);
+  expect(f.alerts.some(alert => alert.type === 'cost_brake')).toBe(true);
+  expect(f.alerts.some(alert => alert.type === 'cost_exceeds_revenue')).toBe(false);
+  const previous = (await get(f.costs, '/snapshot?period=2026-10')).snapshot;
+  expect(previous.costs_cents).toBe(6000); expect(previous.revenue_known).toBe(false);
+  f.flags.fail = null;
+  const recovered = await runCostMonitor(f.env, new Date('2026-11-01T02:00:00Z'));
+  expect(recovered.revenue_cents).toBe(0.5); expect(recovered.revenue_known).toBe(true);
+  expect(recovered.revenue_error).toBeNull();
+});
+
+it('persists a completed-month cost report even when only its revenue lookup fails', async () => {
+  const f = await fixture({ fail: 'revenue' });
+  const current = await runCostMonitor(f.env, new Date('2026-11-01T01:00:00Z'));
+  expect(current.revenue_known).toBe(true);
+  const previous = (await get(f.costs, '/snapshot?period=2026-10')).snapshot;
+  expect(previous.costs_cents).toBe(6000); expect(previous.revenue_known).toBe(false);
+  expect(f.alerts.some(alert => alert.type === 'closed_month_cost_revenue_unavailable')).toBe(true);
 });

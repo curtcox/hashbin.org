@@ -40,6 +40,8 @@
     "test:api:health": "bash scripts/api-tests/test-local-health.sh",
     "test:api:auth": "bash scripts/api-tests/test-local-auth.sh",
     "test:api:funded": "node scripts/api-tests/test-local-funded-downloads.mjs",
+    "test:funded:local": "node scripts/run-funded-local-acceptance.mjs",
+    "cost-safety:report": "node scripts/cost-safety-report.mjs",
     "test:api:balance": "bash scripts/api-tests/test-local-balance.sh",
     "test:api:upload": "bash scripts/api-tests/test-local-upload.sh",
     "test:api:download": "bash scripts/api-tests/test-local-download.sh",

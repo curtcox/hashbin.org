@@ -36,3 +36,6 @@ coverage/
 # Playwright output
 test-results/
 playwright-report/
+
+# Operator exports may contain private financial observations.
+/cost-safety-exports/

@@ -5,6 +5,24 @@
 **Phase:** Implemented locally, 2026-10-24; hardened 2026-10-25. Builds on L22 and S20 (`docs/cost-safety.md`). Owner WAF configuration and live acceptance remain pending.
 **Row:** B11 in `STATUS.md`.
 
+## Remaining work
+
+- [x] Implement phases 1–6, regression coverage and API/UI documentation.
+- [x] Make native acceptance self-contained with
+  `npm run test:funded:local`; require it and unit tests in deployment CI.
+- [x] Preserve cost projection/brake checks during revenue outages and retain
+  billing measurements for invoice reconciliation.
+- [ ] Complete [Cloudflare work](cost_safety_cloudflare.md), especially CF2/CF3
+  shared credentials/deployment, CF5 WAF exemption and CF7–CF9 live acceptance.
+- [ ] Complete [Stripe work](cost_safety_stripe.md), ST1–ST4, to establish live
+  checkout, webhook, dispute and accounting behavior.
+- [ ] Calibrate lease operation counts and kept revenue with CF10/ST5 production
+  evidence. Aggregate invoice totals do not identify per-action counts.
+
+All accepted repository phases are implemented. Further production acceptance
+depends on the external checklists. Owner pricing/shutdown decisions and the
+optional questions below are distinct from those setup tasks.
+
 ## Implementation notes
 
 Phases 1–6 are implemented, with tests and API/UI documentation. Phase 0 and live
@@ -79,6 +97,15 @@ proofs, separate request prices and fail-closed safety validation before cache u
 Month-boundary coverage now includes real PlatformStats lease/return revenue,
 exact month-end cutoffs, late ledger delivery and independent live/backfill failures.
 
+Current verification (2026-10-25): **577 unit tests pass (2 skipped)**, the full
+repository suite and both Worker dry-run builds pass, and the isolated native
+runner passes the 2,500-request/accounting check with generated local secrets
+and temporary state. CI requires unit/native checks. Raw usage export and invoice
+reconciliation are ready; actual Cloudflare/Stripe evidence is pending. Hourly
+spike baselines account for missed cron duration. Revenue failures expose unknown
+revenue and alert while retaining cost projection and brake evaluation. The
+earlier macOS frontend SHA-injection failure has been fixed portably.
+
 ## The promise
 
 > A GET or HEAD for a 256t.us file, made with an account or API key that has download
@@ -115,14 +142,17 @@ reach those limits.
 | Key caps vs account caps | **Both apply.** The account caps limit the total; key caps limit each key within it. |
 | When an identity can't pay | **Treat it as anonymous** (it may get 429), and add `X-Budget: exhausted`. |
 
-## Why bypassing the brake is safe
+## Why funded requests bypass the brake
 
 Funded downloads are paid for before they're served. At the $4/M floor, HashBin keeps
 $4 × 0.92 = $3.68/M after Stripe. A download costs about $1.24/M
-(`DOWNLOAD_COST_DOLLARS`). Lease traffic adds about $0.01/M: a few DO requests and row
-writes for every 250 or so downloads. The brake protects against unpaid traffic, and
-funded traffic isn't unpaid. The hard stop is the remaining emergency switch. Phase 6
-adds a cost-model check for this.
+(`DOWNLOAD_COST_DOLLARS`). Full leases amortize coordination across up to 250
+requests; cold singleton leases can cost more than the price. The current model
+includes receipts, cleanup and accounting at 8 DO requests, 20 row reads and
+24 row writes per lease, pending invoice calibration. Prepayment bounds the
+account's spending; it does not guarantee a positive margin on every funded
+request. The hard stop remains the emergency switch, and the hourly monitor
+alerts when estimated funded costs exceed 50% of price.
 
 ## Design
 
@@ -198,8 +228,9 @@ locally, and asks again when it runs out or expires.
 - **Returning unused lease:** the isolate reports what's left of its last lease when it
   asks for the next one, or in `ctx.waitUntil` once the lease expires. The DO credits it
   back to the caps and the float. A lease that's never reported (because the isolate was
-  evicted) stays spent. The most that can be lost is one lease per isolate per minute,
-  at most $0.001, and the budget UI says so.
+  evicted) stays spent. The unreported bound is 250 requests per outstanding
+  identity/price lease. That is $0.001 at the minimum price and more for larger
+  files; idle returns normally run after 25 seconds. The budget UI explains this exposure.
 - The price is per request, computed from the size in the CID's length prefix, so it
   needs no R2 read: `identifiedDownloadPriceUc(size)` in `cost-policy.js`, the greater
   of 400 uc and 2 ¢ per GiB. GET, HEAD and cache hits cost the same, as they do today.
@@ -254,11 +285,9 @@ anonymous: per-IP limit, brake              → 429 as today
 
 ## Phases
 
-0. **Ops check (owner).** Write the single Free-plan WAF rate rule so it exempts
-   `/a/` and `/s/`. The Free plan can match on path only, not headers, so these paths
-   exist for the WAF. Check that the plan supports `not starts_with` (or a wildcard
-   negation). If it doesn't, fall back to a second hostname for funded traffic (with
-   its own Worker route), or the Pro plan, which raises the fixed $7.01/month.
+0. **Ops check (owner, pending CF5).** Actual WAF validation, fallback choices
+   and completion evidence live in [the Cloudflare checklist](cost_safety_cloudflare.md).
+   Shared credentials, deployment and live acceptance are tracked there too.
 1. **Pricing and budget state.** Add `identifiedDownloadPriceUc`, the UserProfile
    `download_budget` with UTC window rollover, the cap endpoints and `download_spend`
    transactions.

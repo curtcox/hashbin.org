@@ -625,6 +625,18 @@ month, `usage_end` its usage cutoff, `recorded_at` the observation time, and
 collected in the same hour. Completed-month refreshes do not replace the live
 `/api/admin/cost-safety` dashboard report.
 
+New reports include `usage` and `usage_units` for Worker requests/CPU,
+R2 class A/B/free operations and integrated storage, and DO requests/duration/
+rows/integrated storage. Legacy measurements are null. When revenue collection
+fails, `revenue_known` is false, `revenue_cents` and `revenue_kept_cents` are null,
+and `revenue_error` explains the failure. Costs, projection and brake evaluation
+continue and produce a critical revenue-unavailable alert. An unknown revenue
+value must not be interpreted as zero.
+
+`npm run cost-safety:report` exports paginated history using
+`COST_SAFETY_ADMIN_TOKEN` and reconciles completed periods with normalized
+invoice amounts. See the [export runbook](cost-safety.md#export-and-invoice-reconciliation).
+
 The admin page is /admin/costs.html. See [operator setup and policy](cost-safety.md)
 for analytics secrets, notification settings, thresholds, and remaining limits.
 

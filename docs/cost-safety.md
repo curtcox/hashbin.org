@@ -67,6 +67,12 @@ are independent: either successful result survives failure of the other. Missing
 or malformed funded metric columns raise an attribution error; all-null SUM
 aggregates represent an empty sample window. Verify full-month access on the account.
 
+Revenue failure is independent of usage collection: reports retain real costs,
+projection and brake checks, set `revenue_known: false`, and expose null revenue
+and kept revenue with `revenue_error`. A critical `cost_revenue_unavailable`
+alert replaces the revenue comparison until the ledger recovers. The dashboard
+shows the degraded revenue state; unknown revenue is never reported as zero.
+
 During the first two UTC days of each month, the monitor also re-queries the
 complete previous month through its exact midnight boundary. This captures its
 final hour and late analytics without adding cumulative usage twice. A known
@@ -93,6 +99,15 @@ History includes completed-month reports with `closed_month: true`, `period`,
 reports have `closed_month: false` and equal cutoff/observation times. Pass
 pagination cursors back unchanged; reports for different periods can share an
 observation hour and have distinct cursor suffixes.
+Hourly spike baselines weight each observed rate by its duration in the preceding
+24 billing hours, so missed cron intervals do not count as single hours. Legacy
+history without interval bounds assumes an hour per observation.
+
+New snapshots also retain `usage` and `usage_units`: Worker requests/CPU
+milliseconds, R2 class A/B/free operations, decimal storage GB-months, and DO
+requests, GB-seconds, rows read/written and decimal storage GB-months. Storage
+integrates the daily maximum over the billing month. Older snapshots retain null
+measurements; no historical measurements are invented.
 AlertStore provides existing webhook delivery and hourly deduplication:
 
 - Costs exceed 92% of monthly earned revenue plus the fixed $7.01 budget.
@@ -127,6 +142,11 @@ content Worker additionally blocks free inline downloads.
 
 ## Operator setup and live acceptance
 
+Track external work and non-secret completion evidence separately:
+[Cloudflare checklist](../todo/cost_safety_cloudflare.md) (CF1–CF10) and
+[Stripe checklist](../todo/cost_safety_stripe.md) (ST1–ST5). Both apply to cost
+safety and funded downloads. These steps have not been verified in production.
+
 1. Create a read-only Account Analytics token with GraphQL and Analytics Engine
    SQL read access. Set main-Worker secrets `CLOUDFLARE_ANALYTICS_TOKEN` and
    `CLOUDFLARE_ACCOUNT_ID`. CI supports matching GitHub secrets and preserves a
@@ -134,8 +154,10 @@ content Worker additionally blocks free inline downloads.
 2. Set `ALERT_WEBHOOK_URL`; test `POST /api/admin/alerts/test` with the admin token.
 3. Deploy the main Worker before the content Worker, whose config binds the
    shared ContentMetadata namespace and Analytics Engine dataset.
-4. Set Cloudflare usage billing notifications for Workers requests/CPU, R2 class
-   B/storage and DO usage near their included allowances.
+4. Check actual eligibility for Cloudflare usage billing notifications, then set
+   available Workers/R2/DO notifications near their included allowances. The
+   published catalog lists Professional-or-higher pay-as-you-go accounts; record
+   unavailable notifications and the owner's monitoring/plan decision (CF6).
 5. Configure the zone's free WAF rate rule for `256t.us` and `www.256t.us`,
    counting by IP, blocking over 5 requests/10 seconds (the Free plan period).
    Exempt `/a/` and `/s/` using the B11 expression below.
@@ -169,6 +191,42 @@ operation-count assumptions, which require invoice calibration after a month.
 After two months, fit heavy-tailed traffic/dispute distributions from retained
 observations before implementing Monte Carlo simulation. Neither measurement
 task can be completed before evidence exists.
+
+## Export and invoice reconciliation
+
+The read-only export tool follows all history cursors without putting the admin
+token in command-line arguments. Set `COST_SAFETY_ADMIN_TOKEN` securely in the
+environment, then run:
+
+```bash
+mkdir -p cost-safety-exports
+npm run cost-safety:report -- --base-url https://hashbin.org --output cost-safety-exports/history.json
+npm run cost-safety:report -- --input cost-safety-exports/history.json --output cost-safety-exports/report.json
+```
+
+This ignored directory holds private financial exports. New output files use
+owner-only permissions and refuse overwriting existing files. HTTPS is required
+outside loopback; redirects are refused to keep the token on the chosen host.
+Export before the 93-day history retention expires.
+
+For an invoice comparison, create a private JSON file with `period` (`YYYY-MM`)
+and `variable_cost_cents` (the actual variable charges for that period). Normalize
+the same services/account scope, currency, included allowances and credits first;
+exclude fixed plan/domain charges, unrelated services and tax. Then run:
+
+```bash
+npm run cost-safety:report -- --input cost-safety-exports/history.json --invoice cost-safety-exports/invoice.json --output cost-safety-exports/reconciled.json
+```
+
+Reconciliation picks the newest cumulative snapshot per billing month; it never
+sums hourly totals. Invoice comparisons require an exact completed-month cutoff.
+Output includes estimated margin, invoice differences and repricing of retained
+usage at the current repository policy. Unknown revenue/legacy measurements stay
+null. Estimates ignore included allowances and use maximum storage, so invoice
+differences are evidence to investigate, not automatic price corrections.
+Account aggregates cannot establish per-action operation counts or heavy-tailed
+traffic/dispute distributions. Those still need CF10/ST5 observations before the
+calibration and simulation steps in the plan can be completed.
 
 ## Sources reviewed 2026-10-24
 
@@ -314,7 +372,18 @@ calibration. Full-lease and singleton margins are regenerated in the price-floor
 
 ## Native local acceptance
 
-Start the main and content Workers in separate terminals, using matching
+Run the isolated acceptance check with one command:
+
+```bash
+npm run test:funded:local
+```
+
+It starts both Workers with random loopback ports, unique local registry names,
+temporary state and generated local-only secrets, then stops them and removes
+their state. It does not need Cloudflare or Stripe credentials. The deploy
+workflow now requires this test and the complete unit suite before deployment.
+
+For interactive debugging, start the main and content Workers in separate terminals, using matching
 **local-only** test secrets:
 
 ```bash

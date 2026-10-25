@@ -7,6 +7,7 @@
 import { handleBackupRequest } from '../utils/backup.js';
 import { COST_POLICY as P } from '../utils/cost-policy.js';
 import { costPeriodBounds } from '../utils/cost-period.js';
+import { COST_USAGE_UNITS, validCostUsage } from '../utils/cost-measurements.js';
 
 /**
  * Get current month period string in YYYY-MM format
@@ -17,6 +18,19 @@ function getCurrentMonthPeriod() {
   const year = now.getUTCFullYear();
   const month = String(now.getUTCMonth() + 1).padStart(2, '0');
   return `${year}-${month}`;
+}
+
+function trailingHourlyAverage(history, period, through) {
+  let total = 0, hours = 0;
+  for (const entry of history) {
+    if (entry.period !== period || entry.hourly_cost_cents === null) continue;
+    const end = Date.parse(entry.usage_end || entry.recorded_at);
+    // Legacy history was produced hourly and did not retain interval bounds.
+    const start = entry.usage_start ? Date.parse(entry.usage_start) : end - 3600000;
+    const overlap = Math.max(0, Math.min(end, through) - Math.max(start, through - 86400000)) / 3600000;
+    if (Number.isFinite(overlap)) { total += entry.hourly_cost_cents * overlap; hours += overlap; }
+  }
+  return hours ? total / hours : null;
 }
 
 
@@ -107,7 +121,11 @@ export class InfrastructureCost {
   async recordSnapshot(data) {
     const at = new Date(data.recorded_at);
     const services = ['workers', 'r2_operations', 'r2_storage', 'durable_objects'];
-    if (!Number.isFinite(at.getTime()) || !Number.isFinite(data.revenue_cents) || data.revenue_cents < 0 ||
+    const revenueKnown = Number.isFinite(data.revenue_cents) && data.revenue_cents >= 0;
+    const revenueUnavailable = data.revenue_cents === null && typeof data.revenue_error === 'string' &&
+      data.revenue_error.length > 0 && data.revenue_error.length <= 500;
+    if (!Number.isFinite(at.getTime()) || (!revenueKnown && !revenueUnavailable) ||
+      (data.usage !== undefined && data.usage !== null && !validCostUsage(data.usage)) ||
       services.some(key => !Number.isFinite(data.costs?.[key]) || data.costs[key] < 0)) {
       return Response.json({ error: 'Invalid cost snapshot' }, { status: 400 });
     }
@@ -135,7 +153,8 @@ export class InfrastructureCost {
       return Response.json({ error: 'Invalid cost safety thresholds' }, { status: 400 });
     }
     const alerts = [];
-    if (total > data.revenue_cents * P.revenueKept + P.fixedMonthlyCents) {
+    if (!revenueKnown) alerts.push({ type: 'cost_revenue_unavailable', message: 'Revenue is unavailable; cost projection and brake checks remain active' });
+    if (revenueKnown && total > data.revenue_cents * P.revenueKept + P.fixedMonthlyCents) {
       alerts.push({ type: 'cost_exceeds_revenue', message: 'Month-to-date costs exceed kept revenue plus the fixed budget' });
     }
     if (projected > alertThreshold) alerts.push({ type: 'cost_projection', message: `Projected monthly costs $${(projected / 100).toFixed(2)} exceed the alert threshold` });
@@ -145,9 +164,7 @@ export class InfrastructureCost {
       const hours = (usageEnd - new Date(previous.usage_end || previous.recorded_at)) / 3600000;
       if (hours > 0) hourlyCost = Math.max(0, total - previous.costs_cents) / hours;
     }
-    const trailing = history.filter(h => h.period === period && h.hourly_cost_cents !== null &&
-      usageEnd - new Date(h.recorded_at) >= 0 && usageEnd - new Date(h.recorded_at) <= 86400000);
-    const average = trailing.length ? trailing.reduce((sum, h) => sum + h.hourly_cost_cents, 0) / trailing.length : null;
+    const average = trailingHourlyAverage(history, period, usageEnd.getTime());
     if (hourlyCost > 0 && average !== null && hourlyCost > average * 10) alerts.push({ type: 'hourly_cost_spike', message: 'Hourly costs exceed ten times the trailing daily average' });
     let brake = Boolean(await this.state.storage.get('safety:brake'));
     if (projected > brakeThreshold) {
@@ -156,7 +173,9 @@ export class InfrastructureCost {
     }
     const report = { period, recorded_at: at.toISOString(), usage_end: usageEnd.toISOString(), closed_month: closedMonth,
       costs, costs_cents: total,
-      revenue_cents: data.revenue_cents, revenue_kept_cents: data.revenue_cents * P.revenueKept,
+      usage: data.usage || null, usage_units: data.usage ? COST_USAGE_UNITS : null,
+      revenue_cents: revenueKnown ? data.revenue_cents : null, revenue_kept_cents: revenueKnown ? data.revenue_cents * P.revenueKept : null,
+      revenue_known: revenueKnown, revenue_error: revenueKnown ? null : data.revenue_error,
       projected_cents: projected, hourly_cost_cents: hourlyCost, trailing_hourly_average_cents: average,
       top_files: data.top_files || [], top_files_error: data.top_files_error || null,
       brake, alerts, source: 'cloudflare_analytics', conservative: true };
@@ -176,6 +195,7 @@ export class InfrastructureCost {
       if (!closedMonth) {
         await storage.put('safety:latest', report);
         await storage.put('safety:history', [...history, { period, recorded_at: report.recorded_at,
+          usage_start: previous?.usage_end || previous?.recorded_at || null, usage_end: report.usage_end,
           hourly_cost_cents: hourlyCost }].slice(-48));
       }
       await storage.put(`analytics:${report.recorded_at.slice(0, 13)}${closedMonth ? `:${period}` : ''}`, report);

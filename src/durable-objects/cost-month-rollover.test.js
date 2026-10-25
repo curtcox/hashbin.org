@@ -101,3 +101,16 @@ it('paginates current and completed reports collected in the same hour', async (
   expect(first.snapshots[0].period).toBe('2026-10');
   expect(second.snapshots[0].period).toBe('2026-11');
 });
+
+it.each([
+  { middle: 120, last: 300, average: 120 / 21, spike: true },
+  { middle: 2001, last: 2551, average: 2001 / 21, spike: false }
+])('weights the daily spike baseline by actual observation duration (%j)', async ({ middle, last, average, spike }) => {
+  const f = fixture();
+  await f.snapshot('2026-10-01T01:00:00Z', 0);
+  await f.snapshot('2026-10-01T02:00:00Z', middle === 120 ? 100 : 1);
+  await f.snapshot('2026-10-01T22:00:00Z', middle);
+  const report = await (await f.snapshot('2026-10-01T23:00:00Z', last)).json();
+  expect(report.trailing_hourly_average_cents).toBeCloseTo(average);
+  expect(report.alerts.some(alert => alert.type === 'hourly_cost_spike')).toBe(spike);
+});
