@@ -3,8 +3,10 @@
  * Handles session management, API key operations, and account management
  */
 
+import { generateDownloadApiKey } from '../auth/download-tokens.js';
+import { validDownloadCaps } from '../utils/download-budget.js';
 import { authenticate, requireAuth } from '../auth/middleware.js';
-import { generateApiKey, hashApiKey, generateKeyId, validateKeyName, validateExpiration, encryptApiKey, decryptApiKey, isSessionFresh } from '../auth/utils.js';
+import { hashApiKey, generateKeyId, validateKeyName, validateExpiration, encryptApiKey, decryptApiKey, isSessionFresh } from '../auth/utils.js';
 import { createClerkClient } from '@clerk/backend';
 
 /**
@@ -364,9 +366,11 @@ export async function handleCreateApiKey(request, env) {
   }
 
   // Generate API key
-  const apiKey = generateApiKey();
-  const keyHash = await hashApiKey(apiKey);
+  if (!env.DOWNLOAD_TOKEN_SECRET) return Response.json({ error: 'DOWNLOAD_TOKEN_SECRET must be configured before creating v2 keys' }, { status: 503 });
+  if (body.download_budget !== undefined && !validDownloadCaps(body.download_budget)) return Response.json({ error: 'Invalid download caps' }, { status: 400 });
   const keyId = generateKeyId();
+  const apiKey = await generateDownloadApiKey(authResult.user.userId, keyId, env.DOWNLOAD_TOKEN_SECRET);
+  const keyHash = await hashApiKey(apiKey);
 
   // Encrypt the API key for reveal functionality
   let keyEncrypted = apiKey;
@@ -395,6 +399,7 @@ export async function handleCreateApiKey(request, env) {
         key_id: keyId,
         key_hash: keyHash,
         key_encrypted: keyEncrypted,
+        download_budget: body.download_budget,
         name: keyName,
         expires_at: expirationValidation.expiresAt
       })

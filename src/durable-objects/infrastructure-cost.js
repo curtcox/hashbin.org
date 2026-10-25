@@ -5,6 +5,7 @@
  */
 
 import { handleBackupRequest } from '../utils/backup.js';
+import { COST_POLICY as P } from '../utils/cost-policy.js';
 
 /**
  * Get current month period string in YYYY-MM format
@@ -32,6 +33,30 @@ export class InfrastructureCost {
     const method = request.method;
 
     try {
+      if (url.pathname === '/snapshot' && method === 'POST') {
+        const data = await request.json();
+        return await this.state.blockConcurrencyWhile(() => this.recordSnapshot(data));
+      }
+      if (url.pathname === '/safety' && method === 'GET') {
+        const latest = await this.state.storage.get('safety:latest');
+        return Response.json({ ...latest, brake: this.env.COST_SAFETY_ALLOWANCE_ONLY === 'true' || Boolean(await this.state.storage.get('safety:brake')),
+          manual_brake: this.env.COST_SAFETY_ALLOWANCE_ONLY === 'true',
+          hard_stop: this.env.COST_SAFETY_HARD_STOP === 'true',
+          stale: !latest || Date.now() - new Date(latest.recorded_at).getTime() > 2 * 3600000 });
+      }
+      if (url.pathname === '/history' && method === 'GET') {
+        const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get('limit')) || 168));
+        const before = url.searchParams.get('before');
+        const rows = await this.state.storage.list({ prefix: 'analytics:', reverse: true, limit,
+          ...(before ? { end: `analytics:${before}` } : {}) });
+        return Response.json({ snapshots: [...rows.values()], next_before: rows.size === limit ? [...rows.keys()].at(-1).slice(10) : null });
+      }
+      if (url.pathname === '/safety' && method === 'POST') {
+        const { brake } = await request.json();
+        if (typeof brake !== 'boolean') return Response.json({ error: 'brake must be boolean' }, { status: 400 });
+        await this.state.storage.put('safety:brake', brake);
+        return Response.json({ brake });
+      }
       // Record costs
       if (url.pathname === '/record' && method === 'POST') {
         const data = await request.json();
@@ -72,6 +97,76 @@ export class InfrastructureCost {
     }
   }
 
+  async recordSnapshot(data) {
+    const at = new Date(data.recorded_at);
+    const services = ['workers', 'r2_operations', 'r2_storage', 'durable_objects'];
+    if (!Number.isFinite(at.getTime()) || !Number.isFinite(data.revenue_cents) || data.revenue_cents < 0 ||
+      services.some(key => !Number.isFinite(data.costs?.[key]) || data.costs[key] < 0)) {
+      return Response.json({ error: 'Invalid cost snapshot' }, { status: 400 });
+    }
+    const period = at.toISOString().slice(0, 7);
+    const latest = await this.state.storage.get('safety:latest');
+    if (latest && new Date(latest.recorded_at) >= at) return Response.json(latest);
+    const previous = await this.state.storage.get(`snapshot:${period}`);
+    const start = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1);
+    const end = Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1);
+    const elapsed = Math.max(1, at - start);
+    const costs = Object.fromEntries(services.map(key => [key, data.costs[key]]));
+    const total = Object.values(costs).reduce((a, b) => a + b, 0);
+    const projected = total / elapsed * (end - start);
+    const alertThreshold = Number(this.env.COST_SAFETY_ALERT_CENTS || P.projectionAlertCents);
+    const brakeThreshold = Number(this.env.COST_SAFETY_BRAKE_CENTS || P.projectionBrakeCents);
+    if (!Number.isFinite(alertThreshold) || alertThreshold <= 0 || !Number.isFinite(brakeThreshold) || brakeThreshold < alertThreshold) {
+      return Response.json({ error: 'Invalid cost safety thresholds' }, { status: 400 });
+    }
+    const alerts = [];
+    if (total > data.revenue_cents * P.revenueKept + P.fixedMonthlyCents) {
+      alerts.push({ type: 'cost_exceeds_revenue', message: 'Month-to-date costs exceed kept revenue plus the fixed budget' });
+    }
+    if (projected > alertThreshold) alerts.push({ type: 'cost_projection', message: `Projected monthly costs $${(projected / 100).toFixed(2)} exceed the alert threshold` });
+    const history = (await this.state.storage.get('safety:history')) || [];
+    let hourlyCost = null;
+    if (previous) {
+      const hours = (at - new Date(previous.recorded_at)) / 3600000;
+      if (hours > 0) hourlyCost = Math.max(0, total - previous.costs_cents) / hours;
+    }
+    const trailing = history.filter(h => h.period === period && h.hourly_cost_cents !== null && at - new Date(h.recorded_at) <= 86400000);
+    const average = trailing.length ? trailing.reduce((sum, h) => sum + h.hourly_cost_cents, 0) / trailing.length : null;
+    if (hourlyCost > 0 && average !== null && hourlyCost > average * 10) alerts.push({ type: 'hourly_cost_spike', message: 'Hourly costs exceed ten times the trailing daily average' });
+    let brake = Boolean(await this.state.storage.get('safety:brake'));
+    if (projected > brakeThreshold) {
+      brake = true;
+      alerts.push({ type: 'cost_brake', message: 'Automatic brake enabled; only included download allowances may be served' });
+    }
+    const report = { period, recorded_at: at.toISOString(), costs, costs_cents: total,
+      revenue_cents: data.revenue_cents, revenue_kept_cents: data.revenue_cents * P.revenueKept,
+      projected_cents: projected, hourly_cost_cents: hourlyCost, trailing_hourly_average_cents: average,
+      top_files: data.top_files || [], top_files_error: data.top_files_error || null,
+      brake, alerts, source: 'cloudflare_analytics', conservative: true };
+    // Cumulative MTD snapshots replace the previous value, never add it twice.
+    // The storage transaction also prevents partial aggregate updates on retries.
+    await this.state.storage.transaction(async storage => {
+      for (const service of services) {
+        const delta = costs[service] - (previous?.costs?.[service] || 0);
+        for (const key of [`total:${service}`, 'total:all_services', `period:${period}:${service}`, `period:${period}:all_services`]) {
+          await storage.put(key, ((await storage.get(key)) || 0) + delta);
+        }
+      }
+      const periods = (await storage.get('periods')) || [];
+      if (!periods.includes(period)) await storage.put('periods', [...periods, period].sort());
+      await storage.put(`snapshot:${period}`, report);
+      await storage.put('safety:latest', report);
+      await storage.put('safety:brake', brake);
+      await storage.put('safety:history', [...history, { period, recorded_at: report.recorded_at,
+        hourly_cost_cents: hourlyCost }].slice(-48));
+      await storage.put(`analytics:${report.recorded_at.slice(0, 13)}`, report);
+      const cutoff = new Date(at.getTime() - 93 * 86400000).toISOString().slice(0, 13);
+      const expired = await storage.list({ prefix: 'analytics:', end: `analytics:${cutoff}`, limit: 48 });
+      if (expired.size) await storage.delete([...expired.keys()]);
+    });
+    return Response.json(report);
+  }
+
   /**
    * Record infrastructure cost
    * @param {object} data - Cost data
@@ -98,7 +193,7 @@ export class InfrastructureCost {
       );
     }
 
-    const validServices = ['workers', 'r2_storage', 'r2_bandwidth', 'durable_objects', 'stripe'];
+    const validServices = ['workers', 'r2_operations', 'r2_storage', 'r2_bandwidth', 'durable_objects', 'stripe'];
     if (!validServices.includes(service)) {
       return new Response(
         JSON.stringify({ 
@@ -180,6 +275,7 @@ export class InfrastructureCost {
       // Get all-time totals
       costs = {
         workers: (await this.state.storage.get('total:workers')) || 0,
+        r2_operations: (await this.state.storage.get('total:r2_operations')) || 0,
         r2_storage: (await this.state.storage.get('total:r2_storage')) || 0,
         r2_bandwidth: (await this.state.storage.get('total:r2_bandwidth')) || 0,
         durable_objects: (await this.state.storage.get('total:durable_objects')) || 0,
@@ -190,6 +286,7 @@ export class InfrastructureCost {
       // Get period-specific totals
       costs = {
         workers: (await this.state.storage.get(`period:${period}:workers`)) || 0,
+        r2_operations: (await this.state.storage.get(`period:${period}:r2_operations`)) || 0,
         r2_storage: (await this.state.storage.get(`period:${period}:r2_storage`)) || 0,
         r2_bandwidth: (await this.state.storage.get(`period:${period}:r2_bandwidth`)) || 0,
         durable_objects: (await this.state.storage.get(`period:${period}:durable_objects`)) || 0,

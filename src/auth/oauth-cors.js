@@ -1,5 +1,5 @@
-const ALLOWED_CORS_HEADERS = 'authorization, content-type';
-const ALLOWED_CORS_METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
+const ALLOWED_CORS_HEADERS = 'authorization, content-type, x-api-key';
+const ALLOWED_CORS_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 const ALWAYS_ALLOWED_ORIGINS = new Set(['https://curtcox.github.io']);
 
 function appendVary(existingValue, token) {

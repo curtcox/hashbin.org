@@ -236,7 +236,7 @@
               </tr>
               <tr>
                 <td style="padding: 0.75rem;">90 MB</td>
-                <td style="padding: 0.75rem;">100 years</td>
+                <td style="padding: 0.75rem;">10 years</td>
                 <td style="text-align: right; padding: 0.75rem;">$3.17</td>
               </tr>
             </tbody>
@@ -245,10 +245,13 @@
 
         <div style="margin-top: 1.5rem;">
           <h3>Payment Processing</h3>
-          <p style="color: var(--color-text-light);">When adding funds to your wallet, Stripe charges standard payment processing fees (2.9% + $0.30 per transaction). These fees are shown before you complete your deposit.</p>
+          <p>Prepaid retention is capped at 10 years from today. Paid files include 2,000 lifetime downloads per paid GB-month, with a target minimum of 5,000 per file. The allowance is reduced when necessary to reserve the file's full storage costs. Unused reservations can be lost when a server restarts.</p>
+          <p>Downloads pause when the prepaid allowance runs out. To continue, purchase bandwidth for the file: the price is the greater of $0.02 per GB or $4 per million requests. During a cost safety brake, only the included allowance can be served. Free inline uploads are limited to 60 per account per hour.</p>
+          <p style="color: var(--color-text-light);">When adding funds to your wallet, Stripe charges standard payment processing fees (2.9% + $0.30 per transaction). These fees are shown before you complete your deposit. The total charge is (credit + $0.30) / 0.971, rounded up to a cent. Accounts under 30 days old may deposit at most $20 per checkout.</p>
         </div>
       </section>
     </div>
+    <section class="card" style="max-width: 900px; margin: 2rem auto;"><h2>Funded downloads</h2><p>Download spending is optional and disabled by default. Enable it in Account settings and set daily and monthly caps for the account and each API key or app. The file’s allowance pays first; afterward each GET, HEAD and cache hit costs the greater of $4 per million requests and $0.02 per GiB. Charges use your live balance and stay within every applicable cap. Unreported leases may stay charged (up to 250 requests per lease); cap changes and revocation apply within 60 seconds. Use protected /a/ or signed /s/ links for funded downloads. Whole cents fund reusable spending credit; at month end unused whole cents return to your balance and fractional cents remain available as credit.</p><p><a href="/account.html">Manage download budget</a></p></section>
   </main>
 
   <!-- Footer -->

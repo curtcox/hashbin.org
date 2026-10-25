@@ -3,6 +3,7 @@
  * Cryptographic functions and validation for API keys
  */
 
+import { V2_KEY_PATTERN } from './download-tokens.js';
 import { AUTH_ERROR_CODES } from './middleware.js';
 
 // API key format constants
@@ -76,6 +77,8 @@ export function validateApiKeyFormat(apiKey) {
       message: 'API key must be a non-empty string'
     };
   }
+
+  if (V2_KEY_PATTERN.test(apiKey)) return { valid: true, error: null, message: null };
 
   // Check for correct prefix (accept current and legacy prefixes)
   const hasPrefix = apiKey.startsWith(PREFIX);

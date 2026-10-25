@@ -5,7 +5,7 @@
 
 // Mirror src/utils/pricing.js (calculateDonationMonths)
 const RATE_PER_GB_PER_MONTH = 0.03;
-const MAX_DONATION_MONTHS = 1200;
+const MAX_DONATION_MONTHS = 120;
 export const MIN_DONATION_CENTS = 100;
 
 /**
@@ -59,12 +59,19 @@ export function initDonationCard(cid, content) {
 
   const update = () => {
     const cents = Math.round(parseFloat(amountInput.value || '0') * 100);
-    const months = donationMonths(cents, content.size_bytes);
+    let months = donationMonths(cents, content.size_bytes);
+    const cap = new Date(); cap.setMonth(cap.getMonth() + MAX_DONATION_MONTHS);
+    while (months > 0) {
+      const end = new Date(Math.max(Date.now(), new Date(content.expires_at).getTime()));
+      end.setMonth(end.getMonth() + months);
+      if (end <= cap) break;
+      months--;
+    }
     if (cents < MIN_DONATION_CENTS) {
       preview.textContent = 'Minimum donation is $1.00.';
       button.disabled = true;
     } else if (months < 1) {
-      preview.textContent = 'This amount buys less than a month for a file this size.';
+      preview.textContent = 'This amount buys less than a month, or the file has reached its 10-year retention cap.';
       button.disabled = true;
     } else {
       preview.textContent = `Adds ${describeMonths(months)}${months === MAX_DONATION_MONTHS ? ' (the maximum per donation)' : ''}.`;

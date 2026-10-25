@@ -3,6 +3,9 @@
  * Stores user profile data synced from Clerk authentication
  */
 
+import { downloadBudget, validDownloadCaps } from '../utils/download-budget.js';
+import { handleDownloadBudget, flushDownloadOutbox } from './download-budget.js';
+import { COST_POLICY } from '../utils/cost-policy.js';
 import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
 
 // Maximum API keys per user
@@ -12,13 +15,16 @@ export class UserProfile {
   constructor(state, env) {
     this.state = state;
     this.env = env;
+    this.profileQueue = Promise.resolve();
   }
 
   async fetch(request) {
     const backupResponse = await handleBackupRequest(this.state, request);
     if (backupResponse) return backupResponse;
 
-    const response = await this.handleRequest(request);
+    const operation = this.profileQueue.then(() => this.handleRequest(request));
+    this.profileQueue = operation.catch(() => {});
+    const response = await operation;
     await this.ensureBackupRegistration();
     return response;
   }
@@ -41,11 +47,43 @@ export class UserProfile {
     this.backupRegistered = await registerForBackup(this.state, this.env, 'USER_PROFILES', name);
   }
 
+  async alarm() {
+    try {
+      const operation = this.profileQueue.then(async () => {
+        const profile = await this.state.storage.get('profile');
+        if (profile?.download_budget) await handleDownloadBudget(this, new Request('https://internal/download/budget'));
+        await flushDownloadOutbox(this);
+        const now = new Date();
+        await this.state.storage.setAlarm(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+      });
+      this.profileQueue = operation.catch(() => {});
+      await operation;
+    }
+    catch (error) {
+      console.error('Download accounting retry', error.message);
+      await this.state.storage.setAlarm(Date.now() + 60000);
+    }
+  }
+
   async handleRequest(request) {
     const url = new URL(request.url);
     const method = request.method;
 
     try {
+      if (url.pathname.startsWith('/download/')) return await handleDownloadBudget(this, request);
+      if (url.pathname === '/inline-upload' && method === 'POST') {
+        return await this.state.blockConcurrencyWhile(async () => {
+          const hour = Math.floor(Date.now() / 3600000);
+          const previous = await this.state.storage.get('inline-upload-window');
+          const count = previous?.hour === hour ? previous.count : 0;
+          if (count >= COST_POLICY.inlineUploadsPerHour) {
+            return Response.json({ error: 'inline_upload_limit' }, { status: 429,
+              headers: { 'Retry-After': String(3600 - Math.floor(Date.now() / 1000) % 3600) } });
+          }
+          await this.state.storage.put('inline-upload-window', { hour, count: count + 1 });
+          return Response.json({ remaining: COST_POLICY.inlineUploadsPerHour - count - 1 });
+        });
+      }
       // Route to appropriate handler
       if (url.pathname === '/profile' && method === 'GET') {
         return await this.getProfile();
@@ -405,6 +443,8 @@ export class UserProfile {
       reveal_timestamps: [] // Track last 3 reveal times for rate limiting
     };
 
+    if (data.download_budget !== undefined && !validDownloadCaps(data.download_budget)) return Response.json({ error: 'Invalid download caps' }, { status: 400 });
+    if (data.download_budget) downloadBudget(profile).keys[apiKey.key_id] = data.download_budget;
     profile.api_keys.push(apiKey);
     profile.updated_at = new Date().toISOString();
 
@@ -987,10 +1027,10 @@ export class UserProfile {
     }
 
     const value = data.default_retention_months;
-    if (!Number.isInteger(value) || value < 1) {
+    if (!Number.isInteger(value) || value < 1 || value > COST_POLICY.maxRetentionMonths) {
       return new Response(JSON.stringify({
         error: 'invalid_settings',
-        message: 'default_retention_months must be an integer >= 1'
+        message: 'default_retention_months must be an integer from 1 to 120'
       }), {
         status: 400,
         headers: { 'content-type': 'application/json' }

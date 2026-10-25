@@ -1,48 +1,28 @@
-# Edge Caching Strategy for Rate-Limited Content
+# Explicit edge caching with prepaid download enforcement
 
-## Overview
+The 256t.us custom-domain Worker runs before Cloudflare's cache. A response's
+Cache-Control header alone does not populate edge cache, and hits still incur
+a Worker request. The previous default-caching premise was incorrect.
 
-This document analyzes edge caching strategies for content subject to rate limiting.
+Use caches.default explicitly for successful GET bodies, with at most a one-hour
+TTL bounded by expiry. Key by canonical URL, extension and download disposition.
+HEAD shares GET entries but cannot replace them with an empty body. Errors are
+never cached. X-Cache reports HIT/MISS and client max-age is reduced on hits.
 
-## Key Finding: Cloudflare CDN Bandwidth is Free
+Every stored response, including a hit or HEAD, consumes a prepaid reservation.
+A per-file Durable Object grants up to 250 requests for 60 seconds, deducted
+before serving. Cached content cannot restore an exhausted budget. Version 2
+misses read .meta (expiry/deleted/disputed) and the body; legacy sidecars still
+read markers until migrated. The owning DO serializes sidecar updates.
 
-Cloudflare does not charge for edge cache bandwidth on any plan (including Free). All plans include unlimited CDN bandwidth. Workers also have no egress/bandwidth charges.
+The Cache API is local to each data center. TTL, rather than a local delete or
+unverified purge-by-URL semantics, provides invalidation. New reservations also
+check takedowns: paid files stop within a minute; inline and marker-only paths
+stop within an hour. Responses are never cached beyond content expiry.
 
-This fundamentally changes the analysis. If hashbin incurs no cost for edge-cached requests, there's no financial reason to disable caching.
+R2 egress is free; Workers requests, CPU, R2 reads and reservation operations
+remain billable. See [cost safety](../cost-safety.md) for policy, operator setup,
+verification and the remaining financial limitations.
 
-Sources:
-- [Cloudflare Workers Pricing](https://developers.cloudflare.com/workers/platform/pricing/) - "no data transfer (egress) or throughput (bandwidth) charges"
-- [Cloudflare Plans](https://www.cloudflare.com/plans/) - unlimited bandwidth on all plans
-
-## Recommendation
-
-**Use default Cloudflare caching behavior.**
-
-### Rationale
-
-1. **No cost to hashbin** - Edge-cached requests don't cost anything
-2. **Better performance** - Users get faster responses from nearby edge locations
-3. **Lower DO load** - Fewer requests hit Durable Objects, reducing invocation costs
-4. **Simplest solution** - No custom cache headers or logic needed
-
-### What Rate Limiting Actually Protects
-
-With free edge bandwidth, rate limiting serves to:
-- Protect origin/Durable Object resources from abuse
-- Provide a simple monetization model based on content popularity
-- Give uploaders control over how frequently their content can be requested from origin
-
-Edge cache hits don't undermine these goals - they reduce load on the origin.
-
-## Implementation
-
-Use Cloudflare's default caching. No special `Cache-Control` headers needed for rate-limited content.
-
-For inline content (≤64 bytes), which has no rate limit:
-```http
-Cache-Control: public, max-age=31536000, immutable
-```
-
-## Decision
-
-**Allow edge caching with default behavior.** Cloudflare doesn't charge for it, so there's no reason to disable it. The simpler solution wins.
+Sources: [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/),
+[Cache API](https://developers.cloudflare.com/workers/runtime-apis/cache/).

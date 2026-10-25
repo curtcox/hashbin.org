@@ -1,3 +1,5 @@
+import { handleDownloads } from './api/downloads.js';
+import { runCostMonitor } from './services/cost-monitor.js';
 /**
  * HashBin.org - Main Worker Entry Point
  * Content distribution platform using 256t hash-based addressing
@@ -82,6 +84,7 @@ import {
   handleAcknowledgeAlert,
   handleGetAuditLog,
   handleExportData,
+  handleCostSafety,
   handleGetCosts,
   handleGetCostsByService,
   handleGetProfitability,
@@ -281,42 +284,17 @@ export default {
     return new Response('Not Found', { status: 404 });
   },
 
-  /**
-   * Scheduled handler for cron jobs
-   * Runs daily at 2 AM UTC for:
-   * - Content expiration processing
-   * - Platform statistics snapshot computation
-   * - Audit log cleanup (1-year retention)
-   * - Anomaly detection
-   */
+  /** Hourly safety monitoring; maintenance remains nightly at 02:00 UTC. */
   async scheduled(event, env, _ctx) {
-    try {
-      console.log('Scheduled job executed:', new Date().toISOString());
-
-      // 1. Process expired content
-      await this.processExpiredContent(env);
-
-      // 2. Compute platform statistics snapshot
-      await this.computePlatformSnapshot(env);
-
-      // 3. Clean up old audit log entries (older than 1 year)
-      await this.cleanupAuditLog(env);
-
-      // 4. Run anomaly detection
-      await this.runAnomalyDetection(env);
-
-      // 5. Process expired disputes
-      await this.processExpiredDisputes(env);
-
-      // 6. Cleanup R2 objects pending deletion
-      await this.cleanupR2PendingDeletion(env);
-
-      // 7. Snapshot Durable Object state to R2 (continues via BackupIndex alarms)
-      await this.startBackupSnapshot(env);
-
-      console.log('Scheduled tasks completed');
-    } catch (error) {
-      console.error('Scheduled job error:', error);
+    const now = new Date(event.scheduledTime || Date.now());
+    // Isolate failures so a maintenance error cannot skip monitoring.
+    for (const job of [() => runCostMonitor(env, now), () => this.runAnomalyDetection(env)]) {
+      try { await job(); } catch (error) { console.error('Hourly safety job failed:', error); }
+    }
+    if (now.getUTCHours() !== 2) return;
+    for (const job of [this.processExpiredContent, this.computePlatformSnapshot, this.cleanupAuditLog,
+      this.processExpiredDisputes, this.cleanupR2PendingDeletion, this.startBackupSnapshot]) {
+      try { await job.call(this, env); } catch (error) { console.error('Nightly job failed:', error); }
     }
   },
 
@@ -568,6 +546,11 @@ export default {
               throw new Error(`DisputeRecord returned ${closeResponse.status}`);
             }
 
+            const availability = env.CONTENT_METADATA.get(env.CONTENT_METADATA.idFromName(dispute.cid));
+            const availabilityResponse = await availability.fetch(new Request('http://internal/availability', {
+              method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disputed: false })
+            }));
+            if (!availabilityResponse.ok) throw new Error('Failed to publish dispute expiry');
             // An expired dispute no longer blocks the content: 256t.us serves 451 while this marker exists
             await env.CONTENT_BUCKET.delete(`${dispute.cid}.disputed`);
 
@@ -659,6 +642,7 @@ async function fetchAssetPage(env, request, url, assetPath) {
  * Handle API routes
  */
 function handleApiRoutes(url, request, env) {
+  if (url.pathname.startsWith('/api/downloads/') || /^\/api\/(auth\/apikeys|oauth\/grants)\/[^/]+\/download-budget$/.test(url.pathname)) return handleDownloads(request, env);
   // Basic routing
   if (url.pathname === '/health') {
     return handleHealth(env);
@@ -961,6 +945,10 @@ function handleApiRoutes(url, request, env) {
   }
 
   // Admin cost and profitability endpoints
+  if (['/api/admin/cost-safety', '/api/admin/cost-safety/history'].includes(url.pathname) && ['GET', 'POST'].includes(request.method)) {
+    return handleCostSafety(request, env);
+  }
+
   if (url.pathname === '/api/admin/costs' && request.method === 'GET') {
     return handleGetCosts(request, env);
   }

@@ -149,6 +149,9 @@
         </div>
         
         <h1>Content Information</h1>
+        <p><a id="funded-download-link" href="#">Open using my download budget</a> · <a href="/account.html">Budget settings</a></p>
+        <button type="button" class="btn btn-secondary" id="browse-with-budget">Use my budget when browsing 256t.us</button>
+        <p id="browse-budget-status" role="status"></p>
         
         <div class="info-card">
           <div class="info-row">
@@ -243,6 +246,14 @@
   </footer>
 
   <!-- Scripts -->
+  <script type="module">
+    import { browseWithBudget } from '/js/download-budget-ui.js';
+    const cid = new URLSearchParams(location.search).get('cid');
+    if (cid) document.getElementById('funded-download-link').href = `https://256t.us/a/${encodeURIComponent(cid)}`;
+    document.getElementById('browse-with-budget').addEventListener('click', async () => {
+      try { await browseWithBudget(cid); } catch (error) { document.getElementById('browse-budget-status').textContent = error.message; }
+    });
+  </script>
   <script type="module" src="/js/app.js"></script>
   <script type="module">
     import { getContentSize, formatFileSize } from './js/hash256t.js';

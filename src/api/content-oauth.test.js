@@ -50,6 +50,7 @@ describe('Content API third-party publishing', () => {
     const env = {
       USER_PROFILES: createDurableObjectBinding(async (request) => {
         const url = new URL(request.url);
+        if (url.pathname === '/inline-upload') return Response.json({ remaining: 59 });
         if (url.pathname === '/balance') {
           return new Response(JSON.stringify({ balance_cents: 2500 }), {
             headers: { 'content-type': 'application/json' }

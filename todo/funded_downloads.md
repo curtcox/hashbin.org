@@ -2,8 +2,29 @@
 
 ## Status
 
-**Phase:** Plan, 2026-10-24. Not started. Builds on L22 and S20 (`docs/cost-safety.md`).
+**Phase:** Implemented locally, 2026-10-24. Builds on L22 and S20 (`docs/cost-safety.md`). Owner WAF configuration and live acceptance remain pending.
 **Row:** B11 in `STATUS.md`.
+
+## Implementation notes
+
+Phases 1–6 are implemented, with tests and API/UI documentation. Phase 0 and live
+acceptance require the actual Cloudflare zone; the candidate Free-plan expression
+and acceptance checklist are in `docs/cost-safety.md`.
+
+- Idle leases return after 25 seconds via waitUntil to fit Workers’ 30-second
+  post-response lifetime; active leases and revocation still expire within 60 seconds.
+- Whole-cent balance accounting means month rollover refunds whole cents of float;
+  fractional cents remain reusable credit. Returned remainders are credited exactly once.
+- Durable outbox events make payment/revenue recording retryable and idempotent.
+- Cost modeling includes singleton leases: these can exceed the minimum price.
+  The hourly monitor alerts when sampled funded costs exceed 50% of price.
+- The unreported-charge bound is 250 requests **per outstanding identity/price lease**;
+  $0.001 is the floor-priced case, not the bound for larger files.
+
+Local verification: 468 unit tests passed (2 skipped), 41 authentication API
+acceptance checks passed, both Worker dry-run bundles passed, and browser checks
+confirmed account/key cap persistence and v2 key creation without page errors or
+mobile overflow. No production deployment was performed.
 
 ## The promise
 

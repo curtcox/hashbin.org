@@ -3,12 +3,14 @@
  * Calculates costs for content retention and Stripe fees
  */
 
+import { COST_POLICY, grossUp, retentionWithinCap } from './cost-policy.js';
+
 // Base rate: $0.03 per GB per month
 export const BASE_RATE_PER_GB_PER_MONTH = 0.03;
 
 // Stripe fees: 2.9% + $0.30
-const STRIPE_FEE_PERCENTAGE = 0.029;
-const STRIPE_FEE_FIXED_CENTS = 30;
+const STRIPE_FEE_PERCENTAGE = COST_POLICY.stripeRate;
+const STRIPE_FEE_FIXED_CENTS = COST_POLICY.stripeFixedCents;
 
 // Minimum deposit: $1.00
 const MINIMUM_DEPOSIT_CENTS = 100;
@@ -24,8 +26,8 @@ const INLINE_CONTENT_THRESHOLD = 64;
  * @returns {number} Cost in cents
  */
 export function calculateRetentionCost(sizeBytes, retentionMonths) {
-  if (sizeBytes < 0 || retentionMonths < 0) {
-    throw new Error('Size and retention must be non-negative');
+  if (!Number.isFinite(sizeBytes) || sizeBytes < 0 || !Number.isInteger(retentionMonths) || retentionMonths > COST_POLICY.maxRetentionMonths || retentionMonths < 0) {
+    throw new Error('Size must be finite and non-negative; retention must be whole months, at most 120');
   }
 
   if (retentionMonths < MINIMUM_RETENTION_MONTHS) {
@@ -88,11 +90,9 @@ export function calculateTotalWithFees(creditCents) {
     throw new Error(`Minimum deposit is ${MINIMUM_DEPOSIT_CENTS} cents ($${MINIMUM_DEPOSIT_CENTS / 100})`);
   }
 
-  // To calculate: if user wants X credit, they pay X + fees
-  // Stripe charges: (amount * 0.029) + 30
-  // So total = creditCents + (creditCents * 0.029) + 30
-  const feeCents = Math.round(creditCents * STRIPE_FEE_PERCENTAGE + STRIPE_FEE_FIXED_CENTS);
-  const totalChargeCents = creditCents + feeCents;
+  // Stripe takes its percentage on the entire charge, including the added fee.
+  const totalChargeCents = grossUp(creditCents);
+  const feeCents = totalChargeCents - creditCents;
 
   return {
     creditCents,
@@ -122,12 +122,12 @@ export function calculateRetentionMonths(donationCents, sizeBytes) {
   return months;
 }
 
-// Cap on retention one donation can add (100 years)
-export const MAX_DONATION_MONTHS = 1200;
+// Cap on retention one donation can add (10 years)
+export const MAX_DONATION_MONTHS = COST_POLICY.maxRetentionMonths;
 export const MIN_DONATION_CENTS = 100;
 
 /**
- * Whole months of retention a donation buys (rounded down, capped at 100 years).
+ * Whole months of retention a donation buys (rounded down, capped at 10 years).
  * Inline content (64 bytes or less) is free and can't take donations.
  * @param {number} donationCents - Donation amount in cents
  * @param {number} sizeBytes - Content size in bytes
@@ -137,6 +137,12 @@ export function calculateDonationMonths(donationCents, sizeBytes) {
   if (donationCents <= 0 || sizeBytes <= INLINE_CONTENT_THRESHOLD) return 0;
   const months = Math.floor(calculateRetentionMonths(donationCents, sizeBytes) + 1e-9);
   return Math.min(months, MAX_DONATION_MONTHS);
+}
+
+export function cappedDonationMonths(donationCents, sizeBytes, expiresAt) {
+  let months = calculateDonationMonths(donationCents, sizeBytes);
+  while (months > 0 && !retentionWithinCap(expiresAt, months)) months--;
+  return months;
 }
 
 /**
@@ -165,7 +171,7 @@ export function formatCents(cents) {
  * @returns {string} New expiration ISO date string
  */
 export function calculateNewExpiration(currentExpiration, monthsToAdd) {
-  const date = new Date(currentExpiration);
+  const date = new Date(Math.max(Date.now(), new Date(currentExpiration).getTime()));
   const currentDay = date.getDate();
   date.setMonth(date.getMonth() + monthsToAdd);
   // If the day changed due to month length differences, set to last day of that month

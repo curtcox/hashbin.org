@@ -7,7 +7,7 @@ describe('donation preview', () => {
   it('matches the server rule: whole months, capped, none for inline content', () => {
     expect(donationMonths(100, oneGB)).toBe(33);
     expect(donationMonths(100, 50 * oneGB)).toBe(0);
-    expect(donationMonths(100, 65)).toBe(1200);
+    expect(donationMonths(100, 65)).toBe(120);
     expect(donationMonths(500, 64)).toBe(0);
   });
 

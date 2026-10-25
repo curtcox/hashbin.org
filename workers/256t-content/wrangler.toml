@@ -15,3 +15,32 @@ bucket_name = "hashbin-content-256t-prod"
 
 [vars]
 ENVIRONMENT = "production"
+
+# Shared prepaid reservations (no public HTTP endpoint).
+[[durable_objects.bindings]]
+name = "CONTENT_METADATA"
+class_name = "ContentMetadata"
+script_name = "hashbin-worker-prod"
+
+[[analytics_engine_datasets]]
+binding = "DOWNLOAD_ANALYTICS"
+dataset = "hashbin_downloads"
+
+[limits]
+cpu_ms = 10
+
+# Configure DOWNLOAD_TOKEN_SECRET and OAUTH_SIGNING_KEY with the same values as the main Worker.
+[[durable_objects.bindings]]
+name = "USER_PROFILES"
+class_name = "UserProfile"
+script_name = "hashbin-worker-prod"
+
+[[durable_objects.bindings]]
+name = "KEY_REGISTRY"
+class_name = "KeyRegistry"
+script_name = "hashbin-worker-prod"
+
+[[durable_objects.bindings]]
+name = "INFRASTRUCTURE_COST"
+class_name = "InfrastructureCost"
+script_name = "hashbin-worker-prod"

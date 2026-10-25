@@ -4,6 +4,7 @@
  */
 
 import { authenticate } from '../auth/middleware.js';
+import { COST_POLICY, retentionWithinCap } from '../utils/cost-policy.js';
 import { MAX_UPLOAD_BYTES, uploadTooLargeResponse } from '../utils/upload-limits.js';
 import { hasOAuthScope, insufficientScopeResponse, isOAuthAuth, oauthNotAllowedResponse } from '../auth/oauth-access.js';
 import { 
@@ -22,12 +23,12 @@ import { recordContentUpload, recordContentDownload, recordPayment } from '../ut
 import { tryAlternateSuppliers } from '../utils/supplier-fallback.js';
 import { buildContentUrl, getContentDomain } from '../utils/content-domain.js';
 
-async function writeContentMeta(env, cid, metadata = {}) {
-  await env.CONTENT_BUCKET.put(`${cid}.meta`, JSON.stringify(metadata), {
-    httpMetadata: {
-      contentType: 'application/json'
-    }
-  });
+async function undoDebit(profile, amount) {
+  if (!amount) return;
+  const response = await profile.fetch(new Request('http://internal/balance/deposit', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amount_cents: amount })
+  }));
+  if (!response.ok) throw new Error('Failed to restore balance after rejected retention change');
 }
 
 /**
@@ -43,6 +44,8 @@ export function publicContentView(content) {
     rate_limit_records: rateLimitRecords = [],
     pending_r2_deletion: _pendingR2Deletion,
     deletion_reason: _deletionReason,
+    availability_version: _availabilityVersion,
+    r2_meta_version: _r2MetaVersion,
     ...rest
   } = content;
   return {
@@ -94,8 +97,8 @@ export async function handleUploadContent(request, env) {
     }
 
     let retention_months = isOAuthPublish
-      ? parseInt(authResult.user.profile?.default_retention_months || '1')
-      : parseInt(url.searchParams.get('retention_months') || '1');
+      ? Number(authResult.user.profile?.default_retention_months || '1')
+      : Number(url.searchParams.get('retention_months') || '1');
     let contentData;
     let size_bytes;
     let contentType = requestContentType.split(';')[0] || 'application/octet-stream';
@@ -111,7 +114,7 @@ export async function handleUploadContent(request, env) {
       const formData = await request.formData();
       const file = formData.get('content');
       if (!isOAuthPublish) {
-        retention_months = parseInt(formData.get('retention_months') || retention_months.toString());
+        retention_months = Number(formData.get('retention_months') || retention_months.toString());
       }
 
       if (!file) {
@@ -154,11 +157,11 @@ export async function handleUploadContent(request, env) {
       );
     }
 
-    if (!Number.isInteger(retention_months) || retention_months < 1) {
+    if (!Number.isInteger(retention_months) || retention_months < 1 || retention_months > COST_POLICY.maxRetentionMonths) {
       return new Response(
         JSON.stringify({
           error: 'Invalid retention',
-          message: 'Minimum retention is 1 month (30 days)'
+          message: 'Retention must be 1–120 whole months'
         }),
         {
           status: 400,
@@ -177,6 +180,11 @@ export async function handleUploadContent(request, env) {
     
     // Calculate cost (inline content is free)
     const cost_cents = isInline ? 0 : calculateRetentionCost(size_bytes, retention_months);
+    if (isInline) {
+      const profile = env.USER_PROFILES.get(env.USER_PROFILES.idFromName(authResult.user.userId));
+      const limited = await profile.fetch(new Request('http://internal/inline-upload', { method: 'POST' }));
+      if (!limited.ok) return limited;
+    }
 
     // Check balance (skip for inline content which is free)
     const userProfileId = env.USER_PROFILES.idFromName(userId);
@@ -224,6 +232,9 @@ export async function handleUploadContent(request, env) {
       return contentDeletedResponse();
     }
 
+    if (existsData.exists && !retentionWithinCap(existsData.expires_at, retention_months)) {
+      return Response.json({ error: 'retention_cap', message: 'Prepaid retention cannot exceed 10 years' }, { status: 400 });
+    }
     if (existsData.exists) {
       // Content already exists - extend retention by minimum 30 days
       const minRetention = Math.max(retention_months, 1);
@@ -287,13 +298,11 @@ export async function handleUploadContent(request, env) {
           })
         })
       );
-      const extendData = await extendResponse.json();
-
-      if (!isInline && extendData.expires_at) {
-        await writeContentMeta(env, hash_256t, {
-          expires_at: extendData.expires_at
-        });
+      if (!extendResponse.ok) {
+        if (extendResponse.status < 500) await undoDebit(userProfileStub, extensionCost);
+        return extendResponse;
       }
+      const extendData = await extendResponse.json();
 
       // Record transaction (only if cost > 0)
       if (!isInline && extensionCost > 0) {
@@ -402,13 +411,11 @@ export async function handleUploadContent(request, env) {
       })
     );
 
-    const metadata = await metadataResponse.json();
-
-    if (!isInline && metadata.expires_at) {
-      await writeContentMeta(env, hash_256t, {
-        expires_at: metadata.expires_at
-      });
+    if (!metadataResponse.ok) {
+      if (metadataResponse.status < 500) await undoDebit(userProfileStub, cost_cents);
+      return metadataResponse;
     }
+    const metadata = await metadataResponse.json();
 
     // Record transaction (only if cost > 0)
     if (!isInline && cost_cents > 0) {
@@ -616,9 +623,9 @@ export async function handleExtendContent(request, env, cid) {
       );
     }
 
-    const months_to_add = parseInt(rawMonths);
+    const months_to_add = Number(rawMonths);
 
-    if (months_to_add < 1) {
+    if (!Number.isInteger(months_to_add) || months_to_add < 1 || months_to_add > COST_POLICY.maxRetentionMonths) {
       return new Response(
         JSON.stringify({
           error: 'Invalid retention',
@@ -650,6 +657,9 @@ export async function handleExtendContent(request, env, cid) {
       return contentDeletedResponse();
     }
     const size_bytes = content.size_bytes;
+    if (!retentionWithinCap(content.expires_at, months_to_add)) {
+      return Response.json({ error: 'retention_cap', message: 'Prepaid retention cannot exceed 10 years' }, { status: 400 });
+    }
 
     // Calculate cost
     const cost_cents = calculateRetentionCost(size_bytes, months_to_add);
@@ -722,13 +732,11 @@ export async function handleExtendContent(request, env, cid) {
       })
     );
 
-    const extendData = await extendResponse.json();
-
-    if (extendData.expires_at && content.size_bytes > 64) {
-      await writeContentMeta(env, cid, {
-        expires_at: extendData.expires_at
-      });
+    if (!extendResponse.ok) {
+      if (extendResponse.status < 500) await undoDebit(userProfileStub, cost_cents);
+      return extendResponse;
     }
+    const extendData = await extendResponse.json();
 
     // Update ExpirationIndex with new expiration date
     if (content.expires_at && extendData.expires_at) {

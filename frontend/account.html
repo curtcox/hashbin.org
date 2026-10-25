@@ -66,7 +66,17 @@
             Choose the default retention used by third-party publishing apps, and revoke any application that should no longer publish with your account.
           </p>
 
-          <section class="card">
+          <section class="card" id="download-budget-card">
+            <h2 class="card-title">Download budget</h2>
+            <p>Opt in to pay from your balance after a file’s allowance runs out. Each GET, HEAD or cache hit costs the greater of $4 per million and $0.02 per GiB. Account and key or app caps both apply.</p>
+            <div id="download-account-caps"></div>
+            <p id="download-budget-usage" role="status"></p>
+            <p>Unused lease requests may remain charged if a server stops: at most 250 requests per lease ($0.001 at the minimum price). Whole cents fund a reusable spending credit; the fractional cent stays available for later downloads.</p>
+            <button type="button" class="btn btn-secondary" id="download-browser-enable">Use my budget when browsing 256t.us</button>
+            <h3>Browser sessions and account signed links</h3>
+            <div id="download-sessions"></div>
+          </section>
+          <section class="card" style="margin-top: 2rem;">
             <div class="account-panel-header">
               <div>
                 <h2 class="card-title">Default third-party retention</h2>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Cost safety – HashBin Admin</title>
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <style>
+    main.container { max-width: 1000px; margin: 0 auto; padding: 1.5rem; }
+    #cost-form button { margin-top: 0.75rem; }
+    #cost-report dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem 1rem; }
+    #cost-report dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
+    #cost-report h2 { margin-top: 1.5rem; }
+    #cost-report table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    #cost-report th, #cost-report td { padding: 0.75rem; text-align: left; vertical-align: top; border-bottom: 1px solid #ddd; overflow-wrap: anywhere; }
+    #cost-report table { font-size: 0.875rem; }
+    #cost-report th:first-child { width: 50%; }
+    #cost-report button { margin-bottom: 0.5rem; white-space: normal; }
+    @media (max-width: 600px) { main.container { padding: 1rem; } #cost-report th, #cost-report td { padding: 0.4rem; } }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main class="container">
+    <h1>Cost safety</h1>
+    <p><a href="/admin/disputes.html">Moderation</a></p>
+    <form id="cost-form" class="card">
+      <label for="admin-token">Admin token (kept in memory until this page closes)</label>
+      <input id="admin-token" type="password" autocomplete="off" class="form-input" required>
+      <button class="btn btn-primary" type="submit">Refresh</button>
+    </form>
+    <p id="cost-status" role="status" aria-live="polite">Enter your admin token to load costs.</p>
+    <section id="cost-report" class="card" hidden>
+      <dl>
+        <dt>Month to date</dt><dd id="cost-mtd"></dd>
+        <dt>Revenue kept after fees</dt><dd id="cost-revenue"></dd>
+        <dt>Projected month end</dt><dd id="cost-projected"></dd>
+        <dt>Last snapshot</dt><dd id="cost-updated"></dd>
+        <dt>Brake</dt><dd id="cost-brake"></dd>
+      </dl>
+      <p>Conservative list-price estimates before included usage. Fixed costs: $7.01/month. Download estimates use a 1% sample.</p>
+      <button id="brake-enable" class="btn btn-secondary" type="button">Enable allowance-only service</button>
+      <button id="brake-disable" class="btn btn-secondary" type="button">Release brake</button>
+      <h2>Top files in the last hour</h2>
+      <table><thead><tr><th>File</th><th>Requests</th><th>HTTP status</th><th>Paid by</th></tr></thead><tbody id="cost-files"></tbody></table>
+    </section>
+  </main>
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/admin-costs.js"></script>
+</body>
+</html>

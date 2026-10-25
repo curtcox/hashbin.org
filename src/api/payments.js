@@ -3,6 +3,7 @@
  * Endpoints for Stripe payments, deposits, and donations
  */
 
+import { COST_POLICY, retentionWithinCap } from '../utils/cost-policy.js';
 import Stripe from 'stripe';
 import { contentDeletedResponse } from './content.js';
 import { authenticate } from '../auth/middleware.js';
@@ -12,11 +13,12 @@ import {
   formatCents, 
   calculateRetentionCost,
   calculateDonationMonths,
+  cappedDonationMonths,
   calculateNewExpiration,
   minimumDonationCents,
   MIN_DONATION_CENTS
 } from '../utils/pricing.js';
-import { recordDeposit, recordDispute } from '../utils/platform-stats.js';
+import { recordDeposit, recordDispute, recordPayment } from '../utils/platform-stats.js';
 
 /**
  * POST /api/balance/deposit
@@ -86,6 +88,16 @@ export async function handleCreateDeposit(request, env) {
           headers: { 'content-type': 'application/json' }
         }
       );
+    }
+
+    // Until 30 days old, each deposit is capped. Missing age fails closed.
+    const profileResponse = await env.USER_PROFILES.get(env.USER_PROFILES.idFromName(authResult.user.userId))
+      .fetch(new Request('http://internal/profile'));
+    if (!profileResponse.ok) return Response.json({ error: 'profile_unavailable' }, { status: 503 });
+    const profile = await profileResponse.json();
+    const age = Date.now() - new Date(profile.created_at).getTime();
+    if ((!Number.isFinite(age) || age < 30 * 86400000) && amount_cents > COST_POLICY.newAccountDepositCapCents) {
+      return Response.json({ error: 'new_account_deposit_cap', message: 'Accounts under 30 days old may deposit at most $20 at a time' }, { status: 400 });
     }
 
     // Calculate total charge (credit amount + fees)
@@ -273,8 +285,9 @@ export async function handleStripeWebhook(request, env) {
  * Handle successful checkout session
  */
 async function handleCheckoutSessionCompleted(session, env) {
-  const userId = session.client_reference_id || session.metadata.user_id;
   const type = session.metadata.type;
+  const userId = session.client_reference_id || session.metadata.user_id ||
+    (type === 'donation' && session.metadata.cid ? `donation:${session.metadata.cid}` : null);
   const amount_cents = parseInt(session.metadata.amount_cents);
 
   if (!userId) {
@@ -321,7 +334,7 @@ async function handleCheckoutSessionCompleted(session, env) {
       const depositData = await depositResponse.json();
       
       // Record transaction
-      const transactionId = crypto.randomUUID();
+      const transactionId = session.id;
       const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
       const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
 
@@ -374,10 +387,10 @@ async function handleCheckoutSessionCompleted(session, env) {
       const size_bytes = content.size_bytes;
 
       // Whole months to add (same rule the checkout quoted)
-      const monthsToAdd = calculateDonationMonths(amount_cents, size_bytes);
+      const monthsToAdd = Number(session.metadata.retention_months) || calculateDonationMonths(amount_cents, size_bytes);
 
       // Extend retention
-      const transactionId = crypto.randomUUID();
+      const transactionId = session.id;
       const extendResponse = await contentMetadataStub.fetch(
         new Request('http://internal/extend', {
           method: 'POST',
@@ -391,6 +404,16 @@ async function handleCheckoutSessionCompleted(session, env) {
         })
       );
 
+      if (!extendResponse.ok) {
+        // A concurrent extension can fill the cap after checkout. Refund this
+        // payment rather than silently collecting money for rejected retention.
+        if ([400, 404, 410].includes(extendResponse.status)) {
+          const stripe = new Stripe(env.STRIPE_SECRET_KEY);
+          await stripe.refunds.create({ payment_intent: session.payment_intent }, { idempotencyKey: `retention-cap-${session.id}` });
+          return;
+        }
+        throw new Error('Donation retention could not be applied');
+      }
       const extendData = await extendResponse.json();
 
       // Update ExpirationIndex with new expiration date
@@ -416,9 +439,9 @@ async function handleCheckoutSessionCompleted(session, env) {
         }
       }
 
-      // If donor is authenticated, record transaction
-      if (donorId) {
-        const paymentRecordId = env.PAYMENT_RECORDS.idFromName(donorId);
+      // Record anonymous donations too, so webhook retries remain idempotent.
+      {
+        const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
         const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
 
         // Calculate Stripe fee
@@ -432,7 +455,7 @@ async function handleCheckoutSessionCompleted(session, env) {
             body: JSON.stringify({
               transaction_id: transactionId,
               type: 'donation_received',
-              user_id: donorId,
+              user_id: donorId || userId,
               amount_cents: amount_cents,
               balance_before_cents: 0,
               balance_after_cents: 0,
@@ -446,10 +469,16 @@ async function handleCheckoutSessionCompleted(session, env) {
         );
       }
 
+      await recordPayment(env, 'donation_received', amount_cents);
       console.log(`Donation completed: ${amount_cents} cents for CID ${cid} by ${donorId || 'anonymous'}`);
       // Note: No email notification for donations per requirements
     } else {
-      console.error(`Failed to process donation for CID ${cid}: content not found`);
+      if ([404, 410].includes(contentResponse.status)) {
+        const stripe = new Stripe(env.STRIPE_SECRET_KEY);
+        await stripe.refunds.create({ payment_intent: session.payment_intent }, { idempotencyKey: `retention-cap-${session.id}` });
+      } else {
+        throw new Error('Donation content unavailable');
+      }
     }
   }
 }
@@ -508,7 +537,7 @@ export async function handleCreateDonation(request, env, cid) {
     }
 
     // Whole months this donation buys; refuse donations that wouldn't add any
-    const monthsAdded = calculateDonationMonths(amount_cents, existsData.size_bytes);
+    const monthsAdded = cappedDonationMonths(amount_cents, existsData.size_bytes, existsData.expires_at);
     if (monthsAdded < 1) {
       const isInline = existsData.size_bytes <= 64;
       return new Response(
@@ -521,6 +550,9 @@ export async function handleCreateDonation(request, env, cid) {
         }),
         { status: 400, headers: { 'content-type': 'application/json' } }
       );
+    }
+    if (!retentionWithinCap(existsData.expires_at, monthsAdded)) {
+      return Response.json({ error: 'retention_cap', message: 'This donation would exceed 10 years of prepaid retention' }, { status: 400 });
     }
     const newExpiration = new Date(calculateNewExpiration(existsData.expires_at, monthsAdded));
 
@@ -562,6 +594,7 @@ export async function handleCreateDonation(request, env, cid) {
         type: 'donation',
         cid: cid,
         amount_cents: amount_cents.toString(),
+        retention_months: monthsAdded.toString(),
         donor_id: donorId || 'anonymous'
       },
       automatic_tax: {
@@ -615,11 +648,11 @@ export async function handleCalculateRetention(request, env) {
       );
     }
 
-    if (!retention_months || retention_months < 1) {
+    if (!Number.isInteger(retention_months) || retention_months < 1 || retention_months > COST_POLICY.maxRetentionMonths) {
       return new Response(
         JSON.stringify({
           error: 'Invalid retention',
-          message: 'Minimum retention is 1 month (30 days)'
+          message: 'Retention must be 1–120 whole months'
         }),
         {
           status: 400,

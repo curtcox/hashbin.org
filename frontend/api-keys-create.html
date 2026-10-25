@@ -232,9 +232,13 @@
             <span id="expiration-error" class="form-error hidden"></span>
           </div>
           
+            <fieldset><legend>Download spending (optional)</legend>
+          <p>Both these limits and your <a href="/account.html">account download limits</a> must be enabled.</p>
+          <div id="create-download-caps"></div></fieldset>
+
           <!-- Form Actions -->
           <div style="display: flex; gap: var(--spacing-md); margin-top: var(--spacing-xl);">
-            <button type="submit" id="submit-btn" class="btn btn-primary">
+          <button type="submit" id="submit-btn" class="btn btn-primary">
               Create API Key
             </button>
             <a href="/api-keys.html" class="btn btn-secondary">Cancel</a>
@@ -295,6 +299,8 @@
 
   <!-- Scripts -->
   <script type="module">
+    import { capsFields, readDownloadCaps } from '/js/download-budget-ui.js';
+    document.getElementById('create-download-caps').innerHTML = capsFields('create-download');
     import { requireAuth } from './js/auth-gate.js';
     import { showToast, setLoading, showElement, hideElement } from './js/utils.js';
     import { createApiKey, copyToClipboard } from './js/api-keys.js';
@@ -375,7 +381,8 @@
       
       try {
         const payload = {
-          expiresAt: expirationInput.value + 'T00:00:00Z'
+          expires_at: expirationInput.value + 'T00:00:00Z',
+          download_budget: readDownloadCaps('create-download')
         };
         
         // Only include name if provided

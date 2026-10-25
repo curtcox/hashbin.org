@@ -83,11 +83,11 @@ describe('Pricing Calculator - P0 Tests', () => {
     it('should calculate total charge with fees correctly', () => {
       const result = calculateTotalWithFees(10000); // Want $100 credit
       
-      // Fee = (10000 × 0.029) + 30 = 320 cents
-      // Total = 10000 + 320 = 10320 cents ($103.20)
+      // Fee = (10000 × 0.029) + 30 = 330 cents
+      // Total = 10000 + 330 = 10330 cents ($103.30)
       expect(result.creditCents).toBe(10000);
-      expect(result.feeCents).toBe(320);
-      expect(result.totalChargeCents).toBe(10320);
+      expect(result.feeCents).toBe(330);
+      expect(result.totalChargeCents).toBe(10330);
     });
   });
 
@@ -146,11 +146,11 @@ describe('Pricing Calculator - P0 Tests', () => {
   // Additional validation tests
   describe('Additional pricing validations', () => {
     it('should reject negative size', () => {
-      expect(() => calculateRetentionCost(-1, 1)).toThrow('Size and retention must be non-negative');
+      expect(() => calculateRetentionCost(-1, 1)).toThrow('Size must be finite and non-negative; retention must be whole months, at most 120');
     });
 
     it('should reject negative retention months', () => {
-      expect(() => calculateRetentionCost(1024, -1)).toThrow('Size and retention must be non-negative');
+      expect(() => calculateRetentionCost(1024, -1)).toThrow('Size must be finite and non-negative; retention must be whole months, at most 120');
     });
 
     it('should enforce minimum retention of 1 month', () => {

@@ -8,12 +8,13 @@ import {
   verifyOAuthJwt
 } from '../auth/oauth.js';
 
-const ALLOWED_SCOPES = new Set(['content:write', 'content:read', 'balance:read']);
+const ALLOWED_SCOPES = new Set(['content:write', 'content:read', 'balance:read', 'downloads:spend']);
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;
 const REFRESH_TOKEN_TTL_DAYS = 30;
 const MAX_SPENDING_LIMIT_USD = 1000000;
 const SCOPE_DESCRIPTIONS = {
+  'downloads:spend': 'Pay for downloads from your balance, within your account and app download caps. Downloads stay disabled until both caps are configured in Account settings.',
   'content:write': 'Publish immutable content using your account balance and default retention.',
   'content:read': 'Check whether content exists and inspect metadata.',
   'balance:read': 'Read your current account balance before publishing.'
@@ -569,6 +570,7 @@ export async function handleGetOAuthAuthorizePage(request, env) {
       <section class="panel">
         <h2>Requested permissions</h2>
         <ul>${scopesHtml}</ul>
+        ${validation.scopes.includes('downloads:spend') ? '<p id="download-consent-budget">Download spending requires enabled account and app daily/monthly caps. Sign in to see current caps.</p>' : ''}
       </section>
       <aside class="panel">
         <h2>App details</h2>
@@ -601,6 +603,26 @@ export async function handleGetOAuthAuthorizePage(request, env) {
     const statusMessage = document.getElementById('status-message');
     const approveButton = document.getElementById('approve-button');
     const denyButton = document.getElementById('deny-button');
+
+    async function showDownloadCaps() {
+      const status = document.getElementById('download-consent-budget');
+      if (!status) return;
+      try {
+        await initializeAuth();
+        const headers = await getAuthHeaders();
+        if (!headers) return;
+        const [budgetResponse, grantsResponse] = await Promise.all([
+          fetch('/api/downloads/budget', { headers }), fetch('/api/account/authorizations', { headers })
+        ]);
+        if (!budgetResponse.ok || !grantsResponse.ok) return;
+        const budget = await budgetResponse.json();
+        const grants = await grantsResponse.json();
+        const grant = grants.authorizations?.find(entry => entry.app_id === authorizePayload.client_id);
+        const format = caps => caps ? ('$' + (caps.daily_cap_cents / 100).toFixed(2) + '/day, $' + (caps.monthly_cap_cents / 100).toFixed(2) + '/month') : 'off (enable caps in Account settings)';
+        status.textContent = 'Download caps — account: ' + format(budget.account) + '; app: ' + format(budget.keys[grant?.grant_id]) + '. Both apply, plus the app monthly spending limit. UTC windows.';
+      } catch { /* The static explanation remains visible when signed out. */ }
+    }
+    showDownloadCaps();
 
     function redirectDenied() {
       const deniedUrl = new URL(authorizePayload.redirect_uri);

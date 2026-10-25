@@ -84,12 +84,11 @@ export function calculateRateLimitPrice(sizeBytes, mtbrMs, durationSeconds) {
   const maxRequests = Math.floor(durationSeconds / mtbrSeconds);
   const maxBytes = sizeBytes * maxRequests;
   
-  // Pricing formula: $0.02 per GB (updated from $0.01 for profitability)
-  // Price = (total_GB_transferred) * $0.02 * 100 cents
+  // Prepay both bandwidth and the per-request floor, including tiny files.
   const pricePerGB = 0.02; // $0.02 per GB
   const bytesPerGB = 1024 * 1024 * 1024;
   const totalGB = (sizeBytes * maxRequests) / bytesPerGB;
-  const priceCents = Math.ceil(totalGB * pricePerGB * 100);
+  const priceCents = Math.ceil(Math.max(totalGB * pricePerGB, maxRequests * 4 / 1e6) * 100);
   
   // Minimum price is $0.01
   const finalPriceCents = Math.max(priceCents, 1);

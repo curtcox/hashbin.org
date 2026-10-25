@@ -68,7 +68,7 @@
         <div class="faq-item">
           <div class="faq-question">Do I need an account to download content?</div>
           <div class="faq-answer">
-            No! Downloads are completely free and require no account. Anyone with a 256t hash can retrieve the associated content. You only need an account if you want to upload content.
+            Downloads require no account or payment from the reader. Anyone with a 256t hash can retrieve its content while the file has prepaid allowance. Paid storage includes an allowance; extra bandwidth can be prepaid to keep popular files available.
           </div>
         </div>
       </section>
@@ -148,7 +148,7 @@
         <div class="faq-item">
           <div class="faq-question">Are there any additional fees?</div>
           <div class="faq-answer">
-            No hidden fees! You only pay the storage cost ($0.03 per GB per month). Stripe charges standard payment processing fees (2.9% + $0.30) which are clearly shown before you complete a deposit.
+            Storage costs $0.03 per GB per month and includes a finite download allowance. When it runs out, downloads pause unless you prepay additional bandwidth at the greater of $0.02 per GB or $4 per million requests. Card fees are shown before checkout; see the pricing page for the exact total and account limits.
           </div>
         </div>
         
@@ -239,6 +239,7 @@
         <p>If you can't find the answer you're looking for, please refer to our <a href="/terms.html">Terms of Service</a> for detailed information about policies and procedures, or reach out through the support channels listed there.</p>
       </section>
     </div>
+    <section class="card" style="max-width: 900px; margin: 2rem auto;"><h2>Funded downloads</h2><p>Download spending is optional and disabled by default. Enable it in Account settings and set daily and monthly caps for the account and each API key or app. The file’s allowance pays first; afterward each GET, HEAD and cache hit costs the greater of $4 per million requests and $0.02 per GiB. Charges use your live balance and stay within every applicable cap. Unreported leases may stay charged (up to 250 requests per lease); cap changes and revocation apply within 60 seconds. Use protected /a/ or signed /s/ links for funded downloads. Whole cents fund reusable spending credit; at month end unused whole cents return to your balance and fractional cents remain available as credit.</p><p><a href="/account.html">Manage download budget</a></p></section>
   </main>
 
   <!-- Footer -->

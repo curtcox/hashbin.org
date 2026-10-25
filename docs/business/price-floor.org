@@ -176,3 +176,86 @@ column of section 2. "Profit" is at today's $0.03.
 |            50 |             0 |            0 |             0 |        0 |                         0 |
 |           100 |             0 |            0 |             0 |        0 |                         0 |
 #+TBLFM: $2=$1+($stripePct*$1)+$stripeFix;%.2f::$3=($stripePct*$2)+$stripeFix;%.4f::$4=$2-$3;%.4f::$5=$1-$4;%.4f::$6=($1+$stripeFix)/(1-$stripePct);%.4f
+
+* 10. Implemented prepaid download bounds (2026-10-24)
+
+Earlier inputs describe the pre-cache implementation. Regenerate these tables
+with =node scripts/cost-safety-model.js=; shared inputs live in
+=src/utils/cost-policy.js=. Every accepted download is assumed to miss cache,
+use the configured 10 ms CPU maximum, two R2 reads and amortized reservations.
+Legacy sidecars reserve for four reads until migrated. Included usage is ignored.
+Storage is conservatively reserved in decimal GB; customer prices remain GiB.
+These tables describe version 2 sidecars.
+
+The nominal 5,000 minimum is reduced to reserve all prepaid storage first.
+Reservations are deducted before serving and never returned on isolate eviction.
+Enforcement lag therefore contributes *zero extra successful downloads* across
+colos: outstanding reservations are already included. A one-minute lease bounds
+brake propagation. Extra prepaid requests cost at least $4/million; 1 cent buys
+at most 2,500. The worst month assumes every download occurs in month one;
+lifetime costs reserve the entire future storage term as well. Operation counts
+and duration estimates still need calibration against real invoices.
+
+| Size | Paid months | Collected ($) | Kept ($) | Downloads | Max month ($) | Max lifetime ($) |
+|-
+| 65 B | 1 | 0.01 | 0.00920 | 5000 | 0.00623 | 0.00623 |
+| 65 B | 120 | 0.01 | 0.00920 | 5000 | 0.00623 | 0.00623 |
+| 1 KiB | 1 | 0.01 | 0.00920 | 5000 | 0.00623 | 0.00623 |
+| 1 KiB | 120 | 0.01 | 0.00920 | 5000 | 0.00623 | 0.00623 |
+| 1 MiB | 1 | 0.01 | 0.00920 | 5000 | 0.00625 | 0.00625 |
+| 1 MiB | 120 | 0.01 | 0.00920 | 5000 | 0.00625 | 0.00812 |
+| ~1/3 GiB | 1 | 0.01 | 0.00920 | 3065 | 0.00920 | 0.00920 |
+| ~1/3 GiB | 120 | 1.20 | 1.10400 | 79999 | 0.10460 | 0.74347 |
+| 1 GiB | 1 | 0.03 | 0.02760 | 5000 | 0.02234 | 0.02234 |
+| 1 GiB | 120 | 3.60 | 3.31200 | 240000 | 0.31374 | 2.23037 |
+| 5 GiB | 1 | 0.15 | 0.13800 | 10000 | 0.09296 | 0.09296 |
+| 5 GiB | 120 | 18.00 | 16.56000 | 1200000 | 1.56856 | 11.15171 |
+
+| Month | Upfront kept ($) | Storage paid ($) | Storage reserve left ($) |
+|-
+| 1 | 0.33120 | 0.01611 | 0.28530 |
+| 2 | 0 | 0.01611 | 0.26920 |
+| 3 | 0 | 0.01611 | 0.25309 |
+| 4 | 0 | 0.01611 | 0.23699 |
+| 5 | 0 | 0.01611 | 0.22088 |
+| 6 | 0 | 0.01611 | 0.20477 |
+| 7 | 0 | 0.01611 | 0.18867 |
+| 8 | 0 | 0.01611 | 0.17256 |
+| 9 | 0 | 0.01611 | 0.15645 |
+| 10 | 0 | 0.01611 | 0.14035 |
+| 11 | 0 | 0.01611 | 0.12424 |
+| 12 | 0 | 0.01611 | 0.10814 |
+
+The second table is a 1 GiB / 12-month cohort with every included download in
+month one. Remaining cash stays nonnegative after every storage month. Actual
+cohorts can be summed month by month; donations/extensions add obligations.
+
+These tables exclude refused Worker requests, distributed inline traffic,
+unknown operation growth, billing-unit rounding, disputes and provider price
+changes. Those risks prevent an absolute no-loss guarantee. See
+=docs/cost-safety.md= for upstream WAF/notifications and remaining operator work.
+The fixed $7.01/month remains an explicit owner budget.
+
+Calibration and heavy-tail simulation remain pending one and two months of
+production data respectively. Hourly reports retain 93 days and can be exported
+through =GET /api/admin/cost-safety/history=.
+
+* Identified downloads (B11, 2026-10-24)
+Price is max($4/M requests, $0.02/GiB/request). All values below are dollars.
+The conservative lease coordination estimate is 6 DO requests, 6 row reads and
+6 row writes per lease, amortized over its requests. This excludes fixed costs.
+
+| File | Requests/lease | Price/request | Cost/request | Kept margin/request | Max unreported lease charge |
+|------+----------------+---------------+--------------+---------------------+-----------------------------|
+| 100 B | 1 | 0.00000400 | 0.00000815 | -0.00000447 | 0.001000 |
+| 100 B | 250 | 0.00000400 | 0.00000127 | 0.00000241 | 0.001000 |
+| 1 GiB | 1 | 0.02000000 | 0.00000815 | 0.01839185 | 5.000000 |
+| 1 GiB | 250 | 0.02000000 | 0.00000127 | 0.01839873 | 5.000000 |
+
+Full leases have positive marginal margin at the floor. Cold singleton requests
+can lose money: the adaptive design is not a universal margin guarantee. The
+hourly monitor alerts above a 50% estimated cost/price ratio. Unreported leases
+remain paid and capped; they increase the user's charge, not unpaid delivery.
+The $0.001 loss bound applies per outstanding lease at the floor only. Prices
+for large files and several identity/price leases multiply the potential charge.
+Regenerate with =node scripts/cost-safety-model.js=.

@@ -5,6 +5,27 @@
 
 import { requireAdmin } from '../auth/admin.js';
 import { deliverAlert } from '../durable-objects/alert-store.js';
+import { COST_POLICY } from '../utils/cost-policy.js';
+
+export async function handleCostSafety(request, env) {
+  const authError = requireAdmin(request, env);
+  if (authError) return authError;
+  const stub = env.INFRASTRUCTURE_COST.get(env.INFRASTRUCTURE_COST.idFromName('global'));
+  const url = new URL(request.url);
+  if (url.pathname.endsWith('/history') && request.method === 'GET') {
+    return stub.fetch(new Request(`https://internal/history${url.search}`));
+  }
+  if (request.method === 'POST') {
+    const body = await request.json().catch(() => null);
+    if (typeof body?.brake !== 'boolean') return Response.json({ error: 'brake must be boolean' }, { status: 400 });
+    const response = await stub.fetch(new Request('https://internal/safety', { method: 'POST',
+      headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brake: body.brake }) }));
+    await logAuditEntry(env, { actor_type: 'admin', actor_id: 'admin', action: 'set_cost_brake',
+      resource_type: 'infrastructure_cost', resource_id: 'global', metadata: { brake: body.brake } });
+    return response;
+  }
+  return stub.fetch(new Request('https://internal/safety'));
+}
 
 /**
  * Get aggregate platform statistics
@@ -681,7 +702,8 @@ export async function handleGetProfitability(request, env) {
 
     // Calculate profitability metrics
     const totalCosts = costData.costs.total;
-    const totalRevenue = statsData.revenue.total_cents;
+    const revenueResponse = period === 'all_time' ? null : await statsStub.fetch(new Request(`https://internal/revenue?period=${encodeURIComponent(period)}`));
+    const totalRevenue = (period === 'all_time' ? statsData.summary.net_revenue_cents : (await revenueResponse.json()).revenue_cents) * COST_POLICY.revenueKept;
     const profit = totalRevenue - totalCosts;
     const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0;
 

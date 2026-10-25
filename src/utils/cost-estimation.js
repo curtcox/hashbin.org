@@ -4,19 +4,21 @@
  * Based on the pricing analysis in done/track_and_predict_expenses.md
  */
 
+import { COST_POLICY, grossUp } from './cost-policy.js';
+
 // Cloudflare Workers pricing
-export const WORKER_COST_PER_MILLION = 0.50; // $0.50 per million requests
+export const WORKER_COST_PER_MILLION = COST_POLICY.workerPerMillion; // $0.30 per million requests
 
 // Cloudflare R2 pricing
-export const R2_STORAGE_COST_PER_GB_MONTH = 0.015; // $0.015 per GB per month
-export const R2_BANDWIDTH_COST_PER_GB = 0.015; // $0.015 per GB downloaded
+export const R2_STORAGE_COST_PER_GB_MONTH = COST_POLICY.r2StoragePerGBMonth;
+export const R2_BANDWIDTH_COST_PER_GB = COST_POLICY.r2EgressPerGB;
 
 // Cloudflare Durable Objects pricing
-export const DURABLE_OBJECTS_COST_PER_MILLION = 0.15; // $0.15 per million requests
+export const DURABLE_OBJECTS_COST_PER_MILLION = COST_POLICY.doPerMillion; // $0.15 per million requests
 
 // Stripe pricing
-export const STRIPE_FEE_PERCENTAGE = 0.029; // 2.9%
-export const STRIPE_FEE_FIXED_CENTS = 30; // $0.30 = 30 cents
+export const STRIPE_FEE_PERCENTAGE = COST_POLICY.stripeRate; // 2.9%
+export const STRIPE_FEE_FIXED_CENTS = COST_POLICY.stripeFixedCents;
 
 /**
  * Calculate Worker request cost
@@ -96,7 +98,7 @@ export function calculateStripeFee(depositCents) {
  * @returns {object} { depositCents, stripeFee, totalCharged }
  */
 export function calculateChargeAmount(depositCents) {
-  const stripeFee = calculateStripeFee(depositCents);
+  const stripeFee = grossUp(depositCents) - depositCents;
   return {
     depositCents,
     stripeFee,
@@ -149,19 +151,21 @@ export function calculateUploadCost(params) {
  * @returns {object} Cost breakdown in cents
  */
 export function calculateDownloadCost(params) {
-  const { sizeGB, workerRequests = 3 } = params;
+  const { sizeGB, workerRequests = 1, requests = 1, cached = false } = params;
 
   if (sizeGB === undefined) {
     throw new Error('sizeGB must be provided');
   }
 
-  const workerCents = calculateWorkerCost(workerRequests);
+  const workerCents = calculateWorkerCost(workerRequests * requests);
   const bandwidthCents = calculateR2BandwidthCost(sizeGB);
+  const readsCents = cached ? 0 : requests * 2 * COST_POLICY.r2ClassBPerMillion / 1e6 * 100;
 
   return {
     worker_cents: workerCents,
     bandwidth_cents: bandwidthCents,
-    total_cents: workerCents + bandwidthCents
+    r2_read_cents: readsCents,
+    total_cents: workerCents + bandwidthCents + readsCents
   };
 }
 
@@ -266,7 +270,7 @@ export function calculateUserCosts(user) {
     const totalDownloadGB = user.downloads.sizeGB || 
                            (user.downloads.count * (user.downloads.avgSizeGB || 1));
     const downloadCost = calculateDownloadCost({
-      sizeGB: totalDownloadGB
+      sizeGB: totalDownloadGB, requests: user.downloads.count || 1
     });
     totalCosts += downloadCost.total_cents;
   }
@@ -324,7 +328,7 @@ export function calculateContentCosts(content) {
   if (content.downloads) {
     const totalBandwidthGB = content.downloads * content.sizeGB;
     const downloadCost = calculateDownloadCost({
-      sizeGB: totalBandwidthGB
+      sizeGB: totalBandwidthGB, requests: content.downloads
     });
     totalCosts += downloadCost.total_cents;
   }

@@ -22,7 +22,7 @@ export class PaymentRecord {
     try {
       if (url.pathname === '/transaction' && method === 'POST') {
         const data = await request.json();
-        return await this.createTransaction(data);
+        return await this.state.blockConcurrencyWhile(() => this.createTransaction(data));
       }
 
       if (url.pathname === '/transactions' && method === 'GET') {
@@ -61,6 +61,8 @@ export class PaymentRecord {
    * Create a new transaction record
    */
   async createTransaction(data) {
+    const existing = await this.state.storage.get(`tx:${data.transaction_id}`);
+    if (existing) return Response.json(existing);
     const transaction = {
       id: data.transaction_id,
       transaction_id: data.transaction_id,

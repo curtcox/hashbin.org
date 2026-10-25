@@ -129,6 +129,13 @@ export async function handleCreateDispute(request, env) {
       })
     }));
 
+    const availability = env.CONTENT_METADATA.get(env.CONTENT_METADATA.idFromName(data.cid));
+    const availabilityResponse = await availability.fetch(new Request('http://internal/availability', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ disputed: true })
+    }));
+    if (!availabilityResponse.ok) throw new Error('Failed to publish content availability');
+
     try {
       await env.CONTENT_BUCKET.put(`${data.cid}.disputed`, JSON.stringify({
         dispute_id: disputeData.dispute.dispute_id,

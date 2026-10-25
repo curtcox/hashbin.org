@@ -2,7 +2,18 @@
 
 ## Status
 
-**Phase:** Plan, written 2026-10-24. Nothing here is implemented yet.
+**Phase:** Code implemented 2026-10-24; deployment, owner dashboard setup and live
+acceptance checks remain. See `docs/cost-safety.md` for the implemented policy,
+operator runbook, defaults, proposal changes, and financial limits.
+Measurements/simulation remain pending production evidence.
+
+The implementation uses prepaid reservations instead of delayed count flushing;
+reduces the suggested minimum where storage would exhaust its margin; uses
+explicit prepaid bandwidth purchases instead of automatic debits; keeps the
+$1 deposit minimum with corrected gross-up; caps outstanding retention at 10
+years; and caps individual deposits at $20 for accounts under 30 days old.
+The absolute no-loss goal below remains an aspiration: refused Worker requests
+and distributed free traffic remain billable without an upstream spending cap.
 **Rows:** L22, S20–S22 in `STATUS.md`; also touches L20, S17, S18, B9.
 **Numbers:** `docs/business/price-floor.org` (the price-floor sheet). Prices checked 2026-10-24.
 

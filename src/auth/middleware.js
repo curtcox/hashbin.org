@@ -3,6 +3,7 @@
  * Handles Clerk session validation and API key authentication
  */
 
+import { verifyDownloadApiKey } from './download-tokens.js';
 import { verifyToken } from '@clerk/backend';
 import { hashApiKey, validateApiKeyFormat } from './utils.js';
 import { getOrCreateLocalProfile, validateLocalUserId } from './local-auth.js';
@@ -128,11 +129,9 @@ async function validateApiKey(apiKey, env) {
   const keyHash = await hashApiKey(apiKey);
 
   // Use KeyRegistry DO to find the user
-  const registryId = env.KEY_REGISTRY.idFromName('global');
-  const registryStub = env.KEY_REGISTRY.get(registryId);
-
   try {
-    const lookupResponse = await registryStub.fetch(
+    const routed = apiKey.startsWith('hb2_') ? await verifyDownloadApiKey(apiKey, env.DOWNLOAD_TOKEN_SECRET) : null;
+    const lookupResponse = routed ? Response.json({ user_id: routed.u, key_id: routed.k }) : await env.KEY_REGISTRY.get(env.KEY_REGISTRY.idFromName('global')).fetch(
       new Request('http://internal/lookup', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -171,6 +170,8 @@ async function validateApiKey(apiKey, env) {
     }
 
     const apiKeyData = await keyResponse.json();
+
+    if (routed && apiKeyData.key_hash !== keyHash) return { valid: false, error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT };
 
     // Check if key is revoked
     if (apiKeyData.revoked_at) {

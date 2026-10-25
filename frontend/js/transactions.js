@@ -30,7 +30,7 @@ export function formatTransactionAmount(amountCents, type) {
   }
 
   // Deposits are positive (IN), purchases are negative (OUT)
-  if (type === 'deposit') {
+  if (type === 'deposit' || type === 'download_refund') {
     return {
       formatted: `${formatted} IN`,
       cssClass: 'amount-in'
@@ -149,6 +149,8 @@ export function getTransactionTypeLabel(type) {
     'cid_extension': 'Retention Extension',
     'donation_received': 'Donation to Content',
     'rate_limit_purchase': 'Bandwidth Purchase',
+    'download_spend': 'Download Spending Credit',
+    'download_refund': 'Unused Download Credit Refund',
     'content_deletion': 'Content Deletion'
   };
   

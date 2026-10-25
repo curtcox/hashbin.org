@@ -4,6 +4,7 @@
  */
 
 import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
+import { COST_POLICY, downloadAllowance, retentionWithinCap } from '../utils/cost-policy.js';
 
 // Rate limiting constants
 const DEFAULT_RATE_LIMIT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
@@ -47,10 +48,25 @@ export class ContentMetadata {
     const method = request.method;
 
     try {
+      if (url.pathname === '/download/reserve' && method === 'POST') {
+        return await this.state.blockConcurrencyWhile(() => this.reserveDownloads(url.searchParams.get('funded') === 'true'));
+      }
+      if (url.pathname === '/availability' && method === 'POST') {
+        const { disputed } = await request.json();
+        return await this.state.blockConcurrencyWhile(async () => {
+          const content = await this.state.storage.get('content');
+          if (!content) return new Response('Not found', { status: 404 });
+          content.disputed = Boolean(disputed);
+          content.availability_version = 2;
+          await this.state.storage.put('content', content);
+          await this.publishMeta(content);
+          return Response.json({ success: true });
+        });
+      }
       // Create or update content record
       if (url.pathname === '/content' && method === 'POST') {
         const data = await request.json();
-        return await this.createContent(data);
+        return await this.state.blockConcurrencyWhile(() => this.createContent(data));
       }
 
       // Get content metadata
@@ -66,7 +82,7 @@ export class ContentMetadata {
       // Extend content retention
       if (url.pathname === '/extend' && method === 'POST') {
         const data = await request.json();
-        return await this.extendRetention(data);
+        return await this.state.blockConcurrencyWhile(() => this.extendRetention(data));
       }
 
       // Increment download count
@@ -115,7 +131,7 @@ export class ContentMetadata {
       // Soft delete content
       if (url.pathname === '/soft-delete' && method === 'POST') {
         const data = await request.json();
-        return await this.softDeleteContent(data);
+        return await this.state.blockConcurrencyWhile(() => this.softDeleteContent(data));
       }
 
       // Mark R2 deletion complete
@@ -126,12 +142,12 @@ export class ContentMetadata {
       // Mark content as contested (HTTP 451)
       if (url.pathname === '/contested' && method === 'POST') {
         const data = await request.json();
-        return await this.markContested(data);
+        return await this.state.blockConcurrencyWhile(() => this.markContested(data));
       }
 
       // Unmark content as contested
       if (url.pathname === '/contested' && method === 'DELETE') {
-        return await this.unmarkContested();
+        return await this.state.blockConcurrencyWhile(() => this.unmarkContested());
       }
 
       return new Response('Not Found', { status: 404 });
@@ -149,10 +165,90 @@ export class ContentMetadata {
     }
   }
 
+  async alarm() {
+    // Cloudflare retries a failed alarm with bounded exponential backoff. Read
+    // current state rather than replaying a stale takedown/extension sidecar.
+    await this.state.blockConcurrencyWhile(async () => {
+      const content = await this.state.storage.get('content');
+      if (content) await this.publishMeta(content, false);
+    });
+  }
+
+  async publishMeta(content, scheduleRetry = true) {
+    if (!this.env.CONTENT_BUCKET?.put) return;
+    try {
+      if (content.availability_version !== 2) {
+        // Preserve pre-rollout marker state when a legacy record is extended.
+        if (await this.env.CONTENT_BUCKET.head?.(`${content.hash_256t}.deleted`)) content.deleted_at ||= new Date().toISOString();
+        if (await this.env.CONTENT_BUCKET.head?.(`${content.hash_256t}.disputed`)) content.disputed = true;
+        content.availability_version = 2;
+        await this.state.storage.put('content', content);
+      }
+      await this.env.CONTENT_BUCKET.put(`${content.hash_256t}.meta`, JSON.stringify({
+        version: 2,
+        expires_at: content.expires_at,
+        deleted: Boolean(content.deleted_at),
+        disputed: Boolean(content.disputed || content.contested)
+      }), { httpMetadata: { contentType: 'application/json' } });
+      if (content.r2_meta_version !== 2) {
+        content.r2_meta_version = 2;
+        await this.state.storage.put('content', content);
+      }
+    } catch (error) {
+      // Keep committed availability authoritative and repair transient R2
+      // failures even when the caller cannot safely repeat a mutation.
+      if (scheduleRetry) await this.state.storage.setAlarm?.(Date.now() + 60000);
+      throw error;
+    }
+  }
+
+  // Reservations are deducted BEFORE serving and never returned. Isolate eviction
+  // can waste allowance but cannot create extra allowance. Serialize reservations
+  // across all colos; each lease lasts at most a minute for takedowns/brakes.
+  async reserveDownloads(funded = false) {
+    const content = await this.state.storage.get('content');
+    if (!content || content.deleted_at || !Number.isFinite(new Date(content.expires_at).getTime()) || new Date(content.expires_at).getTime() <= Date.now()) {
+      return Response.json({ count: 0 }, { status: 404 });
+    }
+    if (content.disputed || content.contested) return Response.json({ count: 0 }, { status: 451 });
+    const budget = (await this.state.storage.get('download-budget')) || { reserved: 0, purchases: {} };
+    const remaining = Math.max(0, downloadAllowance(content) - budget.reserved);
+    let count = Math.min(COST_POLICY.leaseSize, remaining);
+    budget.reserved += count;
+    // Existing bandwidth purchases also prepay a finite request count at >= $4/M.
+    const safety = (await this.env.INFRASTRUCTURE_COST?.get(this.env.INFRASTRUCTURE_COST.idFromName('global'))
+        .fetch(new Request('https://internal/safety')).then(r => {
+          if (!r.ok) throw new Error('Cost brake unavailable');
+          return r.json();
+        }));
+    if (this.env.COST_SAFETY_HARD_STOP === 'true' || safety?.hard_stop) return Response.json({ count: 0 }, { status: 503 });
+    const brake = this.env.COST_SAFETY_ALLOWANCE_ONLY === 'true' || safety?.brake;
+    if (!count && (!brake || funded)) {
+      for (const purchase of content.rate_limit_records || []) {
+        if (new Date(purchase.expires_at).getTime() <= Date.now()) continue;
+        const paidRequests = Math.min(purchase.max_requests || 0,
+          Math.floor((purchase.price_cents || 0) / 100 / COST_POLICY.downloadDollarsPerMillion * 1e6));
+        const used = budget.purchases[purchase.record_id] || 0;
+        count = Math.min(COST_POLICY.leaseSize, Math.max(0, paidRequests - used));
+        if (count) {
+          budget.purchases[purchase.record_id] = used + count;
+          break;
+        }
+      }
+    }
+    if (!count) return Response.json({ count: 0 }, { status: 429 });
+    await this.state.storage.put('download-budget', budget);
+    return Response.json({ count, expires_at: Math.min(Date.now() + COST_POLICY.leaseSeconds * 1000,
+      new Date(content.expires_at).getTime()), allowance: downloadAllowance(content), reserved: budget.reserved });
+  }
+
   /**
    * Create content record
    */
   async createContent(data) {
+    if (!retentionWithinCap(null, data.retention_months)) {
+      return Response.json({ error: 'retention_cap', message: 'Retention must be 1–120 whole months' }, { status: 400 });
+    }
     const existingContent = await this.state.storage.get('content');
 
     if (existingContent) {
@@ -186,6 +282,7 @@ export class ContentMetadata {
 
     const content = {
       hash_256t: data.hash_256t,
+      availability_version: 2,
       size_bytes: data.size_bytes,
       content_type: data.content_type || 'application/octet-stream',
       uploader_id: data.uploader_id,
@@ -223,6 +320,7 @@ export class ContentMetadata {
     };
 
     await this.state.storage.put('content', content);
+    await this.publishMeta(content);
 
     return new Response(JSON.stringify(content), {
       status: 201,
@@ -304,6 +402,14 @@ export class ContentMetadata {
       );
     }
 
+    // Stripe can retry after applying retention but before its payment record
+    // was written. Never apply the same paid session twice or refund it as a
+    // newly rejected extension.
+    if (data.payment_id && content.retention_payments?.some(p => p.payment_id === data.payment_id)) {
+      return Response.json({ expires_at: content.expires_at, months_added: 0,
+        total_payments: content.retention_payments.length, duplicate: true });
+    }
+
     if (content.deleted_at) {
       return new Response(
         JSON.stringify({ error: 'CONTENT_DELETED', message: 'Deleted content cannot be extended' }),
@@ -311,8 +417,12 @@ export class ContentMetadata {
       );
     }
 
+    if (!retentionWithinCap(content.expires_at, data.months_to_add)) {
+      return Response.json({ error: 'retention_cap', message: 'Prepaid retention cannot exceed 10 years from today' }, { status: 400 });
+    }
+
     // Calculate new expiration
-    const current_expires_at = new Date(content.expires_at);
+    const current_expires_at = new Date(Math.max(Date.now(), new Date(content.expires_at).getTime()));
     const new_expires_at = new Date(current_expires_at);
     const currentDay = new_expires_at.getDate();
     new_expires_at.setMonth(new_expires_at.getMonth() + data.months_to_add);
@@ -335,6 +445,7 @@ export class ContentMetadata {
     content.retention_payments.push(payment);
 
     await this.state.storage.put('content', content);
+    await this.publishMeta(content);
 
     return new Response(
       JSON.stringify({
@@ -571,6 +682,8 @@ export class ContentMetadata {
         }
       );
     }
+
+    if (content.deleted_at) return Response.json({ error: 'content_deleted' }, { status: 410 });
 
     // Create rate limit record
     const now = new Date();
@@ -833,6 +946,7 @@ export class ContentMetadata {
     content.contested_by = data.admin_id || 'system';
 
     await this.state.storage.put('content', content);
+    await this.publishMeta(content);
 
     return new Response(
       JSON.stringify({ success: true, contested: true }),
@@ -866,6 +980,7 @@ export class ContentMetadata {
     content.uncontested_at = new Date().toISOString();
 
     await this.state.storage.put('content', content);
+    await this.publishMeta(content);
 
     return new Response(
       JSON.stringify({ success: true, contested: false }),
@@ -904,6 +1019,7 @@ export class ContentMetadata {
     content.pending_r2_deletion = true;
 
     await this.state.storage.put('content', content);
+    await this.publishMeta(content);
 
     return new Response(
       JSON.stringify({ success: true, deleted: true }),

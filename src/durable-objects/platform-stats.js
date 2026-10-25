@@ -10,16 +10,43 @@ export class PlatformStats {
   constructor(state, env) {
     this.state = state;
     this.env = env;
+    this.queue = Promise.resolve();
   }
 
   async fetch(request) {
     const backupResponse = await handleBackupRequest(this.state, request);
     if (backupResponse) return backupResponse;
 
+    const operation = this.queue.then(() => this.handleRequest(request));
+    this.queue = operation.catch(() => {});
+    return operation;
+  }
+
+  async handleRequest(request) {
     const url = new URL(request.url);
     const path = url.pathname;
 
     try {
+      if (path === '/download-revenue' && request.method === 'POST') {
+        const event = await request.json();
+        if (typeof event.user_id !== 'string' || !event.user_id || !Number.isSafeInteger(event.sequence) || event.sequence < 1 || typeof event.id !== 'string' || !/^\d{4}-\d{2}$/.test(event.period) || !Number.isFinite(event.revenue_cents)) return Response.json({ error: 'Invalid revenue' }, { status: 400 });
+        return this.state.storage.transaction(async storage => {
+          // UserProfile delivers its durable outbox in sequence. Keep one cursor
+          // per account rather than a permanent row for every download lease.
+          const cursor = `download-sequence:${event.user_id}`;
+          if (event.sequence > ((await storage.get(cursor)) || 0)) {
+            for (const key of [`revenue:${event.period}`, 'total_revenue_cents', 'download_revenue_cents']) {
+              await storage.put(key, Math.round((((await storage.get(key)) || 0) + event.revenue_cents) * 1e6) / 1e6);
+            }
+            await storage.put(cursor, event.sequence);
+          }
+          return Response.json({ recorded: true });
+        });
+      }
+      if (path === '/revenue' && request.method === 'GET') {
+        const period = url.searchParams.get('period');
+        return Response.json({ revenue_cents: (await this.state.storage.get(`revenue:${period}`)) || 0 });
+      }
       // Increment counter
       if (path === '/increment' && request.method === 'POST') {
         const body = await request.json();
@@ -67,6 +94,18 @@ export class PlatformStats {
 
     const current = (await this.state.storage.get(counter)) || 0;
     await this.state.storage.put(counter, current + value);
+    if (['total_deposits', 'total_uploads'].includes(counter)) {
+      const hour = Math.floor(Date.now() / 3600000);
+      const key = `velocity:${counter}`;
+      const history = (await this.state.storage.get(key)) || {};
+      history[hour] = (history[hour] || 0) + value;
+      for (const old of Object.keys(history)) if (Number(old) < hour - 25) delete history[old];
+      await this.state.storage.put(key, history);
+    }
+    if (counter === 'total_revenue_cents') {
+      const key = `revenue:${new Date().toISOString().slice(0, 7)}`;
+      await this.state.storage.put(key, ((await this.state.storage.get(key)) || 0) + value);
+    }
 
     return new Response(
       JSON.stringify({ counter, value: current + value }),
@@ -114,10 +153,20 @@ export class PlatformStats {
     // Build response based on requested type
     let response;
     if (statsType === 'all') {
+      const completedHour = Math.floor(Date.now() / 3600000) - 1;
+      const velocity = counter => {
+        const history = stats[`velocity:${counter}`] || {};
+        const normal = Array.from({ length: 24 }, (_, i) => history[completedHour - 1 - i] || 0);
+        return { last: history[completedHour] || 0, average: normal.reduce((a, b) => a + b, 0) / 24 };
+      };
+      const deposits = velocity('total_deposits');
+      const uploads = velocity('total_uploads');
       response = {
         timestamp: new Date().toISOString(),
         period: 'all_time',
         content: {
+          uploads_last_hour: uploads.last,
+          avg_uploads_per_hour: uploads.average,
           total_files: stats.total_uploads || 0,
           total_size_bytes: stats.total_uploads_bytes || 0,
           inline_content_count: stats.inline_content_count || 0,
@@ -133,6 +182,8 @@ export class PlatformStats {
           accounts_with_balance: stats.users_with_balance || 0
         },
         financial: {
+          deposits_last_hour: deposits.last,
+          avg_deposits_per_hour: deposits.average,
           total_revenue_cents: stats.total_revenue_cents || 0,
           total_deposits_cents: stats.total_deposits_cents || 0,
           total_spent_cents: stats.total_spent_cents || 0,

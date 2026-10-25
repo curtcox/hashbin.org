@@ -196,6 +196,13 @@ export async function handleAdminUpdateDispute(request, env, cid) {
       }));
     }
 
+    const availability = env.CONTENT_METADATA.get(env.CONTENT_METADATA.idFromName(cid));
+    const availabilityResponse = await availability.fetch(new Request('http://internal/availability', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ disputed: data.status === 'open' || data.status === 'under_review' })
+    }));
+    if (!availabilityResponse.ok) throw new Error('Failed to publish content availability');
+
     try {
       if (data.status === 'open' || data.status === 'under_review') {
         await env.CONTENT_BUCKET.put(`${cid}.disputed`, JSON.stringify({

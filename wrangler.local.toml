@@ -157,3 +157,6 @@ new_sqlite_classes = ["ApplicationRegistry"]
 [[migrations]]
 tag = "v10"
 new_sqlite_classes = ["BackupIndex"]
+
+# DOWNLOAD_TOKEN_SECRET: shared HMAC secret with 256t-content (required for new keys).
+# COST_SAFETY_HARD_STOP=true: emergency 503 for all content downloads.

@@ -183,8 +183,8 @@ function handleAmountChange() {
  * requiring an API call. If fee structure changes, update both locations.
  */
 function calculateFees(creditCents) {
-  const feeCents = Math.round(creditCents * STRIPE_FEE_PERCENTAGE + STRIPE_FEE_FIXED_CENTS);
-  const totalChargeCents = creditCents + feeCents;
+  const totalChargeCents = Math.ceil((creditCents + STRIPE_FEE_FIXED_CENTS) / (1 - STRIPE_FEE_PERCENTAGE));
+  const feeCents = totalChargeCents - creditCents;
   
   return {
     creditCents,

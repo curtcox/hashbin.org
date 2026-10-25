@@ -3,6 +3,8 @@
  * Calculates costs for rate limit bandwidth purchases
  */
 
+import { COST_POLICY } from './cost-policy.js';
+
 // Rate per byte: $0.02 per GB (updated from $0.01 for profitability)
 export const RATE_PER_BYTE = 0.02 / (1024 * 1024 * 1024); // $0.00000000001863 per byte
 
@@ -37,7 +39,7 @@ export function calculateRateLimitPrice(sizeBytes, mtbrMs, durationSeconds) {
   }
 
   const maxBytes = sizeBytes * maxRequests;
-  const priceExact = maxBytes * RATE_PER_BYTE;
+  const priceExact = Math.max(maxBytes * RATE_PER_BYTE, maxRequests * COST_POLICY.downloadDollarsPerMillion / 1e6);
   const priceCents = Math.ceil(priceExact * 100); // Round up to nearest cent
 
   return {

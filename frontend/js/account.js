@@ -1,3 +1,4 @@
+import { downloadApi, browseWithBudget, mountCapForm } from '/js/download-budget-ui.js';
 import { requireAuth } from '/js/auth-gate.js';
 import { escapeHtml } from '/js/html.js';
 import { authenticatedFetch, handleApiError, showToast } from '/js/utils.js';
@@ -43,6 +44,7 @@ function renderAuthorizations(authorizations) {
               ${authorization.redirect_uris.map((uri) => `<li><code>${escapeHtml(uri)}</code></li>`).join('')}
             </ul>
           ` : ''}
+          ${(authorization.scopes || []).includes('downloads:spend') ? `<div class="grant-download-caps" data-grant-id="${escapeHtml(authorization.grant_id)}"></div>` : ''}
           <button class="btn btn-secondary revoke-authorization" type="button" data-app-id="${escapeHtml(authorization.app_id)}">
             Revoke access
           </button>
@@ -51,6 +53,10 @@ function renderAuthorizations(authorizations) {
     </div>
   `;
 
+  for (const [index, container] of [...authorizationsList.querySelectorAll('.grant-download-caps')].entries()) {
+    const id = container.dataset.grantId;
+    mountCapForm(container, `grant-download-${index}`, downloadBudgetData?.keys?.[id], caps => downloadApi(`/api/oauth/grants/${encodeURIComponent(id)}/download-budget`, 'PUT', { caps }));
+  }
   for (const button of authorizationsList.querySelectorAll('.revoke-authorization')) {
     button.addEventListener('click', async () => {
       const appId = button.getAttribute('data-app-id');
@@ -134,4 +140,38 @@ refreshButton.addEventListener('click', () => {
   loadAuthorizations();
 });
 
+let downloadBudgetData;
+async function loadDownloadBudget() {
+  const status = document.getElementById('download-budget-usage');
+  try {
+    downloadBudgetData = await downloadApi('/api/downloads/budget');
+    mountCapForm(document.getElementById('download-account-caps'), 'account-download', downloadBudgetData.account, account => downloadApi('/api/downloads/budget', 'PUT', { account }));
+    const b = downloadBudgetData;
+    status.textContent = `Spent today: $${(b.spend.account.day_uc / 1e8).toFixed(6)}. This month: $${(b.spend.account.month_uc / 1e8).toFixed(6)}. Spending credit: $${(b.float_uc / 1e8).toFixed(6)}.`;
+    await loadDownloadSessions();
+  } catch (error) { status.textContent = error.message; }
+}
+async function loadDownloadSessions() {
+  const data = await downloadApi('/api/downloads/sessions');
+  const container = document.getElementById('download-sessions');
+  container.replaceChildren();
+  for (const session of data.sessions) {
+    const row = document.createElement('p');
+    row.textContent = `${session.created_at} — ${session.revoked_at ? 'Revoked' : session.expires_at <= Date.now() ? 'Expired' : session.active ? 'Active' : 'Pending handshake'} `;
+    if (!session.revoked_at) {
+      const button = document.createElement('button'); button.className = 'btn btn-secondary'; button.textContent = 'Revoke';
+      button.addEventListener('click', async () => {
+        try { await downloadApi('/api/downloads/sessions', 'DELETE', { session_id: session.session_id }); await loadDownloadSessions(); }
+        catch (error) { showToast(error.message, 'error'); }
+      });
+      row.append(button);
+    }
+    container.append(row);
+  }
+  if (!data.sessions.length) container.textContent = 'No download sessions.';
+}
+document.getElementById('download-browser-enable').addEventListener('click', async () => {
+  try { await browseWithBudget(); } catch (error) { showToast(error.message, 'error'); }
+});
+await loadDownloadBudget();
 await Promise.all([loadSettings(), loadAuthorizations()]);

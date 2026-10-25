@@ -46,9 +46,9 @@ X-API-Key: hb_abcd1234...
 ```
 
 **API Key Format:**
-- Current: `hb_<32-alphanumeric-characters>`
-- Legacy formats (still supported): `hb_live_*` and `hb_test_*`
-- Total length: 35 characters (current format)
+- Current: `hb2_<base64url-route>.<43-character-secret>.<22-character-HMAC-tag>`
+- Legacy formats: `hb_<32-alphanumeric-characters>`, `hb_live_*` and `hb_test_*`
+- New keys route directly to UserProfile; the signed route contains user and key IDs.
 
 **Constraints:**
 - Maximum 25 API keys per user
@@ -66,7 +66,7 @@ Rate limits are enforced per authentication context:
 | Per API Key | 500 requests/minute (within user limit) |
 
 The content download host (`256t.us`) separately allows 30 requests per IP per
-minute. An HTTP 429 means the request was throttled, not that the content is
+minute for anonymous or exhausted identities. Confirmed funded content requests bypass this limit; see Funded downloads below. An HTTP 429 means the request was throttled, not that the content is
 missing. Bulk download and verification clients should wait for the `Retry-After`
 header, then retry the same CID. Error responses are not cacheable; HTTP 404
 indicates missing, deleted, or expired content.
@@ -592,3 +592,91 @@ curl -X GET https://hashbin.org/health
 
 - **Documentation**: [GitHub Repository](https://github.com/curtcox/hashbin.org)
 - **Issues**: [GitHub Issues](https://github.com/curtcox/hashbin.org/issues)
+
+
+### Cost safety and prepaid downloads
+
+Paid content includes a finite lifetime request allowance tied to its payments
+and reserved storage costs. Every 256t.us GET/HEAD, including a cache hit,
+consumes a reservation. Exhaustion returns 429 with Retry-After: 60. Counter
+unavailability returns 503. Successful responses expose X-Cache: HIT/MISS and
+are cached for at most one hour, bounded by expiry. Additional bandwidth
+purchases prepay finite requests at max($0.02/GiB, $4/million requests).
+
+Uploads accept 1–120 whole retention months. Extensions and donations cannot
+push outstanding retention beyond 10 years from today. Inline uploads are
+limited to 60 per account per UTC hour. Accounts under 30 days old may deposit
+at most $20 per checkout. The total card charge is
+ceil((credit_cents + 30) / 0.971); the existing $1 minimum credit remains.
+
+Admin endpoints require X-Admin-Token:
+
+- GET /api/admin/cost-safety: current monthly snapshot, projection, sampled top
+  files, stale-data flag and effective brake state.
+- POST /api/admin/cost-safety with {"brake":true} or {"brake":false}: latch or
+  release allowance-only service. The environment emergency switch takes priority.
+- GET /api/admin/cost-safety/history?limit=168: up to 1,000 hourly reports;
+  paginate using next_before as before. Reports are retained for 93 days.
+
+The admin page is /admin/costs.html. See [operator setup and policy](cost-safety.md)
+for analytics secrets, notification settings, thresholds, and remaining limits.
+
+## Funded downloads on 256t.us
+
+Downloads use the file's included or purchased allowance first. With an explicitly
+enabled account budget, and key/grant caps where applicable, the requester pays
+after that allowance runs out. The price for each GET, HEAD and cache hit is the
+greater of $4 per million requests and $0.02 per GiB of the size encoded in the CID.
+Amounts in budget spending fields are integer micro-cents (1 cent = 1,000,000 uc).
+Daily and monthly caps are whole cents, in UTC calendar windows.
+
+| Endpoint | Body / result |
+| --- | --- |
+| `GET /api/downloads/budget` | Account caps (`null` means off), key/grant caps, `spend`, `float_uc`, balance |
+| `PUT /api/downloads/budget` | `{ "account": { "daily_cap_cents": 25, "monthly_cap_cents": 200 } }`; use `account: null` to disable |
+| `PUT /api/auth/apikeys/:id/download-budget` | `{ "caps": { "daily_cap_cents": 10, "monthly_cap_cents": 100 } }`; `caps: null` disables |
+| `PUT /api/oauth/grants/:id/download-budget` | Same caps; the grant's existing monthly spending limit also applies |
+| `POST /api/downloads/sign` | `{ "cids": ["<cid>"], "expires_in": 3600 }`; 1–100 CIDs, expiry 1–604800 seconds; returns `urls: [{cid,url}]` and `expires_at` |
+| `POST /api/downloads/session` | `{ "cid": "<optional redirect CID>" }`; returns a 60-second handshake `url` to navigate to |
+| `GET /api/downloads/sessions` | Lists browser sessions and sessions backing account signed links |
+| `DELETE /api/downloads/sessions` | `{ "session_id": "..." }`; revokes within 60 seconds |
+
+Management endpoints require the account's Clerk session (LocalDev in local mode).
+Signed URL minting also accepts an API key or an OAuth token with `downloads:spend`.
+API keys and grants cannot increase their own or the account's caps. Account signed
+links use revocable sessions listed on the account page. Key/grant signed links spend
+from the minting key/grant and stop working when it is revoked. A valid credential
+whose budget cannot cover the request falls back to anonymous limits with
+`X-Budget: exhausted`.
+
+New API keys use `hb2_<route>.<random-secret>.<HMAC-tag>`. The route contains the
+account and key IDs. `POST /api/auth/apikeys` accepts optional `download_budget`
+with daily/monthly caps. Old `hb_` keys continue working on plain CID paths; rotate
+them to use the funded `/a/` path. Configure `DOWNLOAD_TOKEN_SECRET` before creating
+new keys. It must match across both Workers; changing it invalidates existing v2
+keys, signed links, and download sessions.
+
+- Header identity: `GET https://256t.us/a/<cid>[.ext]` with
+  `Authorization: ApiKey hb2_...`, `X-API-Key: hb2_...`, or
+  `Authorization: Bearer <OAuth-access-token>` with `downloads:spend`.
+- Signed link: `GET https://256t.us/s/<token>/<cid>[.ext]`. The signature binds the
+  CID and spending identity. Use these for cross-site embeds.
+- Browser identity: navigate to the handshake URL. It sets the HttpOnly, Secure,
+  SameSite=Lax, Path=/ `__Host-hb_dl` cookie for up to 30 days, then redirects to
+  `/a/<cid>`. Cookies work on direct navigation; credentialed CORS is not enabled.
+- `OPTIONS` supports GET/HEAD and `Authorization, X-API-Key` with wildcard origin.
+
+`X-Budget` is `file`, `funded`, `anon`, or `exhausted` and is exposed to CORS callers.
+Funded requests bypass the content Worker's per-IP and cost-brake limits. The strict
+no-429 promise requires the `/a/` or `/s/` WAF exemption described in
+[Cost safety](cost-safety.md). Plain paths remain subject to the zone WAF. Invalid
+credentials get 401; unavailable/deleted/expired files get 404, disputed files 451,
+and DO failures or the hard stop 503. Hashbin.org API limits are unchanged.
+
+Whole cents are debited into reusable spending credit as `download_spend`
+transactions. Leases consume this credit and reserve cap usage before delivery.
+Unreported lease remainders stay spent (up to 250 requests per outstanding lease;
+$0.001 at the minimum price, more for large files). Returned remainders restore
+credit and applicable caps. At UTC month rollover, whole cents of unused credit
+return as `download_refund`; a fractional cent stays available as spending credit.
+Cap changes and revocations apply on the next lease, within 60 seconds.

@@ -31,6 +31,7 @@ function makeEnv({ disputes, closeStatus = 200 }) {
         }
       })
     },
+    CONTENT_METADATA: { idFromName: name => name, get: () => ({ fetch: async () => Response.json({ success: true }) }) },
     CONTENT_BUCKET: { delete: bucketDelete }
   };
 

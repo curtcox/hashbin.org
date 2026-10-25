@@ -114,6 +114,7 @@ function createMockEnv(isAdmin = true) {
         })
       }))
     },
+    CONTENT_METADATA: { idFromName: name => name, get: () => ({ fetch: async () => Response.json({ success: true }) }) },
     CONTENT_BUCKET: {
       put: vi.fn(async () => undefined),
       delete: vi.fn(async () => undefined)
