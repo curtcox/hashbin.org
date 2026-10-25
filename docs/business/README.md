@@ -15,6 +15,10 @@ recalculate; **Share** gives a link holding your edits.
 | [Fixed costs][fixed] | What the fixed costs are, where each number comes from, and what they leave out | [fixed-costs.org](fixed-costs.org) |
 | [Price floor][floor] | The least HashBin can charge and still collect more than it pays Stripe and Cloudflare, counting every charge a customer can cause | [price-floor.org](price-floor.org) |
 
+What to change so HashBin never owes Stripe and Cloudflare more than it collects (prices,
+download allowances, caching, cost monitoring) is planned in
+[todo/cost_safety.md](../../todo/cost_safety.md).
+
 The `.org` files in this directory are the source of truth. The links open copies saved on
 HashBin on 2026-10-24 and kept until 2027-10-25; after changing a `.org` file, republish it with
 `node scripts/publish.mjs publish` (wrapped as a Sheets document) and update the link here.
