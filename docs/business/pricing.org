@@ -9,7 +9,7 @@ legal, tax, or insurance advice. Calc rule: =*= binds tighter than =/=, so write
 #+CONSTANTS: wReq=0.30 wFree=10 doReq=0.15 doFree=1 clerkFree=50000 clerkBase=25 clerkPer=0.02
 #+CONSTANTS: reqPerUpload=6 doPerUpload=10 cacheHit=0.5
 #+CONSTANTS: stripePct=0.029 stripeFix=0.30 disputeFee=15
-#+CONSTANTS: domainOrg=11 domainUs=8 dmca=2 agent=0 insurance=0 otherFixed=0
+#+CONSTANTS: domainOrg=11.20 domainUs=6.50 dmca=2 agent=0 insurance=0 otherFixed=0
 #+CONSTANTS: llcAssets=500
 
 * Inputs
@@ -31,13 +31,13 @@ legal, tax, or insurance advice. Calc rule: =*= binds tighter than =/=, so write
 | Stripe percentage                             |     0 | fraction         | stripe.com/pricing                             |
 | Stripe fixed fee                              |     0 | $                | same                                           |
 | Stripe dispute fee                            |     0 | $                | same                                           |
-| hashbin.org renewal                           |     0 | $/year           | guess; check registrar invoice                 |
-| 256t.us renewal                               |     0 | $/year           | guess; check registrar invoice                 |
+| hashbin.org renewal                           |     0 | $/year           | Cloudflare Registrar, checked 2026-10-24       |
+| 256t.us renewal                               |     0 | $/year           | Cloudflare Registrar, checked 2026-10-24       |
 | DMCA agent ($6 per 3 years)                   |     0 | $/year           | copyright.gov/dmca-directory                   |
 | Registered agent                              |     0 | $/year           | 0 if you act as your own                       |
 | Insurance                                     |     0 | $/year           | 0 = none; see the legal sheet             |
 | Money the LLC holds (what a judgment can reach) |   0 | $                | ≈ the reserve                                  |
-#+TBLFM: @2$2=$price::@3$2=$depositSize::@4$2=$passThrough::@5$2=$lossBudget::@6$2=$workersBase::@7$2=$r2::@8$2=$r2Free::@9$2=$wReq::@10$2=$clsB::@11$2=$clerkFree::@12$2=$stripePct::@13$2=$stripeFix::@14$2=$disputeFee::@15$2=$domainOrg::@16$2=$domainUs::@17$2=$dmca::@18$2=$agent::@19$2=$insurance::@20$2=$llcAssets
+#+TBLFM: @2$2=$price::@3$2=$depositSize::@4$2=$passThrough::@5$2=$lossBudget::@6$2=$workersBase::@7$2=$r2::@8$2=$r2Free::@9$2=$wReq::@10$2=$clsB::@11$2=$clerkFree::@12$2=$stripePct::@13$2=$stripeFix::@14$2=$disputeFee::@15$2=$domainOrg;%.2f::@16$2=$domainUs;%.2f::@17$2=$dmca::@18$2=$agent::@19$2=$insurance::@20$2=$llcAssets
 
 * 1. Unit economics
 

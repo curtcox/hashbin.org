@@ -9,7 +9,7 @@ legal, tax, or insurance advice. Calc rule: =*= binds tighter than =/=, so write
 #+CONSTANTS: wReq=0.30 wFree=10 doReq=0.15 doFree=1 clerkFree=50000 clerkBase=25 clerkPer=0.02
 #+CONSTANTS: reqPerUpload=6 doPerUpload=10 cacheHit=0.5
 #+CONSTANTS: stripePct=0.029 stripeFix=0.30 disputeFee=15
-#+CONSTANTS: domainOrg=11 domainUs=8 dmca=2 agent=0 insurance=0 otherFixed=0
+#+CONSTANTS: domainOrg=11.20 domainUs=6.50 dmca=2 agent=0 insurance=0 otherFixed=0
 #+CONSTANTS: llcAssets=500
 
 * Reserve: cash to keep in the LLC's account

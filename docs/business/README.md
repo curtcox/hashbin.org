@@ -4,7 +4,7 @@ Written 2026-10-24 for a loss budget of about **$500 a year**, with the owner in
 umbrella policy. This is research to plan with. It is not legal, tax, or insurance advice; the
 two places where a lawyer's hour is worth paying for are marked.
 
-The numbers live in three Sheets documents. Edit any input in the Source pane and the tables
+The numbers live in four Sheets documents. Edit any input in the Source pane and the tables
 recalculate; **Share** gives a link holding your edits.
 
 | Sheet | What it answers | Source |
@@ -12,6 +12,7 @@ recalculate; **Share** gives a link holding your edits.
 | [Legal structure, risk, insurance][legal] | LLC or not, what could go wrong, which insurance | [legal-and-insurance.org](legal-and-insurance.org) |
 | [Pricing and scenarios][pricing] | What to charge, card fees, a year at several sizes, break-even | [pricing.org](pricing.org) |
 | [Cash reserve][reserve] | How much cash to keep | [reserve.org](reserve.org) |
+| [Fixed costs][fixed] | What the fixed costs are, where each number comes from, and what they leave out | [fixed-costs.org](fixed-costs.org) |
 
 The `.org` files in this directory are the source of truth. The links open copies saved on
 HashBin on 2026-10-24 and kept until 2027-10-25; after changing a `.org` file, republish it with
@@ -51,10 +52,11 @@ HashBin on 2026-10-24 and kept until 2027-10-25; after changing a `.org` file, r
 
 **Keep $0.03/GB-month for storage and keep downloads free. Change four things around them.**
 
-Fixed costs are about **$81 a year**: Workers Paid at $60, domains at about $19, and the DMCA
-agent at $2. Clerk is free up to 50,000 monthly retained users. At $0.03 you keep about $0.013 per
-GB-month after R2 and the card fee, so holding **about 512 GB of paid storage all year breaks
-even**. Below that, the loss is under $81, well within budget (pricing sheet, sections 3–4). The
+Fixed costs are about **$80 a year** ($79.70): Workers Paid at $60, domain renewals at $17.70,
+and the DMCA agent at $2 ([fixed-costs sheet][fixed]). Clerk is free up to 50,000 monthly
+retained users. At $0.03 you keep about $0.013 per GB-month after R2 and the card fee, so holding
+**about 504 GB of paid storage all year breaks even**. Below that, the loss is under $80, well
+within budget (pricing sheet, sections 3–4). The
 "Growing" scenario (1,000 paid GB) nets about **+$80 a year**, and "Busy" (20,000 GB) nets about
 **+$2,900**.
 
@@ -141,7 +143,7 @@ for the same limits.
 Recorded, not yet fixed, in the Sheets repository:
 `design/field-report-hashbin-money-model.md` (linked from its PLAN.md under "Field reports").
 
-The model is split into three sheets because a single 17 KB document made a link GitHub Pages
+The model is split into several sheets because a single 17 KB document made a link GitHub Pages
 rejects. Saving to HashBin is the intended answer for large documents; I split it only because
 saving needs your signed-in account. The other gaps: no inputs shared across documents, constants
 hidden in the preview, no `if()` or comparisons in Org formulas, the `a/b*c` precedence trap,
@@ -164,6 +166,7 @@ long for a link fails, and the text is lost unless it was saved to HashBin.
 - Insurance prices: [QuoteSweep](https://www.quotesweep.com/blog/tech-startup-insurance-cost), [Insureon tech E&O](https://it.insureon.com/small-business-insurance/eo/cost), [Secureframe cyber](https://secureframe.com/blog/cyber-insurance-costs), [Insureon media](https://www.insureon.com/media-business-insurance/cost)
 - Lawyer flat-fee review: [ContractsCounsel](https://www.contractscounsel.com/b/website-terms-of-service-and-privacy-policy-review-cost)
 
-[legal]: https://curtcox.github.io/sheets/#AAAAABreoY9Z8j2nzY_F8Z_1CmxWKI1smX7h6Caxe-sMTeZwu95yqnRr5H8LMFVcJ72o5ylCjn-5Vjou84usQqvs2LnMRQ
-[pricing]: https://curtcox.github.io/sheets/#AAAAACWWyMdR072LuZt2k2BtjS9ftGHZZ76TDAmai1NIqYz-8EXJAAuyHVXupIZbvNxa7dF4vLPond5z3zh1sYqrBKafRw
-[reserve]: https://curtcox.github.io/sheets/#AAAAAAqtp3XZfsnPWUQbzP0N4C02TkzGKZ4tzSDt-PXl7N5nyzQzA8UczlZm0GPd3rdFh5A2YxSTXSH76xGt_hm3iTMYZg
+[legal]: https://curtcox.github.io/sheets/#AAAAABrpEFomNngIc8qPlngN-d9m2-v5pQVXoJxTJId5GzwlxGZ2H-54tGK31lOGequdN0rNmmcGj7rQ1Co1i6k9YDI6ng
+[pricing]: https://curtcox.github.io/sheets/#AAAAACWmhcqG6IBSCDuD9iXMJUIY_EZLojPuq0gDqgGrG9ECf8S3rp7q5_xtYmfl0Zh6McEx8hXR6QvUY2qBfa4xqiCU1w
+[reserve]: https://curtcox.github.io/sheets/#AAAAAAqzlWh391fy5fKEJ-DHmirUJ94U4JlxDm2sevsUQtEYBo0kVBJ7O01IAvoF8rWL1q8Ot0ozMNIvOquk1AJvsTNkMg
+[fixed]: https://curtcox.github.io/sheets/#AAAAABt92_XhJo04Xw3Ate2pnIl1_dNPCzyTH9skYvnHaxrXDOxmLeRWm0FllRWsNRZG2kA2QdKyeyCfb4gMBiMby0dpYQ

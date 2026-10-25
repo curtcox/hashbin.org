@@ -1,0 +1,73 @@
+#+TITLE: HashBin: fixed costs
+
+Fixed costs are what you pay to keep HashBin running even if nobody uploads anything. The other
+sheets use them for break-even, scenarios and the reserve. This sheet shows each piece, where its number came from,
+and what it leaves out. Every number is an input: the =#+CONSTANTS:= lines in the source and the
+input columns of each table. Prices checked 2026-10-24. Calc rule: =*= binds tighter than =/=.
+
+#+CONSTANTS: price=0.03 depositSize=10 lossBudget=500 r2=0.015 stripePct=0.029 stripeFix=0.30
+#+CONSTANTS: workersBase=5 domainOrg=11.20 domainUs=6.50 dmca=2 agent=0 insurance=0 otherFixed=0
+#+CONSTANTS: domainOrgGuess=11 domainUsGuess=8 dmcaFee=6 dmcaYears=3
+
+* 1. Fixed costs, line by line
+
+"Now" is what the pricing, legal and reserve sheets use. The first version of those sheets said
+$81 because the two domain renewals were guesses ($11 and $8, the "Earlier guess" column). Both
+domains are registered with Cloudflare, which sells at cost, and their real renewals add up to
+$1.30 less.
+
+#+NAME: fixed
+| Cost                    | How it's billed               | Earlier guess ($/yr) | Now ($/yr)     | Difference | Where the number comes from                                              |
+|-------------------------+-------------------------------+---------------------+----------------+------------+--------------------------------------------------------------------------|
+| Cloudflare Workers Paid | $5 a month, minimum charge    |                    0 |              0 |          0 | developers.cloudflare.com/workers/platform/pricing                       |
+| hashbin.org renewal     | yearly, renews 2027-01-12     |                    0 |              0 |          0 | Cloudflare Registrar sells at cost; .org renews at $11.20                |
+| 256t.us renewal         | yearly, renews 2027-03-31     |                    0 |              0 |          0 | Cloudflare Registrar; .us renews at $6.50                                |
+| DMCA agent designation  | $6 every 3 years              |                    0 |              0 |          0 | copyright.gov/dmca-directory                                             |
+| Registered agent        | $0 if you act as your own     |                    0 |              0 |          0 | Missouri lets a member be the LLC's agent; a service is about $100/yr    |
+| Insurance               | none                          |                    0 |              0 |          0 | the legal sheet's recommendation; a bundle is about $2,500/yr            |
+| Other                   | none                          |                    0 |              0 |          0 | room for anything you add                                                |
+| Total                   |                               |                    0 |              0 |          0 |                                                                          |
+#+TBLFM: @2$3=12*$workersBase;%.2f::@3$3=$domainOrgGuess;%.2f::@4$3=$domainUsGuess;%.2f::@5$3=$dmca;%.2f::@6$3=$agent;%.2f::@7$3=$insurance;%.2f::@8$3=$otherFixed;%.2f::@2$4=12*$workersBase;%.2f::@3$4=$domainOrg;%.2f::@4$4=$domainUs;%.2f::@5$4=$dmcaFee/$dmcaYears;%.2f::@6$4=$agent;%.2f::@7$4=$insurance;%.2f::@8$4=$otherFixed;%.2f::@>$3=vsum(@2..@-1);%.2f::@>$4=vsum(@2..@-1);%.2f::$5=$4-$3;%.2f
+
+* 2. What fixed costs leave out, and why
+
+These grow with use or happen only once, so they aren't fixed yearly costs. The ones that grow
+with use are in the pricing sheet's per-GB margin and scenarios instead.
+
+#+NAME: excluded
+| Cost                        | Price                                          | Why it isn't a fixed cost                                                         |
+|-----------------------------+------------------------------------------------+---------------------------------------------------------------------------------|
+| R2 storage                  | $0.015/GB-month after 10 GB free               | Grows with what users store. You charge $0.03, so it's paid from revenue.        |
+| Worker and R2 requests      | included: 10M requests, 1M DO requests a month | Workers Paid covers normal traffic. Only a viral file goes past it (STATUS B9).  |
+| Stripe fees                 | 2.9% + $0.30 per deposit                       | Charged only when someone pays you. Taken out of the margin.                    |
+| Clerk sign-in               | $0 up to 50,000 monthly retained users         | Free at any size you're likely to reach soon.                                   |
+| Forming the LLC             | $50 once                                       | One-time. Missouri has no annual report or yearly LLC fee.                      |
+| Lawyer reviews the Terms    | about $760 once                                | Optional and one-time (legal sheet, section 1).                                 |
+| Your time                   | not priced                                     | The model counts only money you pay out.                                        |
+
+* 3. What the fixed costs mean
+
+Margin is what you keep from each paid GB-month after R2 and the card fee on a typical deposit.
+"Paid GB to cover it" is how much storage users must pay for all year for HashBin to break even.
+
+#+NAME: meaning
+| Measure                            | Earlier ($81) | Now     | Unit            |
+|------------------------------------+---------------+---------+-----------------|
+| Fixed costs                        |             0 |       0 | $/year          |
+| Per month                          |             0 |       0 | $/month         |
+| Share of your $500 loss budget     |             0 |       0 | %               |
+| Margin per paid GB-month           |             0 |       0 | $/GB-month      |
+| Paid GB to cover it                |             0 |       0 | GB, all year    |
+#+TBLFM: @2$2=remote(fixed,@>$3);%.2f::@2$3=remote(fixed,@>$4);%.2f::@3$2=@2$2/12;%.2f::@3$3=@2$3/12;%.2f::@4$2=100*(@2$2/$lossBudget);%.1f::@4$3=100*(@2$3/$lossBudget);%.1f::@5$2=($price*(1-((($stripePct*$depositSize)+$stripeFix)/$depositSize)))-$r2;%.4f::@5$3=@5$2;%.4f::@6$2=ceil(@2$2/(12*@5$2))::@6$3=ceil(@2$3/(12*@5$3))
+
+* 4. Could the $60 go away?
+
+Workers Paid is three-quarters of the total. HashBin's Durable Objects all use SQLite storage,
+which the free Workers plan allows, so the site might run on the free plan for about $20 a year.
+The free plan also can't bill you more: past its limits, requests fail instead.
+
+The catch is the free plan's limits: 100,000 requests a day and 10 ms of CPU per request. Hashing
+a large upload can take more than 10 ms, and one popular link can use up 100,000 requests in an
+afternoon, taking the whole site down until the next day. That's fine while only friends are
+testing, and wrong for a public launch. This hasn't been tested; try uploads on a free-plan
+preview before relying on it.

@@ -9,7 +9,7 @@ legal, tax, or insurance advice. Calc rule: =*= binds tighter than =/=, so write
 #+CONSTANTS: wReq=0.30 wFree=10 doReq=0.15 doFree=1 clerkFree=50000 clerkBase=25 clerkPer=0.02
 #+CONSTANTS: reqPerUpload=6 doPerUpload=10 cacheHit=0.5
 #+CONSTANTS: stripePct=0.029 stripeFix=0.30 disputeFee=15
-#+CONSTANTS: domainOrg=11 domainUs=8 dmca=2 agent=0 insurance=0 otherFixed=0
+#+CONSTANTS: domainOrg=11.20 domainUs=6.50 dmca=2 agent=0 insurance=0 otherFixed=0
 #+CONSTANTS: llcAssets=500
 
 * 1. Legal structure: what each option costs
@@ -27,7 +27,7 @@ Columns 2, 6 and 7 are inputs. Workers, domains and DMCA come from the constants
 | MO LLC + general liability only         |    50 |       0 |       0 |    0 |     0 |       400 |      0 |           0 | Same; GL rarely covers content claims    |
 | MO LLC + tech E&O, cyber, media bundle  |    50 |       0 |       0 |    0 |     0 |      2500 |      0 |           0 | Same, plus insurer pays defense          |
 | Wyoming LLC registered in Missouri      |   205 |       0 |       0 |    0 |   110 |         0 |      0 |           0 | Same as MO LLC, costs more               |
-#+TBLFM: $3=12*$workersBase::$4=$domainOrg+$domainUs::$5=$dmca::$8=$2+$3+$4+$5+$6+$7;%.2f::$9=$3+$4+$5+$6+$7;%.2f
+#+TBLFM: $3=12*$workersBase::$4=$domainOrg+$domainUs;%.2f::$5=$dmca::$8=$2+$3+$4+$5+$6+$7;%.2f::$9=$3+$4+$5+$6+$7;%.2f
 
 * 2. Risks: what could go wrong in a year
 
