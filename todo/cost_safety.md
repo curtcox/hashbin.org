@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase:** Code implemented 2026-10-24; deployment, owner dashboard setup and live
+**Phase:** Code implemented 2026-10-24, hardened 2026-10-25; deployment, owner dashboard setup and live
 acceptance checks remain. See `docs/cost-safety.md` for the implemented policy,
 operator runbook, defaults, proposal changes, and financial limits.
 Measurements/simulation remain pending production evidence.
@@ -16,6 +16,44 @@ The absolute no-loss goal below remains an aspiration: refused Worker requests
 and distributed free traffic remain billable without an upstream spending cap.
 **Rows:** L22, S20–S22 in `STATUS.md`; also touches L20, S17, S18, B9.
 **Numbers:** `docs/business/price-floor.org` (the price-floor sheet). Prices checked 2026-10-24.
+
+Follow-up implementation (2026-10-25): per-file analytics now includes HTTP
+401/404/429/451/503 responses, including per-IP refusals and delivery exceptions,
+so refused traffic can appear in hourly top-file alerts. Each request is sampled
+once, preserving cache-hit, payer and funded lease-cost attribution. Continuous
+budget traffic also preserves the earliest accounting alarm so earned revenue
+cannot be indefinitely delayed by new requests. See `docs/cost-safety.md`.
+
+Further implementation (2026-10-25): unused funded credit survives rejected
+renewals, lease retry receipts are atomic and expire through bounded alarm
+cleanup, and revoked/abandoned browser sessions free capacity. Native workerd
+acceptance caught and now covers cross-request promise cancellation in bursts.
+The funded cost model and price-floor table include receipt/index/cleanup work
+(8 DO requests, 20 row reads and 24 row writes per lease as planning assumptions).
+568 unit tests pass (2 skipped); the native burst serves exactly 2,500 requests
+for a one-cent cap and records its debit through the accounting alarm. Production
+calibration and live operator setup remain pending.
+
+Accounting events now persist as ordered rows outside the profile, with bounded
+alarm delivery and transactional acknowledgement. Receipt cleanup and delivery
+continue independently through outages. The monitor also retains successful
+top-file/funded-total analytics when the other query fails, and rejects malformed
+funded metric columns while preserving cost snapshots and the brake.
+
+The safety protocol now validates both boolean switches for file reservations
+and deliveries; missing bindings outside local mode and invalid/unavailable
+shared state produce 503 before allowance or balance spending. Direct and signed
+requests for the same spending identity/price share their paid lease, preserving
+credential checks while avoiding duplicate reservations at exhausted caps.
+
+Month-boundary monitoring now refreshes the complete previous month during the
+first two UTC days, recovers known incomplete snapshots after longer outages,
+and updates original-month revenue for delayed funded-credit returns. Completed
+reports replace costs rather than adding them, retain separate history cursors,
+and can latch the brake without replacing the active dashboard report. Their
+alerts identify the month and final-hour files; backfill failures do not stop
+the current run. Regression tests cover exact/leap/year boundaries, final-hour
+bursts, corrections, net funded revenue, pagination and partial failures.
 
 ## The goal and the rule that gets there
 

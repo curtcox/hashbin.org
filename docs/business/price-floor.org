@@ -240,17 +240,19 @@ Calibration and heavy-tail simulation remain pending one and two months of
 production data respectively. Hourly reports retain 93 days and can be exported
 through =GET /api/admin/cost-safety/history=.
 
-* Identified downloads (B11, 2026-10-24)
+* Identified downloads (B11, updated 2026-10-25)
 Price is max($4/M requests, $0.02/GiB/request). All values below are dollars.
-The conservative lease coordination estimate is 6 DO requests, 6 row reads and
-6 row writes per lease, amortized over its requests. This excludes fixed costs.
+The planning allowance is 8 DO requests, 20 row reads and 24 row writes per
+lease, amortized over its requests. It includes receipt lookups, expiry indexing
+and cleanup, the balance transaction, and lease/return revenue events. These are
+operation-count assumptions awaiting production calibration, excluding fixed costs.
 
 | File | Requests/lease | Price/request | Cost/request | Kept margin/request | Max unreported lease charge |
 |------+----------------+---------------+--------------+---------------------+-----------------------------|
-| 100 B | 1 | 0.00000400 | 0.00000815 | -0.00000447 | 0.001000 |
-| 100 B | 250 | 0.00000400 | 0.00000127 | 0.00000241 | 0.001000 |
-| 1 GiB | 1 | 0.02000000 | 0.00000815 | 0.01839185 | 5.000000 |
-| 1 GiB | 250 | 0.02000000 | 0.00000127 | 0.01839873 | 5.000000 |
+| 100 B | 1 | 0.00000400 | 0.00002646 | -0.00002278 | 0.001000 |
+| 100 B | 250 | 0.00000400 | 0.00000134 | 0.00000234 | 0.001000 |
+| 1 GiB | 1 | 0.02000000 | 0.00002646 | 0.01837354 | 5.000000 |
+| 1 GiB | 250 | 0.02000000 | 0.00000134 | 0.01839866 | 5.000000 |
 
 Full leases have positive marginal margin at the floor. Cold singleton requests
 can lose money: the adaptive design is not a universal margin guarantee. The

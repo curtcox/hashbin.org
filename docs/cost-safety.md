@@ -62,12 +62,37 @@ buckets on Standard: Infrequent Access retrieval/storage is outside this table. 
 uses daily maximum bytes. Required dataset errors, missing fields, unpriced
 operation types or truncated results raise `cost_monitor_unavailable` without
 overwriting the last good snapshot. Download attribution failure raises its own
-alert and leaves cost snapshots/brake running. Verify full-month access on the account.
+alert and leaves cost snapshots/brake running. Top-file and funded-total queries
+are independent: either successful result survives failure of the other. Missing
+or malformed funded metric columns raise an attribution error; all-null SUM
+aggregates represent an empty sample window. Verify full-month access on the account.
+
+During the first two UTC days of each month, the monitor also re-queries the
+complete previous month through its exact midnight boundary. This captures its
+final hour and late analytics without adding cumulative usage twice. A known
+incomplete prior snapshot is recovered after longer outages, subject to dataset
+retention/access. Outside that correction window, the immediately previous
+month's ledger revenue is still checked: delayed funded-credit returns update
+its report without re-querying historical usage. Verify previous-month as well
+as current-month access on the production account.
+
+Completed-month reports use their own period's revenue, storage-month length,
+usage cutoff and billing-day spike baseline. They never replace the active
+dashboard report or make a failed live run appear fresh. Their costs replace
+the prior period total transactionally, and their thresholds can still latch
+the shared brake. Alerts use `closed_month_` type prefixes and include the
+period, preserving current-month alert delivery in the same hourly run.
+Backfill failures alert independently while current monitoring continues.
 
 InfrastructureCost replaces cumulative MTD snapshots transactionally, rather
 than counting them twice, and retains hourly reports for 93 days. PlatformStats
 tracks monthly earned revenue and hourly deposit/upload counts. Historical
 revenue is not guessed/backfilled; the first partial month is conservative.
+History includes completed-month reports with `closed_month: true`, `period`,
+`usage_end` (the billing cutoff), and `recorded_at` (observation time). Current
+reports have `closed_month: false` and equal cutoff/observation times. Pass
+pagination cursors back unchanged; reports for different periods can share an
+observation hour and have distinct cursor suffixes.
 AlertStore provides existing webhook delivery and hourly deduplication:
 
 - Costs exceed 92% of monthly earned revenue plus the fixed $7.01 budget.
@@ -77,7 +102,10 @@ AlertStore provides existing webhook delivery and hourly deduplication:
 
 The content Worker samples 1% of valid-file requests to `hashbin_downloads`.
 Points carry weight 100; SQL also multiplies by `_sample_interval`. Top-file
-reports show HTTP status, including refusals. Counts are estimates, not billing
+reports show HTTP status, including refusals. Sampling happens once after the
+delivery attempt, including per-IP/allowance refusals, bad credentials and
+delivery exceptions for recognized CID paths. Funded charges and lease overhead
+remain attributed when an attempt fails after spending. Counts are estimates, not billing
 counters. Analytics Engine currently does not bill; its published future rates
 are $0.25/M writes beyond 10M and $1/M reads beyond 1M. At 1% sampling writes add
 $0.0025/M content requests before included usage; review when billing changes.
@@ -170,6 +198,13 @@ and automatic cost brake continue to constrain anonymous traffic. Confirmed fund
 identities bypass them and the Worker's 30/minute per-IP limit; junk credentials
 on protected paths are rejected locally without any DO call.
 
+Deliveries and stored-file reservations share `readCostSafety`: a missing
+`INFRASTRUCTURE_COST` binding outside explicit local mode, a failed request, or
+missing/non-boolean `hard_stop` and `brake` fields returns 503 before spending or
+reserving allowance. Invalid state is not cached as permission to serve. A local
+emergency hard stop still takes priority without contacting the shared service.
+The content Worker's valid safety cache retains its existing 60-second TTL.
+
 Replace the **single zone WAF rate rule's matching expression** with:
 
 ```text
@@ -211,9 +246,57 @@ at UTC midnight when that comes first. The Worker returns idle remainders after
 lifetime; renewal also returns remainders. Eviction or a failed return leaves the
 lease spent. An accounting outbox commits with the balance and retries through a
 DO alarm. PaymentRecord and PlatformStats deliveries are idempotent. Revenue is
+delivered on the earliest scheduled accounting alarm; new budget reads/checks
+and leases cannot postpone an existing alarm under continuous traffic. Revenue is
 recognized when credit is leased, reversed for returned requests, and attributed
 to the original UTC month. Rollover refunds whole cents of float; fractional cents
 remain reusable credit because balances use whole cents.
+
+Pending accounting events are separate, sequence-ordered storage rows, committed
+in the same atomic batch as the profile and lease receipts. An outage no longer
+makes the profile grow with its entire accounting history. Legacy profile arrays
+migrate in batches of at most 120 events, within the 128-entry storage put limit.
+Each alarm delivers at most 16 events and checks a one-second work budget between
+deliveries; individual dispatches carry a five-second abort signal. A transaction
+acknowledges the delivered prefix and removes its rows. Failed acknowledgements
+replay through the recipients' idempotency checks. Remaining batches run after
+one second, delivery failures retry after one minute, and receipt cleanup proceeds
+independently. A cleanup failure likewise cannot stop accounting batches.
+
+Lease receipts live in separate storage rows with a timestamp index, retained
+until 24 hours after lease expiry. An atomic batch write commits the profile,
+receipt and expiry index together. Returned receipts prevent an allocation retry
+from charging again; retrying an ID with a changed price/request count is rejected.
+Remainders commit even when a renewal is refused for revocation, invalid renewal
+parameters or the hard stop. Legacy profile receipts remain readable and migrate
+on return. The accounting alarm prunes at most 64 receipts per run (128 deleted
+keys), schedules the next expiry, and leaves unreported leases spent. The storage
+behavior follows Cloudflare's [atomic batch storage API](https://developers.cloudflare.com/durable-objects/api/legacy-kv-storage-api/).
+
+Browser session creation prunes revoked sessions, expired sessions and abandoned
+60-second handshakes before enforcing the 100-session limit. Active sessions
+retain their full lifetime. Session lookup rejects inherited object properties.
+
+For a valid credential, an active lease's unused requests confirm funding until that lease's
+original expiry. They already count against the account's caps and balance, so
+a separate funding check may correctly find no unreserved money while those
+requests remain paid. This avoids spurious 429s when an older confirmation
+expires, without extending the lease or the 60-second revocation window.
+
+Direct credentials and signed URLs for the same account/key/grant/session and
+request price share one lease. Credential proofs remain separately checked
+(including key hash and OAuth app ID), and revalidation may revoke access before
+the lease ends. A shared lease cannot authorize a bad credential or pay a higher
+request price. This also avoids duplicate reservations and false exhaustion when
+the caller switches between a direct key and its signed URL at a fully reserved cap.
+
+The content Worker coordinates file reservations, funding checks and leases with
+request-owned scheduler waits and shared plain state. It keeps delivery work in
+waitUntil and removes timed-out/canceled waiters. Shared promise chains and shared
+resolvers can be canceled under Cloudflare's
+[cross-request promise handling](https://developers.cloudflare.com/workers/configuration/compatibility-flags/#handle-cross-request-promise-resolution-correctly).
+The production compatibility behavior stays enabled; the native acceptance test
+below exercises this separately from the Node unit suite.
 
 Analytics adds a payer blob (`funded`, `file`, `anon`) and estimated price/lease
 coordination cost. The hourly monitor alerts when sampled funded delivery cost
@@ -223,3 +306,37 @@ than the $4/M floor. This is a real limitation of the adaptive design, not a
 profit guarantee. Idle/unreported leased requests still count toward the caps;
 250 outstanding requests cost $0.001 only at the minimum price (a 1 GiB file costs
 $5 for that many requests). See the identified rows in `scripts/cost-safety-model.js`.
+
+The lease coordination planning allowance is now 8 DO requests, 20 row reads and
+24 row writes per lease, including receipts, expiry indexing/cleanup, the balance
+transaction and lease/return revenue events. These assumptions still need invoice
+calibration. Full-lease and singleton margins are regenerated in the price-floor sheet.
+
+## Native local acceptance
+
+Start the main and content Workers in separate terminals, using matching
+**local-only** test secrets:
+
+```bash
+npx wrangler dev --config wrangler.local.toml --local --port 8787 --persist-to /tmp/hashbin-funded-main --var DOWNLOAD_TOKEN_SECRET:local-test-only --var OAUTH_SIGNING_KEY:local-oauth-test-only
+```
+
+```bash
+npx wrangler dev --config workers/256t-content/wrangler.local.toml --local --port 8788 --persist-to /tmp/hashbin-funded-content --var DOWNLOAD_TOKEN_SECRET:local-test-only --var OAUTH_SIGNING_KEY:local-oauth-test-only
+```
+
+Wait until the content Worker's DO bindings show connected, then run:
+
+```bash
+npm run test:api:funded
+```
+
+`BASE_URL` and `CONTENT_BASE_URL` override the local ports. The script refuses
+non-loopback URLs and checks that the main Worker uses local authentication.
+It exercises 2,500 funded GET/HEAD/signed requests with the content brake on,
+mixes direct and signed requests after the entire cap is reserved, checks the
+exact one-cent cap and subsequent exhaustion, and checks transaction
+delivery from the real accounting alarm. Inline content avoids sharing an R2
+emulator between processes; stored-file allowances, caching and takedowns retain
+their unit coverage and require the live acceptance above. No live WAF behavior
+is inferred from this local check.

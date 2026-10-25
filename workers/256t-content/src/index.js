@@ -1,4 +1,5 @@
 import { parseIdentity, confirmedFunding, takeFundedDownload, hardStopped, handshake } from './funding.js';
+import { exclusive } from './mutex.js';
 import { COST_POLICY, identifiedDownloadPriceUc, FUNDED_LEASE_COST_DOLLARS } from '../../../src/utils/cost-policy.js';
 const CID_PATTERN = /^([A-Za-z0-9_-]{8,94})(?:\.([a-zA-Z0-9]+))?$/;
 const INLINE_CONTENT_THRESHOLD = 64;
@@ -18,41 +19,29 @@ async function takeDownload(env, cid, funded = false) {
   let budgets = budgetsByEnv.get(env);
   if (!budgets) { budgets = new Map(); budgetsByEnv.set(env, budgets); }
   let lease = budgets.get(budgetKey);
-  if (!lease || lease.pending || lease.expires_at <= Date.now()) {
-    if (!lease?.pending) {
-      trim(budgets);
-      lease = { pending: env.CONTENT_METADATA.get(env.CONTENT_METADATA.idFromName(cid))
-        .fetch(new Request(`https://internal/download/reserve${funded ? '?funded=true' : ''}`, { method: 'POST' }))
-        .then(async response => ({ ...(await response.json()), status: response.status })) };
-      budgets.set(budgetKey, lease);
-    }
-    try {
-      const result = await lease.pending;
-      if (!Number.isInteger(result.count) || result.count < 0 || result.count > COST_POLICY.leaseSize ||
-        (result.count > 0 && (!Number.isFinite(result.expires_at) || result.expires_at <= Date.now() ||
-          result.expires_at > Date.now() + COST_POLICY.leaseSeconds * 1000))) {
-        throw new Error('Invalid download reservation');
+  if (!lease) { trim(budgets); lease = {}; budgets.set(budgetKey, lease); }
+  return exclusive(lease, async () => {
+    if (!lease.expires_at || lease.expires_at <= Date.now()) {
+      try {
+        const response = await env.CONTENT_METADATA.get(env.CONTENT_METADATA.idFromName(cid))
+          .fetch(new Request(`https://internal/download/reserve${funded ? '?funded=true' : ''}`, { method: 'POST' }));
+        const result = { ...await response.json(), status: response.status };
+        if (!Number.isInteger(result.count) || result.count < 0 || result.count > COST_POLICY.leaseSize ||
+          (result.count > 0 && (!Number.isFinite(result.expires_at) || result.expires_at <= Date.now() ||
+            result.expires_at > Date.now() + COST_POLICY.leaseSeconds * 1000))) {
+          throw new Error('Invalid download reservation');
+        }
+        Object.assign(lease, result, { expires_at: result.expires_at || Date.now() + 60000 });
+      } catch {
+        Object.assign(lease, { count: 0, status: 503, expires_at: Date.now() + 60000 });
+        return 503;
       }
-      // Only the first waiter installs the shared object. Every waiter consumes
-      // that same object synchronously, preventing duplicate use of reservations.
-      if (budgets.get(budgetKey) === lease) {
-        budgets.set(budgetKey, { ...result, expires_at: result.expires_at || Date.now() + 60000 });
-      }
-      lease = budgets.get(budgetKey);
-    } catch {
-      budgets.set(budgetKey, { count: 0, status: 503, expires_at: Date.now() + 60000 });
-      return 503;
     }
-  }
-  if (!lease.count) {
-    // Another waiter can consume the last local request while this one awaits.
-    // Ask the file again before charging an identity: there may be more allowance.
-    if (lease.status < 400 && lease.expires_at === 0) return takeDownload(env, cid, funded);
-    return lease.status >= 400 ? lease.status : 429;
-  }
-  lease.count -= 1;
-  if (!lease.count) lease.expires_at = 0;
-  return null;
+    if (!lease.count) return lease.status >= 400 ? lease.status : 429;
+    lease.count -= 1;
+    if (!lease.count) lease.expires_at = 0;
+    return null;
+  });
 }
 
 function sampleDownload(env, cid, status, cacheHit, payer = 'anon', price = 0, newLease = false) {
@@ -195,6 +184,7 @@ async function serveContent(request, env, cid, extension = null, ctx = null, ide
   if (await hardStopped(env)) return textResponse(503, 'Downloads temporarily stopped', { 'Retry-After': '60' });
   const inline = isInlineContent(cid);
   const price = identifiedDownloadPriceUc(decodeLengthPrefix(cid.slice(0, 8)));
+  payment.price = price;
   const confirmation = identity ? await confirmedFunding(env, identity, price) : null;
   if (confirmation?.invalid) { enforceRateLimit(request); return textResponse(401, 'Invalid download identity'); }
   if (!confirmation?.funded) {
@@ -234,7 +224,7 @@ async function serveContent(request, env, cid, extension = null, ctx = null, ide
   const hit = await cache?.match(cacheKey);
   const validUntil = Number(hit?.headers.get('X-Cache-Until') || 0);
   if (hit && validUntil > Date.now()) {
-    sampleDownload(env, cid, 200, true, payment.analyticsPayer || (payment.payer === 'exhausted' ? 'anon' : payment.payer), price, payment.newLease);
+    payment.cacheHit = true;
     const headers = new Headers(hit.headers);
     headers.set('X-Cache', 'HIT');
     headers.set('Cache-Control', `public, max-age=${Math.max(0, Math.floor((validUntil - Date.now()) / 1000))}`);
@@ -256,7 +246,6 @@ async function serveContent(request, env, cid, extension = null, ctx = null, ide
     response.headers.set('Cache-Control', `public, max-age=${Math.max(0, ttl)}`);
     response.headers.set('X-Cache', 'MISS');
     response.headers.set('X-Cache-Until', String(Date.now() + Math.max(0, ttl) * 1000));
-    sampleDownload(env, cid, response.status, false, payment.analyticsPayer || (payment.payer === 'exhausted' ? 'anon' : payment.payer), price, payment.newLease);
     if (cache && request.method === 'GET' && ttl > 0) {
       const write = cache.put(cacheKey, response.clone()).catch(error => console.warn('Cache write failed', error.message));
       if (ctx?.waitUntil) ctx.waitUntil(write); else await write;
@@ -353,16 +342,26 @@ export default {
     try { identity = await parseIdentity(request, env, match[1], signed?.[1], strict); }
     catch {
       enforceRateLimit(request); // Invalid credentials count but never trigger a DO lookup on funded paths.
+      sampleDownload(env, match[1], 401, false);
       return textResponse(401, 'Invalid or missing download credential');
     }
+    const payment = {};
+    let response;
     try {
-      const payment = {};
-      const response = await serveContent(request, env, match[1], match[2] || null, ctx, identity, payment);
-      response.headers.set('X-Budget', payment.payer || 'anon');
-      return response;
+      const delivery = serveContent(request, env, match[1], match[2] || null, ctx, identity, payment);
+      // Keep queued work alive if its client disconnects while another request
+      // owns a lease operation. Its finally block must release the next waiter.
+      ctx?.waitUntil(delivery.catch(() => {}));
+      response = await delivery;
     } catch (error) {
       console.error('Content delivery failed', error.message);
-      return textResponse(503, 'Content temporarily unavailable', { 'Retry-After': '60' });
+      response = textResponse(503, 'Content temporarily unavailable', { 'Retry-After': '60' });
     }
+    // Refusals also incur Worker costs. Include them in top-file attribution,
+    // while preserving actual funded charges and lease overhead on failures.
+    sampleDownload(env, match[1], response.status, Boolean(payment.cacheHit),
+      payment.analyticsPayer || (payment.payer === 'exhausted' ? 'anon' : payment.payer), payment.price, payment.newLease);
+    response.headers.set('X-Budget', payment.payer || 'anon');
+    return response;
   }
 };

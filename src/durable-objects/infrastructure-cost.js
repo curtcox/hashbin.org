@@ -6,6 +6,7 @@
 
 import { handleBackupRequest } from '../utils/backup.js';
 import { COST_POLICY as P } from '../utils/cost-policy.js';
+import { costPeriodBounds } from '../utils/cost-period.js';
 
 /**
  * Get current month period string in YYYY-MM format
@@ -36,6 +37,12 @@ export class InfrastructureCost {
       if (url.pathname === '/snapshot' && method === 'POST') {
         const data = await request.json();
         return await this.state.blockConcurrencyWhile(() => this.recordSnapshot(data));
+      }
+      if (url.pathname === '/snapshot' && method === 'GET') {
+        const period = url.searchParams.get('period');
+        try { costPeriodBounds(period); }
+        catch { return Response.json({ error: 'Invalid cost period' }, { status: 400 }); }
+        return Response.json({ snapshot: (await this.state.storage.get(`snapshot:${period}`)) || null });
       }
       if (url.pathname === '/safety' && method === 'GET') {
         const latest = await this.state.storage.get('safety:latest');
@@ -104,13 +111,21 @@ export class InfrastructureCost {
       services.some(key => !Number.isFinite(data.costs?.[key]) || data.costs[key] < 0)) {
       return Response.json({ error: 'Invalid cost snapshot' }, { status: 400 });
     }
-    const period = at.toISOString().slice(0, 7);
-    const latest = await this.state.storage.get('safety:latest');
-    if (latest && new Date(latest.recorded_at) >= at) return Response.json(latest);
+    const currentPeriod = at.toISOString().slice(0, 7);
+    const period = data.period ?? currentPeriod;
+    let bounds;
+    try { bounds = costPeriodBounds(period); }
+    catch { return Response.json({ error: 'Invalid cost period' }, { status: 400 }); }
+    const { start, end } = bounds;
+    const closedMonth = period < currentPeriod;
+    const usageEnd = new Date(data.usage_end ?? at);
+    if (period > currentPeriod || !Number.isFinite(usageEnd.getTime()) || usageEnd < start || usageEnd > end || usageEnd > at ||
+      (closedMonth && usageEnd.getTime() !== end.getTime()) || (!closedMonth && usageEnd.getTime() !== at.getTime())) {
+      return Response.json({ error: 'Invalid cost usage window' }, { status: 400 });
+    }
     const previous = await this.state.storage.get(`snapshot:${period}`);
-    const start = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), 1);
-    const end = Date.UTC(at.getUTCFullYear(), at.getUTCMonth() + 1, 1);
-    const elapsed = Math.max(1, at - start);
+    if (previous && new Date(previous.recorded_at) >= at) return Response.json(previous);
+    const elapsed = Math.max(1, usageEnd - start);
     const costs = Object.fromEntries(services.map(key => [key, data.costs[key]]));
     const total = Object.values(costs).reduce((a, b) => a + b, 0);
     const projected = total / elapsed * (end - start);
@@ -127,10 +142,11 @@ export class InfrastructureCost {
     const history = (await this.state.storage.get('safety:history')) || [];
     let hourlyCost = null;
     if (previous) {
-      const hours = (at - new Date(previous.recorded_at)) / 3600000;
+      const hours = (usageEnd - new Date(previous.usage_end || previous.recorded_at)) / 3600000;
       if (hours > 0) hourlyCost = Math.max(0, total - previous.costs_cents) / hours;
     }
-    const trailing = history.filter(h => h.period === period && h.hourly_cost_cents !== null && at - new Date(h.recorded_at) <= 86400000);
+    const trailing = history.filter(h => h.period === period && h.hourly_cost_cents !== null &&
+      usageEnd - new Date(h.recorded_at) >= 0 && usageEnd - new Date(h.recorded_at) <= 86400000);
     const average = trailing.length ? trailing.reduce((sum, h) => sum + h.hourly_cost_cents, 0) / trailing.length : null;
     if (hourlyCost > 0 && average !== null && hourlyCost > average * 10) alerts.push({ type: 'hourly_cost_spike', message: 'Hourly costs exceed ten times the trailing daily average' });
     let brake = Boolean(await this.state.storage.get('safety:brake'));
@@ -138,7 +154,8 @@ export class InfrastructureCost {
       brake = true;
       alerts.push({ type: 'cost_brake', message: 'Automatic brake enabled; only included download allowances may be served' });
     }
-    const report = { period, recorded_at: at.toISOString(), costs, costs_cents: total,
+    const report = { period, recorded_at: at.toISOString(), usage_end: usageEnd.toISOString(), closed_month: closedMonth,
+      costs, costs_cents: total,
       revenue_cents: data.revenue_cents, revenue_kept_cents: data.revenue_cents * P.revenueKept,
       projected_cents: projected, hourly_cost_cents: hourlyCost, trailing_hourly_average_cents: average,
       top_files: data.top_files || [], top_files_error: data.top_files_error || null,
@@ -155,11 +172,13 @@ export class InfrastructureCost {
       const periods = (await storage.get('periods')) || [];
       if (!periods.includes(period)) await storage.put('periods', [...periods, period].sort());
       await storage.put(`snapshot:${period}`, report);
-      await storage.put('safety:latest', report);
       await storage.put('safety:brake', brake);
-      await storage.put('safety:history', [...history, { period, recorded_at: report.recorded_at,
-        hourly_cost_cents: hourlyCost }].slice(-48));
-      await storage.put(`analytics:${report.recorded_at.slice(0, 13)}`, report);
+      if (!closedMonth) {
+        await storage.put('safety:latest', report);
+        await storage.put('safety:history', [...history, { period, recorded_at: report.recorded_at,
+          hourly_cost_cents: hourlyCost }].slice(-48));
+      }
+      await storage.put(`analytics:${report.recorded_at.slice(0, 13)}${closedMonth ? `:${period}` : ''}`, report);
       const cutoff = new Date(at.getTime() - 93 * 86400000).toISOString().slice(0, 13);
       const expired = await storage.list({ prefix: 'analytics:', end: `analytics:${cutoff}`, limit: 48 });
       if (expired.size) await storage.delete([...expired.keys()]);

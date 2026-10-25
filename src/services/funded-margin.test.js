@@ -14,4 +14,14 @@ describe('funded margin monitoring', () => {
     expect(fundedMarginExceeded({ downloads: 1000, price_dollars: 0.004, lease_cost_dollars: FUNDED_LEASE_COST_DOLLARS * 4 })).toBe(false);
     expect(() => fundedMarginExceeded({ downloads: -1 })).toThrow();
   });
+  it('accepts empty SQL aggregates and numeric strings, but rejects absent columns', () => {
+    expect(fundedMarginExceeded({ downloads: null, price_dollars: null, lease_cost_dollars: null })).toBe(false);
+    expect(fundedMarginExceeded({ downloads: '1000', price_dollars: '0.004', lease_cost_dollars: '0' })).toBe(false);
+    expect(() => fundedMarginExceeded({})).toThrow('Incomplete');
+    expect(() => fundedMarginExceeded({ downloads: 1, price_dollars: 0.004 })).toThrow('Incomplete');
+    expect(() => fundedMarginExceeded({ downloads: 1, price_dollars: 'unknown', lease_cost_dollars: 0 })).toThrow('Invalid');
+    for (const invalid of ['', false, [], {}, undefined, null]) {
+      expect(() => fundedMarginExceeded({ downloads: 1, price_dollars: invalid, lease_cost_dollars: 0 })).toThrow('Invalid');
+    }
+  });
 });

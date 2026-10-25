@@ -1,5 +1,6 @@
 import { DOWNLOAD_COST_DOLLARS } from '../utils/cost-policy.js';
 import { COST_POLICY as P } from '../utils/cost-policy.js';
+import { costPeriodBounds } from '../utils/cost-period.js';
 
 const API = 'https://api.cloudflare.com/client/v4';
 const MILLION = 1e6;
@@ -96,15 +97,16 @@ export function priceUsage(account, fractionOfMonth) {
   };
 }
 
-export async function collectMonthUsage(env, now) {
+export async function collectMonthUsage(env, now, period = now.toISOString().slice(0, 7)) {
+  const { start, end: next } = costPeriodBounds(period);
+  if (start > now) throw new Error('Future cost period');
+  const through = Math.min(now.getTime(), next.getTime());
   await verifyAnalyticsSchema(env);
-  const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
   const costs = { workers: 0, r2_operations: 0, r2_storage: 0, durable_objects: 0 };
   const scripts = (env.COST_SAFETY_WORKERS || 'hashbin-worker-prod,256t-content-prod').split(',').map(s => s.trim());
   // Daily windows fit dataset range limits and avoid grouping/storage truncation.
-  for (let from = start.getTime(); from < now.getTime(); from += 86400000) {
-    const to = Math.min(from + 86400000, now.getTime());
+  for (let from = start.getTime(); from < through; from += 86400000) {
+    const to = Math.min(from + 86400000, through);
     const data = await graphql(env, USAGE_QUERY, { account: env.CLOUDFLARE_ACCOUNT_ID,
       start: new Date(from).toISOString(), end: new Date(to).toISOString(), scripts });
     const account = data.viewer?.accounts?.[0];
@@ -134,7 +136,15 @@ export function queryTopDownloads(env, now) { return queryDownloadRows(env, now)
 export function queryFundedDownloads(env, now) { return queryDownloadRows(env, now, true); }
 
 export function fundedMarginExceeded(row) {
-  const downloads = Number(row.downloads || 0), price = Number(row.price_dollars || 0), leases = Number(row.lease_cost_dollars || 0);
+  const fields = ['downloads', 'price_dollars', 'lease_cost_dollars'];
+  if (!row || fields.some(field => !Object.hasOwn(row, field))) throw new Error('Incomplete funded analytics');
+  // SQL SUM is null when there are no matching samples; absent columns indicate
+  // an incompatible response and must not silently disable the margin check.
+  const values = fields.map(field => row[field]);
+  if (values.every(value => value === null)) return false;
+  if (values.some(value => (typeof value !== 'number' && typeof value !== 'string') ||
+    (typeof value === 'string' && !value.trim()))) throw new Error('Invalid funded analytics');
+  const [downloads, price, leases] = values.map(Number);
   if (![downloads, price, leases].every(value => Number.isFinite(value) && value >= 0)) throw new Error('Invalid funded analytics');
   return downloads * DOWNLOAD_COST_DOLLARS + leases > price * 0.5;
 }
@@ -147,39 +157,105 @@ export async function createCostAlert(env, type, message, metadata = {}, severit
   if (!response.ok) throw new Error('Cost alert could not be stored');
 }
 
+async function monthlyRevenue(env, period) {
+  const response = await env.PLATFORM_STATS.get(env.PLATFORM_STATS.idFromName('global'))
+    .fetch(new Request(`https://internal/revenue?period=${period}`));
+  if (!response.ok) throw new Error('Revenue unavailable');
+  const { revenue_cents } = await response.json();
+  if (!Number.isFinite(revenue_cents) || revenue_cents < 0) throw new Error('Revenue unavailable');
+  return revenue_cents;
+}
+
+async function saveSnapshot(env, data) {
+  const response = await env.INFRASTRUCTURE_COST.get(env.INFRASTRUCTURE_COST.idFromName('global'))
+    .fetch(new Request('https://internal/snapshot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(data) }));
+  if (!response.ok) throw new Error('Cost snapshot could not be saved');
+  return response.json();
+}
+
+async function reportCostAlerts(env, report, topFiles, closed = false) {
+  for (const alert of report.alerts || []) {
+    const files = topFiles.map(f => `${f.cid} (${f.downloads}, HTTP ${f.status})`).join(', ') || 'no sampled downloads';
+    await createCostAlert(env, `${closed ? 'closed_month_' : ''}${alert.type}`,
+      `${closed ? `Completed month ${report.period}: ` : ''}${alert.message}. Top files in the last hour: ${files}`,
+      report, report.brake ? 'critical' : 'warning');
+  }
+}
+
+async function refreshCompletedMonth(env, now) {
+  const currentStart = costPeriodBounds(now.toISOString().slice(0, 7)).start;
+  const period = new Date(currentStart.getTime() - 1).toISOString().slice(0, 7);
+  if (now.getUTCDate() > 2) {
+    const response = await env.INFRASTRUCTURE_COST.get(env.INFRASTRUCTURE_COST.idFromName('global'))
+      .fetch(new Request(`https://internal/snapshot?period=${period}`));
+    if (!response.ok) throw new Error('Completed-month snapshot unavailable');
+    const body = await response.json();
+    if (!body || !Object.hasOwn(body, 'snapshot') || (body.snapshot !== null &&
+      (typeof body.snapshot !== 'object' || body.snapshot.period !== period))) throw new Error('Completed-month snapshot unavailable');
+    const { snapshot } = body;
+    // Recover a known, incomplete month after a longer monitor outage, without
+    // inventing a prior history when this deployment has never observed one.
+    if (!snapshot) return;
+    if (snapshot.closed_month) {
+      // A funding outbox can recover after the cost correction window. Keep
+      // its original month's net revenue current without re-querying all usage.
+      const revenue = await monthlyRevenue(env, period);
+      if (revenue !== snapshot.revenue_cents) {
+        const updated = await saveSnapshot(env, { ...snapshot, recorded_at: now.toISOString(), revenue_cents: revenue });
+        await reportCostAlerts(env, updated, snapshot.top_files || [], true);
+      }
+      return;
+    }
+  }
+  const costs = await collectMonthUsage(env, now, period);
+  const revenue = await monthlyRevenue(env, period);
+  let topFiles = [], topFilesError = null;
+  try { topFiles = await queryTopDownloads(env, currentStart); }
+  catch (error) { topFilesError = error.message; }
+  const report = await saveSnapshot(env, { period, recorded_at: now.toISOString(), usage_end: currentStart.toISOString(),
+    costs, revenue_cents: revenue, top_files: topFiles, top_files_error: topFilesError });
+  // Separate alert types preserve the existing per-type hourly deduplication
+  // without suppressing a current-month warning in the same monitor run.
+  if (topFilesError) await createCostAlert(env, 'closed_month_download_analytics_unavailable',
+    `Completed month ${period}: ${topFilesError}`, { period }, 'critical');
+  await reportCostAlerts(env, report, topFiles, true);
+}
+
 export async function runCostMonitor(env, now = new Date()) {
   if (env.ENVIRONMENT === 'local') return;
   try {
     if (!env.CLOUDFLARE_ANALYTICS_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) throw new Error('Configure CLOUDFLARE_ANALYTICS_TOKEN and CLOUDFLARE_ACCOUNT_ID');
+    // Revisit the completed month for two days to capture the final UTC hour,
+    // delayed analytics and returned funded credit attributed to that month.
+    try { await refreshCompletedMonth(env, now); }
+    catch (error) {
+      const period = new Date(costPeriodBounds(now.toISOString().slice(0, 7)).start.getTime() - 1).toISOString().slice(0, 7);
+      try { await createCostAlert(env, 'closed_month_cost_monitor_unavailable', `Completed month ${period}: ${error.message}`, { period }, 'critical'); }
+      catch (alertError) { console.error('Completed-month cost alert unavailable', alertError.message); }
+    }
     const costs = await collectMonthUsage(env, now);
     let topFiles = [];
     let topFilesError = null;
     let fundedTotals = [];
-    try { [topFiles, fundedTotals] = await Promise.all([queryTopDownloads(env, now), queryFundedDownloads(env, now)]); }
-    catch (error) {
-      // An attribution outage must not disable the cost brake.
-      topFilesError = error.message;
-    }
+    // Preserve independent evidence: a top-file outage must not disable funded
+    // margin alerts, and a funded-total outage must not erase top-file reports.
+    const results = await Promise.allSettled([queryTopDownloads(env, now), queryFundedDownloads(env, now)]);
+    const attributionErrors = [];
+    if (results[0].status === 'fulfilled') topFiles = results[0].value;
+    else attributionErrors.push(`Top downloads: ${results[0].reason.message}`);
+    if (results[1].status === 'fulfilled') fundedTotals = results[1].value;
+    else attributionErrors.push(`Funded downloads: ${results[1].reason.message}`);
     let marginAlerts = [];
     try { marginAlerts = fundedTotals.filter(fundedMarginExceeded); }
-    catch (error) { topFilesError = error.message; }
-    const statsResponse = await env.PLATFORM_STATS.get(env.PLATFORM_STATS.idFromName('global'))
-      .fetch(new Request(`https://internal/revenue?period=${now.toISOString().slice(0, 7)}`));
-    if (!statsResponse.ok) throw new Error('Revenue unavailable');
-    const { revenue_cents } = await statsResponse.json();
-    if (!Number.isFinite(revenue_cents) || revenue_cents < 0) throw new Error('Revenue unavailable');
-    const response = await env.INFRASTRUCTURE_COST.get(env.INFRASTRUCTURE_COST.idFromName('global'))
-      .fetch(new Request('https://internal/snapshot', { method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ recorded_at: now.toISOString(), costs, revenue_cents, top_files: topFiles, top_files_error: topFilesError }) }));
-    if (!response.ok) throw new Error('Cost snapshot could not be saved');
-    const report = await response.json();
+    catch (error) { attributionErrors.push(error.message); }
+    topFilesError = attributionErrors.join('; ') || null;
+    const revenue_cents = await monthlyRevenue(env, now.toISOString().slice(0, 7));
+    const report = await saveSnapshot(env, { recorded_at: now.toISOString(), costs, revenue_cents,
+      top_files: topFiles, top_files_error: topFilesError });
     for (const row of marginAlerts) await createCostAlert(env, 'funded_download_margin',
       'Funded download cost estimate exceeds 50% of its price', row, 'critical');
     if (topFilesError) await createCostAlert(env, 'download_analytics_unavailable', topFilesError, {}, 'critical');
-    for (const alert of report.alerts || []) {
-      const files = topFiles.map(f => `${f.cid} (${f.downloads}, HTTP ${f.status})`).join(', ') || 'no sampled downloads';
-      await createCostAlert(env, alert.type, `${alert.message}. Top files in the last hour: ${files}`, report, report.brake ? 'critical' : 'warning');
-    }
+    await reportCostAlerts(env, report, topFiles);
     return report;
   } catch (error) {
     await createCostAlert(env, 'cost_monitor_unavailable', error.message, {}, 'critical');

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { setTimeout as realTimeout } from 'node:timers/promises';
 
 function cidFor(size = 100) {
   const prefix = Buffer.alloc(6);
@@ -19,11 +20,13 @@ describe('content worker transient errors', () => {
   const payload = 'a'.repeat(100);
 
   beforeEach(async () => {
+    vi.stubGlobal('scheduler', { wait: realTimeout });
     vi.resetModules();
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-17T00:00:00Z'));
     worker = (await import('./index.js')).default;
     env = {
+      ENVIRONMENT: 'local',
       CONTENT_METADATA: { idFromName: name => name, get: () => ({ fetch: async () => Response.json({ count: 250, expires_at: Date.now() + 60000 }) }) },
       CONTENT_BUCKET: {
         head: vi.fn(async () => null),
@@ -35,7 +38,7 @@ describe('content worker transient errors', () => {
       }
     };
   });
-  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
   function memoryCache() {
     const entries = new Map();
@@ -106,6 +109,29 @@ describe('content worker transient errors', () => {
     delete env.CONTENT_METADATA;
     expect((await worker.fetch(request(cid), env)).status).toBe(503);
     expect(env.CONTENT_BUCKET.get).not.toHaveBeenCalled();
+  });
+
+  it.each([429, 404, 451, 503])('attributes refused requests to their file and HTTP status (%s)', async status => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const writeDataPoint = vi.fn();
+    env.DOWNLOAD_ANALYTICS = { writeDataPoint };
+    env.CONTENT_METADATA.get = () => ({ fetch: async () => Response.json({ count: 0 }, { status }) });
+    expect((await worker.fetch(request(cid), env)).status).toBe(status);
+    expect(writeDataPoint).toHaveBeenCalledExactlyOnceWith({
+      indexes: [cid], blobs: [cid, String(status), 'miss', 'anon'], doubles: [100, 0, 0]
+    });
+  });
+
+  it('samples cache hits, misses and per-IP refusals once each', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    memoryCache();
+    const writeDataPoint = vi.fn();
+    env.DOWNLOAD_ANALYTICS = { writeDataPoint };
+    for (let i = 0; i < 31; i++) await worker.fetch(request(cid), env);
+    expect(writeDataPoint).toHaveBeenCalledTimes(31);
+    expect(writeDataPoint.mock.calls[0][0].blobs).toEqual([cid, '200', 'miss', 'file']);
+    expect(writeDataPoint.mock.calls[1][0].blobs).toEqual([cid, '200', 'hit', 'file']);
+    expect(writeDataPoint.mock.calls[30][0].blobs).toEqual([cid, '429', 'miss', 'anon']);
   });
 
   it('keeps stored content available after the per-IP download window resets', async () => {

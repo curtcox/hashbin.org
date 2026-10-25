@@ -1,5 +1,7 @@
 import { verifyDownloadApiKey, verifyDownloadToken, verifyDownloadOAuth, signDownloadToken } from '../../../src/auth/download-tokens.js';
 import { sha256Hex } from '../../../src/auth/oauth.js';
+import { exclusive } from './mutex.js';
+import { readCostSafety } from '../../../src/utils/cost-safety-state.js';
 
 const byEnv = new WeakMap();
 function state(env) {
@@ -41,7 +43,7 @@ export async function parseIdentity(request, env, cid, signedToken, strict) {
   return null;
 }
 function stub(env, identity) { return env.USER_PROFILES.get(env.USER_PROFILES.idFromName(identity.u)); }
-function idKey(identity) { return `${identity.u}:${identity.kind}:${identity.k || identity.sid}:${identity.key_hash || ''}`; }
+function idKey(identity) { return JSON.stringify([identity.u, identity.kind, identity.k || identity.sid]); }
 async function call(env, identity, path, data) {
   const response = await stub(env, identity).fetch(new Request(`https://internal/download/${path}`, { method: 'POST',
     body: JSON.stringify({ identity, ...data }) }));
@@ -51,25 +53,35 @@ async function call(env, identity, path, data) {
 }
 export async function confirmedFunding(env, identity, price) {
   const cache = state(env).confirmations, key = `${idKey(identity)}:${price}`;
-  let entry = cache.get(key);
-  if (entry?.pending) return entry.pending;
-  if (!entry || entry.expires_at <= Date.now()) {
-    const pending = call(env, identity, 'check', { price_uc: price, requests: 1, request_id: crypto.randomUUID() }).then(result => {
-      const confirmation = { ...result, expires_at: Math.min(Date.now() + 60000, (identity.exp || Infinity) * 1000) };
-      boundedSet(cache, key, confirmation);
-      return confirmation;
-    }).catch(error => { cache.delete(key); throw error; });
-    boundedSet(cache, key, { pending });
-    entry = await pending;
+  // Credential checks remain distinct even when their paid lease is shared.
+  const proof = JSON.stringify([key, identity.key_hash || null, identity.app_id || null]);
+  let entry = cache.get(proof);
+  if (!entry) { entry = {}; boundedSet(cache, proof, entry); }
+  const confirmation = await exclusive(entry, async () => {
+    if (!entry.expires_at || entry.expires_at <= Date.now()) {
+      const result = await call(env, identity, 'check', { price_uc: price, requests: 1, request_id: crypto.randomUUID() });
+      Object.assign(entry, { funded: result.funded, invalid: result.invalid,
+        expires_at: Math.min(Date.now() + 60000, (identity.exp || Infinity) * 1000) });
+    }
+    return { funded: entry.funded, invalid: entry.invalid, expires_at: entry.expires_at };
+  });
+  if (confirmation.invalid) return confirmation;
+  // A fresh check can see no unreserved budget while the identity still holds
+  // paid requests. Share those across direct credentials and signed URLs.
+  const lease = state(env).leases.get(key);
+  if (lease) {
+    const paid = await exclusive(lease, () => lease.expires_at > Date.now() && lease.remaining >= price
+      ? { funded: true, expires_at: lease.expires_at } : null);
+    if (paid) return paid;
   }
-  return entry;
+  return confirmation;
 }
 export async function takeFundedDownload(env, identity, price, ctx) {
   const leases = state(env).leases, key = `${idKey(identity)}:${price}`;
   // A per-identity queue ensures one lease cannot be duplicated by concurrent waiters.
   let entry = leases.get(key);
-  if (!entry) { entry = { tail: Promise.resolve(), requests: 1, remaining: 0 }; boundedSet(leases, key, entry); }
-  const operation = entry.tail.then(async () => {
+  if (!entry) { entry = { requests: 1, remaining: 0 }; boundedSet(leases, key, entry); }
+  return exclusive(entry, async () => {
     let newLease = false;
     if (!entry.expires_at || entry.expires_at <= Date.now() || entry.remaining < price) {
       const exhaustedQuickly = entry.lease_id && entry.remaining === 0 && entry.expires_at > Date.now();
@@ -84,36 +96,29 @@ export async function takeFundedDownload(env, identity, price, ctx) {
       if (ctx?.waitUntil) {
         const leaseId = result.lease_id;
         ctx.waitUntil(new Promise(resolve => setTimeout(resolve, Math.max(0, Math.min(25000, result.expires_at - Date.now())))).then(() => {
-          const release = entry.tail.then(async () => {
+          return exclusive(entry, async () => {
             if (entry.lease_id !== leaseId) return;
             const unused = entry.remaining;
             entry.expires_at = 0; entry.remaining = 0; delete entry.lease_id;
             await call(env, identity, 'return', { lease_id: leaseId, unused_uc: unused });
           });
-          entry.tail = release.catch(() => {});
-          return release;
         }).catch(error => console.warn('Unused download lease remains spent', error.message)));
       }
     }
     entry.remaining -= price;
     return { funded: true, new_lease: newLease };
   });
-  entry.tail = operation.catch(() => {});
-  return operation;
 }
 export async function hardStopped(env) {
   if (env.COST_SAFETY_HARD_STOP === 'true') return true;
-  if (!env.INFRASTRUCTURE_COST) return false;
   const current = state(env);
-  if (!current.safety || current.safety.until <= Date.now()) {
-    if (!current.safetyPending) current.safetyPending = (async () => {
-      const response = await env.INFRASTRUCTURE_COST.get(env.INFRASTRUCTURE_COST.idFromName('global')).fetch(new Request('https://internal/safety'));
-      if (!response.ok) throw new Error('Safety unavailable');
-      current.safety = { ...await response.json(), until: Date.now() + 60000 };
-    })().finally(() => { current.safetyPending = null; });
-    await current.safetyPending;
-  }
-  return current.safety.hard_stop === true;
+  if (current.safety?.until > Date.now()) return current.safety.hard_stop === true;
+  return exclusive(current, async () => {
+    if (!current.safety || current.safety.until <= Date.now()) {
+      current.safety = { ...await readCostSafety(env), until: Date.now() + 60000 };
+    }
+    return current.safety.hard_stop === true;
+  });
 }
 export async function handshake(request, env) {
   const token = new URL(request.url).searchParams.get('t');

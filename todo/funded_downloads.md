@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase:** Implemented locally, 2026-10-24. Builds on L22 and S20 (`docs/cost-safety.md`). Owner WAF configuration and live acceptance remain pending.
+**Phase:** Implemented locally, 2026-10-24; hardened 2026-10-25. Builds on L22 and S20 (`docs/cost-safety.md`). Owner WAF configuration and live acceptance remain pending.
 **Row:** B11 in `STATUS.md`.
 
 ## Implementation notes
@@ -20,11 +20,64 @@ and acceptance checklist are in `docs/cost-safety.md`.
   The hourly monitor alerts when sampled funded costs exceed 50% of price.
 - The unreported-charge bound is 250 requests **per outstanding identity/price lease**;
   $0.001 is the floor-priced case, not the bound for larger files.
+- Funding checks honor unused requests in an active prepaid lease when its earlier
+  confirmation expires. A fully reserved cap or balance cannot turn those paid
+  requests into 429s. The original lease expiry still bounds revocation.
+- New budget requests preserve earlier accounting alarms, so continuous traffic
+  cannot postpone transaction/revenue delivery indefinitely.
+- Analytics includes refused and failed deliveries once per request, retaining
+  funded charges and lease overhead when delivery fails after spending.
+- Returned credit commits even if the replacement lease is denied for revocation,
+  the hard stop or malformed renewal parameters. Returned allocation IDs cannot
+  charge again within the 24-hour receipt window; changed retry parameters fail.
+- Receipts and their expiry indexes are separate from the profile and commit in
+  the same atomic batch as balance/spending/outbox changes. Alarm cleanup is
+  bounded; old profile leases migrate on return and unreported leases stay spent.
+- New browser sessions reclaim revoked/expired entries and abandoned handshakes.
+  Active sessions retain their lifetime, and inherited properties are invalid IDs.
+- Native workerd testing exposed cross-request promise cancellation. File and
+  identity lease coordination now uses request-owned scheduler waits with timeout
+  cleanup. `npm run test:api:funded` covers the real runtime and accounting alarm.
+- Pending accounting events now live in separate ordered rows, so outages do not
+  grow the profile blob. Bounded alarm batches acknowledge delivered prefixes in
+  a transaction, preserve idempotent replay and migrate old inline outboxes.
+  Receipt cleanup and accounting delivery retry independently.
+- Hourly monitoring preserves successful top-file/funded-total query results
+  independently and flags incomplete funded metrics instead of assuming zero.
+- Direct credentials and signed URLs share the same identity/price lease, while
+  key hashes and OAuth app IDs retain independent validity checks. Switching forms
+  at a fully reserved cap can still spend the paid remainder, without new charges.
+- File reservations and content deliveries use a shared strict safety protocol:
+  unavailable/malformed state or missing bindings outside local mode return 503
+  before reserving or spending. Valid safety caching remains bounded to 60 seconds.
+- Month rollover now preserves the previous month's final-hour costs and matches
+  them to that month's net funded revenue. Completed reports refresh late credit
+  returns without changing the live dashboard month or double-counting usage.
 
-Local verification: 468 unit tests passed (2 skipped), 41 authentication API
+Initial local verification (2026-10-24): 468 unit tests passed (2 skipped), 41 authentication API
 acceptance checks passed, both Worker dry-run bundles passed, and browser checks
 confirmed account/key cap persistence and v2 key creation without page errors or
 mobile overflow. No production deployment was performed.
+
+Follow-up verification (2026-10-25): 479 unit tests passed (2 skipped), including
+cap exhaustion across confirmation expiry, the original revocation deadline,
+accounting alarm scheduling, and refused/funded analytics. Both Worker dry-run
+bundles passed. The full `npm test` command stops at the existing GNU `sed`
+syntax in `scripts/inject-git-sha.sh` on macOS; production deployment and live
+acceptance remain pending.
+
+Latest verification (2026-10-25): 568 unit tests passed (2 skipped), both Worker
+dry-run bundles passed, and native local acceptance served 2,500 funded
+GET/HEAD/signed requests within an exact one-cent cap before exhausted fallback.
+The real accounting alarm recorded the debit. The local content configuration
+and repeatable acceptance commands are in `docs/cost-safety.md`. Live WAF and
+regional acceptance remain pending. Regression coverage includes a 1,501-event
+backlog outside the profile, bounded/ordered draining, large legacy migration,
+failed acknowledgements, independent maintenance failures, partial analytics
+outages, mixed direct/signed use at a fully reserved cap, invalid credential
+proofs, separate request prices and fail-closed safety validation before cache use.
+Month-boundary coverage now includes real PlatformStats lease/return revenue,
+exact month-end cutoffs, late ledger delivery and independent live/backfill failures.
 
 ## The promise
 

@@ -72,6 +72,8 @@ export function identifiedDownloadPriceUc(sizeBytes) {
   return Math.max(400, Math.ceil(sizeBytes / 1024 ** 3 * 2 * 1e6));
 }
 
-// Conservative lease coordination estimate: checks, lease, alarm/outbox and accounting.
-export const FUNDED_LEASE_COST_DOLLARS = (6 * COST_POLICY.doPerMillion +
-  6 * COST_POLICY.doRowsReadPerMillion + 6 * COST_POLICY.doRowsWrittenPerMillion) / 1e6;
+// Planning allowance for checks, lease/return, receipt lookup/index/cleanup,
+// alarm/outbox, a balance transaction and two revenue events. Calibrate from
+// production usage; cold singleton requests still exceed the minimum price.
+export const FUNDED_LEASE_COST_DOLLARS = (8 * COST_POLICY.doPerMillion +
+  20 * COST_POLICY.doRowsReadPerMillion + 24 * COST_POLICY.doRowsWrittenPerMillion) / 1e6;

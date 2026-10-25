@@ -45,6 +45,7 @@ bash scripts/run-all-api-tests.sh
 ```bash
 npm run test:api:health         # Health & Config (10 tests)
 npm run test:api:auth           # Authentication (31 tests)
+npm run test:api:funded         # Native two-Worker funded burst and accounting
 npm run test:api:balance        # Balance Management (10 tests)
 npm run test:api:upload         # Content Upload (35 tests)
 npm run test:api:download       # Content Download (17 tests)
@@ -55,6 +56,12 @@ npm run test:api:donation       # Donations (4 tests)
 npm run test:api:errors         # Error Handling (6 tests)
 npm run test:api:concurrent     # Concurrent Operations (4 tests)
 ```
+
+`test:api:funded` also needs the local content Worker on port 8788 with shared
+local-only signing secrets. It exercises workerd request contexts and real DO
+storage/alarms with 2,500 funded GET/HEAD/signed requests and an exact one-cent cap.
+See [the two-Worker setup](../../docs/cost-safety.md#native-local-acceptance).
+`CONTENT_BASE_URL` overrides the content port; both endpoints must be loopback.
 
 ## Test Architecture
 

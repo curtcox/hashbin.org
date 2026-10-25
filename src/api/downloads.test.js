@@ -12,7 +12,8 @@ function req(path, method = 'GET', body, authorization = 'LocalDev user') {
 }
 beforeEach(() => {
   profile = { user_id: 'user', balance_cents: 100, api_keys: [], oauth_grants: [], oauth_refresh_tokens: [] };
-  user = new UserProfile({ storage: { get: async () => structuredClone(profile), put: async (_, v) => { profile = structuredClone(v); }, setAlarm: async () => {} } }, {});
+  user = new UserProfile({ storage: { get: async () => structuredClone(profile),
+    put: async (key, value) => { profile = structuredClone(typeof key === 'string' ? value : key.profile); }, setAlarm: async () => {} } }, {});
   env = { ENVIRONMENT: 'local', USER_PROFILES: { idFromName: id => id, get: () => user }, DOWNLOAD_TOKEN_SECRET: 'download-secret',
     KEY_REGISTRY: { idFromName: id => id, get: () => ({ fetch: async () => Response.json({ registered: true }) }) } };
 });
@@ -60,5 +61,16 @@ describe('download API', () => {
     expect((await handleDownloads(req('/api/downloads/budget', 'GET', undefined, 'ApiKey junk'), env)).status).toBe(401);
     const bad = req('/api/downloads/budget', 'PUT', {});
     expect((await handleDownloads(new Request(bad.url, { method: 'PUT', headers: bad.headers, body: '{' }), env)).status).toBe(400);
+  });
+  it.each(['__proto__', 'constructor', 'toString'])('rejects inherited properties as session IDs (%s)', async sessionId => {
+    const target = sessionId === '__proto__' ? Object.prototype : Object.prototype[sessionId];
+    const previous = Object.getOwnPropertyDescriptor(target, 'revoked_at');
+    try {
+      const response = await handleDownloads(req('/api/downloads/sessions', 'DELETE', { session_id: sessionId }), env);
+      expect(response.status).toBe(404);
+      expect(Object.getOwnPropertyDescriptor(target, 'revoked_at')).toEqual(previous);
+    } finally {
+      if (previous) Object.defineProperty(target, 'revoked_at', previous); else delete target.revoked_at;
+    }
   });
 });

@@ -1,0 +1,36 @@
+name = "256t-content-local"
+main = "src/index.js"
+compatibility_date = "2024-12-01"
+
+# Run alongside the main wrangler.local.toml. Supply matching local-only
+# DOWNLOAD_TOKEN_SECRET and OAUTH_SIGNING_KEY via --var on both dev commands.
+[vars]
+ENVIRONMENT = "local"
+COST_SAFETY_ALLOWANCE_ONLY = "true"
+
+[limits]
+cpu_ms = 10
+
+[[r2_buckets]]
+binding = "CONTENT_BUCKET"
+bucket_name = "hashbin-content-local"
+
+[[durable_objects.bindings]]
+name = "CONTENT_METADATA"
+class_name = "ContentMetadata"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "USER_PROFILES"
+class_name = "UserProfile"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "INFRASTRUCTURE_COST"
+class_name = "InfrastructureCost"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "KEY_REGISTRY"
+class_name = "KeyRegistry"
+script_name = "hashbin-worker-local"

@@ -5,6 +5,7 @@
 
 import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
 import { COST_POLICY, downloadAllowance, retentionWithinCap } from '../utils/cost-policy.js';
+import { readCostSafety } from '../utils/cost-safety-state.js';
 
 // Rate limiting constants
 const DEFAULT_RATE_LIMIT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
@@ -216,13 +217,11 @@ export class ContentMetadata {
     let count = Math.min(COST_POLICY.leaseSize, remaining);
     budget.reserved += count;
     // Existing bandwidth purchases also prepay a finite request count at >= $4/M.
-    const safety = (await this.env.INFRASTRUCTURE_COST?.get(this.env.INFRASTRUCTURE_COST.idFromName('global'))
-        .fetch(new Request('https://internal/safety')).then(r => {
-          if (!r.ok) throw new Error('Cost brake unavailable');
-          return r.json();
-        }));
-    if (this.env.COST_SAFETY_HARD_STOP === 'true' || safety?.hard_stop) return Response.json({ count: 0 }, { status: 503 });
-    const brake = this.env.COST_SAFETY_ALLOWANCE_ONLY === 'true' || safety?.brake;
+    let safety;
+    try { safety = await readCostSafety(this.env); }
+    catch { return Response.json({ count: 0 }, { status: 503 }); }
+    if (safety.hard_stop) return Response.json({ count: 0 }, { status: 503 });
+    const brake = safety.brake;
     if (!count && (!brake || funded)) {
       for (const purchase of content.rate_limit_records || []) {
         if (new Date(purchase.expires_at).getTime() <= Date.now()) continue;

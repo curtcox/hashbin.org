@@ -5,6 +5,7 @@
 
 import { downloadBudget, validDownloadCaps } from '../utils/download-budget.js';
 import { handleDownloadBudget, flushDownloadOutbox } from './download-budget.js';
+import { pruneDownloadLeases } from './download-leases.js';
 import { COST_POLICY } from '../utils/cost-policy.js';
 import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
 
@@ -52,9 +53,17 @@ export class UserProfile {
       const operation = this.profileQueue.then(async () => {
         const profile = await this.state.storage.get('profile');
         if (profile?.download_budget) await handleDownloadBudget(this, new Request('https://internal/download/budget'));
-        await flushDownloadOutbox(this);
+        let pendingAccounting = false;
+        let maintenanceFailed = false;
+        try { pendingAccounting = await flushDownloadOutbox(this); }
+        catch (error) { maintenanceFailed = true; console.error('Download accounting retry', error.message); }
         const now = new Date();
-        await this.state.storage.setAlarm(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+        let receiptAlarm = null;
+        try { receiptAlarm = await pruneDownloadLeases(this.state.storage, now.getTime()); }
+        catch (error) { maintenanceFailed = true; console.error('Download receipt cleanup retry', error.message); }
+        await this.state.storage.setAlarm(Math.min(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1),
+          receiptAlarm || Infinity, pendingAccounting ? now.getTime() + 1000 : Infinity,
+          maintenanceFailed ? now.getTime() + 60000 : Infinity));
       });
       this.profileQueue = operation.catch(() => {});
       await operation;

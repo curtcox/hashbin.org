@@ -618,6 +618,13 @@ Admin endpoints require X-Admin-Token:
 - GET /api/admin/cost-safety/history?limit=168: up to 1,000 hourly reports;
   paginate using next_before as before. Reports are retained for 93 days.
 
+History also includes completed-month refreshes. `period` identifies the billing
+month, `usage_end` its usage cutoff, `recorded_at` the observation time, and
+`closed_month` distinguishes completed periods from live MTD reports. Return
+`next_before` unchanged as `before`; it can include a period suffix for reports
+collected in the same hour. Completed-month refreshes do not replace the live
+`/api/admin/cost-safety` dashboard report.
+
 The admin page is /admin/costs.html. See [operator setup and policy](cost-safety.md)
 for analytics secrets, notification settings, thresholds, and remaining limits.
 
@@ -671,10 +678,12 @@ Funded requests bypass the content Worker's per-IP and cost-brake limits. The st
 no-429 promise requires the `/a/` or `/s/` WAF exemption described in
 [Cost safety](cost-safety.md). Plain paths remain subject to the zone WAF. Invalid
 credentials get 401; unavailable/deleted/expired files get 404, disputed files 451,
-and DO failures or the hard stop 503. Hashbin.org API limits are unchanged.
+and DO failures, invalid required safety state or the hard stop 503. Hashbin.org API limits are unchanged.
 
 Whole cents are debited into reusable spending credit as `download_spend`
 transactions. Leases consume this credit and reserve cap usage before delivery.
+Direct credentials and signed URLs for the same spending identity and request
+price share paid leases; each credential remains independently validated.
 Unreported lease remainders stay spent (up to 250 requests per outstanding lease;
 $0.001 at the minimum price, more for large files). Returned remainders restore
 credit and applicable caps. At UTC month rollover, whole cents of unused credit

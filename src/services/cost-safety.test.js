@@ -57,7 +57,7 @@ describe('prepaid cost safety', () => {
   it('serializes reservations across workers, including restarts, with no overrun', async () => {
     const file = content();
     const backing = state({ content: file });
-    const doEnv = {};
+    const doEnv = { ENVIRONMENT: 'local' };
     let object = new ContentMetadata(backing, doEnv);
     const granted = await Promise.all(Array.from({ length: 25 }, () => reserve(object).then(r => r.json())));
     const total = granted.reduce((sum, result) => sum + result.count, 0);
@@ -69,7 +69,7 @@ describe('prepaid cost safety', () => {
   it('honors expiry, takedowns, and a brake on already prepaid purchases', async () => {
     const file = content({ rate_limit_records: [{ record_id: 'paid', price_cents: 1, max_requests: 2500, expires_at: '2030-01-01' }] });
     const backing = state({ content: file, 'download-budget': { reserved: downloadAllowance(file), purchases: {} } });
-    const env = { COST_SAFETY_ALLOWANCE_ONLY: 'true' };
+    const env = { ENVIRONMENT: 'local', COST_SAFETY_ALLOWANCE_ONLY: 'true' };
     const object = new ContentMetadata(backing, env);
     expect((await reserve(object)).status).toBe(429);
     env.COST_SAFETY_ALLOWANCE_ONLY = 'false';
@@ -175,7 +175,9 @@ describe('hourly monitor', () => {
     vi.stubGlobal('fetch', vi.fn(async (url, init) => {
       if (url.endsWith('/analytics_engine/sql')) return attributionUnavailable
         ? new Response('Unavailable', { status: 503 })
-        : Response.json({ data: [{ cid: 'burst-file', status: '200', downloads: 2e8 }] });
+        : Response.json({ data: init.body.includes("AND blob4 = 'funded'")
+          ? [{ downloads: 0, price_dollars: 0, lease_cost_dollars: 0 }]
+          : [{ cid: 'burst-file', status: '200', downloads: 2e8 }] });
       const { query } = JSON.parse(init.body);
       if (query.includes('__type')) return Response.json({ data: {
         workers: { fields: ['requests', 'cpuTimeUs'].map(name => ({ name })) },
@@ -201,4 +203,59 @@ describe('hourly monitor', () => {
     expect(withoutAttribution.top_files_error).toContain('503');
     expect(alerts.some(alert => alert.type === 'download_analytics_unavailable')).toBe(true);
   });
+});
+
+it.each([
+  { name: 'top-file query fails', topFails: true },
+  { name: 'funded-total query fails', fundedFails: true },
+  { name: 'both queries fail', topFails: true, fundedFails: true },
+  { name: 'funded columns are missing', malformed: true },
+  { name: 'both queries succeed' }
+])('preserves independent cost evidence when $name', async ({ topFails, fundedFails, malformed }) => {
+  const alerts = [];
+  const env = { CLOUDFLARE_ANALYTICS_TOKEN: 'read-only-test', CLOUDFLARE_ACCOUNT_ID: 'account',
+    INFRASTRUCTURE_COST: binding(new InfrastructureCost(state(), {})),
+    PLATFORM_STATS: binding({ fetch: async () => Response.json({ revenue_cents: 0 }) }),
+    ALERT_STORE: binding({ fetch: async request => { alerts.push(await request.json()); return Response.json({}); } }) };
+  vi.stubGlobal('fetch', async (url, init) => {
+    if (url.endsWith('/analytics_engine/sql')) {
+      const funded = init.body.includes("AND blob4 = 'funded'");
+      if (funded ? fundedFails : topFails) return new Response('Unavailable', { status: 503 });
+      return Response.json({ data: funded
+        ? [malformed ? { downloads: 1000 } : { downloads: 1000, price_dollars: 0.004, lease_cost_dollars: 0.02 }]
+        : [{ cid: 'costly-file', status: '429', payer: 'anon', downloads: 1e6 }] });
+    }
+    if (JSON.parse(init.body).query.includes('__type')) return Response.json({ data: {
+      workers: { fields: ['requests', 'cpuTimeUs'].map(name => ({ name })) },
+      periodic: { fields: ['duration', 'rowsRead', 'rowsWritten'].map(name => ({ name })) },
+      storage: { fields: [{ name: 'storedBytes' }] }
+    } });
+    return Response.json({ data: { viewer: { accounts: [{
+      workers: [{ sum: { requests: 2e8, cpuTimeUs: 2e11 } }],
+      operations: [], r2: [], invocations: [], periodic: [], storage: []
+    }] } } });
+  });
+  const report = await runCostMonitor(env, new Date('2026-10-01T01:00:00Z'));
+  expect(report.brake).toBe(true);
+  expect(report.top_files.map(row => row.cid)).toEqual(topFails ? [] : ['costly-file']);
+  expect(alerts.some(alert => alert.type === 'funded_download_margin')).toBe(!fundedFails && !malformed);
+  expect(alerts.some(alert => alert.type === 'download_analytics_unavailable')).toBe(Boolean(topFails || fundedFails || malformed));
+  if (!topFails) expect(alerts.find(alert => alert.type === 'cost_brake').message).toContain('costly-file');
+  if (topFails) expect(report.top_files_error).toContain('Top downloads');
+  if (fundedFails) expect(report.top_files_error).toContain('Funded downloads');
+});
+
+it.each([{}, null, { hard_stop: false }, { hard_stop: false, brake: 'false' }])('does not reserve or spend stored-file allowance from malformed safety state (%j)', async safety => {
+  const stored = state({ content: content() });
+  const object = new ContentMetadata(stored, { ENVIRONMENT: 'production', INFRASTRUCTURE_COST: binding({ fetch: async () => Response.json(safety) }) });
+  expect((await reserve(object)).status).toBe(503);
+  expect(await stored.storage.get('download-budget')).toBeUndefined();
+});
+
+it('blocks stored-file reservations when the production safety binding is missing, including funded bypass', async () => {
+  const stored = state({ content: content() });
+  const object = new ContentMetadata(stored, { ENVIRONMENT: 'production' });
+  expect((await reserve(object)).status).toBe(503);
+  expect((await object.fetch(new Request('https://internal/download/reserve?funded=true', { method: 'POST' }))).status).toBe(503);
+  expect(await stored.storage.get('download-budget')).toBeUndefined();
 });
