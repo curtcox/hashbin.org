@@ -1,0 +1,178 @@
+#+TITLE: HashBin: price floor
+
+The question: what must HashBin charge so that the money customers pay is more than what HashBin
+pays Stripe and Cloudflare? This sheet counts every Stripe and Cloudflare charge a customer can
+cause and nothing else (no Clerk, DMCA fee, insurance or LLC; see the fixed-costs and legal
+sheets). The Workers plan and both domains count, because Cloudflare bills them. Every number is
+an input: the =#+CONSTANTS:= lines in the source and the input columns of each table. Guesses are
+marked "guess". Operation counts come from reading src/api/content.js and
+workers/256t-content. Prices checked 2026-10-24.
+Calc rule: =*= binds tighter than =/=, so write =(a/b)*c=.
+
+#+CONSTANTS: price=0.03 bw=0.02 dep=10 pass=0 donShare=0.10 donSize=5
+#+CONSTANTS: stripePct=0.029 stripeFix=0.30 intlPct=0.015 intlShare=0.10 taxPct=0.005 taxShare=0 taxRate=0.07
+#+CONSTANTS: refundRate=0.01 disputeRate=0.005 disputeFee=15 counterFee=15 respond=0
+#+CONSTANTS: workersBase=5 domainOrg=11.20 domainUs=6.50
+#+CONSTANTS: wReq=0.30 wFree=10 cpuPrice=0.02 cpuFree=30 doReq=0.15 doFree=1 doGbs=12.50 doGbsFree=400000 doMem=0.125
+#+CONSTANTS: rowW=1.00 rowWFree=50 doStore=0.20 doStoreFree=5 r2=0.015 r2Free=10 clsA=4.50 clsAFree=1 clsB=0.36 clsBFree=10
+#+CONSTANTS: upMB=5 dlMB=1 metaKB=2 doMs=10 cpuBase=5 cpuPerMB=5 cpuDl=2 cpuIn=1 cpuIp=1
+#+CONSTANTS: upW=1 upDO=9 upRows=8 upA=2 inDO=5 inRows=4 inA=1 dlB=4 inB=3 apiDO=2 apiRows=1 apiB=2 rfDO=2 rfB=1
+
+* 1. Every charge a customer can cause
+
+"Free" is what the $5 Workers Paid plan or Stripe's standard pricing includes each month.
+
+#+NAME: catalog
+| Charge                      | Price                                   | Free each month    | What causes it                                                    |
+|-----------------------------+-----------------------------------------+--------------------+-------------------------------------------------------------------|
+| Workers Paid plan           | $5/month minimum                        |                    | Being open at all                                                 |
+| Worker requests             | $0.30 per million                       | 10 million         | Every upload, download, turned-away request, API call, webhook    |
+| Worker CPU time             | $0.02 per million ms                    | 30 million ms      | Hashing uploads (about 5 ms per MB, guess), JSON, checkout        |
+| Static assets               | free                                    | unlimited          | The site's pages, scripts, images                                 |
+| Workers Logs                | $0.60 per million events                | 20 million         | Off today (wrangler.toml turns on no logging)                     |
+| Durable Object requests     | $0.15 per million                       | 1 million          | 9 per upload; 256t.us downloads use none                          |
+| Durable Object duration     | $12.50 per million GB-s                 | 400,000 GB-s       | 128 MB billed while each request runs (10 ms each, guess)          |
+| DO rows written             | $1.00 per million                       | 50 million         | Upload records, balances, last-served time on API downloads       |
+| DO rows read                | $0.001 per million                      | 25 billion         | Every lookup; too cheap to model                                  |
+| DO stored data              | $0.20 per GB-month                      | 5 GB               | About 2 KB of records per stored file (guess)                     |
+| R2 storage                  | $0.015 per GB-month                     | 10 GB              | Paid files kept until they expire                                 |
+| R2 class A (writes)         | $4.50 per million                       | 1 million          | 2 per upload (file and .meta), dispute and deletion markers       |
+| R2 class B (reads)          | $0.36 per million                       | 10 million         | 4 per 256t.us download (.deleted, .disputed, .meta, file)         |
+| R2 egress, deletes          | free                                    | unlimited          | Downloads, expirations                                            |
+| Domains                     | $11.20 + $6.50 a year                   |                    | hashbin.org and 256t.us at Cloudflare Registrar                   |
+| Card fee                    | 2.9% + $0.30 per successful charge      |                    | Every deposit and donation; charged on the total, fee and tax too |
+| International card          | +1.5%                                   |                    | A card issued outside the US                                      |
+| Currency conversion         | +1%                                     |                    | Never today: checkout charges only USD                            |
+| Stripe Tax (Checkout)       | 0.5% per transaction                    |                    | automatic_tax is on; charged only where you register to collect   |
+| Refund                      | the original fee isn't returned         |                    | Giving a deposit back                                             |
+| Dispute                     | $15, plus $15 more if you respond and lose |                 | A chargeback; you also lose the money                             |
+| Radar Lite, Checkout, payouts | included                              |                    | Fraud screening, the hosted page, standard payouts to your bank   |
+| Instant Payouts             | 1.5%, 50¢ minimum                       |                    | Only if you choose them                                           |
+
+* 2. What a collected dollar is worth after Stripe
+
+Per $1 of credit customers buy. "Add fee at checkout" is what the code does today: it charges
+credit + 2.9% + $0.30, but Stripe takes 2.9% of the whole charge, fee included, so a little is
+lost on each deposit (section 6). Donations never add the fee. International cards, refunds and
+disputes cost the same either way. Rates of international cards, refunds, disputes and donations
+are guesses.
+
+#+NAME: keep
+| Where the money goes                        | Absorb card fees | Add fee at checkout | Note                                         |
+|---------------------------------------------+------------------+---------------------+----------------------------------------------|
+| Card fee on deposits                        |                0 |                   0 | typical deposit $10                          |
+| Card fee on donations (never added)         |                0 |                   0 | 10% of money is donations of $5 (guess)      |
+| International cards                         |                0 |                   0 | 10% of payments (guess)                      |
+| Stripe Tax and card fee on tax collected    |                0 |                   0 | 0 until you register somewhere               |
+| Refunds                                     |                0 |                   0 | 1% of deposits (guess)                       |
+| Disputes: money, $15 fee                    |                0 |                   0 | 0.5% of deposits, not contested (guess)      |
+| Lost per $1                                 |                0 |                   0 |                                              |
+| Kept per $1                                 |                0 |                   0 |                                              |
+#+TBLFM: @2$2=(1-$donShare)*($stripePct+($stripeFix/$dep));%.4f::@2$3=(1-$donShare)*(($stripePct*(($stripePct*$dep)+$stripeFix))/$dep);%.4f::@3$2=$donShare*($stripePct+($stripeFix/$donSize));%.4f::@3$3=@3$2;%.4f::@4$2=$intlShare*$intlPct;%.4f::@4$3=@4$2;%.4f::@5$2=$taxShare*(($taxPct*(1+$taxRate))+($stripePct*$taxRate));%.4f::@5$3=@5$2;%.4f::@6$2=$refundRate*($stripePct+($stripeFix/$dep));%.4f::@6$3=@6$2;%.4f::@7$2=$disputeRate*(1+(($disputeFee+($respond*$counterFee))/$dep));%.4f::@7$3=@7$2;%.4f::@8$2=vsum(@2..@7);%.4f::@8$3=vsum(@2..@7);%.4f::@9$2=1-@8$2;%.4f::@9$3=1-@8$3;%.4f
+
+* 3. What each customer action costs Cloudflare
+
+Counts per action, from the code. Costs assume the month's free allowance is already used up, so
+they're the most each action can cost. Public links are served by the 256t.us Worker
+(workers/256t-content): free, no per-file limit, 30 requests a minute per IP. The hashbin.org API
+can also serve a file, with a per-file rate limit and bandwidth sold at $0.02 a GB.
+
+#+NAME: actions
+| Action                                    | Worker requests | CPU ms | DO requests | Rows written | R2 class A | R2 class B | Cost each ($) | Per million ($) |
+|-------------------------------------------+-----------------+--------+-------------+--------------+------------+------------+---------------+-----------------|
+| Paid upload (5 MB)                        |               0 |      0 |           0 |            0 |          0 |          0 |             0 |               0 |
+| Inline upload (free)                      |               0 |      0 |           0 |            0 |          0 |          0 |             0 |               0 |
+| Download from 256t.us (free)              |               0 |      0 |           0 |            0 |          0 |          0 |             0 |               0 |
+| Inline download from 256t.us (free)       |               0 |      0 |           0 |            0 |          0 |          0 |             0 |               0 |
+| Request over 256t.us's per-IP limit       |               0 |      0 |           0 |            0 |          0 |          0 |             0 |               0 |
+| Download through the API (sold by the GB) |               0 |      0 |           0 |            0 |          0 |          0 |             0 |               0 |
+| Refused by the API's per-file limit       |               0 |      0 |           0 |            0 |          0 |          0 |             0 |               0 |
+#+TBLFM: @2$2=$upW::@2$3=$cpuBase+($cpuPerMB*$upMB)::@2$4=$upDO::@2$5=$upRows::@2$6=$upA::@2$7=0::@3$2=1::@3$3=$cpuBase::@3$4=$inDO::@3$5=$inRows::@3$6=$inA::@3$7=0::@4$2=1::@4$3=$cpuDl::@4$4=0::@4$5=0::@4$6=0::@4$7=$dlB::@5$2=1::@5$3=$cpuIn::@5$4=0::@5$5=0::@5$6=0::@5$7=$inB::@6$2=1::@6$3=$cpuIp::@6$4=0::@6$5=0::@6$6=0::@6$7=0::@7$2=1::@7$3=$cpuDl::@7$4=$apiDO::@7$5=$apiRows::@7$6=0::@7$7=$apiB::@8$2=1::@8$3=$cpuIp::@8$4=$rfDO::@8$5=0::@8$6=0::@8$7=$rfB::$8=(($2*$wReq)+($3*$cpuPrice)+($4*$doReq)+($4*($doMs/1000)*$doMem*$doGbs)+($5*$rowW)+($6*$clsA)+($7*$clsB))/1000000;%.8f::$9=1000000*$8;%.2f
+
+* 4. The floors
+
+The least HashBin can charge for each thing without paying Stripe and Cloudflare more than it
+collects. Floor = Cloudflare cost / what a dollar is worth after Stripe (section 2). Only storage
+and API bandwidth have a price today; everything else comes out of the storage margin.
+
+#+NAME: floors
+| What                                      | Cloudflare cost ($) | Floor, absorbing fees ($) | Floor, fee added at checkout ($) | Charged today ($) |
+|-------------------------------------------+---------------------+---------------------------+----------------------------------+-------------------|
+| 1 GB stored for a month                   |                   0 |                         0 |                                0 |                 0 |
+| 1 million paid uploads                    |                   0 |                         0 |                                0 |                 0 |
+| 1 million inline uploads                  |                   0 |                         0 |                                0 |                 0 |
+| 1 million downloads from 256t.us          |                   0 |                         0 |                                0 |                 0 |
+| 1 million inline downloads                |                   0 |                         0 |                                0 |                 0 |
+| 1 million requests over the per-IP limit  |                   0 |                         0 |                                0 |                 0 |
+| 1 million API downloads (1 MB each)       |                   0 |                         0 |                                0 |                 0 |
+| 1 million refused API downloads           |                   0 |                         0 |                                0 |                 0 |
+| Plan and domains, per month               |                   0 |                         0 |                                0 |                 0 |
+#+TBLFM: @2$2=$r2+((((1024/$upMB)*$metaKB)/1048576)*$doStore);%.4f::@3$2=remote(actions,@2$9);%.4f::@4$2=remote(actions,@3$9);%.4f::@5$2=remote(actions,@4$9);%.4f::@6$2=remote(actions,@5$9);%.4f::@7$2=remote(actions,@6$9);%.4f::@8$2=remote(actions,@7$9);%.4f::@9$2=remote(actions,@8$9);%.4f::@10$2=$workersBase+(($domainOrg+$domainUs)/12);%.4f::@2$5=$price;%.4f::@3$5=0;%.4f::@4$5=0;%.4f::@5$5=0;%.4f::@6$5=0;%.4f::@7$5=0;%.4f::@8$5=1000000*($dlMB/1024)*$bw;%.4f::@9$5=0;%.4f::@10$5=0;%.4f::$3=$2/remote(keep,@9$2);%.4f::$4=$2/remote(keep,@9$3);%.4f
+
+#+NAME: thresholds
+| Threshold                                                  | Absorbing fees | Fee added at checkout | Unit      |
+|------------------------------------------------------------+----------------+-----------------------+-----------|
+| Free 256t.us downloads one paid GB-month pays for          |              0 |                     0 | downloads |
+| Paid storage at today's price that covers plan and domains |              0 |                     0 | GB        |
+| Smallest file whose API downloads pay for themselves       |              0 |                     0 | KB        |
+#+TBLFM: @2$2=floor((($price*remote(keep,@9$2))-remote(floors,@2$2))/remote(actions,@4$8))::@2$3=floor((($price*remote(keep,@9$3))-remote(floors,@2$2))/remote(actions,@4$8))::@3$2=ceil(remote(floors,@10$2)/(($price*remote(keep,@9$2))-remote(floors,@2$2)))::@3$3=ceil(remote(floors,@10$2)/(($price*remote(keep,@9$3))-remote(floors,@2$2)))::@4$2=(remote(actions,@7$8)/($bw*remote(keep,@9$2)))*1048576;%.1f::@4$3=(remote(actions,@7$8)/($bw*remote(keep,@9$3)))*1048576;%.1f
+
+* 5. What customers would have to pay, by scenario
+
+Columns 2–6 are inputs (guesses). Downloads are from 256t.us. These costs include the free
+allowances, so a small site pays mostly the plan and domains. "Price floor" is the storage price
+at which money kept after Stripe exactly covers the Cloudflare bill; it uses =pass= to pick a
+column of section 2. "Profit" is at today's $0.03.
+
+#+NAME: scenarios
+| Scenario                         | Paid GB | Paid uploads/mo | Inline uploads/mo | Downloads M/mo | Over IP limit M/mo | Workers | DOs | R2 | Cloudflare $/mo | Price floor $/GB-mo | Profit $/mo |
+|----------------------------------+---------+-----------------+-------------------+----------------+--------------------+---------+-----+----+-----------------+---------------------+-------------|
+| Today (friends and testing)      |       2 |              50 |                20 |          0.001 |                  0 |       0 |   0 |  0 |               0 |                   0 |           0 |
+| Small                            |      50 |            2000 |               500 |            0.1 |               0.01 |       0 |   0 |  0 |               0 |                   0 |           0 |
+| Growing                          |    1000 |           30000 |              5000 |              1 |                0.1 |       0 |   0 |  0 |               0 |                   0 |           0 |
+| Busy                             |   20000 |          300000 |             50000 |             10 |                  1 |       0 |   0 |  0 |               0 |                   0 |           0 |
+| Growing + one viral file (200 M) |    1000 |           30000 |              5000 |            201 |                0.1 |       0 |   0 |  0 |               0 |                   0 |           0 |
+| Busy + one viral file (200 M)    |   20000 |          300000 |             50000 |            210 |                  1 |       0 |   0 |  0 |               0 |                   0 |           0 |
+| Growing + one IP retrying 100/s  |    1000 |           30000 |              5000 |              1 |                259 |       0 |   0 |  0 |               0 |                   0 |           0 |
+#+TBLFM: $7=(max(0,(((($3*$upW)+$4)/1000000)+$5+$6)-$wFree)*$wReq)+(max(0,(((($3*($cpuBase+($cpuPerMB*$upMB)))+($4*$cpuBase))/1000000)+($5*$cpuDl)+($6*$cpuIp))-$cpuFree)*$cpuPrice);%.2f::$8=(max(0,((($3*$upDO)+($4*$inDO))/1000000)-$doFree)*$doReq)+(max(0,(((($3*$upDO)+($4*$inDO))*($doMs/1000))*$doMem)-$doGbsFree)*($doGbs/1000000))+(max(0,((($3*$upRows)+($4*$inRows))/1000000)-$rowWFree)*$rowW)+(max(0,(((($2*1024)/$upMB)*$metaKB)/1048576)-$doStoreFree)*$doStore);%.2f::$9=(max(0,$2-$r2Free)*$r2)+(max(0,((($3*$upA)+($4*$inA))/1000000)-$clsAFree)*$clsA)+(max(0,($5*$dlB)-$clsBFree)*$clsB);%.2f::$10=$7+$8+$9+$workersBase+(($domainOrg+$domainUs)/12);%.2f::$11=($10/((remote(keep,@9$2)*(1-$pass))+(remote(keep,@9$3)*$pass)))/$2;%.4f::$12=(($price*$2)*((remote(keep,@9$2)*(1-$pass))+(remote(keep,@9$3)*$pass)))-$10;%.2f
+
+* 6. What this found
+
+- *The answer: at least $0.0164 for each paid GB-month, plus enough paid GB to cover $7.01 a month
+  for the plan and domains.* At today's $0.03 that takes about 514 paid GB, as long as free
+  downloads stay under about 7,000 per paid GB-month. Below that no sensible price works: with
+  2 GB stored, HashBin would have to charge $3.50 a GB-month (the Today row).
+- *Free downloads are the cost that can outrun any storage price.* Each 256t.us download is a
+  Worker request and four R2 reads (.deleted, .disputed, .meta, the file): about $1.78 per million
+  once the free allowances are used up. One file downloaded 200 million times a month costs about
+  $350 a month. The responses say "cache for a year", but a Worker on its own domain runs before
+  Cloudflare's cache, so every download reaches R2. Saving responses with the Cache API, or
+  folding the two marker checks into the .meta read, would cut most of those reads. Neither has
+  been tested.
+- *The per-IP limit is cheap but local.* A request over 30 a minute costs one Worker request
+  ($0.30 per million): one IP retrying 100 times a second for a month costs about $80. The count
+  lives in each Worker instance's memory, so it isn't global, and a bot using many IPs just gets
+  served (the viral rows).
+- *Today's checkout fee doesn't fully cover Stripe.* The code adds 2.9% + $0.30 to the credit,
+  but Stripe takes 2.9% of the total including that fee: about 1.7¢ short on a $10 deposit. The
+  total that comes out even is (credit + $0.30) / (1 − 0.029). See the table below.
+- *Disputes are the biggest Stripe cost after the card fee itself.* Each one loses the deposit and
+  $15; at the guessed 0.5% that's 1.25¢ of every dollar. International cards (+1.5%) and Stripe
+  Tax (0.5% once registered) aren't passed to the customer either.
+- *API bandwidth is sold by the GB but costs by the request.* A download through the hashbin.org
+  API costs about $2.40 per million however small the file (mostly the row recording when it was
+  last served), so selling it at $0.02 a GB loses money on files under about 136 KB. Each purchase
+  does round up to at least 1¢.
+- *src/utils/cost-estimation.js is out of date.* It charges R2 egress at $0.015 a GB (R2 egress is
+  free) and Worker requests at $0.50 per million (now $0.30).
+
+#+NAME: checkout
+| Credit bought | Charged today | Stripe takes | HashBin keeps | Short by | Total that comes out even |
+|---------------+---------------+--------------+---------------+----------+---------------------------|
+|             1 |             0 |            0 |             0 |        0 |                         0 |
+|             5 |             0 |            0 |             0 |        0 |                         0 |
+|            10 |             0 |            0 |             0 |        0 |                         0 |
+|            20 |             0 |            0 |             0 |        0 |                         0 |
+|            50 |             0 |            0 |             0 |        0 |                         0 |
+|           100 |             0 |            0 |             0 |        0 |                         0 |
+#+TBLFM: $2=$1+($stripePct*$1)+$stripeFix;%.2f::$3=($stripePct*$2)+$stripeFix;%.4f::$4=$2-$3;%.4f::$5=$1-$4;%.4f::$6=($1+$stripeFix)/(1-$stripePct);%.4f

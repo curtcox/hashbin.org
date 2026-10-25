@@ -4,7 +4,7 @@ Written 2026-10-24 for a loss budget of about **$500 a year**, with the owner in
 umbrella policy. This is research to plan with. It is not legal, tax, or insurance advice; the
 two places where a lawyer's hour is worth paying for are marked.
 
-The numbers live in four Sheets documents. Edit any input in the Source pane and the tables
+The numbers live in five Sheets documents. Edit any input in the Source pane and the tables
 recalculate; **Share** gives a link holding your edits.
 
 | Sheet | What it answers | Source |
@@ -13,6 +13,7 @@ recalculate; **Share** gives a link holding your edits.
 | [Pricing and scenarios][pricing] | What to charge, card fees, a year at several sizes, break-even | [pricing.org](pricing.org) |
 | [Cash reserve][reserve] | How much cash to keep | [reserve.org](reserve.org) |
 | [Fixed costs][fixed] | What the fixed costs are, where each number comes from, and what they leave out | [fixed-costs.org](fixed-costs.org) |
+| [Price floor][floor] | The least HashBin can charge and still collect more than it pays Stripe and Cloudflare, counting every charge a customer can cause | [price-floor.org](price-floor.org) |
 
 The `.org` files in this directory are the source of truth. The links open copies saved on
 HashBin on 2026-10-24 and kept until 2027-10-25; after changing a `.org` file, republish it with
@@ -66,9 +67,11 @@ within budget (pricing sheet, sections 3–4). The
    ($1.33). Instead, set a **$10 minimum deposit and absorb the fee** (5.9%, already in the
    break-even above), or sell fixed-price credit packs. This touches `src/utils/pricing.js`,
    `src/api/payments.js`, the deposit UI, and Terms §3.
-2. **Put a budget on downloads.** Downloads cost almost nothing until something goes viral. One
-   file downloaded 200 million times a month costs about **$1,070 a year** in Worker and R2
-   requests, twice your loss budget, and Cloudflare has no hard spending cap. Settle STATUS
+2. **Put a budget on downloads.** Downloads cost almost nothing until something goes viral. Each
+   256t.us download is a Worker request plus four uncached R2 reads, so one file downloaded 200
+   million times a month costs about **$350 a month** ([price-floor sheet][floor], section 5),
+   and Cloudflare has no hard spending cap. (The pricing sheet assumed one R2 read and a 50%
+   cache hit rate, and put this at about $1,070 a year.) Settle STATUS
    **B9**: give each CID a free allowance, then have the uploader pay about $1 per extra million
    requests (twice cost), or throttle. Also set Cloudflare billing notifications now.
 3. **Cap prepaid retention.** Uploads accept any number of months (`src/api/content.js`), and
@@ -137,6 +140,12 @@ for the same limits.
 - Checkout and Terms §3 describe the Stripe fee as a "card processing fee" (surcharge rules
   above).
 - The dispute form has no NCII category, and every dispute auto-expires after 30 days.
+- Checkout adds 2.9% + $0.30 to the credit, but Stripe takes 2.9% of the whole charge: about
+  1.7¢ short per $10 deposit. The even total is (credit + $0.30) / 0.971.
+- The 256t.us Worker sends `immutable` cache headers but never uses the Cache API, so every
+  download does four R2 reads. Its 30-a-minute IP limit is per instance, not global.
+- API bandwidth sells at $0.02/GB but costs per request, so it loses money on files under
+  about 136 KB.
 
 ## Where Sheets fell short for this job
 
@@ -170,3 +179,4 @@ long for a link fails, and the text is lost unless it was saved to HashBin.
 [pricing]: https://curtcox.github.io/sheets/#AAAAACWmhcqG6IBSCDuD9iXMJUIY_EZLojPuq0gDqgGrG9ECf8S3rp7q5_xtYmfl0Zh6McEx8hXR6QvUY2qBfa4xqiCU1w
 [reserve]: https://curtcox.github.io/sheets/#AAAAAAqzlWh391fy5fKEJ-DHmirUJ94U4JlxDm2sevsUQtEYBo0kVBJ7O01IAvoF8rWL1q8Ot0ozMNIvOquk1AJvsTNkMg
 [fixed]: https://curtcox.github.io/sheets/#AAAAABt92_XhJo04Xw3Ate2pnIl1_dNPCzyTH9skYvnHaxrXDOxmLeRWm0FllRWsNRZG2kA2QdKyeyCfb4gMBiMby0dpYQ
+[floor]: https://curtcox.github.io/sheets/#AAAAAFEl6qEGaLAteXumTY90Rly1GLqcNNXWdlvvkXppO30DMC4RfwXzPvv3AZYtpeuffPU4C4LxwQo7QEw13KXYGtY45Q
