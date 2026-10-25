@@ -139,6 +139,8 @@ form.addEventListener('submit', async (event) => {
       <strong>${escapeHtml(app.app_name)}</strong>
       <div>Client ID <code>${escapeHtml(app.client_id)}</code></div>
       <div>Client Secret <code>${escapeHtml(app.client_secret)}</code></div>
+      <small>Put the client ID in your app. The secret is shown only once and isn't needed for PKCE.
+        <a href="#client-credentials">What's the difference?</a></small>
     `;
     form.reset();
     showToast('Application registered', 'success');
