@@ -43,6 +43,19 @@ curl -X POST http://localhost:8787/api/balance/dev-deposit \
 
 This credits the local balance immediately and records a transaction in history.
 
+## Local OAuth
+
+`npm run dev:local` has no `OAUTH_SIGNING_KEY`, so `/oauth/authorize` answers
+`server_misconfigured`. To exercise OAuth publishing locally, start the server with a throwaway key:
+
+```bash
+npx wrangler dev --config wrangler.local.toml --local --var OAUTH_SIGNING_KEY:local-test-key
+```
+
+Approve a request without the browser by posting the authorize URL's query parameters as JSON to
+`/oauth/authorize` with `Authorization: LocalDev <user_id>` and `Accept: application/json`; the
+response's `redirect_to` is the callback URL. See [publishing from the command line](publishing-from-the-command-line.md).
+
 ## Helpful Endpoints
 
 - `GET /health` — confirms the server is running and shows `environment: "local"`
