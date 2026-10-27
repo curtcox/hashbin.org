@@ -4,7 +4,7 @@
 
 **Phase:** production configuration and acceptance; not verified in the production
 account. Backend implementation is in [done/clerk.md](../done/clerk.md).
-Updated 2026-10-25. This plan takes precedence over older dashboard recipes in
+Updated 2026-10-27 (account move and admin token retirement, section 3). This plan takes precedence over older dashboard recipes in
 [deployment_checklist.md](deployment_checklist.md).
 
 ## Access preference: API and CLI first
@@ -88,7 +88,56 @@ acceptance check complete.
   production instance and secret names using CI/Workers API metadata. This step
   deploys the repository revision and must follow the normal release process.
 
-## 3. API and browser acceptance
+## 3. Move existing HashBin accounts to production user IDs
+
+A production Clerk instance issues new user IDs; users do not carry over from the
+development instance. HashBin keys every account's data by the Clerk user ID, so
+each existing account (today only the owner's) must be moved to its new ID, or it
+signs in to an empty account while its balance, uploads and apps sit under the old
+one. Do this after CL7 and before anyone else signs up; it only gets harder with
+more accounts.
+
+What is keyed by the user ID, and what happens to it:
+
+| Data | Where | Move |
+|---|---|---|
+| Profile: balance and totals, uploads list, suppliers, settings, download caps, accounting outbox | `USER_PROFILES` object named by the user ID, with `user_id` inside | Copy to the new ID, rewriting `user_id` |
+| Balance history | `PAYMENT_RECORDS` object named by the user ID | Copy to the new ID |
+| Content ownership | `uploader_id` in each uploaded CID's `CONTENT_METADATA` | Rewrite, so the owner can still delete and extend |
+| Suppliers | owner user ID in each `SUPPLIER_REGISTRY` record | Rewrite |
+| Developer apps (e.g. "Claude Code publisher") | `owner_user_id` in `APPLICATION_REGISTRY` | Rewrite; the `client_id` is unchanged, so `publish.mjs` keeps its app |
+| API keys (`hbk_`) | signed route names the old user ID | Cannot move: revoke and reissue |
+| OAuth grants and refresh tokens (`hbr_<userId>.…`) | tokens name the old user ID | Cannot move: revoke, then re-approve each app (`publish.mjs authorize`) |
+| Admin keys (`hba_`) | signed route names the old ID, and must equal `ADMIN_USER_ID` | Cannot move: reissue after updating `ADMIN_USER_ID` |
+| Download sessions and signed links | token payload names the old user ID | Cannot move: they expire; create new ones |
+| Rate-limit purchases, deletion records, admin action log | historical `payer_id` / actor IDs | Leave as history |
+
+- [ ] **CL12 — Build the move.** Add a one-off admin-only operation (route or script
+  over the restore API) that, given an old and new user ID, copies the profile and
+  payment records, rewrites ownership in content metadata, suppliers and developer
+  apps, revokes keys, grants and refresh tokens in the copied profile, and marks
+  the old profile `deleted_at` with `migrated_to` so its balance cannot be spent
+  twice. It must be idempotent, report counts, and support a dry run. Cover it
+  with unit tests and a local rehearsal (two LocalDev users).
+- [ ] **CL13 — Move each account.** Run `POST /api/admin/backups/run` and confirm the
+  snapshot completed (see [backup-and-restore.md](../docs/backup-and-restore.md)).
+  Sign up once on the production instance with the same provider, record the new
+  user ID (`GET /api/auth/session`), and do nothing else in that account. Dry-run,
+  then run the move, overwriting the new, empty profile. Verify balance, upload
+  list, deleting/extending an own upload, suppliers and developer apps under the
+  new ID. Authenticate this step with the legacy admin token: admin keys and the
+  admin session both depend on `ADMIN_USER_ID`, which is about to change.
+- [ ] **CL14 — Re-point the admin.** Set the `ADMIN_USER_ID` GitHub secret to the new
+  ID and deploy (`gh workflow run deploy.yml --ref main`). Confirm
+  `/admin/keys.html` works while signed in, then reissue admin keys, API keys and
+  app approvals (`node scripts/publish.mjs authorize --limit 5`).
+- [ ] **CL15 — Retire the shared admin token.** Only after CL14 is verified, remove
+  `X-Admin-Token` support as listed under "Remaining" in
+  [scoped_keys.md](scoped_keys.md), drop its deploy step, and delete the
+  `ADMIN_SECRET_TOKEN` Worker and GitHub secrets. Until then it is the way back
+  into admin if the user ID changes.
+
+## 4. API and browser acceptance
 
 - [ ] **CL8 — HTTP checks.** Check `/health` and `/api/config` via HTTP. Current
   `/health` Clerk details expose `secretKeyConfigured`,
@@ -124,7 +173,7 @@ acceptance check complete.
 
 ## Completion criteria and manual exceptions
 
-Complete CL1–CL11 with evidence before marking production readiness done. For
+Complete CL1–CL15 with evidence before marking production readiness done. For
 any browser configuration fallback, record the exact setting, missing documented
 API/entitlement, manual action and verification. Missing credentials are an API
 access prerequisite, not a blanket browser-configuration requirement. Product
