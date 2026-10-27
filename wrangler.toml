@@ -172,6 +172,11 @@ new_sqlite_classes = ["ApplicationRegistry"]
 tag = "v10"
 new_sqlite_classes = ["BackupIndex"]
 
+# API keys carry their own signed route, so the key lookup table is no longer needed
+[[migrations]]
+tag = "v11"
+deleted_classes = ["KeyRegistry"]
+
 # Scheduled jobs (cron triggers)
 [triggers]
 crons = ["0 * * * *"]  # Hourly safety checks; maintenance at 02:00 UTC

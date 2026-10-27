@@ -4,7 +4,7 @@
  */
 
 import { adminActorId } from '../auth/admin.js';
-import { hasScope } from '../auth/scopes.js';
+import { checkCaveats, hasScope } from '../auth/scopes.js';
 
 /**
  * DELETE /api/content/{cid}
@@ -15,6 +15,10 @@ export async function handleDeleteContent(request, env, cid) {
     // The route requires content:delete or admin:takedown; only the latter reaches other users' content.
     const isAdmin = request.isAdmin === true || hasScope(request.auth, 'admin:takedown');
     const userId = adminActorId(request);
+    if (!isAdmin) {
+      const caveatDenied = checkCaveats(request.auth, { cid });
+      if (caveatDenied) return caveatDenied;
+    }
 
     // Get content metadata
     const contentId = env.CONTENT_METADATA.idFromName(cid);

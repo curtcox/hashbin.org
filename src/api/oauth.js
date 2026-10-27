@@ -312,7 +312,7 @@ export async function handleOAuthAuthorize(request, env) {
     const grant = await upsertGrant(env, authResult.user.userId, {
       app_id: app.app_id,
       scopes,
-      spending_limit: validation.spendingLimit
+      caveats: validation.spendingLimit === null ? {} : { monthly_spend_limit_cents: Math.round(validation.spendingLimit * 100) }
     });
 
     const now = Math.floor(Date.now() / 1000);
@@ -325,7 +325,6 @@ export async function handleOAuthAuthorize(request, env) {
       scopes,
       code_challenge: data.code_challenge,
       code_challenge_method: 'S256',
-      spending_limit: grant.spending_limit ?? null,
       iat: now,
       exp: now + AUTHORIZATION_CODE_TTL_SECONDS
     }, env.OAUTH_SIGNING_KEY);

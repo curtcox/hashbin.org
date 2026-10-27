@@ -185,7 +185,7 @@ async function serveContent(request, env, cid, extension = null, ctx = null, ide
   const inline = isInlineContent(cid);
   const price = identifiedDownloadPriceUc(decodeLengthPrefix(cid.slice(0, 8)));
   payment.price = price;
-  const confirmation = identity ? await confirmedFunding(env, identity, price) : null;
+  const confirmation = identity ? await confirmedFunding(env, identity, price, cid) : null;
   if (confirmation?.invalid) { enforceRateLimit(request); return textResponse(401, 'Invalid download identity'); }
   if (!confirmation?.funded) {
     if (identity) payment.payer = 'exhausted';

@@ -371,6 +371,8 @@
             <p>Uncheck anything this key no longer needs. Scopes can only be removed; create a new key for more access.</p>
             <div id="key-scope-options"></div>
             <button id="save-scopes-btn" class="btn btn-secondary" type="button" disabled>Remove unchecked scopes</button>
+            <h3>Limits</h3>
+            <ul id="key-caveats"></ul>
           </section>
           <section><h2>Download spending</h2>
             <p>Account and key caps both apply, and the key needs the <code>downloads:spend</code> scope.</p>
@@ -565,6 +567,26 @@
       }
       saveBtn.disabled = true;
       saveBtn.style.display = expired ? 'none' : '';
+
+      const labels = {
+        monthly_spend_limit_cents: value => `Spends at most $${(value / 100).toFixed(2)} a month`,
+        max_upload_bytes: value => `Uploads at most ${value} bytes`,
+        max_retention_months: value => `Buys at most ${value} months of retention at a time`,
+        content_types: value => `Uploads only ${value.join(', ')}`,
+        cids: value => `Acts only on ${value.length} listed CID${value.length === 1 ? '' : 's'}`
+      };
+      const list = document.getElementById('key-caveats');
+      list.replaceChildren();
+      for (const [name, value] of Object.entries(key.caveats || {})) {
+        const item = document.createElement('li');
+        item.textContent = labels[name] ? labels[name](value) : name;
+        list.append(item);
+      }
+      if (!list.children.length) {
+        const item = document.createElement('li');
+        item.textContent = 'No limits beyond its scopes and expiry';
+        list.append(item);
+      }
     }
 
     document.getElementById('save-scopes-btn').addEventListener('click', async () => {

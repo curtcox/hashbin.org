@@ -1,4 +1,5 @@
 import { downloadBudget, downloadIdentityValid, identityKey, UC_PER_CENT as UC, validDownloadCaps } from '../utils/download-budget.js';
+import { findSpender, recordSpend, rollSpend, spendRoomCents } from '../utils/credential-spend.js';
 import { readDownloadLease, downloadLeaseEntries } from './download-leases.js';
 import { stageDownloadOutbox, hasDownloadOutbox } from './download-outbox.js';
 export { flushDownloadOutbox } from './download-outbox.js';
@@ -45,8 +46,8 @@ async function returnLease(owner, profile, b, identity, data, writes, now) {
     if (b.spend.day === lease.day) usage.day_uc -= amount;
     if (b.spend.month === lease.month) usage.month_uc -= amount;
   }
-  const grant = lease.kind === 'oauth' && profile.oauth_grants?.find(g => g.grant_id === lease.k);
-  if (grant && b.spend.month === lease.month && grant.spending_reset === lease.grant_reset) grant.spending_used = Math.max(0, (grant.spending_used || 0) - amount / UC / 100);
+  const credential = (lease.kind === 'oauth' || lease.kind === 'key') && findSpender(profile, { kind: lease.kind, id: lease.k });
+  if (credential && b.spend.month === lease.month && credential.spend_reset === (lease.spend_reset ?? lease.grant_reset)) recordSpend(credential, -amount / UC);
   if (amount) outbox(profile, { revenue_cents: -amount / UC, period: lease.month });
 }
 
@@ -115,7 +116,7 @@ export async function handleDownloadBudget(owner, request) {
     // A returned remainder is independent of eligibility for a replacement.
     // Commit it even when revocation or the hard stop rejects that replacement.
     if (owner.env.COST_SAFETY_HARD_STOP === 'true') return reply({ funded: false, reason: 'hard_stop' }, 503);
-    if (!downloadIdentityValid(profile, data.identity)) return reply({ funded: false, reason: 'invalid_identity' }, 401);
+    if (!downloadIdentityValid(profile, data.identity, now.getTime(), typeof data.cid === 'string' ? data.cid : undefined)) return reply({ funded: false, reason: 'invalid_identity' }, 401);
     const identity = data.identity, price = data.price_uc;
     if (!Number.isSafeInteger(price) || price < 400 || !Number.isInteger(data.requests) || data.requests < 1 || data.requests > 250 ||
       typeof data.request_id !== 'string' || !data.request_id.length || data.request_id.length > 100) return reply({ error: 'Invalid lease' }, 400);
@@ -134,10 +135,12 @@ export async function handleDownloadBudget(owner, request) {
     for (const [caps, used] of [[b.account, b.spend.account], ...(identity.k ? [[b.keys[identity.k], usage]] : [])]) {
       room = Math.min(room, caps ? caps.daily_cap_cents * UC - used.day_uc : 0, caps ? caps.monthly_cap_cents * UC - used.month_uc : 0);
     }
-    const grant = identity.kind === 'oauth' && profile.oauth_grants.find(g => g.grant_id === identity.k);
-    if (grant) {
-      if (!grant.spending_reset || new Date(grant.spending_reset) <= now) { grant.spending_used = 0; grant.spending_reset = owner.nextMonthlyReset(now); }
-      if (grant.spending_limit != null) room = Math.min(room, Math.floor((grant.spending_limit - (grant.spending_used || 0)) * 100 * UC + 0.0001));
+    // The key or grant's own monthly spending limit applies on top of download caps
+    const credential = (identity.kind === 'oauth' || identity.kind === 'key') && findSpender(profile, { kind: identity.kind, id: identity.k }, now);
+    if (credential) {
+      rollSpend(credential, now, owner.nextMonthlyReset(now));
+      const credentialRoom = spendRoomCents(credential);
+      if (credentialRoom !== Infinity) room = Math.min(room, Math.floor(credentialRoom * UC + 0.0001));
     }
     const amount = Math.floor(Math.min(room, price * data.requests) / price) * price;
     if (amount < price) result = { funded: false, reason: 'exhausted' };
@@ -148,12 +151,12 @@ export async function handleDownloadBudget(owner, request) {
       b.float_uc -= amount;
       b.spend.account.day_uc += amount; b.spend.account.month_uc += amount;
       if (usage) { usage.day_uc += amount; usage.month_uc += amount; }
-      if (grant) grant.spending_used = (grant.spending_used || 0) + amount / UC / 100;
+      if (credential) recordSpend(credential, amount / UC);
       // Keep old leases long enough for delayed returns; evicted isolates remain spent.
       for (const [id, l] of Object.entries(b.leases)) if (l.expires_at < now.getTime() - 86400000) delete b.leases[id];
       const expires_at = Math.min(now.getTime() + 60000, Date.parse(`${b.spend.day}T00:00:00Z`) + 86400000,
         data.identity.exp ? data.identity.exp * 1000 : Infinity);
-      const lease = { identity: identityKey(identity), kind: identity.kind, k: identity.k, grant_reset: grant?.spending_reset,
+      const lease = { identity: identityKey(identity), kind: identity.kind, k: identity.k, spend_reset: credential?.spend_reset,
         price_uc: price, requests: data.requests, lease_uc: amount, expires_at, day: b.spend.day, month: b.spend.month };
       writes.set(data.request_id, lease);
       outbox(profile, { revenue_cents: amount / UC });

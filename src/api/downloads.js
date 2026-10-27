@@ -1,4 +1,5 @@
 import { authenticate, requireAuth } from '../auth/middleware.js';
+import { checkCaveats } from '../auth/scopes.js';
 import { signDownloadToken } from '../auth/download-tokens.js';
 import { getContentBaseUrl } from '../utils/content-domain.js';
 import { validate256tCID } from '../utils/hash256t.js';
@@ -29,6 +30,10 @@ async function routeDownloads(request, env) {
     if (minting && method === 'POST') {
       if (!env.DOWNLOAD_TOKEN_SECRET) return json({ error: 'Download signing is not configured' }, 503);
       if (!Array.isArray(data.cids) || !data.cids.length || data.cids.length > 100 || data.cids.some(cid => typeof cid !== 'string' || !validate256tCID(cid))) return json({ error: 'Supply 1–100 valid CIDs' }, 400);
+      for (const cid of data.cids) {
+        const caveatDenied = checkCaveats(auth, { cid });
+        if (caveatDenied) return caveatDenied;
+      }
       const seconds = data.expires_in ?? 3600;
       if (!Number.isInteger(seconds) || seconds < 1 || seconds > 7 * 86400) return json({ error: 'expires_in must be 1–604800 seconds' }, 400);
       const iat = Math.floor(Date.now() / 1000);

@@ -11,8 +11,6 @@ export { UserProfile } from './durable-objects/user-profile.js';
 export { PaymentRecord } from './durable-objects/payment-record.js';
 export { ContestRecord } from './durable-objects/contest-record.js';
 export { MessageThread } from './durable-objects/message-thread.js';
-// Unused; still exported until a later deploy deletes it with a migration, once no worker binds it
-export { KeyRegistry } from './durable-objects/key-registry.js';
 export { PlatformStats } from './durable-objects/platform-stats.js';
 export { AlertStore } from './durable-objects/alert-store.js';
 export { AuditLog } from './durable-objects/audit-log.js';

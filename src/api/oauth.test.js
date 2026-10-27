@@ -278,9 +278,9 @@ describe('OAuth API', () => {
 
     const approved = await authorize('7.25');
     expect(approved.status).toBe(302);
-    const code = new URL(approved.headers.get('location')).searchParams.get('code');
-    const payload = await verifyOAuthJwt(code, env.OAUTH_SIGNING_KEY);
-    expect(payload.spending_limit).toBe(7.25);
+    const grants = await (await env.USER_PROFILES.get(env.USER_PROFILES.idFromName('limit_user'))
+      .fetch(new Request('http://internal/oauth/grants'))).json();
+    expect(grants.authorizations[0].caveats.monthly_spend_limit_cents).toBe(725);
   });
 
   it('rejects token exchange when the PKCE verifier does not match', async () => {

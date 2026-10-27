@@ -4,6 +4,7 @@
  */
 
 import { authenticate } from '../auth/middleware.js';
+import { checkCaveats, spenderOf } from '../auth/scopes.js';
 import { 
   calculateRateLimitPrice, 
   validateRateLimitPurchase,
@@ -48,6 +49,10 @@ export async function handlePurchaseRateLimit(request, env) {
         }
       );
     }
+
+    const caveatDenied = checkCaveats(authResult, { cid });
+    if (caveatDenied) return caveatDenied;
+    const spender = spenderOf(authResult);
 
     if (!minTimeBetweenRequestsMs) {
       return new Response(
@@ -195,7 +200,7 @@ export async function handlePurchaseRateLimit(request, env) {
       new Request('http://internal/balance/debit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ amount_cents: pricing.priceCents })
+        body: JSON.stringify({ amount_cents: pricing.priceCents, spender })
       })
     );
 
@@ -228,12 +233,12 @@ export async function handlePurchaseRateLimit(request, env) {
     );
 
     if (!purchaseResponse.ok) {
-      // Rollback balance debit (credit it back)
+      // Rollback balance debit (credit it back, with the key's or app's spending room)
       await userProfileStub.fetch(
-        new Request('http://internal/balance/credit', {
+        new Request('http://internal/balance/deposit', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ amount_cents: pricing.priceCents })
+          body: JSON.stringify({ amount_cents: pricing.priceCents, spender })
         })
       );
 

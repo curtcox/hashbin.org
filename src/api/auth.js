@@ -6,7 +6,7 @@
 import { generateApiKey } from '../auth/download-tokens.js';
 import { validDownloadCaps } from '../utils/download-budget.js';
 import { authenticate, requireAuth } from '../auth/middleware.js';
-import { ALL_USER_SCOPES, parseScopes } from '../auth/scopes.js';
+import { ALL_USER_SCOPES, parseCaveats, parseScopes } from '../auth/scopes.js';
 import { hashApiKey, generateKeyId, validateKeyName, validateExpiration, isSessionFresh } from '../auth/utils.js';
 import { createClerkClient } from '@clerk/backend';
 
@@ -272,8 +272,8 @@ async function defaultKeyName(stub) {
  * Handle API key creation
  * POST /api/auth/apikeys (session only; enforced by the route table)
  *
- * Body: { name?, scopes, expires_at?, download_budget? }. A key holds only the
- * scopes named here, and is shown once: only its hash is stored.
+ * Body: { name?, scopes, caveats?, expires_at?, download_budget? }. A key holds only
+ * the scopes named here, limited by its caveats, and is shown once: only its hash is stored.
  */
 export async function handleCreateApiKey(request, env) {
   const authResult = await authenticate(request, env);
@@ -302,6 +302,11 @@ export async function handleCreateApiKey(request, env) {
     }, 400);
   }
 
+  const { caveats, error: caveatError } = parseCaveats(body.caveats, 'key');
+  if (caveatError) {
+    return jsonResponse({ error: 'Invalid caveats', message: caveatError }, 400);
+  }
+
   const expirationValidation = validateExpiration(body.expires_at);
   if (!expirationValidation.valid) {
     return jsonResponse({ error: 'Invalid expiration', message: expirationValidation.message }, 400);
@@ -326,6 +331,7 @@ export async function handleCreateApiKey(request, env) {
       download_budget: body.download_budget,
       name: keyName,
       scopes,
+      caveats,
       expires_at: expirationValidation.expiresAt
     })
   }));
@@ -373,9 +379,9 @@ export async function handleRevokeApiKey(request, env, keyId) {
 }
 
 /**
- * Rename an API key or narrow its scopes (never widen them)
+ * Rename an API key or narrow its scopes and caveats (never widen them)
  * PATCH /api/auth/apikeys/:keyId (session only; Clerk sessions must be fresh)
- * Body: { name?, scopes? }
+ * Body: { name?, scopes?, caveats? }
  */
 export async function handleUpdateApiKey(request, env, keyId) {
   const authResult = await authenticate(request, env);
@@ -422,8 +428,15 @@ export async function handleUpdateApiKey(request, env, keyId) {
     }
     update.scopes = scopes;
   }
+  if (body.caveats !== undefined) {
+    const { caveats, error: caveatError } = parseCaveats(body.caveats, 'key');
+    if (caveatError) {
+      return jsonResponse({ error: 'Invalid caveats', message: caveatError }, 400);
+    }
+    update.caveats = caveats;
+  }
   if (Object.keys(update).length === 0) {
-    return jsonResponse({ error: 'Nothing to update', message: 'Provide name or scopes' }, 400);
+    return jsonResponse({ error: 'Nothing to update', message: 'Provide name, scopes or caveats' }, 400);
   }
 
   return userProfileStub(env, authResult.user.userId).fetch(

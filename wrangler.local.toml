@@ -153,5 +153,10 @@ new_sqlite_classes = ["ApplicationRegistry"]
 tag = "v10"
 new_sqlite_classes = ["BackupIndex"]
 
+# API keys carry their own signed route, so the key lookup table is no longer needed
+[[migrations]]
+tag = "v11"
+deleted_classes = ["KeyRegistry"]
+
 # DOWNLOAD_TOKEN_SECRET: shared HMAC secret with 256t-content (required for new keys).
 # COST_SAFETY_HARD_STOP=true: emergency 503 for all content downloads.

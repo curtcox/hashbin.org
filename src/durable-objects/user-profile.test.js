@@ -749,4 +749,36 @@ describe('UserProfile Durable Object - P0 Key Management Tests', () => {
       expect(list[0].revoked).toBe(true);
     });
   });
+
+  describe('Credential spending limits', () => {
+    function post(path, body) {
+      return new Request(`http://test.com${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    }
+
+    it('holds a key to its monthly spend limit and returns room on refunds', async () => {
+      const key = createTestApiKey({ key_id: 'key_1', caveats: { monthly_spend_limit_cents: 200 } });
+      mockState = createMockState({ profile: createBasicProfile({ api_keys: [key], balance_cents: 1000 }) });
+      userProfile = new UserProfile(mockState, mockEnv);
+      const spender = { kind: 'key', id: 'key_1' };
+
+      expect((await userProfile.fetch(post('/balance/debit', { amount_cents: 150, spender }))).status).toBe(200);
+      const over = await userProfile.fetch(post('/balance/debit', { amount_cents: 51, spender }));
+      expect(over.status).toBe(400);
+      expect((await over.json()).error).toBe('spending_limit_exceeded');
+      expect((await userProfile.fetch(post('/balance/debit', { amount_cents: 50, spender }))).status).toBe(200);
+
+      expect((await userProfile.fetch(post('/balance/deposit', { amount_cents: 50, spender }))).status).toBe(200);
+      expect((await userProfile.fetch(post('/balance/debit', { amount_cents: 50, spender }))).status).toBe(200);
+      // The account's own session has no credential limit
+      expect((await userProfile.fetch(post('/balance/debit', { amount_cents: 300 }))).status).toBe(200);
+    });
+
+    it('refuses spending through a revoked key', async () => {
+      const key = createTestApiKey({ key_id: 'key_1', revoked_at: new Date().toISOString() });
+      mockState = createMockState({ profile: createBasicProfile({ api_keys: [key], balance_cents: 1000 }) });
+      userProfile = new UserProfile(mockState, mockEnv);
+      const response = await userProfile.fetch(post('/balance/debit', { amount_cents: 1, spender: { kind: 'key', id: 'key_1' } }));
+      expect((await response.json()).error).toBe('invalid_credential');
+    });
+  });
 });

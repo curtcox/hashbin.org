@@ -4,6 +4,8 @@
  */
 
 import { downloadBudget, validDownloadCaps } from '../utils/download-budget.js';
+import { findSpender, migrateGrantSpending, recordSpend, rollSpend, spendRoomCents } from '../utils/credential-spend.js';
+import { caveatsNarrower } from '../auth/scopes.js';
 import { handleDownloadBudget, flushDownloadOutbox } from './download-budget.js';
 import { pruneDownloadLeases } from './download-leases.js';
 import { COST_POLICY } from '../utils/cost-policy.js';
@@ -742,9 +744,9 @@ export class UserProfile {
   }
 
   /**
-   * Rename an API key or narrow its scopes. Scopes may only be removed, never added.
+   * Rename an API key or narrow its scopes and caveats; neither may ever be loosened.
    * @param {string} keyId
-   * @param {Request} request - body { name?, scopes? }, validated by the API handler
+   * @param {Request} request - body { name?, scopes?, caveats? }, validated by the API handler
    * @returns {Response}
    */
   async updateApiKey(keyId, request) {
@@ -780,6 +782,15 @@ export class UserProfile {
         }, { status: 400 });
       }
       apiKey.scopes = [...new Set(body.scopes)];
+    }
+    if (body.caveats !== undefined) {
+      if (!caveatsNarrower(apiKey.caveats || {}, body.caveats)) {
+        return Response.json({
+          error: 'CAVEAT_WIDENING',
+          message: 'A key\'s limits can only be tightened; create a new key for looser ones'
+        }, { status: 400 });
+      }
+      apiKey.caveats = body.caveats;
     }
     if (body.name !== undefined) {
       apiKey.name = body.name;
@@ -840,6 +851,7 @@ export class UserProfile {
     if (!profile.oauth_refresh_tokens) {
       profile.oauth_refresh_tokens = [];
     }
+    profile.oauth_grants.forEach(migrateGrantSpending);
   }
 
   async getSettings() {
@@ -916,18 +928,18 @@ export class UserProfile {
         user_id: profile.user_id,
         app_id: data.app_id,
         scopes: data.scopes || [],
-        spending_limit: data.spending_limit ?? null,
-        spending_used: 0,
-        spending_reset: this.nextMonthlyReset(),
+        caveats: data.caveats || {},
+        spend_used_cents: 0,
+        spend_reset: this.nextMonthlyReset(),
         created_at: new Date().toISOString(),
         revoked_at: null
       };
       profile.oauth_grants.push(grant);
     } else {
       grant.scopes = data.scopes || grant.scopes;
-      grant.spending_limit = data.spending_limit ?? grant.spending_limit ?? null;
-      if (!grant.spending_reset) {
-        grant.spending_reset = this.nextMonthlyReset();
+      grant.caveats = data.caveats || grant.caveats || {};
+      if (!grant.spend_reset) {
+        grant.spend_reset = this.nextMonthlyReset();
       }
     }
 
@@ -1183,6 +1195,9 @@ export class UserProfile {
 
     profile.balance_cents = balance_after;
     profile.total_deposited_cents = (profile.total_deposited_cents || 0) + amount_cents;
+    // A refund of a key's or app's debit also returns its monthly spending room
+    const spender = data.spender ? findSpender(profile, data.spender) : null;
+    if (spender) recordSpend(spender, -amount_cents);
     profile.updated_at = new Date().toISOString();
 
     await this.state.storage.put('profile', profile);
@@ -1234,34 +1249,18 @@ export class UserProfile {
       );
     }
 
-    if (data.oauth_grant_id) {
-      const grant = profile.oauth_grants.find((entry) => entry.grant_id === data.oauth_grant_id && !entry.revoked_at);
-      if (!grant) {
-        return new Response(JSON.stringify({
-          error: 'invalid_grant',
-          message: 'OAuth grant not found'
-        }), {
-          status: 400,
-          headers: { 'content-type': 'application/json' }
-        });
-      }
-
-      if (grant.spending_reset && new Date(grant.spending_reset) <= new Date()) {
-        grant.spending_used = 0;
-        grant.spending_reset = this.nextMonthlyReset();
-      }
-
-      if (grant.spending_limit !== null && grant.spending_limit !== undefined) {
-        const proposedSpend = (grant.spending_used || 0) + (amount_cents / 100);
-        if (proposedSpend > grant.spending_limit) {
-          return new Response(JSON.stringify({
-            error: 'spending_limit_exceeded',
-            message: 'This app would exceed its monthly spending limit'
-          }), {
-            status: 400,
-            headers: { 'content-type': 'application/json' }
-          });
-        }
+    // A key or app grant spends within its own monthly limit
+    const spender = data.spender ? findSpender(profile, data.spender) : null;
+    if (data.spender && !spender) {
+      return Response.json({ error: 'invalid_credential', message: 'The key or app authorization is no longer valid' }, { status: 400 });
+    }
+    if (spender) {
+      rollSpend(spender, new Date(), this.nextMonthlyReset());
+      if (amount_cents > spendRoomCents(spender)) {
+        return Response.json({
+          error: 'spending_limit_exceeded',
+          message: 'This would exceed the monthly spending limit set for this key or app'
+        }, { status: 400 });
       }
     }
 
@@ -1288,11 +1287,8 @@ export class UserProfile {
 
     profile.balance_cents = balance_after;
     profile.total_spent_cents = (profile.total_spent_cents || 0) + amount_cents;
-    if (data.oauth_grant_id) {
-      const grant = profile.oauth_grants.find((entry) => entry.grant_id === data.oauth_grant_id && !entry.revoked_at);
-      if (grant) {
-        grant.spending_used = (grant.spending_used || 0) + (amount_cents / 100);
-      }
+    if (spender) {
+      recordSpend(spender, amount_cents);
     }
     profile.updated_at = new Date().toISOString();
 

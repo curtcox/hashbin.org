@@ -93,7 +93,7 @@ describe('funded download accounting', () => {
     expect(b.float_uc).toBe(0); expect(f.read().balance_cents).toBe(10);
     expect(f.events().some(e => e.transaction?.type === 'download_refund')).toBe(true);
   });
-  it('applies OAuth spending_limit alongside other spending and download caps', async () => {
+  it('applies a grant spending limit (migrated from dollars) alongside other spending and download caps', async () => {
     const f = profileFixture({ oauth_grants: [{ grant_id: 'grant', app_id: 'app', scopes: ['downloads:spend'], spending_limit: 0.01, spending_used: 0.009, spending_reset: '2099-01-01' }] });
     await enabled(f);
     await f.call('key-budget', { kind: 'oauth', key_id: 'grant', caps: caps() }, 'PUT');
@@ -101,7 +101,8 @@ describe('funded download accounting', () => {
     const result = await (await lease(f, { identity: grant, requests: 250 })).json();
     expect(result.lease_uc).toBe(100000);
     expect((await (await lease(f, { identity: grant })).json()).funded).toBe(false);
-    expect(f.read().oauth_grants[0].spending_used).toBeCloseTo(0.01);
+    expect(f.read().oauth_grants[0].spend_used_cents).toBeCloseTo(1);
+    expect(f.read().oauth_grants[0].caveats.monthly_spend_limit_cents).toBe(1);
   });
   it('checks funding without charging file allowance requests', async () => {
     const f = profileFixture(); await enabled(f);

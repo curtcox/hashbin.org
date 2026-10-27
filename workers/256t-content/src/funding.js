@@ -36,15 +36,16 @@ async function call(env, identity, path, data) {
   if (!response.ok) throw new Error('Funding unavailable');
   return response.json();
 }
-export async function confirmedFunding(env, identity, price) {
+export async function confirmedFunding(env, identity, price, cid) {
   const cache = state(env).confirmations, key = `${idKey(identity)}:${price}`;
-  // Credential checks remain distinct even when their paid lease is shared.
-  const proof = JSON.stringify([key, identity.key_hash || null, identity.app_id || null]);
+  // Credential checks remain distinct even when their paid lease is shared, and per
+  // CID, since a credential may be limited to certain CIDs.
+  const proof = JSON.stringify([key, identity.key_hash || null, identity.app_id || null, cid || null]);
   let entry = cache.get(proof);
   if (!entry) { entry = {}; boundedSet(cache, proof, entry); }
   const confirmation = await exclusive(entry, async () => {
     if (!entry.expires_at || entry.expires_at <= Date.now()) {
-      const result = await call(env, identity, 'check', { price_uc: price, requests: 1, request_id: crypto.randomUUID() });
+      const result = await call(env, identity, 'check', { price_uc: price, requests: 1, request_id: crypto.randomUUID(), cid });
       Object.assign(entry, { funded: result.funded, invalid: result.invalid,
         expires_at: Math.min(Date.now() + 60000, (identity.exp || Infinity) * 1000) });
     }

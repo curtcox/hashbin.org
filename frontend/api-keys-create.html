@@ -231,6 +231,23 @@
                 <div id="scope-options"></div>
                 <span id="scopes-error" class="form-error hidden"></span>
               </fieldset>
+
+              <!-- Caveats -->
+              <fieldset class="form-group" id="key-caveats">
+                <legend class="form-label">Limits (optional)</legend>
+                <p class="form-help">Leave a field empty for no limit. Limits can be tightened later, never loosened.</p>
+                <label class="form-label" for="caveat-spend">Monthly spending limit (US dollars)</label>
+                <input id="caveat-spend" class="form-input" type="number" min="0.01" step="0.01" placeholder="e.g. 2.00">
+                <label class="form-label" for="caveat-bytes">Largest upload (bytes)</label>
+                <input id="caveat-bytes" class="form-input" type="number" min="1" step="1" placeholder="e.g. 1048576">
+                <label class="form-label" for="caveat-months">Longest retention per upload or extension (months)</label>
+                <input id="caveat-months" class="form-input" type="number" min="1" max="120" step="1" placeholder="e.g. 12">
+                <label class="form-label" for="caveat-types">Allowed content types (comma-separated)</label>
+                <input id="caveat-types" class="form-input" type="text" placeholder="e.g. text/plain, image/png">
+                <label class="form-label" for="caveat-cids">Only this content (CIDs, one per line)</label>
+                <textarea id="caveat-cids" class="form-input" rows="3" placeholder="Limits extending, deleting, rate-limit purchases and downloads to these CIDs"></textarea>
+                <span id="caveats-error" class="form-error hidden"></span>
+              </fieldset>
               
               <!-- Expiration Date Field -->
               <div class="form-group">
@@ -348,6 +365,19 @@
     }));
     const selectedScopes = () => [...document.querySelectorAll('input[name="scope"]:checked')].map(box => box.value);
 
+    // Caveats from the optional limit fields; empty fields add no limit
+    function readCaveats() {
+      const value = id => document.getElementById(id).value.trim();
+      const list = (id, separator) => value(id).split(separator).map(entry => entry.trim()).filter(Boolean);
+      const caveats = {};
+      if (value('caveat-spend')) caveats.monthly_spend_limit_cents = Math.round(Number(value('caveat-spend')) * 100);
+      if (value('caveat-bytes')) caveats.max_upload_bytes = Number(value('caveat-bytes'));
+      if (value('caveat-months')) caveats.max_retention_months = Number(value('caveat-months'));
+      if (value('caveat-types')) caveats.content_types = list('caveat-types', ',').map(type => type.toLowerCase());
+      if (value('caveat-cids')) caveats.cids = list('caveat-cids', /\s+/);
+      return caveats;
+    }
+
     // Set default expiration date (90 days from now)
     const expirationInput = document.getElementById('key-expiration');
     expirationInput.value = new Date(Date.now() + 90 * DAY_MS).toISOString().split('T')[0];
@@ -426,6 +456,7 @@
       try {
         const payload = {
           scopes,
+          caveats: readCaveats(),
           expires_at: expirationInput.value + 'T00:00:00Z',
           download_budget: readDownloadCaps('create-download')
         };

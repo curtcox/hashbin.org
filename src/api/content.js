@@ -4,6 +4,7 @@
  */
 
 import { authenticate } from '../auth/middleware.js';
+import { checkCaveats, spenderOf } from '../auth/scopes.js';
 import { COST_POLICY, retentionWithinCap } from '../utils/cost-policy.js';
 import { MAX_UPLOAD_BYTES, uploadTooLargeResponse } from '../utils/upload-limits.js';
 import { 
@@ -22,10 +23,10 @@ import { recordContentUpload, recordContentDownload, recordPayment } from '../ut
 import { tryAlternateSuppliers } from '../utils/supplier-fallback.js';
 import { buildContentUrl, getContentDomain } from '../utils/content-domain.js';
 
-async function undoDebit(profile, amount) {
+async function undoDebit(profile, amount, spender) {
   if (!amount) return;
   const response = await profile.fetch(new Request('http://internal/balance/deposit', {
-    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amount_cents: amount })
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ amount_cents: amount, spender })
   }));
   if (!response.ok) throw new Error('Failed to restore balance after rejected retention change');
 }
@@ -91,6 +92,8 @@ export async function handleUploadContent(request, env) {
     const url = new URL(request.url);
     const requestContentType = request.headers.get('content-type') || '';
     const isOAuthPublish = authResult.user.authMethod === 'oauth';
+    const caveats = authResult.user.caveats || {};
+    const spender = spenderOf(authResult);
 
     let retention_months = isOAuthPublish
       ? Number(authResult.user.profile?.default_retention_months || '1')
@@ -104,6 +107,9 @@ export async function handleUploadContent(request, env) {
     const declaredLength = parseInt(request.headers.get('content-length') || '', 10);
     if (Number.isFinite(declaredLength) && declaredLength > MAX_UPLOAD_BYTES + 64 * 1024) {
       return uploadTooLargeResponse(declaredLength);
+    }
+    if (caveats.max_upload_bytes && Number.isFinite(declaredLength) && declaredLength > caveats.max_upload_bytes + 64 * 1024) {
+      return checkCaveats(authResult, { bytes: declaredLength });
     }
 
     if (requestContentType.includes('multipart/form-data')) {
@@ -165,6 +171,13 @@ export async function handleUploadContent(request, env) {
         }
       );
     }
+
+    // Apps publish with the account's default retention, held to their retention cap
+    if (isOAuthPublish && caveats.max_retention_months) {
+      retention_months = Math.min(retention_months, caveats.max_retention_months);
+    }
+    const caveatDenied = checkCaveats(authResult, { bytes: size_bytes, retention_months, content_type: contentType });
+    if (caveatDenied) return caveatDenied;
 
     const userId = authResult.user.userId;
 
@@ -265,7 +278,7 @@ export async function handleUploadContent(request, env) {
           new Request('http://internal/balance/debit', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ amount_cents: extensionCost })
+            body: JSON.stringify({ amount_cents: extensionCost, spender })
           })
         );
 
@@ -295,7 +308,7 @@ export async function handleUploadContent(request, env) {
         })
       );
       if (!extendResponse.ok) {
-        if (extendResponse.status < 500) await undoDebit(userProfileStub, extensionCost);
+        if (extendResponse.status < 500) await undoDebit(userProfileStub, extensionCost, spender);
         return extendResponse;
       }
       const extendData = await extendResponse.json();
@@ -363,7 +376,7 @@ export async function handleUploadContent(request, env) {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             amount_cents: cost_cents,
-            oauth_grant_id: isOAuthPublish ? authResult.user.oauth?.grantId : undefined
+            spender
           })
         })
       );
@@ -408,7 +421,7 @@ export async function handleUploadContent(request, env) {
     );
 
     if (!metadataResponse.ok) {
-      if (metadataResponse.status < 500) await undoDebit(userProfileStub, cost_cents);
+      if (metadataResponse.status < 500) await undoDebit(userProfileStub, cost_cents, spender);
       return metadataResponse;
     }
     const metadata = await metadataResponse.json();
@@ -630,6 +643,10 @@ export async function handleExtendContent(request, env, cid) {
       );
     }
 
+    const caveatDenied = checkCaveats(authResult, { cid, retention_months: months_to_add });
+    if (caveatDenied) return caveatDenied;
+    const spender = spenderOf(authResult);
+
     const userId = authResult.user.userId;
 
     // Get content metadata to find size
@@ -694,7 +711,7 @@ export async function handleExtendContent(request, env, cid) {
         new Request('http://internal/balance/debit', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ amount_cents: cost_cents })
+          body: JSON.stringify({ amount_cents: cost_cents, spender })
         })
       );
 
@@ -725,7 +742,7 @@ export async function handleExtendContent(request, env, cid) {
     );
 
     if (!extendResponse.ok) {
-      if (extendResponse.status < 500) await undoDebit(userProfileStub, cost_cents);
+      if (extendResponse.status < 500) await undoDebit(userProfileStub, cost_cents, spender);
       return extendResponse;
     }
     const extendData = await extendResponse.json();
