@@ -33,6 +33,13 @@ describe('read-only observation export', () => {
     expect((await exportCostHistory('https://example.com', 'private-token', request)).snapshots).toHaveLength(1);
     expect(new URL(request.mock.calls[1][0]).searchParams.get('before')).toBe('2026-11-01T01:2026-10');
     expect(request.mock.calls[0][1].redirect).toBe('error');
+    expect(request.mock.calls[0][1].headers).toEqual({ 'X-Admin-Token': 'private-token' });
+  });
+
+  it('sends an admin key as an ApiKey credential', async () => {
+    const request = vi.fn().mockResolvedValue(Response.json({ snapshots: [], next_before: null }));
+    await exportCostHistory('https://example.com', 'hba_route.random.tag', request);
+    expect(request.mock.calls[0][1].headers).toEqual({ Authorization: 'ApiKey hba_route.random.tag' });
   });
   it('rejects credential leaks, missing tokens and pagination loops', async () => {
     await expect(exportCostHistory('http://example.com', 'private')).rejects.toThrow('HTTPS');

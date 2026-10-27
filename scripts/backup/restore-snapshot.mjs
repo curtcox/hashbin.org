@@ -2,7 +2,10 @@
  * Restore Durable Object state from a backup snapshot through the admin API.
  *
  * Usage:
- *   ADMIN_TOKEN=... node scripts/backup/restore-snapshot.mjs --run <run_id> [options]
+ *   ADMIN_KEY=hba_... node scripts/backup/restore-snapshot.mjs --run <run_id> [options]
+ *
+ * ADMIN_KEY is an admin key with admin:backups and admin:restore (issue one at
+ * /admin/keys.html). ADMIN_TOKEN, the legacy shared admin token, also still works.
  *
  * Options:
  *   --base-url <url>     API origin (default https://hashbin.org)
@@ -28,7 +31,8 @@ const onlyBinding = option('--binding');
 const onlyName = option('--name');
 const overwrite = flag('--overwrite');
 const dryRun = flag('--dry-run');
-const token = process.env.ADMIN_TOKEN;
+const token = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN;
+const credentialHeaders = token?.startsWith('hba_') ? { Authorization: `ApiKey ${token}` } : { 'X-Admin-Token': token };
 
 function fail(message) {
   console.error(message);
@@ -38,14 +42,14 @@ function fail(message) {
 async function api(path, init = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
-    headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json', ...(init.headers || {}) }
+    headers: { ...credentialHeaders, 'Content-Type': 'application/json', ...(init.headers || {}) }
   });
   return response;
 }
 
 async function main() {
   if (!runId || !token) {
-    fail('Usage: ADMIN_TOKEN=... node scripts/backup/restore-snapshot.mjs --run <run_id> [--binding B] [--name N] [--overwrite] [--dry-run] [--base-url URL]');
+    fail('Usage: ADMIN_KEY=hba_... node scripts/backup/restore-snapshot.mjs --run <run_id> [--binding B] [--name N] [--overwrite] [--dry-run] [--base-url URL]');
     return;
   }
 

@@ -274,7 +274,7 @@ jobs:
             echo "$ADMIN_USER_ID" | npx wrangler secret put ADMIN_USER_ID
             echo "✅ ADMIN_USER_ID configured"
           else
-            echo "ℹ️ ADMIN_USER_ID not set; admin moderation is available via ADMIN_SECRET_TOKEN only"
+            echo "⚠️ ADMIN_USER_ID not set; nobody can sign in as admin or issue admin keys"
           fi
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

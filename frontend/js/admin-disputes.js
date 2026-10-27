@@ -1,9 +1,10 @@
 /**
  * Admin moderation page (/admin/disputes.html)
- * Uses the X-Admin-Token admin API; the token lives only in sessionStorage.
+ * Acts as the signed-in admin; the legacy admin token, if entered, lives only in sessionStorage.
  */
 
 import { escapeHtml } from '/js/html.js';
+import { adminHeaders } from '/js/admin-auth.js';
 import { claimTypeLabel, formatDisputeDate, isHttpsUrl, statusLabel } from '/js/disputes.js';
 
 const TOKEN_KEY = 'hashbin.adminToken';
@@ -33,11 +34,12 @@ let memoryToken = getToken();
 async function adminFetch(path, init = {}) {
   const response = await fetch(path, {
     ...init,
-    headers: { 'X-Admin-Token': memoryToken || '', 'Content-Type': 'application/json', ...(init.headers || {}) }
+    headers: { ...await adminHeaders(memoryToken), 'Content-Type': 'application/json', ...(init.headers || {}) }
   });
   if (response.status === 401 || response.status === 403) {
+    const hadToken = Boolean(memoryToken);
     setToken(null);
-    showTokenForm('That token was rejected.');
+    showTokenForm(hadToken ? 'That token was rejected.' : 'Sign in as the admin, or enter the legacy admin token.');
     throw new Error('unauthorized');
   }
   return response;
@@ -166,4 +168,4 @@ document.getElementById('sign-out').addEventListener('click', () => {
   showTokenForm();
 });
 
-if (memoryToken) start();
+start();

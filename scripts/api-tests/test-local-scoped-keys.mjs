@@ -64,4 +64,22 @@ expectStatus(await call(`/api/auth/apikeys/${keyId}`, { method: 'PATCH', body: {
 expectStatus(await call(`/api/auth/apikeys/${keyId}`, { method: 'PATCH', body: { caveats: { max_upload_bytes: 1024, max_retention_months: 12, monthly_spend_limit_cents: oneUpload } } }), 200, 'Tighten a caveat');
 expectStatus(await upload(2048, 1), 403, 'Publish above the tightened size', 'caveat_violation');
 
+// Admin keys, when the local Worker runs with --var ADMIN_USER_ID:<ADMIN_USER>
+if (process.env.ADMIN_USER) {
+  const admin = `LocalDev ${process.env.ADMIN_USER}`;
+  expectStatus(await call('/api/admin/keys', { method: 'POST', body: { scopes: ['admin:stats'], expires_in_days: 7 } }), 403, 'Non-admin issues an admin key', 'not_admin');
+  expectStatus(await call('/api/admin/keys', { method: 'POST', authorization: admin, body: { scopes: ['admin:stats'], expires_in_days: 91 } }), 400, 'Admin key beyond 90 days');
+  const issued = await call('/api/admin/keys', { method: 'POST', authorization: admin, body: { name: 'Stats only', scopes: ['admin:stats'], expires_in_days: 7 } });
+  expectStatus(issued, 201, 'Issue an admin:stats key');
+  const adminKey = `ApiKey ${issued.data.admin_key}`;
+  expectStatus(await call('/api/admin/stats', { authorization: adminKey }), 200, 'Admin key reads statistics');
+  expectStatus(await call('/api/admin/costs', { authorization: adminKey }), 403, 'Admin key outside its scope', 'insufficient_scope');
+  expectStatus(await call('/api/admin/keys', { method: 'POST', authorization: adminKey, body: { scopes: ['admin:stats'], expires_in_days: 7 } }), 403, 'Admin key issues another', 'session_required');
+  expectStatus(await call('/api/balance', { authorization: adminKey }), 403, 'Admin key acts as a user', 'insufficient_scope');
+  const adminUserKey = await call('/api/auth/apikeys', { method: 'POST', authorization: admin, body: { scopes: ['balance:read'] } });
+  expectStatus(await call('/api/admin/stats', { authorization: `ApiKey ${adminUserKey.data.api_key}` }), 403, 'The admin\'s own user key reaches admin', 'insufficient_scope');
+  expectStatus(await call(`/api/admin/keys/${issued.data.key_id}`, { method: 'DELETE', authorization: admin }), 200, 'Revoke the admin key');
+  expectStatus(await call('/api/admin/stats', { authorization: adminKey }), 401, 'Revoked admin key');
+}
+
 console.log(`PASS: ${checks} scoped-key checks`);

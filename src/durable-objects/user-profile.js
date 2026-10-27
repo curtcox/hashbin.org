@@ -204,6 +204,25 @@ export class UserProfile {
         return await this.narrowOAuthGrant(grantId, await request.json());
       }
 
+      if (url.pathname === '/admin-keys' && method === 'POST') {
+        return await this.createAdminKey(await request.json());
+      }
+
+      if (url.pathname === '/admin-keys' && method === 'GET') {
+        return await this.listAdminKeys();
+      }
+
+      const adminKeyMatch = url.pathname.match(/^\/admin-keys\/([^/]+)(\/use)?$/);
+      if (adminKeyMatch && method === 'GET') {
+        return await this.getAdminKey(adminKeyMatch[1]);
+      }
+      if (adminKeyMatch && method === 'DELETE') {
+        return await this.revokeAdminKey(adminKeyMatch[1]);
+      }
+      if (adminKeyMatch?.[2] && method === 'POST') {
+        return await this.recordAdminKeyUse(adminKeyMatch[1]);
+      }
+
       if (url.pathname === '/oauth/codes/redeem' && method === 'POST') {
         return await this.redeemOAuthCode(await request.json());
       }
@@ -978,6 +997,75 @@ export class UserProfile {
     profile.updated_at = new Date().toISOString();
     await this.state.storage.put('profile', profile);
     return Response.json(grant);
+  }
+
+  /**
+   * Admin keys live in the admin's own profile, stored as hashes only.
+   * Body { key_id, key_hash, name, scopes, expires_at }, validated by the API handler.
+   */
+  async createAdminKey(data) {
+    const profile = await this.state.storage.get('profile');
+    if (!profile) {
+      return Response.json({ error: 'Profile not found' }, { status: 404 });
+    }
+    const keys = profile.admin_keys ||= [];
+    if (keys.filter((key) => !key.revoked_at && new Date(key.expires_at) > new Date()).length >= MAX_API_KEYS) {
+      return Response.json({ error: 'AUTH_KEY_LIMIT', message: `Maximum of ${MAX_API_KEYS} admin keys allowed` }, { status: 400 });
+    }
+    const key = {
+      key_id: data.key_id,
+      key_hash: data.key_hash,
+      name: data.name,
+      scopes: data.scopes,
+      created_at: new Date().toISOString(),
+      expires_at: data.expires_at,
+      last_used_at: null,
+      usage_count: 0,
+      revoked_at: null
+    };
+    keys.push(key);
+    profile.updated_at = new Date().toISOString();
+    await this.state.storage.put('profile', profile);
+    const { key_hash: _hash, ...visible } = key;
+    return Response.json(visible, { status: 201 });
+  }
+
+  async listAdminKeys() {
+    const profile = await this.state.storage.get('profile');
+    if (!profile) {
+      return Response.json({ error: 'Profile not found' }, { status: 404 });
+    }
+    return Response.json((profile.admin_keys || []).map(({ key_hash: _hash, ...visible }) => visible));
+  }
+
+  async getAdminKey(keyId) {
+    const profile = await this.state.storage.get('profile');
+    const key = profile?.admin_keys?.find((entry) => entry.key_id === keyId);
+    return key ? Response.json(key) : Response.json({ error: 'Admin key not found' }, { status: 404 });
+  }
+
+  async revokeAdminKey(keyId) {
+    const profile = await this.state.storage.get('profile');
+    const key = profile?.admin_keys?.find((entry) => entry.key_id === keyId);
+    if (!key) {
+      return Response.json({ error: 'Admin key not found' }, { status: 404 });
+    }
+    key.revoked_at ||= new Date().toISOString();
+    profile.updated_at = new Date().toISOString();
+    await this.state.storage.put('profile', profile);
+    return Response.json({ success: true, revoked_at: key.revoked_at });
+  }
+
+  async recordAdminKeyUse(keyId) {
+    const profile = await this.state.storage.get('profile');
+    const key = profile?.admin_keys?.find((entry) => entry.key_id === keyId);
+    if (!key) {
+      return Response.json({ error: 'Admin key not found' }, { status: 404 });
+    }
+    key.last_used_at = new Date().toISOString();
+    key.usage_count = (key.usage_count || 0) + 1;
+    await this.state.storage.put('profile', profile);
+    return Response.json({ success: true });
   }
 
   /**

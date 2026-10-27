@@ -1,3 +1,5 @@
+import { adminHeaders } from '/js/admin-auth.js';
+
 const byId = id => document.getElementById(id);
 const money = cents => Number.isFinite(cents) ? `$${(cents / 100).toFixed(2)}` : 'Unavailable';
 
@@ -6,7 +8,7 @@ async function load(brake) {
   try {
     const response = await fetch('/api/admin/cost-safety', {
       method: typeof brake === 'boolean' ? 'POST' : 'GET',
-      headers: { 'X-Admin-Token': byId('admin-token').value, 'Content-Type': 'application/json' },
+      headers: { ...await adminHeaders(byId('admin-token').value || null), 'Content-Type': 'application/json' },
       ...(typeof brake === 'boolean' ? { body: JSON.stringify({ brake }) } : {})
     });
     if (!response.ok) throw new Error(`Request failed (HTTP ${response.status})`);
@@ -37,3 +39,4 @@ async function load(brake) {
 byId('cost-form').addEventListener('submit', event => { event.preventDefault(); load(); });
 byId('brake-enable').addEventListener('click', () => load(true));
 byId('brake-disable').addEventListener('click', () => load(false));
+load();

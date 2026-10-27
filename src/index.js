@@ -145,7 +145,8 @@ import {
 
 import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js';
 import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
-import { PUBLIC, SESSION, USER_SCOPES, checkAccess, isSessionAuth } from './auth/scopes.js';
+import { ADMIN_SESSION, PUBLIC, SESSION, USER_SCOPES, checkAccess, isSessionAuth } from './auth/scopes.js';
+import { handleCreateAdminKey, handleListAdminKeys, handleRevokeAdminKey } from './api/admin-keys.js';
 import { handleClerkWebhook } from './api/clerk-webhook.js';
 
 // Configuration constants
@@ -706,6 +707,9 @@ const API_ROUTES = [
   { method: 'POST', path: /^\/api\/suppliers\/([^/]+)\/scan$/, access: 'suppliers:write', handler: (request, env, m) => handleRescanSupplier(request, env, m[1]) },
 
   // Admin
+  { method: 'POST', path: '/api/admin/keys', access: ADMIN_SESSION, handler: handleCreateAdminKey },
+  { method: 'GET', path: '/api/admin/keys', access: ADMIN_SESSION, handler: handleListAdminKeys },
+  { method: 'DELETE', path: /^\/api\/admin\/keys\/([^/]+)$/, access: ADMIN_SESSION, handler: (request, env, m) => handleRevokeAdminKey(request, env, m[1]) },
   { method: 'GET', path: '/api/admin/disputes', access: 'admin:disputes', handler: handleAdminListDisputes },
   { method: 'PATCH', path: /^\/api\/admin\/disputes\/([^/]+)$/, access: 'admin:disputes', handler: (request, env, m) => handleAdminUpdateDispute(request, env, m[1]) },
   { method: 'POST', path: /^\/api\/admin\/content\/([^/]+)\/delete$/, access: 'admin:takedown', handler: (request, env, m) => handleAdminDeleteContent(request, env, m[1]) },

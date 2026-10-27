@@ -27,7 +27,7 @@ jobs:
 
       - name: Start local server
         run: |
-          npm run dev:local -- --var DOWNLOAD_TOKEN_SECRET:local-ci-only --var OAUTH_SIGNING_KEY:local-oauth-ci-only &
+          npm run dev:local -- --var DOWNLOAD_TOKEN_SECRET:local-ci-only --var OAUTH_SIGNING_KEY:local-oauth-ci-only --var ADMIN_USER_ID:local_admin &
           echo $! > /tmp/server.pid
 
       - name: Wait for server ready
@@ -48,6 +48,8 @@ jobs:
 
       - name: Run API Tests
         run: bash scripts/run-all-api-tests.sh
+        env:
+          ADMIN_USER: local_admin
 
       - name: Verify native funded downloads with isolated local Workers
         run: npm run test:funded:local

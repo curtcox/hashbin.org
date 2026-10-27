@@ -242,6 +242,36 @@ async function validateApiKey(apiKey, env) {
   }
 }
 
+/**
+ * Validate an hba_ admin key: signed for ADMIN_USER_ID, stored (as a hash) in that
+ * account's profile, unrevoked and unexpired. It holds only its own admin scopes.
+ */
+async function validateAdminKey(adminKey, env) {
+  const invalid = { valid: false, error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT, message: 'Admin key not found' };
+  let route;
+  try {
+    route = await verifyApiKey(adminKey, env.DOWNLOAD_TOKEN_SECRET, 'hba');
+  } catch (_error) {
+    return invalid;
+  }
+  if (!env.ADMIN_USER_ID || route.u !== env.ADMIN_USER_ID) return invalid;
+
+  try {
+    const profileStub = env.USER_PROFILES.get(env.USER_PROFILES.idFromName(route.u));
+    const response = await profileStub.fetch(new Request(`http://internal/admin-keys/${encodeURIComponent(route.k)}`));
+    if (!response.ok) return invalid;
+    const key = await response.json();
+    if (key.key_hash !== await hashApiKey(adminKey)) return invalid;
+    if (key.revoked_at) return { valid: false, error: AUTH_ERROR_CODES.AUTH_KEY_REVOKED, message: 'Admin key has been revoked' };
+    if (new Date(key.expires_at) <= new Date()) return { valid: false, error: AUTH_ERROR_CODES.AUTH_EXPIRED, message: 'Admin key has expired' };
+
+    profileStub.fetch(new Request(`http://internal/admin-keys/${encodeURIComponent(route.k)}/use`, { method: 'POST' })).catch(() => {});
+    return { valid: true, userId: route.u, keyId: route.k, scopes: (key.scopes || []).filter(scope => scope.startsWith('admin:')) };
+  } catch (_error) {
+    return invalid;
+  }
+}
+
 async function validateOAuthAccessToken(token, env) {
   if (!env.OAUTH_SIGNING_KEY) {
     return {
@@ -573,6 +603,26 @@ async function authenticateUncached(request, env) {
           grantId: oauthValidation.grantId,
           scopes: oauthValidation.scopes
         }
+      },
+      error: null
+    };
+  }
+
+  // Admin key authentication
+  if (auth.type === 'apikey' && auth.value?.startsWith('hba_')) {
+    const validation = await validateAdminKey(auth.value, env);
+    if (!validation.valid) {
+      return { authenticated: false, user: null, error: validation.error };
+    }
+    return {
+      authenticated: true,
+      user: {
+        userId: validation.userId,
+        keyId: validation.keyId,
+        authMethod: 'admin_key',
+        session: false,
+        scopes: validation.scopes,
+        caveats: {}
       },
       error: null
     };

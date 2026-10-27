@@ -28,11 +28,12 @@
     <h1>Cost safety</h1>
     <p><a href="/admin/disputes.html">Moderation</a></p>
     <form id="cost-form" class="card">
-      <label for="admin-token">Admin token (kept in memory until this page closes)</label>
-      <input id="admin-token" type="password" autocomplete="off" class="form-input" required>
+      <p>Sign in as the admin to load costs. <a href="/admin/keys.html">Admin keys</a></p>
+      <label for="admin-token">Or the legacy admin token (kept in memory until this page closes)</label>
+      <input id="admin-token" type="password" autocomplete="off" class="form-input">
       <button class="btn btn-primary" type="submit">Refresh</button>
     </form>
-    <p id="cost-status" role="status" aria-live="polite">Enter your admin token to load costs.</p>
+    <p id="cost-status" role="status" aria-live="polite">Loading costs...</p>
     <section id="cost-report" class="card" hidden>
       <dl>
         <dt>Month to date</dt><dd id="cost-mtd"></dd>

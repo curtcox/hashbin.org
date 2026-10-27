@@ -43,6 +43,8 @@ export const ALL_ADMIN_SCOPES = Object.freeze(Object.keys(ADMIN_SCOPES));
 // Route access levels besides a scope (or list of scopes, any one of which suffices).
 export const PUBLIC = 'public';
 export const SESSION = 'session';
+// The ADMIN_USER_ID account's own session (not an admin key), for issuing admin keys
+export const ADMIN_SESSION = 'admin-session';
 
 /**
  * Parse a list of scopes for a credential kind ('key' | 'oauth' | 'admin').
@@ -91,6 +93,10 @@ export function checkAccess(authResult, access, unauthenticated) {
   if (access === PUBLIC) return null;
   if (!authResult?.authenticated) return unauthenticated();
   if (access === SESSION) return isSessionAuth(authResult) ? null : sessionRequiredResponse();
+  if (access === ADMIN_SESSION) {
+    if (!isSessionAuth(authResult)) return sessionRequiredResponse();
+    return authResult.user.scopes?.some(scope => scope.startsWith('admin:')) ? null : jsonError(403, 'not_admin', 'Only the admin may manage admin keys');
+  }
   const anyOf = Array.isArray(access) ? access : [access];
   return anyOf.some(scope => hasScope(authResult, scope)) ? null : insufficientScopeResponse(anyOf.join(' or '));
 }

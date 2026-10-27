@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <title>Admin Keys - HashBin.org Admin</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <style>
+    .admin-keys-form { display: grid; gap: 0.75rem; }
+    .admin-keys-form fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 0.35rem; }
+    .admin-keys-form label { display: flex; gap: 0.5rem; align-items: baseline; }
+    .admin-key-value { font-family: 'Courier New', monospace; word-break: break-all; padding: 0.75rem; background: var(--color-bg-light, #f3f4f6); border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--color-border, #e5e7eb); vertical-align: top; }
+    @media (max-width: 600px) { main.container { padding: 1rem; } th, td { padding: 0.35rem; } }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main class="container" style="max-width: 900px;">
+    <h1>Admin keys</h1>
+    <p><a href="/admin/disputes.html">Moderation</a> · <a href="/admin/costs.html">Cost safety</a></p>
+    <p>An admin key holds only the admin scopes you pick, for at most 90 days. Scripts use it as
+      <code>Authorization: ApiKey hba_…</code>. Only the admin's own sign-in can issue or revoke them.</p>
+    <p id="keys-status" role="status" aria-live="polite">Loading...</p>
+
+    <section class="card" id="create-card" hidden>
+      <h2>Issue a key</h2>
+      <form id="create-form" class="admin-keys-form">
+        <label for="key-name">Name <input id="key-name" class="form-input" maxlength="100" placeholder="e.g. Cost report"></label>
+        <fieldset>
+          <legend>Scopes *</legend>
+          <div id="scope-options"></div>
+        </fieldset>
+        <label for="key-days">Expires in (days, 1–90) <input id="key-days" class="form-input" type="number" min="1" max="90" value="30" required></label>
+        <button class="btn btn-primary" type="submit">Issue key</button>
+      </form>
+      <div id="new-key" hidden>
+        <p><strong>Copy this key now; it cannot be shown again.</strong></p>
+        <p class="admin-key-value" id="new-key-value"></p>
+      </div>
+    </section>
+
+    <section class="card" id="list-card" hidden>
+      <h2>Keys</h2>
+      <table>
+        <thead><tr><th>Name</th><th>Scopes</th><th>Expires</th><th>Last used</th><th></th></tr></thead>
+        <tbody id="key-rows"></tbody>
+      </table>
+    </section>
+  </main>
+
+  <script type="module">
+    import { authenticatedFetch } from '/js/utils.js';
+    import { renderNavHeader } from '/js/nav-header.js';
+
+    renderNavHeader();
+    const byId = id => document.getElementById(id);
+    const status = byId('keys-status');
+
+    async function api(path, init = {}) {
+      const response = await authenticatedFetch(path, { ...init, headers: { 'Content-Type': 'application/json', ...(init.headers || {}) } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || data.error || `HTTP ${response.status}`);
+      return data;
+    }
+
+    function cell(text) {
+      const td = document.createElement('td');
+      td.textContent = text;
+      return td;
+    }
+
+    async function load() {
+      try {
+        const { keys, scopes } = await api('/api/admin/keys');
+        if (!byId('scope-options').children.length) {
+          for (const [scope, description] of Object.entries(scopes)) {
+            const label = document.createElement('label');
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.name = 'scope';
+            box.value = scope;
+            const code = document.createElement('code');
+            code.textContent = scope;
+            label.append(box, code, ' — ' + description);
+            byId('scope-options').append(label);
+          }
+        }
+        byId('key-rows').replaceChildren(...keys.map(key => {
+          const row = document.createElement('tr');
+          const active = !key.revoked_at && new Date(key.expires_at) > new Date();
+          row.append(cell(key.name), cell(key.scopes.join(' ')),
+            cell(key.revoked_at ? 'Revoked' : new Date(key.expires_at).toLocaleDateString()),
+            cell(key.last_used_at ? new Date(key.last_used_at).toLocaleString() : 'Never'));
+          const actions = document.createElement('td');
+          if (active) {
+            const revoke = document.createElement('button');
+            revoke.className = 'btn btn-secondary btn-sm';
+            revoke.textContent = 'Revoke';
+            revoke.addEventListener('click', async () => {
+              if (!confirm(`Revoke "${key.name}"? Anything using it stops working immediately.`)) return;
+              await api(`/api/admin/keys/${encodeURIComponent(key.key_id)}`, { method: 'DELETE' });
+              load();
+            });
+            actions.append(revoke);
+          }
+          row.append(actions);
+          return row;
+        }));
+        byId('create-card').hidden = false;
+        byId('list-card').hidden = false;
+        status.textContent = keys.length ? '' : 'No admin keys yet.';
+      } catch (error) {
+        status.textContent = `Sign in as the admin to manage admin keys. (${error.message})`;
+      }
+    }
+
+    byId('create-form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const scopes = [...document.querySelectorAll('input[name="scope"]:checked')].map(box => box.value);
+      if (!scopes.length) {
+        status.textContent = 'Pick at least one scope.';
+        return;
+      }
+      try {
+        const created = await api('/api/admin/keys', { method: 'POST', body: JSON.stringify({
+          name: byId('key-name').value, scopes, expires_in_days: Number(byId('key-days').value) }) });
+        byId('new-key-value').textContent = created.admin_key;
+        byId('new-key').hidden = false;
+        byId('create-form').reset();
+        load();
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    });
+
+    load();
+  </script>
+  <script type="module" src="/js/banner.js"></script>
+</body>
+</html>

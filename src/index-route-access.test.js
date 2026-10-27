@@ -8,7 +8,7 @@ vi.mock('./auth/middleware.js', async () => {
 });
 
 import worker, { apiRoutes } from './index.js';
-import { ALL_ADMIN_SCOPES, ALL_USER_SCOPES, PUBLIC, SESSION, USER_SCOPES, ADMIN_SCOPES, checkAccess } from './auth/scopes.js';
+import { ADMIN_SESSION, ALL_ADMIN_SCOPES, ALL_USER_SCOPES, PUBLIC, SESSION, USER_SCOPES, ADMIN_SCOPES, checkAccess } from './auth/scopes.js';
 
 const unauthenticated = () => new Response(null, { status: 401 });
 
@@ -42,16 +42,17 @@ describe('route access declarations', () => {
   it('declares a valid access level on every route', () => {
     for (const route of routes) {
       const { access } = route;
-      const valid = access === PUBLIC || access === SESSION || (scopesOf(access).length > 0 &&
+      const valid = access === PUBLIC || access === SESSION || access === ADMIN_SESSION || (scopesOf(access).length > 0 &&
         scopesOf(access).every(scope => Object.hasOwn(USER_SCOPES, scope) || Object.hasOwn(ADMIN_SCOPES, scope)));
       expect(valid, `${route.method} ${route.path}`).toBe(true);
       expect(typeof route.handler).toBe('function');
     }
   });
 
-  it('requires an admin scope on every admin route', () => {
+  it('requires an admin scope, or the admin\'s own session, on every admin route', () => {
     for (const route of routes.filter(r => samplePath(r).startsWith('/api/admin/'))) {
-      expect(scopesOf(route.access).every(scope => scope.startsWith('admin:')), String(route.path)).toBe(true);
+      const adminOnly = route.access === ADMIN_SESSION || scopesOf(route.access).every(scope => scope.startsWith('admin:'));
+      expect(adminOnly, String(route.path)).toBe(true);
     }
   });
 
@@ -73,6 +74,13 @@ describe('route access declarations', () => {
     }
     expect(status(anonymous, access)).toBe(401);
     expect(status(keyWithNoScopes, access)).toBe(403);
+    if (access === ADMIN_SESSION) {
+      expect(status(adminSession, access)).toBe(200);
+      expect(status(userSession, access)).toBe(403);
+      expect(status(adminKey, access)).toBe(403);
+      expect(status(keyWithEveryUserScope, access)).toBe(403);
+      return;
+    }
     if (access === SESSION) {
       expect(status(userSession, access)).toBe(200);
       expect(status(adminSession, access)).toBe(200);

@@ -33,8 +33,10 @@ export function validateAdminToken(token, env) {
 /**
  * Identifier for the admin in audit records
  * @param {Request} request - HTTP request
- * @returns {string} - Admin's user ID, or 'admin_token' for token auth
+ * @returns {string} - Admin's user ID, with the admin key's ID when one was used,
+ *   or 'admin_token' for token auth
  */
 export function adminActorId(request) {
+  if (request.user?.authMethod === 'admin_key') return `${request.user.userId} (admin key ${request.user.keyId})`;
   return request.user?.userId || 'admin_token';
 }
