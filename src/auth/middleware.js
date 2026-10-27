@@ -639,15 +639,11 @@ export function applyRateLimit(request, authResult) {
   let identifier, limit;
 
   if (authResult.authenticated) {
-    if (authResult.user.authMethod === 'apikey') {
-      // Per-key rate limit
-      identifier = `key:${authResult.user.keyId}`;
-      limit = KEY_RATE_LIMIT;
-    } else {
-      // Per-user rate limit
-      identifier = `user:${authResult.user.userId}`;
-      limit = USER_RATE_LIMIT;
-    }
+    // Each credential has its own budget: the account's session, or one key or app grant
+    const user = authResult.user;
+    const credentialId = user.keyId || user.oauth?.grantId || user.userId || 'admin';
+    identifier = `${user.authMethod}:${credentialId}`;
+    limit = user.session ? USER_RATE_LIMIT : KEY_RATE_LIMIT;
   } else {
     // Anonymous rate limit by IP
     const ip = request.headers.get('cf-connecting-ip') || 'unknown';
