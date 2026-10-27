@@ -30,7 +30,3 @@ name = "INFRASTRUCTURE_COST"
 class_name = "InfrastructureCost"
 script_name = "hashbin-worker-local"
 
-[[durable_objects.bindings]]
-name = "KEY_REGISTRY"
-class_name = "KeyRegistry"
-script_name = "hashbin-worker-local"

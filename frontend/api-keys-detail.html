@@ -367,15 +367,17 @@
             </div>
           </div>
           
+          <section id="key-scopes-section"><h2>What this key can do</h2>
+            <p>Uncheck anything this key no longer needs. Scopes can only be removed; create a new key for more access.</p>
+            <div id="key-scope-options"></div>
+            <button id="save-scopes-btn" class="btn btn-secondary" type="button" disabled>Remove unchecked scopes</button>
+          </section>
           <section><h2>Download spending</h2>
-            <p>Account and key caps both apply. Rotate older hb_ keys to use the protected /a/ path.</p>
+            <p>Account and key caps both apply, and the key needs the <code>downloads:spend</code> scope.</p>
             <div id="key-download-caps"></div><p id="key-download-status" role="status"></p>
           </section>
           <!-- Actions -->
           <div class="actions-section">
-            <button id="reveal-btn" class="btn btn-primary">
-              🔓 Reveal Key
-            </button>
             <button id="revoke-btn" class="btn btn-danger">
               🗑️ Revoke Key
             </button>
@@ -386,31 +388,6 @@
       </div>
     </div>
   </main>
-
-  <!-- Reveal Key Modal -->
-  <div id="reveal-modal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>API Key Revealed</h2>
-      </div>
-      <div class="modal-body">
-        <p>Here is your full API key:</p>
-        
-        <div class="key-display" id="revealed-key-display">
-          <!-- Key will be displayed here -->
-        </div>
-        
-        <button id="copy-revealed-key-btn" class="btn btn-secondary" style="width: 100%;">
-          📋 Copy to Clipboard
-        </button>
-      </div>
-      <div class="modal-footer">
-        <button id="close-reveal-modal-btn" class="btn btn-primary">
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
 
   <!-- Revoke Confirmation Modal -->
   <div id="revoke-modal" class="modal">
@@ -451,7 +428,7 @@
     import { 
       listApiKeys,
       updateApiKeyName,
-      revealApiKey,
+      updateApiKeyScopes,
       revokeApiKey,
       formatUsageCount,
       formatRelativeTime,
@@ -556,12 +533,58 @@
         document.getElementById('revoke-btn').style.display = 'none';
       }
       
-      // Hide edit and reveal buttons if expired
+      // Hide edit button if expired
       if (expired) {
         document.getElementById('edit-name-btn').style.display = 'none';
-        document.getElementById('reveal-btn').style.display = 'none';
       }
+
+      displayScopes(key, expired);
     }
+
+    // Scopes: one checkbox per scope the key holds; unchecking narrows the key
+    function displayScopes(key, expired) {
+      const options = document.getElementById('key-scope-options');
+      const saveBtn = document.getElementById('save-scopes-btn');
+      options.replaceChildren();
+      for (const scope of key.scopes || []) {
+        const row = document.createElement('label');
+        row.className = 'checkbox-container';
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.checked = true;
+        box.disabled = expired;
+        box.value = scope;
+        box.addEventListener('change', () => {
+          const kept = [...options.querySelectorAll('input:checked')].length;
+          saveBtn.disabled = kept === 0 || kept === key.scopes.length;
+        });
+        const code = document.createElement('code');
+        code.textContent = scope;
+        row.append(box, code);
+        options.append(row);
+      }
+      saveBtn.disabled = true;
+      saveBtn.style.display = expired ? 'none' : '';
+    }
+
+    document.getElementById('save-scopes-btn').addEventListener('click', async () => {
+      const saveBtn = document.getElementById('save-scopes-btn');
+      const kept = [...document.querySelectorAll('#key-scope-options input:checked')].map(box => box.value);
+      setLoading(saveBtn, true);
+      try {
+        currentKey = { ...currentKey, ...(await updateApiKeyScopes(currentKey.key_id, kept)) };
+        displayScopes(currentKey, false);
+        showToast('Scopes narrowed', 'success');
+      } catch (error) {
+        if (error.status === 403 && error.data?.error === 'FRESH_AUTH_REQUIRED') {
+          showToast('Please re-authenticate to change keys (session must be less than 5 minutes old)', 'error', 5000);
+        } else {
+          showToast(error.message || 'Failed to change scopes', 'error');
+        }
+      } finally {
+        setLoading(saveBtn, false);
+      }
+    });
     
     function showError(message) {
       document.getElementById('error-message').textContent = message;
@@ -695,59 +718,6 @@
           cancel();
         }
       });
-    });
-    
-    // Reveal key functionality
-    const revealBtn = document.getElementById('reveal-btn');
-    const revealModal = document.getElementById('reveal-modal');
-    const revealedKeyDisplay = document.getElementById('revealed-key-display');
-    const copyRevealedKeyBtn = document.getElementById('copy-revealed-key-btn');
-    const closeRevealModalBtn = document.getElementById('close-reveal-modal-btn');
-    
-    revealBtn.addEventListener('click', async () => {
-      setLoading(revealBtn, true);
-      revealBtn.disabled = true;
-      
-      try {
-        const result = await revealApiKey(currentKey.key_id);
-        
-        revealedKeyDisplay.textContent = result.key;
-        revealModal.classList.add('show');
-        
-      } catch (error) {
-        console.error('Failed to reveal key:', error);
-        
-        if (error.status === 403 && error.data?.error === 'FRESH_AUTH_REQUIRED') {
-          showToast('Please re-authenticate to reveal keys (session must be less than 5 minutes old)', 'error', 5000);
-        } else if (error.status === 429) {
-          showToast(error.data?.message || 'Rate limit exceeded. Please try again later.', 'error', 5000);
-        } else {
-          showToast(error.message || 'Failed to reveal key', 'error');
-        }
-      } finally {
-        setLoading(revealBtn, false);
-        revealBtn.disabled = false;
-      }
-    });
-    
-    copyRevealedKeyBtn.addEventListener('click', async () => {
-      const key = revealedKeyDisplay.textContent;
-      await copyToClipboard(key);
-      showToast('Copied to clipboard', 'success', 3000);
-      copyRevealedKeyBtn.textContent = '✓ Copied!';
-      setTimeout(() => {
-        copyRevealedKeyBtn.textContent = '📋 Copy to Clipboard';
-      }, 3000);
-    });
-    
-    closeRevealModalBtn.addEventListener('click', () => {
-      revealModal.classList.remove('show');
-    });
-    
-    revealModal.addEventListener('click', (e) => {
-      if (e.target === revealModal) {
-        revealModal.classList.remove('show');
-      }
     });
     
     // Revoke key functionality

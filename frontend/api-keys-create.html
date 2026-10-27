@@ -211,10 +211,26 @@
                   maxlength="100"
                 >
                 <span class="form-help">
-                  A descriptive name to help you identify this key. If left empty, defaults to "Hosting" (or "Hosting n" if that name already exists)
+                  A descriptive name to help you identify this key. If left empty, defaults to "Key" (or "Key n" if that name already exists)
                 </span>
                 <span id="name-error" class="form-error hidden"></span>
               </div>
+
+              <!-- Scopes -->
+              <fieldset class="form-group" id="key-scopes">
+                <legend class="form-label">What this key can do *</legend>
+                <p class="form-help">
+                  Give the key only what its job needs. Anyone holding it can do exactly these things and nothing else;
+                  managing keys, apps, settings and deposits always needs you to sign in.
+                </p>
+                <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-sm); margin-bottom: var(--spacing-md);">
+                  <button type="button" class="btn btn-secondary" data-preset="content:write">Publish only</button>
+                  <button type="button" class="btn btn-secondary" data-preset="content:write balance:read">Publish + read balance</button>
+                  <button type="button" class="btn btn-secondary" data-preset="downloads:spend">Downloads only</button>
+                </div>
+                <div id="scope-options"></div>
+                <span id="scopes-error" class="form-error hidden"></span>
+              </fieldset>
               
               <!-- Expiration Date Field -->
               <div class="form-group">
@@ -227,7 +243,7 @@
                   required
             >
             <span class="form-help">
-              Maximum 5 years from today. Default is 1 year.
+              Maximum one year from today. Default is 90 days.
             </span>
             <span id="expiration-error" class="form-error hidden"></span>
           </div>
@@ -308,20 +324,40 @@
     // Protect this page - require authentication
     await requireAuth();
     
-    // Set default expiration date (1 year from now)
+    // Scope checkboxes, from the server's scope list; none checked until chosen
+    const DAY_MS = 24 * 60 * 60 * 1000;
+    const scopeOptions = document.getElementById('scope-options');
+    const config = await fetch('/api/config').then(response => response.json());
+    for (const [scope, description] of Object.entries(config.api_key_scopes || {})) {
+      const row = document.createElement('label');
+      row.className = 'checkbox-container';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.name = 'scope';
+      box.value = scope;
+      const text = document.createElement('span');
+      const code = document.createElement('code');
+      code.textContent = scope;
+      text.append(code, ' — ' + description);
+      row.append(box, text);
+      scopeOptions.append(row);
+    }
+    document.querySelectorAll('[data-preset]').forEach(button => button.addEventListener('click', () => {
+      const chosen = button.dataset.preset.split(' ');
+      document.querySelectorAll('input[name="scope"]').forEach(box => { box.checked = chosen.includes(box.value); });
+    }));
+    const selectedScopes = () => [...document.querySelectorAll('input[name="scope"]:checked')].map(box => box.value);
+
+    // Set default expiration date (90 days from now)
     const expirationInput = document.getElementById('key-expiration');
-    const oneYearFromNow = new Date();
-    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-    expirationInput.value = oneYearFromNow.toISOString().split('T')[0];
+    expirationInput.value = new Date(Date.now() + 90 * DAY_MS).toISOString().split('T')[0];
     
     // Set min date (today)
     const today = new Date().toISOString().split('T')[0];
     expirationInput.min = today;
     
-    // Set max date (5 years from today)
-    const fiveYearsFromNow = new Date();
-    fiveYearsFromNow.setFullYear(fiveYearsFromNow.getFullYear() + 5);
-    expirationInput.max = fiveYearsFromNow.toISOString().split('T')[0];
+    // Set max date (just under a year from today)
+    expirationInput.max = new Date(Date.now() + 364 * DAY_MS).toISOString().split('T')[0];
     
     // Form submission
     const form = document.getElementById('create-key-form');
@@ -334,6 +370,7 @@
       // Clear previous errors
       document.getElementById('name-error').classList.add('hidden');
       document.getElementById('expiration-error').classList.add('hidden');
+      document.getElementById('scopes-error').classList.add('hidden');
       
       // Validate
       const name = nameInput.value.trim();
@@ -360,14 +397,21 @@
         hasError = true;
       }
       
-      const maxDate = new Date();
-      maxDate.setFullYear(maxDate.getFullYear() + 5);
+      const maxDate = new Date(Date.now() + 364 * DAY_MS);
       maxDate.setHours(0, 0, 0, 0);
       
       if (expirationDate > maxDate) {
         const expirationError = document.getElementById('expiration-error');
-        expirationError.textContent = 'Expiration date cannot be more than 5 years from now';
+        expirationError.textContent = 'Expiration date cannot be more than a year from now';
         expirationError.classList.remove('hidden');
+        hasError = true;
+      }
+
+      const scopes = selectedScopes();
+      if (scopes.length === 0) {
+        const scopesError = document.getElementById('scopes-error');
+        scopesError.textContent = 'Choose at least one thing this key can do';
+        scopesError.classList.remove('hidden');
         hasError = true;
       }
       
@@ -381,6 +425,7 @@
       
       try {
         const payload = {
+          scopes,
           expires_at: expirationInput.value + 'T00:00:00Z',
           download_budget: readDownloadCaps('create-download')
         };

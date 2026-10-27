@@ -283,12 +283,7 @@ log_test "Health check reports Durable Objects status"
 RESPONSE=$(curl -s "$BASE_URL/health")
 if echo "$RESPONSE" | grep -q '"durableObjects"'; then
   if echo "$RESPONSE" | grep -q '"USER_PROFILES"'; then
-    if echo "$RESPONSE" | grep -q '"KEY_REGISTRY"'; then
-      log_pass "Health check reports USER_PROFILES and KEY_REGISTRY status"
-    else
-      log_fail "Health check missing KEY_REGISTRY status"
-      echo "Response: $RESPONSE"
-    fi
+    log_pass "Health check reports USER_PROFILES status"
   else
     log_fail "Health check missing USER_PROFILES status"
     echo "Response: $RESPONSE"

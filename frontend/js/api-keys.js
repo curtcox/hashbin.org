@@ -18,8 +18,9 @@ export async function listApiKeys() {
 /**
  * Create a new API key
  * @param {Object} data API key data
- * @param {string} data.name Key name (1-100 characters)
- * @param {string} data.expiresAt ISO 8601 timestamp
+ * @param {string} [data.name] Key name (1-100 characters)
+ * @param {string[]} data.scopes What the key may do (at least one scope)
+ * @param {string} [data.expires_at] ISO 8601 timestamp
  * @returns {Promise<Object>} Created API key with full key value
  */
 export async function createApiKey(data) {
@@ -53,13 +54,18 @@ export async function updateApiKeyName(keyId, name) {
 }
 
 /**
- * Reveal API key (requires fresh authentication)
+ * Narrow an API key's scopes (requires fresh authentication). Scopes can only be removed.
  * @param {string} keyId API key ID
- * @returns {Promise<Object>} Object with full key value
+ * @param {string[]} scopes The scopes to keep
+ * @returns {Promise<Object>} Updated API key
  */
-export async function revealApiKey(keyId) {
-  const response = await authenticatedFetch(`/api/auth/apikeys/${keyId}/reveal`, {
-    method: 'POST'
+export async function updateApiKeyScopes(keyId, scopes) {
+  const response = await authenticatedFetch(`/api/auth/apikeys/${keyId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ scopes })
   });
   await handleApiError(response);
   return response.json();
@@ -161,7 +167,7 @@ export function isExpired(expiresAt) {
 /**
  * Get key prefix (first 8 chars + ellipsis)
  * @param {string} key Full API key or key_id
- * @returns {string} Key prefix (e.g., "hb_abc...")
+ * @returns {string} Key prefix (e.g., "hbk_abc...")
  */
 export function getKeyPrefix(key) {
   if (!key) return '';

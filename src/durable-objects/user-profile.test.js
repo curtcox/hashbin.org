@@ -398,14 +398,13 @@ describe('UserProfile Durable Object - P0 Key Management Tests', () => {
     return {
       key_id: 'key_' + Math.random().toString(36).substr(2, 9),
       key_hash: 'hash_' + Math.random().toString(36).substr(2, 16),
-      key_encrypted: 'encrypted_value',
       name: 'Test Key',
+      scopes: ['content:write'],
       created_at: new Date().toISOString(),
       expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
       last_used_at: null,
       usage_count: 0,
       revoked_at: null,
-      reveal_timestamps: [],
       ...overrides,
     };
   }
@@ -457,7 +456,6 @@ describe('UserProfile Durable Object - P0 Key Management Tests', () => {
     it('should not include key_hash in list response', async () => {
       const key = createTestApiKey({
         key_hash: 'secret_hash_value',
-        key_encrypted: 'secret_encrypted_value',
       });
       
       const profile = createBasicProfile({
@@ -636,7 +634,6 @@ describe('UserProfile Durable Object - P0 Key Management Tests', () => {
         body: JSON.stringify({
           key_id: 'key_26',
           key_hash: 'hash_26',
-          key_encrypted: 'encrypted_26',
           name: 'Key 26',
           expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         }),
@@ -670,7 +667,6 @@ describe('UserProfile Durable Object - P0 Key Management Tests', () => {
         body: JSON.stringify({
           key_id: 'key_25',
           key_hash: 'hash_25',
-          key_encrypted: 'encrypted_25',
           name: 'Key 25',
           expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         }),
@@ -710,7 +706,6 @@ describe('UserProfile Durable Object - P0 Key Management Tests', () => {
         body: JSON.stringify({
           key_id: 'key_25',
           key_hash: 'hash_25',
-          key_encrypted: 'encrypted_25',
           name: 'Key 25',
           expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         }),
@@ -719,6 +714,39 @@ describe('UserProfile Durable Object - P0 Key Management Tests', () => {
       const response = await userProfile.fetch(request);
       
       expect(response.status).toBe(201);
+    });
+  });
+
+  describe('Key scopes', () => {
+    function keyRequest(path, method, body) {
+      return new Request(`http://test.com${path}`, { method, headers: { 'content-type': 'application/json' },
+        ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+    }
+
+    it('narrows a key\'s scopes but never widens them', async () => {
+      const key = createTestApiKey({ key_id: 'key_1', scopes: ['content:write', 'balance:read'] });
+      mockState = createMockState({ profile: createBasicProfile({ api_keys: [key] }) });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const widened = await userProfile.fetch(keyRequest('/apikeys/key_1/update', 'PATCH', { scopes: ['content:write', 'content:delete'] }));
+      expect(widened.status).toBe(400);
+      expect((await widened.json()).error).toBe('SCOPE_WIDENING');
+
+      const narrowed = await userProfile.fetch(keyRequest('/apikeys/key_1/update', 'PATCH', { scopes: ['balance:read'] }));
+      expect(narrowed.status).toBe(200);
+      expect((await narrowed.json()).scopes).toEqual(['balance:read']);
+    });
+
+    it('revokes keys created before scopes existed', async () => {
+      const unscoped = createTestApiKey({ key_id: 'old_key' });
+      delete unscoped.scopes;
+      mockState = createMockState({ profile: createBasicProfile({ api_keys: [unscoped] }) });
+      userProfile = new UserProfile(mockState, mockEnv);
+
+      const response = await userProfile.fetch(keyRequest('/apikeys/old_key', 'GET'));
+      expect((await response.json()).revoked_at).toBeTruthy();
+      const list = await (await userProfile.fetch(keyRequest('/apikeys', 'GET'))).json();
+      expect(list[0].revoked).toBe(true);
     });
   });
 });

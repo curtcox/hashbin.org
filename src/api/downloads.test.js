@@ -3,7 +3,7 @@ import { handleDownloads } from './downloads.js';
 import worker from '../index.js';
 import { handleCreateApiKey } from './auth.js';
 import { UserProfile } from '../durable-objects/user-profile.js';
-import { verifyDownloadApiKey, verifyDownloadToken } from '../auth/download-tokens.js';
+import { verifyApiKey, verifyDownloadToken } from '../auth/download-tokens.js';
 import { sha256Hex } from '../auth/oauth.js';
 
 let env, profile, user, key;
@@ -15,16 +15,15 @@ beforeEach(() => {
   profile = { user_id: 'user', balance_cents: 100, api_keys: [], oauth_grants: [], oauth_refresh_tokens: [] };
   user = new UserProfile({ storage: { get: async () => structuredClone(profile),
     put: async (key, value) => { profile = structuredClone(typeof key === 'string' ? value : key.profile); }, setAlarm: async () => {} } }, {});
-  env = { ENVIRONMENT: 'local', USER_PROFILES: { idFromName: id => id, get: () => user }, DOWNLOAD_TOKEN_SECRET: 'download-secret',
-    KEY_REGISTRY: { idFromName: id => id, get: () => ({ fetch: async () => Response.json({ registered: true }) }) } };
+  env = { ENVIRONMENT: 'local', USER_PROFILES: { idFromName: id => id, get: () => user }, DOWNLOAD_TOKEN_SECRET: 'download-secret' };
 });
 describe('download API', () => {
-  it('creates routable v2 keys with explicit caps in the profile', async () => {
+  it('creates routable keys with explicit caps in the profile', async () => {
     const caps = { daily_cap_cents: 10, monthly_cap_cents: 100 };
     const r = await handleCreateApiKey(req('/api/auth/apikeys', 'POST', { name: 'Downloader', scopes: ['downloads:spend'], download_budget: caps }), env);
     expect(r.status).toBe(201);
     key = (await r.json()).api_key;
-    const identity = await verifyDownloadApiKey(key, env.DOWNLOAD_TOKEN_SECRET);
+    const identity = await verifyApiKey(key, env.DOWNLOAD_TOKEN_SECRET);
     expect(identity.u).toBe('user');
     expect(profile.download_budget.keys[identity.k]).toEqual(caps);
     expect(profile.api_keys[0].key_hash).toBe(await sha256Hex(key));
@@ -32,7 +31,7 @@ describe('download API', () => {
   it('creates signed URLs from a key identity, bounds lifetime and batch size, and enforces owner-only budget management', async () => {
     const created = await handleCreateApiKey(req('/api/auth/apikeys', 'POST', { name: 'Downloader', scopes: ['downloads:spend'] }), env);
     key = (await created.json()).api_key;
-    const identity = await verifyDownloadApiKey(key, env.DOWNLOAD_TOKEN_SECRET);
+    const identity = await verifyApiKey(key, env.DOWNLOAD_TOKEN_SECRET);
     const signed = await worker.fetch(req('/api/downloads/sign', 'POST', { cids: [cid] }, `ApiKey ${key}`), env, {});
     expect(signed.status).toBe(200);
     const { urls } = await signed.json();

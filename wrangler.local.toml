@@ -44,11 +44,6 @@ class_name = "MessageThread"
 script_name = "hashbin-worker-local"
 
 [[durable_objects.bindings]]
-name = "KEY_REGISTRY"
-class_name = "KeyRegistry"
-script_name = "hashbin-worker-local"
-
-[[durable_objects.bindings]]
 name = "PLATFORM_STATS"
 class_name = "PlatformStats"
 script_name = "hashbin-worker-local"

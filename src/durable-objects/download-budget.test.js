@@ -5,7 +5,7 @@ import { flushDownloadOutbox } from './download-outbox.js';
 
 export function profileFixture(overrides = {}, env = {}) {
   const profile = { user_id: 'user', balance_cents: 10, total_spent_cents: 0,
-    api_keys: [{ key_id: 'key', expires_at: '2099-01-01', key_hash: 'hash' }],
+    api_keys: [{ key_id: 'key', expires_at: '2099-01-01', key_hash: 'hash', scopes: ['downloads:spend'] }],
     oauth_grants: [{ grant_id: 'grant', app_id: 'app', scopes: ['downloads:spend'], spending_limit: 1, spending_used: 0, spending_reset: '2099-01-01' }], ...overrides };
   const values = new Map([['profile', structuredClone(profile)]]);
   const state = { storage: {

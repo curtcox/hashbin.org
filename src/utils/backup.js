@@ -25,7 +25,6 @@ export const DERIVED_BINDINGS = { PAYMENT_RECORDS: 'USER_PROFILES' };
 
 /** Fixed-name objects, backed up in full every run */
 export const SINGLETONS = [
-  ['KEY_REGISTRY', 'global'],
   ['EXPIRATION_INDEX', 'global'],
   ['DELETION_RECORD', 'global'],
   ['DISPUTE_INDEX', 'dispute-index:global'],

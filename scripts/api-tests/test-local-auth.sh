@@ -132,10 +132,10 @@ else
 fi
 
 # A-021: API key format is correct
-if echo "$api_key" | grep -qE '^hb2_[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]{43}\.[a-zA-Z0-9_-]{22}$'; then
-  pass "A-021: API key format is correct (routable v2)"
+if echo "$api_key" | grep -qE '^hbk_[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]{43}\.[a-zA-Z0-9_-]{22}$'; then
+  pass "A-021: API key format is correct (signed hbk_)"
 else
-  fail "A-021: API key format is correct" "Expected routable v2 key"
+  fail "A-021: API key format is correct" "Expected signed hbk_ key"
 fi
 
 # Store key_id for later tests

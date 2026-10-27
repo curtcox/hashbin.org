@@ -19,17 +19,19 @@ async function checkTag(input, signature, secret) {
   for (let i = 0; i < expected.length; i++) different |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
   if (different) throw new Error('Invalid signature');
 }
-export const V2_KEY_PATTERN = /^hb2_([A-Za-z0-9_-]{1,1024})\.([A-Za-z0-9_-]{43})\.([A-Za-z0-9_-]{22})$/;
-export async function generateDownloadApiKey(userId, keyId, secret) {
+// API keys: hbk_<route>.<random>.<tag>. The route names the account and key, so a key
+// can be checked without a lookup table; scopes and caveats stay server-side.
+export const API_KEY_PATTERN = /^hbk_([A-Za-z0-9_-]{1,1024})\.([A-Za-z0-9_-]{43})\.([A-Za-z0-9_-]{22})$/;
+export async function generateApiKey(userId, keyId, secret) {
   const route = encode({ u: userId, k: keyId });
   const random = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   const input = `${route}.${random}`;
-  return `hb2_${input}.${await tag(input, secret)}`;
+  return `hbk_${input}.${await tag(input, secret)}`;
 }
-export async function verifyDownloadApiKey(value, secret) {
-  const match = value?.match(V2_KEY_PATTERN);
-  if (!match) throw new Error('Invalid v2 key');
+export async function verifyApiKey(value, secret) {
+  const match = value?.match(API_KEY_PATTERN);
+  if (!match) throw new Error('Invalid API key');
   await checkTag(`${match[1]}.${match[2]}`, match[3], secret);
   const route = decode(match[1]);
   if (typeof route.u !== 'string' || !route.u || typeof route.k !== 'string' || !route.k) throw new Error('Invalid route');

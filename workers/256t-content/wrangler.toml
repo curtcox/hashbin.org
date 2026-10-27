@@ -36,11 +36,6 @@ class_name = "UserProfile"
 script_name = "hashbin-worker-prod"
 
 [[durable_objects.bindings]]
-name = "KEY_REGISTRY"
-class_name = "KeyRegistry"
-script_name = "hashbin-worker-prod"
-
-[[durable_objects.bindings]]
 name = "INFRASTRUCTURE_COST"
 class_name = "InfrastructureCost"
 script_name = "hashbin-worker-prod"

@@ -3,53 +3,13 @@
  * Cryptographic functions and validation for API keys
  */
 
-import { V2_KEY_PATTERN } from './download-tokens.js';
+import { API_KEY_PATTERN } from './download-tokens.js';
 import { AUTH_ERROR_CODES } from './middleware.js';
 
-// API key format constants
-const API_KEY_LENGTH = 32; // Random alphanumeric characters
-const PREFIX = 'hb_';
-const LEGACY_PREFIX = 'hb_live_'; // Legacy format for backward compatibility
-
-/**
- * Generate a cryptographically secure API key
- * Format: hb_<32-chars>
- */
-export function generateApiKey() {
-  const randomPart = generateRandomString(API_KEY_LENGTH);
-  return PREFIX + randomPart;
-}
-
-/**
- * Generate cryptographically secure random string
- * Uses rejection sampling to avoid modulo bias
- */
-function generateRandomString(length) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  const charsLength = chars.length;
-  
-  // Use rejection sampling to avoid modulo bias
-  // Generate enough random bytes to avoid bias
-  const maxValidValue = 256 - (256 % charsLength);
-  
-  let result = '';
-  let bytesNeeded = length;
-  
-  while (bytesNeeded > 0) {
-    const randomBytes = crypto.getRandomValues(new Uint8Array(bytesNeeded * 2));
-    
-    for (let i = 0; i < randomBytes.length && result.length < length; i++) {
-      // Reject bytes that would cause bias
-      if (randomBytes[i] < maxValidValue) {
-        result += chars[randomBytes[i] % charsLength];
-      }
-    }
-    
-    bytesNeeded = length - result.length;
-  }
-  
-  return result;
-}
+// API keys last 90 days unless the creator picks a date, and never more than a year.
+const DEFAULT_KEY_LIFETIME_DAYS = 90;
+const MAX_KEY_LIFETIME_DAYS = 365;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * Hash API key using SHA-256
@@ -65,9 +25,7 @@ export async function hashApiKey(apiKey) {
 }
 
 /**
- * Validate API key format
- * Checks prefix and length
- * Accepts both current hb_ prefix and legacy hb_live_ and hb_test_ prefixes for backward compatibility
+ * Validate API key format: hbk_<route>.<random>.<tag>
  */
 export function validateApiKeyFormat(apiKey) {
   if (!apiKey || typeof apiKey !== 'string') {
@@ -78,49 +36,11 @@ export function validateApiKeyFormat(apiKey) {
     };
   }
 
-  if (V2_KEY_PATTERN.test(apiKey)) return { valid: true, error: null, message: null };
-
-  // Check for correct prefix (accept current and legacy prefixes)
-  const hasPrefix = apiKey.startsWith(PREFIX);
-  const hasLegacyLivePrefix = apiKey.startsWith(LEGACY_PREFIX);
-  const hasLegacyTestPrefix = apiKey.startsWith('hb_test_');
-
-  if (!hasPrefix && !hasLegacyLivePrefix && !hasLegacyTestPrefix) {
+  if (!API_KEY_PATTERN.test(apiKey)) {
     return {
       valid: false,
       error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
-      message: 'API key must start with hb_'
-    };
-  }
-
-  // Check length based on prefix
-  let prefix;
-  if (hasPrefix) {
-    prefix = PREFIX;
-  } else if (hasLegacyLivePrefix) {
-    prefix = LEGACY_PREFIX;
-  } else {
-    prefix = 'hb_test_';
-  }
-  
-  const expectedLength = prefix.length + API_KEY_LENGTH;
-
-  if (apiKey.length !== expectedLength) {
-    return {
-      valid: false,
-      error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
-      message: `API key must be exactly ${expectedLength} characters`
-    };
-  }
-
-  // Check characters (alphanumeric only)
-  const keyPart = apiKey.substring(prefix.length);
-  const validChars = /^[A-Za-z0-9]+$/;
-  if (!validChars.test(keyPart)) {
-    return {
-      valid: false,
-      error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
-      message: 'API key contains invalid characters'
+      message: 'API key must have the form hbk_<route>.<random>.<tag>'
     };
   }
 
@@ -173,23 +93,18 @@ export function validateKeyName(name) {
 
 /**
  * Validate expiration date
- * Maximum 5 years from now
+ * Defaults to 90 days from now; at most one year from now
  */
 export function validateExpiration(expiresAt) {
+  const now = new Date();
   if (!expiresAt) {
-    // Default to 5 years from now
-    const fiveYearsFromNow = new Date();
-    fiveYearsFromNow.setFullYear(fiveYearsFromNow.getFullYear() + 5);
     return {
       valid: true,
-      expiresAt: fiveYearsFromNow.toISOString()
+      expiresAt: new Date(now.getTime() + DEFAULT_KEY_LIFETIME_DAYS * DAY_MS).toISOString()
     };
   }
 
   const expirationDate = new Date(expiresAt);
-  const now = new Date();
-  const maxExpiration = new Date();
-  maxExpiration.setFullYear(maxExpiration.getFullYear() + 5);
 
   // Check if date is valid
   if (isNaN(expirationDate.getTime())) {
@@ -207,11 +122,10 @@ export function validateExpiration(expiresAt) {
     };
   }
 
-  // Check if beyond 5 years
-  if (expirationDate > maxExpiration) {
+  if (expirationDate.getTime() > now.getTime() + MAX_KEY_LIFETIME_DAYS * DAY_MS) {
     return {
       valid: false,
-      message: 'Expiration date cannot be more than 5 years in the future'
+      message: 'Expiration date cannot be more than one year in the future'
     };
   }
 
@@ -222,84 +136,8 @@ export function validateExpiration(expiresAt) {
 }
 
 /**
- * Encrypt API key using AES-256-GCM
- * Returns base64-encoded ciphertext with IV prepended
- * Format: <12-byte IV><ciphertext><16-byte auth tag>
- */
-export async function encryptApiKey(apiKey, encryptionKey) {
-  // Convert encryption key from base64 to CryptoKey
-  const keyData = Uint8Array.from(atob(encryptionKey), c => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['encrypt']
-  );
-
-  // Generate random IV (12 bytes for AES-GCM)
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-
-  // Encrypt the API key
-  const encoder = new TextEncoder();
-  const plaintext = encoder.encode(apiKey);
-  const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
-    cryptoKey,
-    plaintext
-  );
-
-  // Combine IV and ciphertext
-  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
-  combined.set(iv, 0);
-  combined.set(new Uint8Array(ciphertext), iv.length);
-
-  // Return base64-encoded result
-  return btoa(String.fromCharCode(...combined));
-}
-
-/**
- * Decrypt API key using AES-256-GCM
- * Expects base64-encoded ciphertext with IV prepended
- */
-export async function decryptApiKey(encryptedKey, encryptionKey) {
-  // Convert encryption key from base64 to CryptoKey
-  const keyData = Uint8Array.from(atob(encryptionKey), c => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'AES-GCM', length: 256 },
-    false,
-    ['decrypt']
-  );
-
-  // Decode base64
-  const combined = Uint8Array.from(atob(encryptedKey), c => c.charCodeAt(0));
-
-  // Extract IV (first 12 bytes)
-  const iv = combined.slice(0, 12);
-
-  // Extract ciphertext (remaining bytes)
-  const ciphertext = combined.slice(12);
-
-  // Decrypt
-  try {
-    const plaintext = await crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv },
-      cryptoKey,
-      ciphertext
-    );
-
-    const decoder = new TextDecoder();
-    return decoder.decode(plaintext);
-  } catch (error) {
-    throw new Error('Decryption failed: Invalid key or corrupted data');
-  }
-}
-
-/**
  * Check if a Clerk session is "fresh" (authenticated within threshold minutes)
- * Used for sensitive operations like key reveal
+ * Used for sensitive operations like changing a key
  * @param {Object} session - Clerk session object with 'iat' (issued at) timestamp
  * @param {number} thresholdMinutes - Maximum age in minutes (default: 5)
  * @returns {boolean} True if session is fresh

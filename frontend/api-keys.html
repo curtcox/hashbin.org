@@ -305,6 +305,7 @@
                 <tr>
                   <th>Name</th>
                   <th>Key Prefix</th>
+                  <th>Can do</th>
                   <th>Status</th>
                   <th>Usage</th>
                   <th>Last Used</th>
@@ -434,6 +435,7 @@
                     📋
                   </button>
                 </td>
+                <td>${(key.scopes || []).map(scope => `<code>${escapeHtml(scope)}</code>`).join(' ')}</td>
                 <td>
                   <span class="status-badge ${statusClass}">
                     <span class="status-dot ${statusClass}"></span>

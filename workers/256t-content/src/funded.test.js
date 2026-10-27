@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { UserProfile } from '../../../src/durable-objects/user-profile.js';
-import { generateDownloadApiKey, signDownloadToken, signOAuthJwt } from '../../../src/auth/download-tokens.js';
+import { generateApiKey, signDownloadToken, signOAuthJwt } from '../../../src/auth/download-tokens.js';
 import { sha256Hex } from '../../../src/auth/oauth.js';
 import { setTimeout as realTimeout } from 'node:timers/promises';
 
@@ -16,8 +16,8 @@ beforeEach(async () => {
   vi.stubGlobal('scheduler', { wait: realTimeout });
   vi.resetModules(); vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-24T12:00:00Z'));
   worker = (await import('./index.js')).default;
-  key = await generateDownloadApiKey('user', 'key', 'shared-secret');
-  profile = { user_id: 'user', balance_cents: 10, api_keys: [{ key_id: 'key', key_hash: await sha256Hex(key), expires_at: '2099-01-01' }],
+  key = await generateApiKey('user', 'key', 'shared-secret');
+  profile = { user_id: 'user', balance_cents: 10, api_keys: [{ key_id: 'key', key_hash: await sha256Hex(key), expires_at: '2099-01-01', scopes: ['downloads:spend'] }],
     oauth_grants: [{ grant_id: 'grant', app_id: 'app', scopes: ['downloads:spend'], spending_limit: 1, spending_used: 0 }] };
   stored = structuredClone(profile);
   const rows = new Map();
@@ -60,7 +60,7 @@ describe('funded content delivery', () => {
     expect(stored.balance_cents).toBe(10);
     expect(stored.download_budget.spend.account.day_uc).toBe(0);
   });
-  it.each([{}, { Authorization: 'ApiKey hb_junk' }, { Authorization: 'ApiKey hb_' + 'a'.repeat(32) }, { Authorization: 'Bearer junk' }, { 'X-API-Key': 'hb2_forged' }])('rejects missing/junk credentials before ANY DO access: %j', async headers => {
+  it.each([{}, { Authorization: 'ApiKey hb_junk' }, { Authorization: 'ApiKey hb_' + 'a'.repeat(32) }, { Authorization: 'Bearer junk' }, { 'X-API-Key': 'hbk_forged' }, { 'X-API-Key': 'hb_' + 'a'.repeat(32) }])('rejects missing/junk credentials before ANY DO access: %j', async headers => {
     const forbidden = { idFromName: () => { throw new Error('DO touched'); } };
     const r = await worker.fetch(req(undefined, headers), { ...env, USER_PROFILES: forbidden, CONTENT_METADATA: forbidden, INFRASTRUCTURE_COST: forbidden });
     expect(r.status).toBe(401); expect(calls).not.toHaveBeenCalled();
@@ -143,16 +143,10 @@ it('renews shared file leases before charging waiters in a burst', async () => {
   expect(reserve).toHaveBeenCalledTimes(15);
 });
 
-it('accepts a legacy key only on a plain path and caches its registry lookup', async () => {
-  const legacy = 'hb_' + 'a'.repeat(32);
-  stored.api_keys[0].key_hash = await sha256Hex(legacy);
-  const lookup = vi.fn(async () => Response.json({ user_id: 'user', key_id: 'key' }));
-  env.KEY_REGISTRY = { idFromName: id => id, get: () => ({ fetch: lookup }) };
-  expect((await worker.fetch(req(`/${cid}`, { 'X-API-Key': legacy }), env)).status).toBe(200);
-  expect((await worker.fetch(req(`/${cid}`, { 'X-API-Key': legacy }), env)).status).toBe(200);
-  expect(lookup).toHaveBeenCalledTimes(1);
-  expect((await worker.fetch(req(`/a/${cid}`, { 'X-API-Key': legacy }), env)).status).toBe(401);
-  expect(lookup).toHaveBeenCalledTimes(1);
+it('refuses retired key formats and keys without downloads:spend', async () => {
+  expect((await worker.fetch(req(`/${cid}`, { 'X-API-Key': 'hb_' + 'a'.repeat(32) }), env)).status).toBe(401);
+  stored.api_keys[0].scopes = ['content:write'];
+  expect((await worker.fetch(req(`/${cid}`, auth()), env)).status).toBe(401);
 });
 
 it('keeps using prepaid requests when a funding confirmation expires at the cap', async () => {
@@ -190,7 +184,7 @@ it('samples invalid funded credentials without accessing a Durable Object', asyn
   vi.spyOn(Math, 'random').mockReturnValue(0);
   const writeDataPoint = vi.fn();
   env.DOWNLOAD_ANALYTICS = { writeDataPoint };
-  expect((await worker.fetch(req(undefined, { 'X-API-Key': 'hb2_forged' }), env)).status).toBe(401);
+  expect((await worker.fetch(req(undefined, { 'X-API-Key': 'hbk_forged' }), env)).status).toBe(401);
   expect(calls).not.toHaveBeenCalled();
   expect(writeDataPoint).toHaveBeenCalledExactlyOnceWith({
     indexes: [cid], blobs: [cid, '401', 'miss', 'anon'], doubles: [100, 0, 0]
@@ -247,7 +241,7 @@ it('refuses production content when the safety binding is missing', async () => 
 it('validates each credential proof before sharing an existing paid lease', async () => {
   await worker.fetch(req(undefined, auth()), env);
   await worker.fetch(req(undefined, auth()), env); // One paid request remains.
-  const wrongKey = await generateDownloadApiKey('user', 'key', env.DOWNLOAD_TOKEN_SECRET);
+  const wrongKey = await generateApiKey('user', 'key', env.DOWNLOAD_TOKEN_SECRET);
   const response = await worker.fetch(req(undefined, { Authorization: `ApiKey ${wrongKey}` }), env);
   expect(response.status).toBe(401);
   const before = stored.download_budget.spend.account.day_uc;

@@ -3,7 +3,7 @@
  * Handles Clerk session validation and API key authentication
  */
 
-import { verifyDownloadApiKey } from './download-tokens.js';
+import { verifyApiKey } from './download-tokens.js';
 import { verifyToken } from '@clerk/backend';
 import { hashApiKey, validateApiKeyFormat } from './utils.js';
 import { getOrCreateLocalProfile, validateLocalUserId } from './local-auth.js';
@@ -127,21 +127,15 @@ async function validateApiKey(apiKey, env) {
     };
   }
 
-  // Hash the key for lookup
+  // Hash the key for comparison with the stored hash
   const keyHash = await hashApiKey(apiKey);
 
-  // Use KeyRegistry DO to find the user
   try {
-    const routed = apiKey.startsWith('hb2_') ? await verifyDownloadApiKey(apiKey, env.DOWNLOAD_TOKEN_SECRET) : null;
-    const lookupResponse = routed ? Response.json({ user_id: routed.u, key_id: routed.k }) : await env.KEY_REGISTRY.get(env.KEY_REGISTRY.idFromName('global')).fetch(
-      new Request('http://internal/lookup', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ key_hash: keyHash })
-      })
-    );
-
-    if (!lookupResponse.ok) {
+    // The signed route names the account and key; a forged or altered key fails here
+    let route;
+    try {
+      route = await verifyApiKey(apiKey, env.DOWNLOAD_TOKEN_SECRET);
+    } catch (_error) {
       return {
         valid: false,
         error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
@@ -149,9 +143,8 @@ async function validateApiKey(apiKey, env) {
       };
     }
 
-    const keyInfo = await lookupResponse.json();
-    const userId = keyInfo.user_id;
-    const keyId = keyInfo.key_id;
+    const userId = route.u;
+    const keyId = route.k;
 
     // Get the full key details from UserProfile DO
     const userProfileId = env.USER_PROFILES.idFromName(userId);
@@ -173,7 +166,7 @@ async function validateApiKey(apiKey, env) {
 
     const apiKeyData = await keyResponse.json();
 
-    if (routed && apiKeyData.key_hash !== keyHash) return { valid: false, error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT };
+    if (apiKeyData.key_hash !== keyHash) return { valid: false, error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT, message: 'API key not found' };
 
     // Check if key is revoked
     if (apiKeyData.revoked_at) {

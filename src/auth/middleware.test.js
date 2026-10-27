@@ -5,7 +5,11 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { authenticate, AUTH_ERROR_CODES } from './middleware.js';
-import { generateApiKey, hashApiKey } from './utils.js';
+import { hashApiKey } from './utils.js';
+import { generateApiKey as mintApiKey } from './download-tokens.js';
+
+const SECRET = 'test-download-secret';
+const generateTestKey = (keyId = 'key_456') => mintApiKey('user_123', keyId, SECRET);
 
 // Mock Clerk verifyToken
 vi.mock('@clerk/backend', () => ({
@@ -39,7 +43,7 @@ describe('Authentication Middleware - P0 Security Tests', () => {
     mockEnv = {
       CLERK_SECRET_KEY: 'test_clerk_secret',
       ENVIRONMENT: 'test',
-      KEY_REGISTRY: createMockDurableObject('KEY_REGISTRY'),
+      DOWNLOAD_TOKEN_SECRET: SECRET,
       USER_PROFILES: createMockDurableObject('USER_PROFILES'),
     };
   });
@@ -47,19 +51,10 @@ describe('Authentication Middleware - P0 Security Tests', () => {
   // SEC-01: Timing attack on key validation
   describe('SEC-01: Timing attack protection', () => {
     it('should take consistent time for valid and invalid keys', async () => {
-      const validKey = generateApiKey();
+      const validKey = await generateTestKey();
       const invalidKey = 'hb_' + 'a'.repeat(32);
       
       // Mock the registry to return valid for one key
-      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
-        lookup: async (keyHash) => {
-          const validKeyHash = await hashApiKey(validKey);
-          if (keyHash === validKeyHash) {
-            return { user_id: 'user_123', key_id: 'key_456' };
-          }
-          return null;
-        }
-      });
       
       mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
         getApiKey: () => ({
@@ -104,7 +99,7 @@ describe('Authentication Middleware - P0 Security Tests', () => {
 
     it('should use constant-time comparison for key hashes', async () => {
       // Generate keys with similar prefixes
-      const key1 = generateApiKey();
+      const key1 = await generateTestKey();
       const key2 = 'hb_' + key1.substring(3, 5) + 'z'.repeat(30);
       
       const request1 = new Request('http://test.com', {
@@ -136,7 +131,7 @@ describe('Authentication Middleware - P0 Security Tests', () => {
   // SEC-02: Key enumeration prevention
   describe('SEC-02: Key enumeration prevention', () => {
     it('should return same error for non-existent and invalid keys', async () => {
-      const nonExistentKey = generateApiKey();
+      const nonExistentKey = await generateTestKey();
       const malformedKey = 'invalid_key_format';
       
       const request1 = new Request('http://test.com', {
@@ -160,16 +155,13 @@ describe('Authentication Middleware - P0 Security Tests', () => {
     });
 
     it('should not reveal if a key exists but is revoked', async () => {
-      const validKey = generateApiKey();
-      
-      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
-        lookup: async () => ({ user_id: 'user_123', key_id: 'key_456' })
-      });
+      const validKey = await generateTestKey();
+      const keyHash = await hashApiKey(validKey);
       
       mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
         getApiKey: () => ({
           id: 'key_456',
-          key_hash: 'hash123',
+          key_hash: keyHash,
           name: 'Test Key',
           created_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
@@ -194,18 +186,8 @@ describe('Authentication Middleware - P0 Security Tests', () => {
     });
 
     it('should not distinguish between expired and non-existent keys via timing', async () => {
-      const nonExistentKey = generateApiKey();
-      const expiredKey = generateApiKey();
-      
-      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
-        lookup: async (keyHash) => {
-          const expiredKeyHash = await hashApiKey(expiredKey);
-          if (keyHash === expiredKeyHash) {
-            return { user_id: 'user_123', key_id: 'key_456' };
-          }
-          return null;
-        }
-      });
+      const nonExistentKey = await generateTestKey();
+      const expiredKey = await generateTestKey();
       
       mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
         getApiKey: () => ({
@@ -427,16 +409,13 @@ describe('Authentication Middleware - P0 Security Tests', () => {
   // KEYVAL-03: Revoked API key is rejected
   describe('KEYVAL-03: Revoked key rejection', () => {
     it('should reject revoked API key', async () => {
-      const validKey = generateApiKey();
-      
-      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
-        lookup: async () => ({ user_id: 'user_789', key_id: 'key_revoked' })
-      });
+      const validKey = await generateTestKey();
+      const keyHash = await hashApiKey(validKey);
       
       mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
         getApiKey: () => ({
           id: 'key_revoked',
-          key_hash: 'hash_revoked',
+          key_hash: keyHash,
           name: 'Revoked Key',
           created_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
@@ -460,15 +439,13 @@ describe('Authentication Middleware - P0 Security Tests', () => {
     });
 
     it('should not provide user context for revoked key', async () => {
-      const validKey = generateApiKey();
-      
-      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
-        lookup: async () => ({ user_id: 'user_789', key_id: 'key_revoked' })
-      });
+      const validKey = await generateTestKey();
+      const keyHash = await hashApiKey(validKey);
       
       mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
         getApiKey: () => ({
           id: 'key_revoked',
+          key_hash: keyHash,
           revoked_at: new Date().toISOString(),
           expires_at: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
         }),
@@ -493,16 +470,13 @@ describe('Authentication Middleware - P0 Security Tests', () => {
   // KEYVAL-04: Expired API key is rejected
   describe('KEYVAL-04: Expired key rejection', () => {
     it('should reject expired API key', async () => {
-      const validKey = generateApiKey();
-      
-      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
-        lookup: async () => ({ user_id: 'user_999', key_id: 'key_expired' })
-      });
+      const validKey = await generateTestKey();
+      const keyHash = await hashApiKey(validKey);
       
       mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
         getApiKey: () => ({
           id: 'key_expired',
-          key_hash: 'hash_expired',
+          key_hash: keyHash,
           name: 'Expired Key',
           created_at: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString(),
           expires_at: new Date(Date.now() - 1000).toISOString(), // Expired
@@ -526,15 +500,13 @@ describe('Authentication Middleware - P0 Security Tests', () => {
     });
 
     it('should not provide user context for expired key', async () => {
-      const validKey = generateApiKey();
-      
-      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
-        lookup: async () => ({ user_id: 'user_999', key_id: 'key_expired' })
-      });
+      const validKey = await generateTestKey();
+      const keyHash = await hashApiKey(validKey);
       
       mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
         getApiKey: () => ({
           id: 'key_expired',
+          key_hash: keyHash,
           expires_at: new Date(Date.now() - 86400000).toISOString(), // Expired yesterday
           revoked_at: null,
         }),
@@ -556,15 +528,13 @@ describe('Authentication Middleware - P0 Security Tests', () => {
     });
 
     it('should reject key that expired exactly now', async () => {
-      const validKey = generateApiKey();
-      
-      mockEnv.KEY_REGISTRY = createMockDurableObject('KEY_REGISTRY', {
-        lookup: async () => ({ user_id: 'user_999', key_id: 'key_expired' })
-      });
+      const validKey = await generateTestKey();
+      const keyHash = await hashApiKey(validKey);
       
       mockEnv.USER_PROFILES = createMockDurableObject('USER_PROFILES', {
         getApiKey: () => ({
           id: 'key_expired',
+          key_hash: keyHash,
           expires_at: new Date(Date.now()).toISOString(), // Expires right now
           revoked_at: null,
         }),
@@ -587,6 +557,49 @@ describe('Authentication Middleware - P0 Security Tests', () => {
   });
 });
 
+describe('API key scopes', () => {
+  async function envFor(record) {
+    return {
+      ENVIRONMENT: 'test',
+      DOWNLOAD_TOKEN_SECRET: SECRET,
+      USER_PROFILES: createMockDurableObject('USER_PROFILES', {
+        getApiKey: () => record,
+        getProfile: () => ({ user_id: 'user_123', deleted_at: null })
+      })
+    };
+  }
+
+  it('gives a key exactly its stored scopes and caveats, never a session', async () => {
+    const key = await generateTestKey();
+    const env = await envFor({ key_id: 'key_456', key_hash: await hashApiKey(key), scopes: ['balance:read'],
+      caveats: { max_upload_bytes: 10 }, expires_at: new Date(Date.now() + 86400000).toISOString(), revoked_at: null });
+    const result = await authenticate(new Request('http://test.com', { headers: { Authorization: `ApiKey ${key}` } }), env);
+    expect(result.authenticated).toBe(true);
+    expect(result.user).toMatchObject({ authMethod: 'apikey', session: false, scopes: ['balance:read'], caveats: { max_upload_bytes: 10 } });
+  });
+
+  it('refuses a different key presented under a stored key\'s route', async () => {
+    const stored = await generateTestKey();
+    const other = await generateTestKey();
+    const env = await envFor({ key_id: 'key_456', key_hash: await hashApiKey(stored), scopes: ['balance:read'],
+      expires_at: new Date(Date.now() + 86400000).toISOString(), revoked_at: null });
+    const result = await authenticate(new Request('http://test.com', { headers: { Authorization: `ApiKey ${other}` } }), env);
+    expect(result.authenticated).toBe(false);
+  });
+
+  it('gives sessions every user scope and only the admin session admin scopes', async () => {
+    const env = { ENVIRONMENT: 'local', ADMIN_USER_ID: 'boss', USER_PROFILES: createMockDurableObject('USER_PROFILES', {
+      getProfile: () => ({ user_id: 'boss', deleted_at: null }) }) };
+    const admin = await authenticate(new Request('http://test.com', { headers: { Authorization: 'LocalDev boss' } }), env);
+    expect(admin.user.session).toBe(true);
+    expect(admin.user.scopes).toEqual(expect.arrayContaining(['content:write', 'admin:takedown']));
+    env.USER_PROFILES = createMockDurableObject('USER_PROFILES', { getProfile: () => ({ user_id: 'someone', deleted_at: null }) });
+    const user = await authenticate(new Request('http://test.com', { headers: { Authorization: 'LocalDev someone' } }), env);
+    expect(user.user.scopes).toContain('content:write');
+    expect(user.user.scopes.some(scope => scope.startsWith('admin:'))).toBe(false);
+  });
+});
+
 /**
  * Helper function to create mock Durable Object bindings
  */
@@ -597,24 +610,6 @@ function createMockDurableObject(name, handlers = {}) {
       fetch: async (request) => {
         const url = new URL(request.url);
         const path = url.pathname;
-        
-        // Handle KEY_REGISTRY lookups
-        if (name === 'KEY_REGISTRY' && path === '/lookup') {
-          const body = await request.json();
-          const keyHash = body.key_hash;
-          
-          if (handlers.lookup) {
-            const result = await handlers.lookup(keyHash);
-            if (result) {
-              return new Response(JSON.stringify(result), {
-                status: 200,
-                headers: { 'content-type': 'application/json' }
-              });
-            }
-          }
-          
-          return new Response('Not found', { status: 404 });
-        }
         
         // Handle USER_PROFILES API key lookups
         if (name === 'USER_PROFILES' && path.startsWith('/apikeys/')) {

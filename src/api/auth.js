@@ -3,11 +3,11 @@
  * Handles session management, API key operations, and account management
  */
 
-import { generateDownloadApiKey } from '../auth/download-tokens.js';
+import { generateApiKey } from '../auth/download-tokens.js';
 import { validDownloadCaps } from '../utils/download-budget.js';
 import { authenticate, requireAuth } from '../auth/middleware.js';
 import { ALL_USER_SCOPES, parseScopes } from '../auth/scopes.js';
-import { hashApiKey, generateKeyId, validateKeyName, validateExpiration, encryptApiKey, decryptApiKey, isSessionFresh } from '../auth/utils.js';
+import { hashApiKey, generateKeyId, validateKeyName, validateExpiration, isSessionFresh } from '../auth/utils.js';
 import { createClerkClient } from '@clerk/backend';
 
 /**
@@ -224,19 +224,6 @@ export async function handleLinkProvider(request, env) {
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk') {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid authentication method',
-        message: 'Use Clerk session to link OAuth providers'
-      }),
-      {
-        status: 403,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
   // In Clerk's architecture, OAuth provider linking is handled by the frontend SDK
   // The user initiates the OAuth flow in the browser, and Clerk handles the linking
   // automatically. The webhook (user.updated) will then notify this backend.
@@ -254,587 +241,198 @@ export async function handleLinkProvider(request, env) {
   );
 }
 
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' }
+  });
+}
+
+function userProfileStub(env, userId) {
+  return env.USER_PROFILES.get(env.USER_PROFILES.idFromName(userId));
+}
+
+/**
+ * Default key name: "Key", then "Key 2", "Key 3"...
+ */
+async function defaultKeyName(stub) {
+  try {
+    const response = await stub.fetch(new Request('http://internal/apikeys', { method: 'GET' }));
+    const names = response.ok ? (await response.json()).map(key => key.name) : [];
+    if (!names.includes('Key')) return 'Key';
+    let n = 2;
+    while (names.includes(`Key ${n}`)) n++;
+    return `Key ${n}`;
+  } catch (_error) {
+    return 'Key';
+  }
+}
+
 /**
  * Handle API key creation
- * POST /api/auth/apikeys
+ * POST /api/auth/apikeys (session only; enforced by the route table)
+ *
+ * Body: { name?, scopes, expires_at?, download_budget? }. A key holds only the
+ * scopes named here, and is shown once: only its hash is stored.
  */
 export async function handleCreateApiKey(request, env) {
   const authResult = await authenticate(request, env);
-  const isLocalMode = env.ENVIRONMENT === 'local';
-
-  // Require Clerk session (API keys can't create other API keys)
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid authentication method',
-        message: 'API keys cannot be used to create new API keys. Use Clerk session (or local auth in local mode).'
-      }),
-      {
-        status: 403,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
-  // Parse request body
   let body;
   try {
     body = await request.json();
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid request body',
-        message: 'Request body must be valid JSON'
-      }),
-      {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
+  } catch (_error) {
+    return jsonResponse({ error: 'Invalid request body', message: 'Request body must be valid JSON' }, 400);
   }
 
-  // Get existing keys to determine default name
-  const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
-  const userProfileStub = env.USER_PROFILES.get(userProfileId);
-
-  let keyName = body.name;
-  
-  // If no name provided, generate a smart default
-  if (!keyName || keyName.trim() === '') {
-    try {
-      const existingKeysResponse = await userProfileStub.fetch(
-        new Request('http://internal/apikeys', {
-          method: 'GET'
-        })
-      );
-      
-      if (!existingKeysResponse.ok) {
-        // If we can't fetch existing keys, just use "Hosting" as default
-        keyName = 'Hosting';
-      } else {
-        const existingKeys = await existingKeysResponse.json();
-        const existingNames = existingKeys.map(key => key.name);
-        
-        // Default to "Hosting" if no keys exist
-        if (existingKeys.length === 0 || !existingNames.includes('Hosting')) {
-          keyName = 'Hosting';
-        } else {
-          // Find next available "Hosting n" name
-          let n = 2;
-          while (existingNames.includes(`Hosting ${n}`)) {
-            n++;
-          }
-          keyName = `Hosting ${n}`;
-        }
-      }
-    } catch (error) {
-      // If error fetching keys, default to "Hosting"
-      keyName = 'Hosting';
-    }
-  }
-
-  // Validate key name
+  const stub = userProfileStub(env, authResult.user.userId);
+  const keyName = typeof body.name === 'string' && body.name.trim() !== '' ? body.name : await defaultKeyName(stub);
   const nameValidation = validateKeyName(keyName);
   if (!nameValidation.valid) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid key name',
-        message: nameValidation.message
-      }),
-      {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
+    return jsonResponse({ error: 'Invalid key name', message: nameValidation.message }, 400);
   }
 
-  // Scopes: required, and only ever the user scopes
   const scopes = parseScopes(body.scopes, 'key');
   if (!scopes || scopes.length === 0) {
-    return Response.json({
+    return jsonResponse({
       error: 'Invalid scopes',
       message: `scopes must be a non-empty list drawn from: ${ALL_USER_SCOPES.join(', ')}`
-    }, { status: 400 });
+    }, 400);
   }
 
-  // Validate expiration
   const expirationValidation = validateExpiration(body.expires_at);
   if (!expirationValidation.valid) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid expiration',
-        message: expirationValidation.message
-      }),
-      {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
+    return jsonResponse({ error: 'Invalid expiration', message: expirationValidation.message }, 400);
   }
 
-  // Generate API key
-  if (!env.DOWNLOAD_TOKEN_SECRET) return Response.json({ error: 'DOWNLOAD_TOKEN_SECRET must be configured before creating v2 keys' }, { status: 503 });
-  if (body.download_budget !== undefined && !validDownloadCaps(body.download_budget)) return Response.json({ error: 'Invalid download caps' }, { status: 400 });
+  if (!env.DOWNLOAD_TOKEN_SECRET) {
+    return jsonResponse({ error: 'DOWNLOAD_TOKEN_SECRET must be configured before creating keys' }, 503);
+  }
+  if (body.download_budget !== undefined && !validDownloadCaps(body.download_budget)) {
+    return jsonResponse({ error: 'Invalid download caps' }, 400);
+  }
+
   const keyId = generateKeyId();
-  const apiKey = await generateDownloadApiKey(authResult.user.userId, keyId, env.DOWNLOAD_TOKEN_SECRET);
-  const keyHash = await hashApiKey(apiKey);
+  const apiKey = await generateApiKey(authResult.user.userId, keyId, env.DOWNLOAD_TOKEN_SECRET);
 
-  // Encrypt the API key for reveal functionality
-  let keyEncrypted = apiKey;
-  if (!isLocalMode) {
-    if (!env.API_KEY_ENCRYPTION_KEY) {
-      return new Response(
-        JSON.stringify({
-          error: 'Encryption key not configured',
-          message: 'API_KEY_ENCRYPTION_KEY secret must be set'
-        }),
-        {
-          status: 500,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
-    }
-    keyEncrypted = await encryptApiKey(apiKey, env.API_KEY_ENCRYPTION_KEY);
-  }
-
-  // Store in UserProfile DO
-  const response = await userProfileStub.fetch(
-    new Request('http://internal/apikeys', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        key_id: keyId,
-        key_hash: keyHash,
-        key_encrypted: keyEncrypted,
-        download_budget: body.download_budget,
-        name: keyName,
-        scopes,
-        expires_at: expirationValidation.expiresAt
-      })
+  const response = await stub.fetch(new Request('http://internal/apikeys', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      key_id: keyId,
+      key_hash: await hashApiKey(apiKey),
+      download_budget: body.download_budget,
+      name: keyName,
+      scopes,
+      expires_at: expirationValidation.expiresAt
     })
-  );
+  }));
 
   if (!response.ok) {
-    const error = await response.json();
-    return new Response(
-      JSON.stringify(error),
-      {
-        status: response.status,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
+    return jsonResponse(await response.json(), response.status);
   }
 
-  const keyInfo = await response.json();
-
-  // Register key in KeyRegistry
-  const registryId = env.KEY_REGISTRY.idFromName('global');
-  const registryStub = env.KEY_REGISTRY.get(registryId);
-
-  await registryStub.fetch(
-    new Request('http://internal/register', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        key_hash: keyHash,
-        user_id: authResult.user.userId,
-        key_id: keyId
-      })
-    })
-  );
-
-  // Return the API key (ONLY SHOWN ONCE!)
-  return new Response(
-    JSON.stringify(
-      Object.assign({}, keyInfo, {
-        api_key: apiKey,
-        warning: 'Save this API key securely. It will not be shown again.'
-      })
-    ),
-    {
-      status: 201,
-      headers: { 'content-type': 'application/json' }
-    }
-  );
+  // The key itself is returned only here
+  return jsonResponse({
+    ...(await response.json()),
+    api_key: apiKey,
+    warning: 'Save this API key securely. It cannot be shown again.'
+  }, 201);
 }
 
 /**
  * Handle list API keys
- * GET /api/auth/apikeys
+ * GET /api/auth/apikeys (session only)
  */
 export async function handleListApiKeys(request, env) {
   const authResult = await authenticate(request, env);
-  const isLocalMode = env.ENVIRONMENT === 'local';
-
-  // Require Clerk session
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid authentication method',
-        message: 'Use Clerk session (or local auth in local mode) to list API keys'
-      }),
-      {
-        status: 403,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
-  // Get keys from UserProfile DO
-  const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
-  const userProfileStub = env.USER_PROFILES.get(userProfileId);
-
-  const response = await userProfileStub.fetch(
-    new Request('http://internal/apikeys', {
-      method: 'GET'
-    })
+  const response = await userProfileStub(env, authResult.user.userId).fetch(
+    new Request('http://internal/apikeys', { method: 'GET' })
   );
-
-  const keys = await response.json();
-
-  return new Response(JSON.stringify(keys), {
-    status: 200,
-    headers: { 'content-type': 'application/json' }
-  });
+  return jsonResponse(await response.json(), response.status);
 }
 
 /**
  * Handle revoke API key
- * DELETE /api/auth/apikeys/:keyId
+ * DELETE /api/auth/apikeys/:keyId (session only)
  */
 export async function handleRevokeApiKey(request, env, keyId) {
   const authResult = await authenticate(request, env);
-  const isLocalMode = env.ENVIRONMENT === 'local';
-
-  // Require Clerk session
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid authentication method',
-        message: 'Use Clerk session (or local auth in local mode) to revoke API keys'
-      }),
-      {
-        status: 403,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
-  // Revoke key in UserProfile DO
-  const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
-  const userProfileStub = env.USER_PROFILES.get(userProfileId);
-
-  const response = await userProfileStub.fetch(
-    new Request(`http://internal/apikeys/${keyId}`, {
-      method: 'DELETE'
-    })
+  const response = await userProfileStub(env, authResult.user.userId).fetch(
+    new Request(`http://internal/apikeys/${encodeURIComponent(keyId)}`, { method: 'DELETE' })
   );
-
-  if (!response.ok) {
-    const error = await response.json();
-    return new Response(
-      JSON.stringify(error),
-      {
-        status: response.status,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
-  const result = await response.json();
-
-  // Note: KeyRegistry entry is not removed here because we don't have the key hash
-  // The validation in middleware will check the revoked_at field in the UserProfile
-  // This is acceptable because revoked keys are kept for 5 years for audit purposes
-
-  return new Response(JSON.stringify(result), {
-    status: 200,
-    headers: { 'content-type': 'application/json' }
-  });
+  return jsonResponse(await response.json(), response.status);
 }
 
 /**
- * Handle reveal API key
- * POST /api/auth/apikeys/:keyId/reveal
- */
-export async function handleRevealApiKey(request, env, keyId) {
-  const authResult = await authenticate(request, env);
-  const isLocalMode = env.ENVIRONMENT === 'local';
-
-  // Require Clerk session (API keys cannot reveal other keys)
-  const authError = requireAuth(authResult);
-  if (authError) return authError;
-
-  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid authentication method',
-        message: 'API keys cannot reveal other API keys. Use Clerk session (or local auth in local mode).'
-      }),
-      {
-        status: 403,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
-  // Verify session is fresh (authenticated within last 5 minutes)
-  if (!isLocalMode) {
-    try {
-      if (!env.CLERK_SECRET_KEY) {
-        throw new Error('CLERK_SECRET_KEY not configured');
-      }
-
-      const clerkClient = createClerkClient({
-        secretKey: env.CLERK_SECRET_KEY
-      });
-
-      const sessionId = authResult.user.sessionId;
-      const session = await clerkClient.sessions.getSession(sessionId);
-
-      // Check if session is fresh
-      if (!isSessionFresh(session, 5)) {
-        return new Response(
-          JSON.stringify({
-            error: 'FRESH_AUTH_REQUIRED',
-            message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
-          }),
-          {
-            status: 403,
-            headers: { 'content-type': 'application/json' }
-          }
-        );
-      }
-    } catch (error) {
-      return new Response(
-        JSON.stringify({
-          error: 'Session verification failed',
-          message: error.message
-        }),
-        {
-          status: 500,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
-    }
-  }
-
-  // Get encrypted key from UserProfile DO (includes rate limiting)
-  const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
-  const userProfileStub = env.USER_PROFILES.get(userProfileId);
-
-  const response = await userProfileStub.fetch(
-    new Request(`http://internal/apikeys/${keyId}/reveal`, {
-      method: 'POST'
-    })
-  );
-
-  if (!response.ok) {
-    const error = await response.json();
-    return new Response(
-      JSON.stringify(error),
-      {
-        status: response.status,
-        headers: response.headers
-      }
-    );
-  }
-
-  const keyData = await response.json();
-
-  // Decrypt the API key
-  if (!isLocalMode && !env.API_KEY_ENCRYPTION_KEY) {
-    return new Response(
-      JSON.stringify({
-        error: 'Encryption key not configured',
-        message: 'API_KEY_ENCRYPTION_KEY secret must be set'
-      }),
-      {
-        status: 500,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
-  try {
-    const apiKey = isLocalMode
-      ? keyData.key_encrypted
-      : await decryptApiKey(keyData.key_encrypted, env.API_KEY_ENCRYPTION_KEY);
-
-    return new Response(
-      JSON.stringify({
-        key_id: keyData.key_id,
-        name: keyData.name,
-        api_key: apiKey,
-        created_at: keyData.created_at,
-        expires_at: keyData.expires_at,
-        last_used_at: keyData.last_used_at,
-        warning: 'Keep this API key secure. Limit how often you reveal it.'
-      }),
-      {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: 'Decryption failed',
-        message: 'Unable to decrypt API key'
-      }),
-      {
-        status: 500,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-}
-
-/**
- * Update API key name
- * Requires fresh Clerk session (authenticated within last 5 minutes)
- * PATCH /api/auth/apikeys/:keyId
- * @param {Request} request
- * @param {Object} env
- * @param {string} keyId
- * @returns {Response}
+ * Rename an API key or narrow its scopes (never widen them)
+ * PATCH /api/auth/apikeys/:keyId (session only; Clerk sessions must be fresh)
+ * Body: { name?, scopes? }
  */
 export async function handleUpdateApiKey(request, env, keyId) {
   const authResult = await authenticate(request, env);
-  const isLocalMode = env.ENVIRONMENT === 'local';
-
-  // Require Clerk session (API keys cannot update themselves)
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
-  if (authResult.user.authMethod !== 'clerk' && !(isLocalMode && authResult.user.authMethod === 'local')) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid authentication method',
-        message: 'API keys cannot update other API keys. Use Clerk session (or local auth in local mode).'
-      }),
-      {
-        status: 403,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
   // Verify session is fresh (authenticated within last 5 minutes)
-  if (!isLocalMode) {
+  if (authResult.user.authMethod === 'clerk') {
     try {
       if (!env.CLERK_SECRET_KEY) {
         throw new Error('CLERK_SECRET_KEY not configured');
       }
-
-      const clerkClient = createClerkClient({
-        secretKey: env.CLERK_SECRET_KEY
-      });
-
-      const sessionId = authResult.user.sessionId;
-      const session = await clerkClient.sessions.getSession(sessionId);
-
-      // Check if session is fresh (5 minutes)
+      const clerkClient = createClerkClient({ secretKey: env.CLERK_SECRET_KEY });
+      const session = await clerkClient.sessions.getSession(authResult.user.sessionId);
       if (!isSessionFresh(session, 5)) {
-        return new Response(
-          JSON.stringify({
-            error: 'FRESH_AUTH_REQUIRED',
-            message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
-          }),
-          {
-            status: 403,
-            headers: { 'content-type': 'application/json' }
-          }
-        );
+        return jsonResponse({
+          error: 'FRESH_AUTH_REQUIRED',
+          message: 'This operation requires a fresh authentication session (authenticated within the last 5 minutes). Please re-authenticate.'
+        }, 403);
       }
     } catch (error) {
-      return new Response(
-        JSON.stringify({
-          error: 'Session verification failed',
-          message: error.message
-        }),
-        {
-          status: 500,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+      return jsonResponse({ error: 'Session verification failed', message: error.message }, 500);
     }
   }
 
-  // Parse request body
   let body;
   try {
     body = await request.json();
-  } catch (error) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid request body',
-        message: 'Request body must be valid JSON'
-      }),
-      {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
+  } catch (_error) {
+    return jsonResponse({ error: 'Invalid request body', message: 'Request body must be valid JSON' }, 400);
   }
 
-  // Validate name
-  const { name } = body;
-
-  if (!name || typeof name !== 'string') {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid name',
-        message: 'Name is required and must be a string'
-      }),
-      {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
+  const update = {};
+  if (body.name !== undefined) {
+    if (typeof body.name !== 'string' || body.name.length < 1 || body.name.length > 100) {
+      return jsonResponse({ error: 'Invalid name', message: 'Name must be a string of 1 to 100 characters' }, 400);
+    }
+    update.name = body.name;
+  }
+  if (body.scopes !== undefined) {
+    const scopes = parseScopes(body.scopes, 'key');
+    if (!scopes || scopes.length === 0) {
+      return jsonResponse({ error: 'Invalid scopes', message: 'scopes must be a non-empty list of user scopes' }, 400);
+    }
+    update.scopes = scopes;
+  }
+  if (Object.keys(update).length === 0) {
+    return jsonResponse({ error: 'Nothing to update', message: 'Provide name or scopes' }, 400);
   }
 
-  // Validate name length (1-100 characters)
-  if (name.length < 1 || name.length > 100) {
-    return new Response(
-      JSON.stringify({
-        error: 'Invalid name length',
-        message: 'Name must be between 1 and 100 characters'
-      }),
-      {
-        status: 400,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
-  // Get user profile DO
-  const userId = authResult.user.userId;
-  const userProfileId = env.USER_PROFILES.idFromName(userId);
-  const userProfileStub = env.USER_PROFILES.get(userProfileId);
-
-  // Update API key name
-  const updateResponse = await userProfileStub.fetch(
-    new Request(`http://internal/apikeys/${keyId}/update`, {
+  return userProfileStub(env, authResult.user.userId).fetch(
+    new Request(`http://internal/apikeys/${encodeURIComponent(keyId)}/update`, {
       method: 'PATCH',
-      headers: {
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify({ name })
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(update)
     })
   );
-
-  // Return response from DO
-  return updateResponse;
 }
 
 /**

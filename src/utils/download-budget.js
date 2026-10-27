@@ -12,7 +12,8 @@ export function downloadIdentityValid(profile, identity, now = Date.now()) {
   if (!identity || identity.u !== profile.user_id || profile.deleted_at) return false;
   if (identity.kind === 'key') {
     return (profile.api_keys || []).some(k => k.key_id === identity.k && !k.revoked_at &&
-      new Date(k.expires_at).getTime() > now && (!identity.key_hash || identity.key_hash === k.key_hash));
+      new Date(k.expires_at).getTime() > now && (!identity.key_hash || identity.key_hash === k.key_hash) &&
+      k.scopes?.includes('downloads:spend'));
   }
   if (identity.kind === 'oauth') {
     return (profile.oauth_grants || []).some(g => g.grant_id === identity.k && !g.revoked_at &&

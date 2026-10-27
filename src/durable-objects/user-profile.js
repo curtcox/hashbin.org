@@ -12,6 +12,21 @@ import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
 // Maximum API keys per user
 const MAX_API_KEYS = 25;
 
+/**
+ * Keys from before scopes existed acted as the whole account; revoke them on sight.
+ * Returns true when the profile changed and needs saving.
+ */
+function retireUnscopedKeys(profile) {
+  let changed = false;
+  for (const key of profile.api_keys || []) {
+    if (!key.revoked_at && !Array.isArray(key.scopes)) {
+      key.revoked_at = new Date().toISOString();
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 export class UserProfile {
   constructor(state, env) {
     this.state = state;
@@ -154,15 +169,9 @@ export class UserProfile {
         return await this.updateLastUsed(keyId);
       }
 
-      if (url.pathname.startsWith('/apikeys/') && url.pathname.endsWith('/reveal') && method === 'POST') {
-        const keyId = url.pathname.split('/')[2];
-        return await this.revealApiKey(keyId);
-      }
-
-      // Note: Internal route uses '/update' suffix for clarity and consistency with '/reveal' pattern
       if (url.pathname.startsWith('/apikeys/') && url.pathname.endsWith('/update') && method === 'PATCH') {
         const keyId = url.pathname.split('/')[2];
-        return await this.updateApiKeyName(keyId, request);
+        return await this.updateApiKey(keyId, request);
       }
 
       if (url.pathname === '/balance' && method === 'GET') {
@@ -424,6 +433,8 @@ export class UserProfile {
       );
     }
 
+    retireUnscopedKeys(profile);
+
     // Check API key limit
     const activeKeys = profile.api_keys.filter(key => !key.revoked_at);
     if (activeKeys.length >= MAX_API_KEYS) {
@@ -442,7 +453,6 @@ export class UserProfile {
     const apiKey = {
       key_id: data.key_id,
       key_hash: data.key_hash,
-      key_encrypted: data.key_encrypted, // AES-256-GCM encrypted key for reveal
       name: data.name,
       scopes: Array.isArray(data.scopes) ? data.scopes : [],
       caveats: data.caveats || {},
@@ -450,8 +460,7 @@ export class UserProfile {
       expires_at: data.expires_at,
       last_used_at: null,
       usage_count: 0,
-      revoked_at: null,
-      reveal_timestamps: [] // Track last 3 reveal times for rate limiting
+      revoked_at: null
     };
 
     if (data.download_budget !== undefined && !validDownloadCaps(data.download_budget)) return Response.json({ error: 'Invalid download caps' }, { status: 400 });
@@ -495,6 +504,8 @@ export class UserProfile {
       );
     }
 
+    if (retireUnscopedKeys(profile)) await this.state.storage.put('profile', profile);
+
     // Return keys without hashes
     const keys = profile.api_keys.map(key => ({
       key_id: key.key_id,
@@ -531,6 +542,8 @@ export class UserProfile {
         }
       );
     }
+
+    if (retireUnscopedKeys(profile)) await this.state.storage.put('profile', profile);
 
     const apiKey = profile.api_keys.find(key => key.key_id === keyId);
 
@@ -608,117 +621,6 @@ export class UserProfile {
       JSON.stringify({
         success: true,
         message: 'API key revoked successfully'
-      }),
-      {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
-  }
-
-  /**
-   * Reveal an API key (with rate limiting)
-   * Returns encrypted key data if within rate limits
-   */
-  async revealApiKey(keyId) {
-    const profile = await this.state.storage.get('profile');
-
-    if (!profile) {
-      return new Response(
-        JSON.stringify({
-          error: 'Profile not found'
-        }),
-        {
-          status: 404,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
-    }
-
-    const apiKey = profile.api_keys.find(key => key.key_id === keyId);
-
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({
-          error: 'API key not found'
-        }),
-        {
-          status: 404,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
-    }
-
-    // Check if key is revoked
-    if (apiKey.revoked_at) {
-      return new Response(
-        JSON.stringify({
-          error: 'KEY_REVOKED',
-          message: 'Cannot reveal a revoked API key'
-        }),
-        {
-          status: 400,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
-    }
-
-    // Check rate limiting (3 reveals per hour)
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    
-    // Initialize reveal_timestamps if not present (backward compatibility)
-    if (!apiKey.reveal_timestamps) {
-      apiKey.reveal_timestamps = [];
-    }
-
-    // Filter to only recent reveals (within last hour)
-    const recentReveals = apiKey.reveal_timestamps
-      .map(ts => new Date(ts))
-      .filter(ts => ts > oneHourAgo);
-
-    if (recentReveals.length >= 3) {
-      // Calculate when the oldest reveal will be outside the window
-      const oldestReveal = recentReveals.sort((a, b) => a - b)[0];
-      const resetTime = new Date(oldestReveal.getTime() + 60 * 60 * 1000);
-      const retryAfterSeconds = Math.ceil((resetTime.getTime() - now.getTime()) / 1000);
-
-      return new Response(
-        JSON.stringify({
-          error: 'REVEAL_RATE_LIMITED',
-          message: 'Maximum 3 reveals per hour exceeded',
-          retry_after_seconds: retryAfterSeconds
-        }),
-        {
-          status: 429,
-          headers: {
-            'content-type': 'application/json',
-            'Retry-After': retryAfterSeconds.toString()
-          }
-        }
-      );
-    }
-
-    // Record this reveal
-    apiKey.reveal_timestamps.push(now.toISOString());
-    
-    // Keep only last 3 timestamps (sliding window)
-    if (apiKey.reveal_timestamps.length > 3) {
-      apiKey.reveal_timestamps = apiKey.reveal_timestamps.slice(-3);
-    }
-
-    profile.updated_at = new Date().toISOString();
-    await this.state.storage.put('profile', profile);
-
-    // Return encrypted key data (decryption happens in API handler with encryption key)
-    return new Response(
-      JSON.stringify({
-        key_id: apiKey.key_id,
-        key_encrypted: apiKey.key_encrypted,
-        name: apiKey.name,
-        created_at: apiKey.created_at,
-        expires_at: apiKey.expires_at,
-        last_used_at: apiKey.last_used_at
       }),
       {
         status: 200,
@@ -840,138 +742,64 @@ export class UserProfile {
   }
 
   /**
-   * Update API key name
+   * Rename an API key or narrow its scopes. Scopes may only be removed, never added.
    * @param {string} keyId
-   * @param {Request} request
+   * @param {Request} request - body { name?, scopes? }, validated by the API handler
    * @returns {Response}
    */
-  async updateApiKeyName(keyId, request) {
+  async updateApiKey(keyId, request) {
     const profile = await this.state.storage.get('profile');
-
     if (!profile) {
-      return new Response(
-        JSON.stringify({
-          error: 'Profile not found'
-        }),
-        {
-          status: 404,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+      return Response.json({ error: 'Profile not found' }, { status: 404 });
     }
 
-    // Find the API key
     const apiKey = profile.api_keys.find(key => key.key_id === keyId);
-
     if (!apiKey) {
-      return new Response(
-        JSON.stringify({
-          error: 'API key not found'
-        }),
-        {
-          status: 404,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+      return Response.json({ error: 'API key not found' }, { status: 404 });
     }
-
-    // Check if key is revoked
     if (apiKey.revoked_at) {
-      return new Response(
-        JSON.stringify({
-          error: 'KEY_REVOKED',
-          message: 'Cannot update a revoked API key'
-        }),
-        {
-          status: 400,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+      return Response.json({ error: 'KEY_REVOKED', message: 'Cannot update a revoked API key' }, { status: 400 });
+    }
+    if (new Date(apiKey.expires_at) < new Date()) {
+      return Response.json({ error: 'KEY_EXPIRED', message: 'Cannot update an expired API key' }, { status: 400 });
     }
 
-    // Check if key is expired
-    const now = new Date();
-    const expiresAt = new Date(apiKey.expires_at);
-    if (expiresAt < now) {
-      return new Response(
-        JSON.stringify({
-          error: 'KEY_EXPIRED',
-          message: 'Cannot update an expired API key'
-        }),
-        {
-          status: 400,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
-    }
-
-    // Parse request body
     let body;
     try {
       body = await request.json();
-    } catch (error) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid request body'
-        }),
-        {
-          status: 400,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+    } catch (_error) {
+      return Response.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const { name } = body;
-
-    // Validate name (same validation as in auth handler for consistency)
-    if (!name || typeof name !== 'string') {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid name',
-          message: 'Name is required and must be a string'
-        }),
-        {
-          status: 400,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+    if (body.scopes !== undefined) {
+      const current = apiKey.scopes || [];
+      if (!Array.isArray(body.scopes) || body.scopes.length === 0 || body.scopes.some(scope => !current.includes(scope))) {
+        return Response.json({
+          error: 'SCOPE_WIDENING',
+          message: 'A key\'s scopes can only be narrowed; create a new key for more access'
+        }, { status: 400 });
+      }
+      apiKey.scopes = [...new Set(body.scopes)];
     }
-
-    if (name.length < 1 || name.length > 100) {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid name length',
-          message: 'Name must be between 1 and 100 characters'
-        }),
-        {
-          status: 400,
-          headers: { 'content-type': 'application/json' }
-        }
-      );
+    if (body.name !== undefined) {
+      apiKey.name = body.name;
     }
-
-    // Update the name
-    apiKey.name = name;
     profile.updated_at = new Date().toISOString();
 
     await this.state.storage.put('profile', profile);
 
     // Return updated key metadata (without sensitive fields)
-    return new Response(
-      JSON.stringify({
-        key_id: apiKey.key_id,
-        name: apiKey.name,
-        created_at: apiKey.created_at,
-        expires_at: apiKey.expires_at,
-        last_used_at: apiKey.last_used_at,
-        usage_count: apiKey.usage_count || 0,
-        revoked: !!apiKey.revoked_at
-      }),
-      {
-        status: 200,
-        headers: { 'content-type': 'application/json' }
-      }
-    );
+    return Response.json({
+      key_id: apiKey.key_id,
+      name: apiKey.name,
+      scopes: apiKey.scopes,
+      caveats: apiKey.caveats || {},
+      created_at: apiKey.created_at,
+      expires_at: apiKey.expires_at,
+      last_used_at: apiKey.last_used_at,
+      usage_count: apiKey.usage_count || 0,
+      revoked: !!apiKey.revoked_at
+    });
   }
 
   /**

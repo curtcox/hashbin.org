@@ -1,6 +1,6 @@
 #!/bin/bash
 # Test script for API Keys feature
-# Tests key creation, listing, revocation, and reveal functionality
+# Structural checks for scoped, hash-only API keys
 # This script runs against a local wrangler dev server
 
 set -e
@@ -55,241 +55,28 @@ echo ""
 echo "Testing against: $BASE_URL"
 echo ""
 
-# ==========================================
-# Test 1: generateApiKey - production format
-# ==========================================
-log_test "generateApiKey produces correct format (hb_ prefix)"
+# Each check: a description, then a command that must succeed
+check() {
+  local description="$1"; shift
+  log_test "$description"
+  if "$@"; then
+    log_pass "$description"
+  else
+    log_fail "$description"
+  fi
+}
+absent() { ! grep -rqE --exclude="*.test.js" "$1" "${@:2}"; }
 
-# This test checks the implementation directly by examining the code
-# In a real test we'd need to actually call the function
-if grep -q "const PREFIX = 'hb_'" $REPO_ROOT/src/auth/utils.js; then
-  log_pass "generateApiKey implementation uses hb_ PREFIX"
-else
-  log_fail "generateApiKey implementation not found or incorrect"
-fi
-
-# Verify the function returns the PREFIX
-if grep -q "return PREFIX + randomPart" $REPO_ROOT/src/auth/utils.js; then
-  log_pass "generateApiKey returns PREFIX + randomPart"
-else
-  log_fail "generateApiKey does not use PREFIX correctly"
-fi
-
-# ==========================================
-# Test 2: API Key format validation
-# ==========================================
-log_test "validateApiKeyFormat correctly validates key format"
-
-# Test implementation exists
-if grep -q "export function validateApiKeyFormat" $REPO_ROOT/src/auth/utils.js; then
-  log_pass "validateApiKeyFormat function exists"
-else
-  log_fail "validateApiKeyFormat function not found"
-fi
-
-# ==========================================
-# Test 3: Encryption functions exist
-# ==========================================
-log_test "Encryption/decryption functions are implemented"
-
-if grep -q "export async function encryptApiKey" $REPO_ROOT/src/auth/utils.js; then
-  log_pass "encryptApiKey function exists"
-else
-  log_fail "encryptApiKey function not found"
-fi
-
-if grep -q "export async function decryptApiKey" $REPO_ROOT/src/auth/utils.js; then
-  log_pass "decryptApiKey function exists"
-else
-  log_fail "decryptApiKey function not found"
-fi
-
-# ==========================================
-# Test 4: isSessionFresh function exists
-# ==========================================
-log_test "isSessionFresh function is implemented"
-
-if grep -q "export function isSessionFresh" $REPO_ROOT/src/auth/utils.js; then
-  log_pass "isSessionFresh function exists"
-else
-  log_fail "isSessionFresh function not found"
-fi
-
-# ==========================================
-# Test 5: UserProfile stores encrypted keys
-# ==========================================
-log_test "UserProfile stores key_encrypted field"
-
-if grep -q "key_encrypted: data.key_encrypted" $REPO_ROOT/src/durable-objects/user-profile.js; then
-  log_pass "UserProfile stores key_encrypted field"
-else
-  log_fail "UserProfile does not store key_encrypted field"
-fi
-
-# ==========================================
-# Test 6: UserProfile stores reveal_timestamps
-# ==========================================
-log_test "UserProfile stores reveal_timestamps for rate limiting"
-
-if grep -q "reveal_timestamps: \[\]" $REPO_ROOT/src/durable-objects/user-profile.js; then
-  log_pass "UserProfile initializes reveal_timestamps array"
-else
-  log_fail "UserProfile does not initialize reveal_timestamps"
-fi
-
-# ==========================================
-# Test 7: Revoke is idempotent
-# ==========================================
-log_test "Revoke API key returns 200 for already revoked keys"
-
-if grep -q "message: 'API key already revoked'" $REPO_ROOT/src/durable-objects/user-profile.js; then
-  log_pass "Revoke operation is idempotent"
-else
-  log_fail "Revoke operation not idempotent"
-fi
-
-# ==========================================
-# Test 8: Reveal endpoint exists in UserProfile
-# ==========================================
-log_test "UserProfile has revealApiKey method"
-
-if grep -q "async revealApiKey(keyId)" $REPO_ROOT/src/durable-objects/user-profile.js; then
-  log_pass "UserProfile.revealApiKey method exists"
-else
-  log_fail "UserProfile.revealApiKey method not found"
-fi
-
-# ==========================================
-# Test 9: Reveal endpoint route exists
-# ==========================================
-log_test "Reveal endpoint route is registered"
-
-if grep -q "url.pathname.endsWith('/reveal')" $REPO_ROOT/src/durable-objects/user-profile.js; then
-  log_pass "Reveal route registered in UserProfile"
-else
-  log_fail "Reveal route not registered in UserProfile"
-fi
-
-# ==========================================
-# Test 10: API handler for reveal exists
-# ==========================================
-log_test "handleRevealApiKey handler exists"
-
-if grep -q "export async function handleRevealApiKey" $REPO_ROOT/src/api/auth.js; then
-  log_pass "handleRevealApiKey handler exists"
-else
-  log_fail "handleRevealApiKey handler not found"
-fi
-
-# ==========================================
-# Test 11: Main router includes reveal endpoint
-# ==========================================
-log_test "Main router includes reveal endpoint"
-
-if grep -q "handleRevealApiKey" $REPO_ROOT/src/index.js; then
-  log_pass "Main router includes handleRevealApiKey"
-else
-  log_fail "Main router does not include handleRevealApiKey"
-fi
-
-# ==========================================
-# Test 12: Reveal checks for fresh session
-# ==========================================
-log_test "Reveal endpoint checks session freshness"
-
-if grep -q "isSessionFresh(session, 5)" $REPO_ROOT/src/api/auth.js; then
-  log_pass "Reveal endpoint validates session freshness"
-else
-  log_fail "Reveal endpoint does not validate session freshness"
-fi
-
-# ==========================================
-# Test 13: Reveal enforces rate limiting
-# ==========================================
-log_test "Reveal endpoint enforces rate limiting (3 per hour)"
-
-if grep -q "recentReveals.length >= 3" $REPO_ROOT/src/durable-objects/user-profile.js; then
-  log_pass "Reveal rate limiting logic exists"
-else
-  log_fail "Reveal rate limiting logic not found"
-fi
-
-# ==========================================
-# Test 14: Encryption key is documented
-# ==========================================
-log_test "API_KEY_ENCRYPTION_KEY is documented in wrangler.toml"
-
-if grep -q "API_KEY_ENCRYPTION_KEY" $REPO_ROOT/wrangler.toml; then
-  log_pass "API_KEY_ENCRYPTION_KEY documented in wrangler.toml"
-else
-  log_fail "API_KEY_ENCRYPTION_KEY not documented in wrangler.toml"
-fi
-
-# ==========================================
-# Test 15: Encryption key generation script exists
-# ==========================================
-log_test "Encryption key generation script exists"
-
-if [ -f "$REPO_ROOT/scripts/generate-encryption-key.sh" ]; then
-  log_pass "generate-encryption-key.sh script exists"
-else
-  log_fail "generate-encryption-key.sh script not found"
-fi
-
-# ==========================================
-# Test 16: Create API key includes encryption
-# ==========================================
-log_test "API key creation encrypts the key"
-
-if grep -q "await encryptApiKey(" $REPO_ROOT/src/api/auth.js; then
-  log_pass "API key creation includes encryption"
-else
-  log_fail "API key creation does not encrypt keys"
-fi
-
-# ==========================================
-# Test 17: Create API key checks for encryption key
-# ==========================================
-log_test "API key creation checks for API_KEY_ENCRYPTION_KEY"
-
-if grep -q "if (!env.API_KEY_ENCRYPTION_KEY)" $REPO_ROOT/src/api/auth.js; then
-  log_pass "Create endpoint validates encryption key exists"
-else
-  log_fail "Create endpoint does not validate encryption key"
-fi
-
-# ==========================================
-# Test 18: Reveal returns decrypted key
-# ==========================================
-log_test "Reveal endpoint decrypts and returns API key"
-
-if grep -q "await decryptApiKey(" $REPO_ROOT/src/api/auth.js; then
-  log_pass "Reveal endpoint decrypts API key"
-else
-  log_fail "Reveal endpoint does not decrypt API key"
-fi
-
-# ==========================================
-# Test 19: Reveal checks if key is revoked
-# ==========================================
-log_test "Reveal endpoint rejects revoked keys"
-
-if grep -q "error: 'KEY_REVOKED'" $REPO_ROOT/src/durable-objects/user-profile.js; then
-  log_pass "Reveal endpoint checks for revoked keys"
-else
-  log_fail "Reveal endpoint does not check for revoked keys"
-fi
-
-# ==========================================
-# Test 20: Reveal requires Clerk session
-# ==========================================
-log_test "Reveal endpoint requires Clerk session (not API key)"
-
-if grep -q "if (authResult.user.authMethod !== 'clerk')" $REPO_ROOT/src/api/auth.js; then
-  log_pass "Reveal endpoint requires Clerk session"
-else
-  log_fail "Reveal endpoint does not validate auth method"
-fi
+check "Keys are signed, routable hbk_ keys" grep -q "return \`hbk_" "$REPO_ROOT/src/auth/download-tokens.js"
+check "Key creation requires scopes" grep -q "parseScopes(body.scopes, 'key')" "$REPO_ROOT/src/api/auth.js"
+check "Key updates can only narrow scopes" grep -q "SCOPE_WIDENING" "$REPO_ROOT/src/durable-objects/user-profile.js"
+check "Pre-scope keys are revoked when seen" grep -q "function retireUnscopedKeys" "$REPO_ROOT/src/durable-objects/user-profile.js"
+check "Key management routes are session-only" grep -q "path: '/api/auth/apikeys', access: SESSION" "$REPO_ROOT/src/index.js"
+check "Keys default to 90 days and last at most a year" grep -q "DEFAULT_KEY_LIFETIME_DAYS = 90" "$REPO_ROOT/src/auth/utils.js"
+check "No reversible key storage or reveal endpoint" absent "encryptApiKey|decryptApiKey|key_encrypted|/reveal" "$REPO_ROOT/src" "$REPO_ROOT/frontend/js"
+check "No legacy hb_ / hb2_ key formats are accepted" absent "LEGACY_PREFIX|hb_live_|startsWith\('hb2_'\)" "$REPO_ROOT/src/auth" "$REPO_ROOT/workers/256t-content/src/funding.js"
+check "No key lookup table is consulted" absent "KEY_REGISTRY" "$REPO_ROOT/src/auth" "$REPO_ROOT/src/api" "$REPO_ROOT/workers/256t-content/src"
+check "Funded key downloads need downloads:spend" grep -q "k.scopes?.includes('downloads:spend')" "$REPO_ROOT/src/utils/download-budget.js"
 
 # ==========================================
 # Print Summary

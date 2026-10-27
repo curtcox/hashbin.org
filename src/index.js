@@ -11,6 +11,7 @@ export { UserProfile } from './durable-objects/user-profile.js';
 export { PaymentRecord } from './durable-objects/payment-record.js';
 export { ContestRecord } from './durable-objects/contest-record.js';
 export { MessageThread } from './durable-objects/message-thread.js';
+// Unused; still exported until a later deploy deletes it with a migration, once no worker binds it
 export { KeyRegistry } from './durable-objects/key-registry.js';
 export { PlatformStats } from './durable-objects/platform-stats.js';
 export { AlertStore } from './durable-objects/alert-store.js';
@@ -34,7 +35,6 @@ import {
   handleCreateApiKey,
   handleListApiKeys,
   handleRevokeApiKey,
-  handleRevealApiKey,
   handleUpdateApiKey,
   handleDeleteAccount
 } from './api/auth.js';
@@ -146,7 +146,7 @@ import {
 
 import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js';
 import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
-import { PUBLIC, SESSION, checkAccess, isSessionAuth } from './auth/scopes.js';
+import { PUBLIC, SESSION, USER_SCOPES, checkAccess, isSessionAuth } from './auth/scopes.js';
 import { handleClerkWebhook } from './api/clerk-webhook.js';
 
 // Configuration constants
@@ -657,7 +657,6 @@ const API_ROUTES = [
   { method: 'POST', path: '/api/auth/apikeys', access: SESSION, handler: handleCreateApiKey },
   { method: 'GET', path: '/api/auth/apikeys', access: SESSION, handler: handleListApiKeys },
   { method: 'DELETE', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeApiKey(request, env, m[1]) },
-  { method: 'POST', path: /^\/api\/auth\/apikeys\/([^/]+)\/reveal$/, access: SESSION, handler: (request, env, m) => handleRevealApiKey(request, env, m[1]) },
   { method: 'PATCH', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateApiKey(request, env, m[1]) },
   { method: 'DELETE', path: '/api/auth/account', access: SESSION, handler: handleDeleteAccount },
   { method: 'POST', path: '/api/developers/apps', access: SESSION, handler: handleCreateDeveloperApp },
@@ -861,7 +860,8 @@ function handleConfig(env) {
     isLocalMode,
     authMode: isLocalMode ? 'local' : 'clerk',
     content_domain: getContentDomain(env),
-    max_upload_bytes: MAX_UPLOAD_BYTES
+    max_upload_bytes: MAX_UPLOAD_BYTES,
+    api_key_scopes: USER_SCOPES
   };
 
   return new Response(JSON.stringify(config), {
@@ -1060,8 +1060,7 @@ async function checkDurableObjects(env) {
     { name: 'USER_PROFILES', binding: env.USER_PROFILES },
     { name: 'PAYMENT_RECORDS', binding: env.PAYMENT_RECORDS },
     { name: 'CONTEST_RECORDS', binding: env.CONTEST_RECORDS },
-    { name: 'MESSAGE_THREADS', binding: env.MESSAGE_THREADS },
-    { name: 'KEY_REGISTRY', binding: env.KEY_REGISTRY }
+    { name: 'MESSAGE_THREADS', binding: env.MESSAGE_THREADS }
   ];
 
   const results = {};

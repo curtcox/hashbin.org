@@ -1,11 +1,10 @@
-import { verifyDownloadApiKey, verifyDownloadToken, verifyDownloadOAuth, signDownloadToken } from '../../../src/auth/download-tokens.js';
-import { sha256Hex } from '../../../src/auth/oauth.js';
+import { verifyApiKey, verifyDownloadToken, verifyDownloadOAuth, signDownloadToken } from '../../../src/auth/download-tokens.js';
 import { exclusive } from './mutex.js';
 import { readCostSafety } from '../../../src/utils/cost-safety-state.js';
 
 const byEnv = new WeakMap();
 function state(env) {
-  if (!byEnv.has(env)) byEnv.set(env, { confirmations: new Map(), leases: new Map(), legacy: new Map() });
+  if (!byEnv.has(env)) byEnv.set(env, { confirmations: new Map(), leases: new Map() });
   return byEnv.get(env);
 }
 function boundedSet(map, key, value) {
@@ -20,21 +19,7 @@ export async function parseIdentity(request, env, cid, signedToken, strict) {
   }
   const authorization = request.headers.get('Authorization');
   const apiKey = request.headers.get('X-API-Key') || (/^ApiKey /i.test(authorization || '') ? authorization.slice(7) : null);
-  if (apiKey?.startsWith('hb2_')) return verifyDownloadApiKey(apiKey, env.DOWNLOAD_TOKEN_SECRET);
-  if (apiKey) {
-    if (strict || !/^hb_[A-Za-z0-9]{32}$/.test(apiKey)) throw new Error('Legacy key requires a plain path');
-    const hash = await sha256Hex(apiKey), cache = state(env).legacy;
-    let entry = cache.get(hash);
-    if (!entry || entry.until <= Date.now()) {
-      const response = await env.KEY_REGISTRY.get(env.KEY_REGISTRY.idFromName('global')).fetch(new Request('https://internal/lookup', {
-        method: 'POST', body: JSON.stringify({ key_hash: hash }) }));
-      if (!response.ok) throw new Error('Invalid legacy key');
-      const info = await response.json();
-      entry = { until: Date.now() + 60000, u: info.user_id, k: info.key_id };
-      boundedSet(cache, hash, entry);
-    }
-    return { u: entry.u, k: entry.k, kind: 'key', key_hash: hash };
-  }
+  if (apiKey) return verifyApiKey(apiKey, env.DOWNLOAD_TOKEN_SECRET);
   if (/^Bearer /i.test(authorization || '')) return verifyDownloadOAuth(authorization.slice(7), env.OAUTH_SIGNING_KEY);
   if (authorization) throw new Error('Invalid authorization');
   const cookie = request.headers.get('Cookie')?.match(/(?:^|;\s*)__Host-hb_dl=([^;]+)/)?.[1];
