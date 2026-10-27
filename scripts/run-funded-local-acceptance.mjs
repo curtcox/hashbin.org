@@ -8,11 +8,12 @@ import { fileURLToPath } from 'node:url';
 import { setTimeout as wait } from 'node:timers/promises';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const temporary = await mkdtemp(join(tmpdir(), 'hashbin-funded-check-'));
-const children = [];
 const secret = randomBytes(32).toString('hex'), oauth = randomBytes(32).toString('hex');
-const suffix = randomBytes(6).toString('hex');
-const mainName = `hashbin-funded-${suffix}-main`, contentName = `hashbin-funded-${suffix}-content`;
+// workerd's Linux build samples allocations with tcmalloc, whose frame-pointer
+// unwinder can segfault on Rust (hyper) frames that keep no frame pointer. That
+// runtime crash is not application behavior, so it alone earns one fresh retry.
+const runtimeCrash = /\*\*\* (?:Received signal #\d+|Fatal uncaught|std::terminate\(\))/;
+let temporary, children = [];
 async function port() {
   const server = createServer();
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
@@ -20,10 +21,10 @@ async function port() {
   await new Promise(resolve => server.close(resolve));
   return number;
 }
-function start(args, env = {}) {
+function start(label, args, env = {}) {
   const child = spawn(process.execPath, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
     detached: process.platform !== 'win32', env: { ...process.env, WRANGLER_SEND_METRICS: 'false', ...env } });
-  const state = { child, output: '', exited: false, code: null };
+  const state = { label, child, output: '', exited: false, code: null };
   child.stdout.on('data', value => { state.output = (state.output + value).slice(-4000); });
   child.stderr.on('data', value => { state.output = (state.output + value).slice(-4000); });
   child.on('error', error => { state.output += error.message; state.exited = true; state.code = 1; });
@@ -50,14 +51,17 @@ async function cleanup() {
   for (const state of children) signal(state, 'SIGTERM');
   for (let i = 0; i < 20 && children.some(state => !state.exited); i++) await wait(100);
   for (const state of children) signal(state, 'SIGKILL');
-  await rm(temporary, { recursive: true, force: true });
+  if (temporary) await rm(temporary, { recursive: true, force: true });
 }
 let interrupted = false;
 for (const event of ['SIGINT', 'SIGTERM']) process.once(event, () => {
   interrupted = true;
   for (const state of children) signal(state, 'SIGTERM');
 });
-try {
+async function acceptance() {
+  temporary = await mkdtemp(join(tmpdir(), 'hashbin-funded-check-'));
+  const suffix = randomBytes(6).toString('hex');
+  const mainName = `hashbin-funded-${suffix}-main`, contentName = `hashbin-funded-${suffix}-content`;
   let main = await readFile(join(root, 'wrangler.local.toml'), 'utf8');
   let content = await readFile(join(root, 'workers/256t-content/wrangler.local.toml'), 'utf8');
   main = main.replace(/^name = "hashbin-worker-local"/m, `name = ${JSON.stringify(mainName)}`)
@@ -77,19 +81,27 @@ try {
     '--inspector-port', String(await port()), '--persist-to', join(temporary, name), '--log-level', 'error',
     '--var', `DOWNLOAD_TOKEN_SECRET:${secret}`, '--var', `OAUTH_SIGNING_KEY:${oauth}`];
   const base = `http://127.0.0.1:${mainPort}`, contentBase = `http://127.0.0.1:${contentPort}`;
-  const server = start(await options(mainPath, mainPort, 'main-state'), { WRANGLER_LOG_PATH: join(temporary, 'main.log') });
+  const server = start('main Worker', await options(mainPath, mainPort, 'main-state'), { WRANGLER_LOG_PATH: join(temporary, 'main.log') });
   await ready(server, `${base}/api/config`, true);
-  const contentServer = start(await options(contentPath, contentPort, 'content-state'), { WRANGLER_LOG_PATH: join(temporary, 'content.log') });
+  const contentServer = start('content Worker', await options(contentPath, contentPort, 'content-state'), { WRANGLER_LOG_PATH: join(temporary, 'content.log') });
   await ready(contentServer, `${contentBase}/health`);
-  const test = start([join(root, 'scripts/api-tests/test-local-funded-downloads.mjs')], { BASE_URL: base, CONTENT_BASE_URL: contentBase });
+  const test = start('acceptance test', [join(root, 'scripts/api-tests/test-local-funded-downloads.mjs')], { BASE_URL: base, CONTENT_BASE_URL: contentBase });
   const code = await new Promise(resolve => { test.child.once('exit', resolve); if (test.exited) resolve(test.code); });
   if (code !== 0 || interrupted) throw new Error('Native funded acceptance failed');
   process.stdout.write(test.output);
-} catch (error) {
-  console.error(error.message);
-  for (const state of children) {
-    const safe = state.output.replaceAll(secret, '[local secret]').replaceAll(oauth, '[local secret]');
-    if (safe.trim()) console.error(safe);
-  }
-  process.exitCode = 1;
-} finally { await cleanup(); }
+}
+for (let attempt = 1; ; attempt++) {
+  children = []; temporary = undefined;
+  try { await acceptance(); break; }
+  catch (error) {
+    console.error(error.message);
+    for (const state of children) {
+      const safe = state.output.replaceAll(secret, '[local secret]').replaceAll(oauth, '[local secret]');
+      if (safe.trim()) console.error(`--- ${state.label} output ---\n${safe}`);
+    }
+    const crashed = children.find(state => state.label.endsWith('Worker') && runtimeCrash.test(state.output));
+    if (attempt > 1 || interrupted || !crashed) { process.exitCode = 1; break; }
+    const notice = `workerd crashed in the ${crashed.label}; retrying once with fresh local Workers`;
+    console.error(process.env.GITHUB_ACTIONS ? `::warning::${notice}` : notice);
+  } finally { await cleanup(); }
+}
