@@ -11,7 +11,9 @@ production. Row B12 in `STATUS.md`.
 - [ ] Set the production `ADMIN_USER_ID` secret (GitHub secret of the same name, or
   `wrangler secret put ADMIN_USER_ID`) to the admin's Clerk user ID. Production has none,
   so today the legacy token is the only way into admin.
-- [ ] Then remove `X-Admin-Token` support (`validateAdminToken` and its branch in
+- [ ] Keep the token through the move to a production Clerk instance, which changes the
+  admin's user ID: [clerk_remaining.md](clerk_remaining.md) CL12–CL15. Retiring it is CL15.
+- [ ] Then (CL15) remove `X-Admin-Token` support (`validateAdminToken` and its branch in
   `authenticate()`, the token fallbacks in `frontend/js/admin-auth.js` and the admin
   pages, scripts and docs), the deploy.yml step, and the `ADMIN_SECRET_TOKEN` secret.
 - [ ] Delete the unused `API_KEY_ENCRYPTION_KEY` Worker secret and GitHub secret.
