@@ -107,3 +107,26 @@
     width: 100%;
   }
 }
+
+.account-muted {
+  color: var(--color-text-light);
+  font-size: 0.9rem;
+}
+
+.account-narrow-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+
+.account-narrow-row label {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.account-narrow-row input {
+  width: 8rem;
+}

@@ -114,7 +114,8 @@ async function issueTokens(env, {
       scope: scopes,
       state: 'managed-state',
       code_challenge: await createPkceChallenge(codeVerifier),
-      code_challenge_method: 'S256'
+      code_challenge_method: 'S256',
+      spending_limit: '5'
     })
   }), env);
 

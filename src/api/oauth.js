@@ -1,4 +1,5 @@
 import { authenticate, requireAuth } from '../auth/middleware.js';
+import { SPENDING_SCOPES, parseCaveats, parseScopes, scopeDescription } from '../auth/scopes.js';
 import {
   createPkceChallenge,
   generateOAuthSecret,
@@ -7,16 +8,15 @@ import {
   verifyOAuthJwt
 } from '../auth/oauth.js';
 
-const ALLOWED_SCOPES = new Set(['content:write', 'content:read', 'balance:read', 'downloads:spend']);
 const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
 const AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;
 const REFRESH_TOKEN_TTL_DAYS = 30;
 const MAX_SPENDING_LIMIT_USD = 1000000;
-const SCOPE_DESCRIPTIONS = {
+const GRANT_EXPIRY_CHOICES_DAYS = [30, 90, 365];
+// Fuller wording for the consent page where the shared description is too terse
+const CONSENT_DESCRIPTIONS = {
   'downloads:spend': 'Pay for downloads from your balance, within your account and app download caps. Downloads stay disabled until both caps are configured in Account settings.',
-  'content:write': 'Publish immutable content using your account balance and default retention.',
-  'content:read': 'Check whether content exists and inspect metadata.',
-  'balance:read': 'Read your current account balance before publishing.'
+  'content:write': 'Publish immutable content using your account balance and default retention.'
 };
 
 function createRefreshToken(userId) {
@@ -84,17 +84,6 @@ async function getApplication(env, clientId) {
   return response.json();
 }
 
-function parseScopes(scopeString) {
-  const scopes = (scopeString || '').split(/\s+/).filter(Boolean);
-  if (scopes.length === 0) {
-    return [];
-  }
-  if (scopes.some((scope) => !ALLOWED_SCOPES.has(scope))) {
-    return null;
-  }
-  return Array.from(new Set(scopes));
-}
-
 // Monthly spending limit in USD. Returns null when no limit was requested and
 // undefined when the value is not a usable amount.
 function parseSpendingLimit(value) {
@@ -129,7 +118,7 @@ function validateAuthorizeRequest(data, app) {
     return { valid: false, error: 'invalid_request', message: 'PKCE with S256 is required.' };
   }
 
-  const scopes = parseScopes(data.scope);
+  const scopes = parseScopes(data.scope, 'oauth');
   if (scopes === null || scopes.length === 0) {
     return { valid: false, error: 'invalid_scope', message: 'At least one supported scope is required.' };
   }
@@ -139,10 +128,60 @@ function validateAuthorizeRequest(data, app) {
     return { valid: false, error: 'invalid_request', message: 'The spending limit must be a positive amount in US dollars.' };
   }
 
-  return { valid: true, scopes, spendingLimit };
+  const maxRetention = parseOptionalInteger(data.max_retention_months, 1, 120);
+  if (maxRetention === undefined) {
+    return { valid: false, error: 'invalid_request', message: 'max_retention_months must be a whole number of months from 1 to 120.' };
+  }
+
+  return { valid: true, scopes, spendingLimit, maxRetention };
 }
 
-async function upsertGrant(env, userId, grantData) {
+// A whole number within bounds; null when absent, undefined when invalid.
+function parseOptionalInteger(value, min, max) {
+  if (value === null || value === undefined || value === '') return null;
+  const number = Number(value);
+  return Number.isInteger(number) && number >= min && number <= max ? number : undefined;
+}
+
+/**
+ * What the user approved on the consent page: a subset of the requested scopes and
+ * limits at least as tight as the app asked for. Spending scopes need a spend limit.
+ * Returns { scopes, caveats } or { error, message }.
+ */
+function grantedAccess(data, validation) {
+  const scopes = data.granted_scopes === undefined ? validation.scopes : parseScopes(data.granted_scopes, 'oauth');
+  if (!scopes || scopes.length === 0 || scopes.some((scope) => !validation.scopes.includes(scope))) {
+    return { error: 'invalid_scope', message: 'Approve at least one of the requested permissions, and no others.' };
+  }
+
+  const limit = data.granted_spending_limit === undefined ? validation.spendingLimit : parseSpendingLimit(data.granted_spending_limit);
+  if (limit === undefined || (validation.spendingLimit !== null && limit !== null && limit > validation.spendingLimit)) {
+    return { error: 'invalid_request', message: 'The spending limit must be a positive amount no higher than the app requested.' };
+  }
+  if (limit === null && scopes.some((scope) => SPENDING_SCOPES.has(scope))) {
+    return { error: 'invalid_request', message: 'Set a monthly spending limit to let this app spend from your balance.' };
+  }
+
+  const retention = data.granted_max_retention_months === undefined
+    ? validation.maxRetention
+    : parseOptionalInteger(data.granted_max_retention_months, 1, 120);
+  if (retention === undefined || (validation.maxRetention !== null && (retention === null || retention > validation.maxRetention))) {
+    return { error: 'invalid_request', message: 'The retention cap must be 1 to 120 months, no higher than the app requested.' };
+  }
+
+  const expiryDays = parseOptionalInteger(data.expires_in_days, 1, 365);
+  if (expiryDays === undefined || (expiryDays !== null && !GRANT_EXPIRY_CHOICES_DAYS.includes(expiryDays))) {
+    return { error: 'invalid_request', message: `Choose an expiry of ${GRANT_EXPIRY_CHOICES_DAYS.join(', ')} days, or none.` };
+  }
+
+  const caveats = {};
+  if (limit !== null) caveats.monthly_spend_limit_cents = Math.round(limit * 100);
+  if (retention !== null) caveats.max_retention_months = retention;
+  if (expiryDays !== null) caveats.expires_at = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString();
+  return { scopes, caveats };
+}
+
+async function createGrant(env, userId, grantData) {
   const profileId = env.USER_PROFILES.idFromName(userId);
   const profileStub = env.USER_PROFILES.get(profileId);
   const grantRequest = () => new Request('http://internal/oauth/grants', {
@@ -216,6 +255,9 @@ async function rotateRefreshToken(env, userId, tokenData) {
     body: JSON.stringify(tokenData)
   }));
 
+  if (response.status === 422) {
+    return { error: 'invalid_scope' };
+  }
   if (!response.ok) {
     return null;
   }
@@ -307,17 +349,23 @@ export async function handleOAuthAuthorize(request, env) {
     if (!validation.valid) {
       return jsonResponse({ error: validation.error, message: validation.message }, 400);
     }
-    const scopes = validation.scopes;
+    const granted = grantedAccess(data, validation);
+    if (granted.error) {
+      return jsonResponse({ error: granted.error, message: granted.message }, 400);
+    }
+    const scopes = granted.scopes;
 
-    const grant = await upsertGrant(env, authResult.user.userId, {
+    // Each approval is its own grant, so two installs of an app can hold different access
+    const grant = await createGrant(env, authResult.user.userId, {
       app_id: app.app_id,
       scopes,
-      caveats: validation.spendingLimit === null ? {} : { monthly_spend_limit_cents: Math.round(validation.spendingLimit * 100) }
+      caveats: granted.caveats
     });
 
     const now = Math.floor(Date.now() / 1000);
     const code = await signOAuthJwt({
       token_type: 'authorization_code',
+      jti: crypto.randomUUID(),
       app_id: app.app_id,
       grant_id: grant.grant_id,
       user_id: authResult.user.userId,
@@ -369,7 +417,8 @@ export async function handleGetOAuthAuthorizePage(request, env) {
     state: url.searchParams.get('state') || '',
     code_challenge: url.searchParams.get('code_challenge'),
     code_challenge_method: url.searchParams.get('code_challenge_method'),
-    spending_limit: url.searchParams.get('spending_limit')
+    spending_limit: url.searchParams.get('spending_limit'),
+    max_retention_months: url.searchParams.get('max_retention_months')
   };
   const validation = validateAuthorizeRequest(requestData, app);
 
@@ -401,17 +450,34 @@ export async function handleGetOAuthAuthorizePage(request, env) {
   }
 
   requestData.spending_limit = validation.spendingLimit;
-  const spendingLimitHtml = validation.spendingLimit === null ? '' : `
-          <div>
-            <dt>Monthly spending limit</dt>
-            <dd>$${validation.spendingLimit.toFixed(2)} per month</dd>
-          </div>`;
+  requestData.max_retention_months = validation.maxRetention;
+  const spends = validation.scopes.some((scope) => SPENDING_SCOPES.has(scope));
 
+  // Each requested permission can be unchecked; limits can be lowered, never raised
   const scopesHtml = validation.scopes.map((scope) => `
       <li>
-        <strong>${escapeHtml(scope)}</strong>
-        <span>${escapeHtml(SCOPE_DESCRIPTIONS[scope] || 'Requested access.')}</span>
+        <label><input type="checkbox" class="grant-scope" value="${escapeHtml(scope)}" checked> <strong>${escapeHtml(scope)}</strong></label>
+        <span>${escapeHtml(CONSENT_DESCRIPTIONS[scope] || scopeDescription(scope))}</span>
       </li>`).join('');
+
+  const limitsHtml = `
+        <h2>Limits</h2>
+        <div class="limits">
+          <label>Monthly spending limit (US dollars)${spends ? ' *' : ''}
+            <input id="grant-spend" type="number" min="0.01" step="0.01"${validation.spendingLimit === null ? '' : ` max="${validation.spendingLimit}" value="${validation.spendingLimit}"`}>
+          </label>
+          <p class="hint">${spends ? 'Required: this app can spend from your balance. ' : ''}${validation.spendingLimit === null ? '' : `The app asked for up to $${validation.spendingLimit.toFixed(2)}; you can lower it.`}</p>
+          <label>Longest retention per upload (months)${validation.maxRetention === null ? '' : ' *'}
+            <input id="grant-retention" type="number" min="1" max="${validation.maxRetention ?? 120}" step="1"${validation.maxRetention === null ? '' : ` value="${validation.maxRetention}"`}>
+          </label>
+          <p class="hint">Empty means your default retention applies.</p>
+          <label>Access expires
+            <select id="grant-expiry">
+              <option value="">When you revoke it</option>
+              ${GRANT_EXPIRY_CHOICES_DAYS.map((days) => `<option value="${days}">In ${days} days</option>`).join('')}
+            </select>
+          </label>
+        </div>`;
 
   return htmlResponse(`<!DOCTYPE html>
 <html lang="en">
@@ -538,6 +604,12 @@ export async function handleGetOAuthAuthorizePage(request, env) {
     }
     .approve { background: var(--ink); color: white; }
     .deny { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    ul + h2 { margin-top: 1.75rem; }
+    .limits { display: grid; gap: 0.5rem; }
+    .limits label { display: grid; gap: 0.35rem; font-weight: 700; }
+    .limits input, .limits select { font: inherit; padding: 0.6rem 0.75rem; border: 1px solid var(--line); border-radius: 12px; }
+    .hint { color: var(--muted); margin: 0 0 0.5rem; font-size: 0.92rem; }
+    li label { display: flex; gap: 0.5rem; align-items: center; }
     .status {
       margin-top: 1rem;
       min-height: 1.5rem;
@@ -557,13 +629,14 @@ export async function handleGetOAuthAuthorizePage(request, env) {
       <div class="eyebrow">Third-Party Publishing</div>
       <h1>${escapeHtml(app.app_name)} wants to use your HashBin account.</h1>
       <p>
-        Review the requested access below. Approving will let this app publish content with your balance using your current default retention settings.
+        Review the requested access below. Uncheck anything you don't want to give, and set limits; the app gets only what you approve.
       </p>
     </section>
     <div class="grid">
       <section class="panel">
         <h2>Requested permissions</h2>
         <ul>${scopesHtml}</ul>
+        ${limitsHtml}
         ${validation.scopes.includes('downloads:spend') ? '<p id="download-consent-budget">Download spending requires enabled account and app daily/monthly caps. Sign in to see current caps.</p>' : ''}
       </section>
       <aside class="panel">
@@ -576,7 +649,7 @@ export async function handleGetOAuthAuthorizePage(request, env) {
           <div>
             <dt>Redirect URI</dt>
             <dd>${escapeHtml(requestData.redirect_uri)}</dd>
-          </div>${spendingLimitHtml}
+          </div>
           <div>
             <dt>State</dt>
             <dd>${escapeHtml(requestData.state || '(none)')}</dd>
@@ -650,6 +723,14 @@ export async function handleGetOAuthAuthorizePage(request, env) {
           return;
         }
 
+        const optional = (id) => document.getElementById(id).value.trim() || null;
+        const grantedScopes = [...document.querySelectorAll('.grant-scope:checked')].map((box) => box.value);
+        if (!grantedScopes.length) {
+          statusMessage.textContent = 'Keep at least one permission, or choose Deny.';
+          approveButton.disabled = false;
+          return;
+        }
+
         statusMessage.textContent = 'Authorizing application...';
         const response = await fetch('/oauth/authorize', {
           method: 'POST',
@@ -658,7 +739,13 @@ export async function handleGetOAuthAuthorizePage(request, env) {
             accept: 'application/json',
             ...authHeaders
           },
-          body: JSON.stringify(authorizePayload)
+          body: JSON.stringify({
+            ...authorizePayload,
+            granted_scopes: grantedScopes,
+            granted_spending_limit: optional('grant-spend'),
+            granted_max_retention_months: optional('grant-retention'),
+            expires_in_days: optional('grant-expiry')
+          })
         });
 
         if (response.ok) {
@@ -693,14 +780,36 @@ export async function handleGetOAuthAuthorizePage(request, env) {
 </html>`);
 }
 
-async function issueTokenPair(env, codePayload) {
+/**
+ * Scopes for an access token: those the client asks for (RFC 6749 §3.3, §6), which
+ * must all be available, or every available scope. Returns null when invalid.
+ */
+function tokenScopes(requested, available) {
+  if (requested === undefined || requested === null || requested === '') return available;
+  const scopes = parseScopes(requested, 'oauth');
+  return scopes && scopes.length > 0 && scopes.every((scope) => available.includes(scope)) ? scopes : null;
+}
+
+// Authorization codes work once
+async function redeemCode(env, codePayload) {
+  if (typeof codePayload.jti !== 'string') return false;
+  const profileStub = env.USER_PROFILES.get(env.USER_PROFILES.idFromName(codePayload.user_id));
+  const response = await profileStub.fetch(new Request('http://internal/oauth/codes/redeem', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ jti: codePayload.jti, expires_at: codePayload.exp })
+  }));
+  return response.ok;
+}
+
+async function issueTokenPair(env, codePayload, scopes) {
   const now = Math.floor(Date.now() / 1000);
   const accessToken = await signOAuthJwt({
     token_type: 'access',
     grant_id: codePayload.grant_id,
     app_id: codePayload.app_id,
     user_id: codePayload.user_id,
-    scopes: codePayload.scopes,
+    scopes,
     iat: now,
     exp: now + ACCESS_TOKEN_TTL_SECONDS
   }, env.OAUTH_SIGNING_KEY);
@@ -721,7 +830,7 @@ async function issueTokenPair(env, codePayload) {
     refresh_token: refreshToken,
     token_type: 'Bearer',
     expires_in: ACCESS_TOKEN_TTL_SECONDS,
-    scope: codePayload.scopes.join(' ')
+    scope: scopes.join(' ')
   };
 }
 
@@ -747,7 +856,16 @@ export async function handleOAuthToken(request, env) {
       return jsonResponse({ error: 'invalid_grant' }, 400);
     }
 
-    return jsonResponse(await issueTokenPair(env, codePayload));
+    const scopes = tokenScopes(data.scope, codePayload.scopes);
+    if (!scopes) {
+      return jsonResponse({ error: 'invalid_scope' }, 400);
+    }
+
+    if (!await redeemCode(env, codePayload)) {
+      return jsonResponse({ error: 'invalid_grant' }, 400);
+    }
+
+    return jsonResponse(await issueTokenPair(env, codePayload, scopes));
   }
 
   if (data.grant_type === 'refresh_token') {
@@ -756,24 +874,36 @@ export async function handleOAuthToken(request, env) {
       return jsonResponse({ error: 'invalid_grant' }, 400);
     }
 
+    // A narrower request applies to this access token only; the refresh token keeps the grant's scopes
+    const requestedScopes = data.scope ? parseScopes(data.scope, 'oauth') : undefined;
+    if (requestedScopes === null || requestedScopes?.length === 0) {
+      return jsonResponse({ error: 'invalid_scope' }, 400);
+    }
+
     const refreshTokenHash = await sha256Hex(data.refresh_token || '');
     const newRefreshToken = createRefreshToken(userId);
     const rotated = await rotateRefreshToken(env, userId, {
       current_token_hash: refreshTokenHash,
       new_token_hash: await sha256Hex(newRefreshToken),
-      new_expires_at: new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString()
+      new_expires_at: new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+      requested_scopes: requestedScopes
     });
 
+    if (rotated?.error) {
+      return jsonResponse({ error: rotated.error }, 400);
+    }
     if (!rotated) {
       return jsonResponse({ error: 'invalid_grant' }, 400);
     }
+
+    const scopes = requestedScopes || rotated.scopes;
 
     const accessToken = await signOAuthJwt({
       token_type: 'access',
       grant_id: rotated.grant_id,
       app_id: rotated.app_id,
       user_id: rotated.user_id,
-      scopes: rotated.scopes,
+      scopes,
       iat: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + ACCESS_TOKEN_TTL_SECONDS
     }, env.OAUTH_SIGNING_KEY);
@@ -783,7 +913,7 @@ export async function handleOAuthToken(request, env) {
       refresh_token: newRefreshToken,
       token_type: 'Bearer',
       expires_in: ACCESS_TOKEN_TTL_SECONDS,
-      scope: rotated.scopes.join(' ')
+      scope: scopes.join(' ')
     });
   }
 
@@ -841,15 +971,58 @@ export async function handleListAuthorizations(request, env) {
   return jsonResponse({ authorizations });
 }
 
-export async function handleRevokeAuthorization(request, env, appId) {
+/**
+ * DELETE /api/account/authorizations/:id — a grant ID revokes that grant, an app ID every grant the app holds
+ */
+export async function handleRevokeAuthorization(request, env, id) {
   const authResult = await authenticate(request, env);
   const authError = requireAuth(authResult);
   if (authError) return authError;
 
   const profileId = env.USER_PROFILES.idFromName(authResult.user.userId);
   const profileStub = env.USER_PROFILES.get(profileId);
-  return profileStub.fetch(new Request(`http://internal/oauth/grants/${appId}`, {
+  return profileStub.fetch(new Request(`http://internal/oauth/grants/${encodeURIComponent(id)}`, {
     method: 'DELETE'
+  }));
+}
+
+/**
+ * PATCH /api/account/authorizations/:grantId — narrow an app's scopes or tighten its limits
+ * Body: { scopes?, caveats? }
+ */
+export async function handleUpdateAuthorization(request, env, grantId) {
+  const authResult = await authenticate(request, env);
+  const authError = requireAuth(authResult);
+  if (authError) return authError;
+
+  let data;
+  try {
+    data = await request.json();
+  } catch (_error) {
+    return jsonResponse({ error: 'invalid_request', message: 'Request body must be valid JSON' }, 400);
+  }
+
+  const update = {};
+  if (data.scopes !== undefined) {
+    const scopes = parseScopes(data.scopes, 'oauth');
+    if (!scopes || scopes.length === 0) {
+      return jsonResponse({ error: 'invalid_scope', message: 'scopes must be a non-empty list of scopes' }, 400);
+    }
+    update.scopes = scopes;
+  }
+  if (data.caveats !== undefined) {
+    const { caveats, error } = parseCaveats(data.caveats, 'oauth');
+    if (error) {
+      return jsonResponse({ error: 'invalid_request', message: error }, 400);
+    }
+    update.caveats = caveats;
+  }
+
+  const profileStub = env.USER_PROFILES.get(env.USER_PROFILES.idFromName(authResult.user.userId));
+  return profileStub.fetch(new Request(`http://internal/oauth/grants/${encodeURIComponent(grantId)}`, {
+    method: 'PATCH',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(update)
   }));
 }
 

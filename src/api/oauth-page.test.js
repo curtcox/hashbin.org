@@ -85,19 +85,24 @@ describe('OAuth authorize page', () => {
     return handleGetOAuthAuthorizePage(new Request(`https://hashbin.test/oauth/authorize?${params}`), env);
   }
 
-  it('shows a requested spending limit and passes it on when approving', async () => {
+  it('pre-fills a requested spending limit that the user may only lower', async () => {
     const response = await consentPage({ spending_limit: '12.5' });
 
     expect(response.status).toBe(200);
     const html = await response.text();
     expect(html).toContain('Monthly spending limit');
-    expect(html).toContain('$12.50 per month');
+    expect(html).toContain('max="12.5" value="12.5"');
+    expect(html).toContain('you can lower it');
     expect(html).toContain('"spending_limit":12.5');
   });
 
-  it('omits the spending limit row when none is requested', async () => {
-    const html = await (await consentPage({})).text();
-    expect(html).not.toContain('Monthly spending limit');
+  it('lets the user uncheck permissions and set limits the app did not ask for', async () => {
+    const html = await (await consentPage()).text();
+    expect(html).toContain('class="grant-scope" value="content:write" checked');
+    expect(html).toContain('Required: this app can spend from your balance.');
+    expect(html).toContain('id="grant-retention"');
+    expect(html).toContain('<option value="90">In 90 days</option>');
+    expect(html).toContain('granted_scopes: grantedScopes');
     expect(html).toContain('"spending_limit":null');
   });
 

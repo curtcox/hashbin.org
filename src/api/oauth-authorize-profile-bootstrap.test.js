@@ -97,7 +97,8 @@ describe('OAuth authorize profile bootstrap', () => {
         scope: 'content:write balance:read',
         state: 'bootstrap-state',
         code_challenge: await createPkceChallenge('bootstrap-verifier-123'),
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        spending_limit: '5'
       })
     }), env);
 

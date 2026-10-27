@@ -91,7 +91,8 @@ export class HashBinClient {
   async createAuthorizationUrl({
     scopes = ['content:write', 'balance:read'],
     state = randomString(24),
-    spendingLimit = null
+    spendingLimit = null,
+    maxRetentionMonths = null
   } = {}) {
     const codeVerifier = randomString(64);
     const codeChallenge = await createPkceChallenge(codeVerifier);
@@ -116,6 +117,9 @@ export class HashBinClient {
     url.searchParams.set('code_challenge_method', 'S256');
     if (spendingLimit !== null && spendingLimit !== undefined) {
       url.searchParams.set('spending_limit', String(spendingLimit));
+    }
+    if (maxRetentionMonths !== null && maxRetentionMonths !== undefined) {
+      url.searchParams.set('max_retention_months', String(maxRetentionMonths));
     }
 
     return { url: url.toString(), state };

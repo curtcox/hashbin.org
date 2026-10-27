@@ -35,7 +35,7 @@ describe('ApplicationRegistry Durable Object', () => {
     const data = await response.json();
     expect(data.app_id).toMatch(/^app_/);
     expect(data.client_id).toBe(data.app_id);
-    expect(data.client_secret).toMatch(/^hbs_/);
+    expect(data).not.toHaveProperty('client_secret');
     expect(data.app_name).toBe('Example Publisher');
     expect(data.redirect_uris).toEqual(['https://example.com/callback']);
   });
@@ -86,8 +86,7 @@ describe('ApplicationRegistry Durable Object', () => {
     expect(response.status).toBe(200);
     const data = await response.json();
     expect(data.app_id).toBe(created.app_id);
-    expect(data.client_secret_hash).toBeTypeOf('string');
-    expect(data.client_secret_hash).not.toBe(created.client_secret);
+    expect(data).not.toHaveProperty('client_secret_hash');
   });
 
   describe('update and delete', () => {

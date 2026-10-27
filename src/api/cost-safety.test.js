@@ -10,7 +10,6 @@ vi.mock('stripe', () => ({ default: vi.fn(function () {
 }) }));
 import { handleCreateDeposit, handleCreateDonation, handleStripeWebhook } from './payments.js';
 import { handleExtendContent } from './content.js';
-import { handleCostSafety } from './admin.js';
 
 const binding = fetch => ({ idFromName: name => name, get: () => ({ fetch }) });
 const post = body => new Request('https://hashbin.org/api/test', { method: 'POST',

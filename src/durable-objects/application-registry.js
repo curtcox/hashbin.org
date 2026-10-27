@@ -1,4 +1,3 @@
-import { generateOAuthSecret, sha256Hex } from '../auth/oauth.js';
 import { handleBackupRequest } from '../utils/backup.js';
 
 const MAX_APP_NAME = 100;
@@ -126,7 +125,10 @@ export class ApplicationRegistry {
   }
 
   async loadApplications() {
-    return (await this.state.storage.get('apps')) || [];
+    const apps = (await this.state.storage.get('apps')) || [];
+    // Apps are public PKCE clients; secrets from before that was settled are dropped
+    for (const app of apps) delete app.client_secret_hash;
+    return apps;
   }
 
   async saveApplications(apps) {
@@ -147,12 +149,10 @@ export class ApplicationRegistry {
     if (invalid) return invalid;
 
     const apps = await this.loadApplications();
-    const clientSecret = generateOAuthSecret('hbs_');
     const app = {
       app_id: `app_${crypto.randomUUID()}`,
       app_name: data.app_name,
       owner_user_id: data.owner_user_id,
-      client_secret_hash: await sha256Hex(clientSecret),
       redirect_uris: data.redirect_uris,
       logo_url: data.logo_url || null,
       website_url: data.website_url || null,
@@ -166,7 +166,6 @@ export class ApplicationRegistry {
     return new Response(JSON.stringify({
       app_id: app.app_id,
       client_id: app.app_id,
-      client_secret: clientSecret,
       app_name: app.app_name,
       redirect_uris: app.redirect_uris,
       created_at: app.created_at

@@ -13,11 +13,27 @@ const retentionStatus = document.getElementById('retention-status');
 const authorizationsList = document.getElementById('authorizations-list');
 const refreshButton = document.getElementById('refresh-authorizations');
 
-function formatMoneyLimit(limit) {
-  if (limit === null || limit === undefined) {
-    return 'Unlimited monthly spend';
-  }
-  return `$${Number(limit).toFixed(2)} monthly spend cap`;
+function describeLimits(caveats = {}) {
+  const limits = [];
+  limits.push(caveats.monthly_spend_limit_cents === undefined
+    ? 'No monthly spending limit'
+    : `$${(caveats.monthly_spend_limit_cents / 100).toFixed(2)} monthly spending limit`);
+  if (caveats.max_retention_months) limits.push(`retention up to ${caveats.max_retention_months} months`);
+  if (caveats.max_upload_bytes) limits.push(`uploads up to ${caveats.max_upload_bytes} bytes`);
+  if (caveats.content_types) limits.push(`only ${caveats.content_types.join(', ')}`);
+  if (caveats.cids) limits.push(`only ${caveats.cids.length} listed CID${caveats.cids.length === 1 ? '' : 's'}`);
+  limits.push(caveats.expires_at ? `expires ${new Date(caveats.expires_at).toLocaleDateString()}` : 'no expiry');
+  return limits.join(' · ');
+}
+
+async function updateAuthorization(grantId, update) {
+  const response = await authenticatedFetch(`/api/account/authorizations/${encodeURIComponent(grantId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(update)
+  });
+  await handleApiError(response);
+  return response.json();
 }
 
 function renderAuthorizations(authorizations) {
@@ -35,9 +51,17 @@ function renderAuthorizations(authorizations) {
       ${authorizations.map((authorization) => `
         <article class="account-authorization-card">
           <h3>${escapeHtml(authorization.app_name)}</h3>
-          <p>${formatMoneyLimit(authorization.spending_limit)}</p>
+          <p>${escapeHtml(describeLimits(authorization.caveats))}</p>
+          <p class="account-muted">Approved ${escapeHtml(new Date(authorization.created_at).toLocaleDateString())}</p>
           <div class="account-chip-row">
-            ${(authorization.scopes || []).map((scope) => `<span class="account-chip">${escapeHtml(scope)}</span>`).join('')}
+            ${(authorization.scopes || []).map((scope) => `<label class="account-chip"><input type="checkbox" class="grant-scope" value="${escapeHtml(scope)}" checked> ${escapeHtml(scope)}</label>`).join('')}
+          </div>
+          <div class="account-narrow-row">
+            <button class="btn btn-secondary narrow-scopes" type="button" data-grant-id="${escapeHtml(authorization.grant_id)}">Remove unchecked permissions</button>
+            <label>Lower monthly limit ($)
+              <input class="grant-limit" type="number" min="0.01" step="0.01"${authorization.caveats?.monthly_spend_limit_cents === undefined ? '' : ` max="${authorization.caveats.monthly_spend_limit_cents / 100}"`}>
+            </label>
+            <button class="btn btn-secondary lower-limit" type="button" data-grant-id="${escapeHtml(authorization.grant_id)}">Set limit</button>
           </div>
           ${authorization.redirect_uris?.length ? `
             <ul class="account-authorization-list">
@@ -45,7 +69,7 @@ function renderAuthorizations(authorizations) {
             </ul>
           ` : ''}
           ${(authorization.scopes || []).includes('downloads:spend') ? `<div class="grant-download-caps" data-grant-id="${escapeHtml(authorization.grant_id)}"></div>` : ''}
-          <button class="btn btn-secondary revoke-authorization" type="button" data-app-id="${escapeHtml(authorization.app_id)}">
+          <button class="btn btn-secondary revoke-authorization" type="button" data-grant-id="${escapeHtml(authorization.grant_id)}">
             Revoke access
           </button>
         </article>
@@ -57,18 +81,54 @@ function renderAuthorizations(authorizations) {
     const id = container.dataset.grantId;
     mountCapForm(container, `grant-download-${index}`, downloadBudgetData?.keys?.[id], caps => downloadApi(`/api/oauth/grants/${encodeURIComponent(id)}/download-budget`, 'PUT', { caps }));
   }
+  const byGrant = Object.fromEntries(authorizations.map((authorization) => [authorization.grant_id, authorization]));
+  for (const button of authorizationsList.querySelectorAll('.narrow-scopes')) {
+    button.addEventListener('click', async () => {
+      const card = button.closest('.account-authorization-card');
+      const scopes = [...card.querySelectorAll('.grant-scope:checked')].map((box) => box.value);
+      if (!scopes.length) {
+        showToast('Keep at least one permission, or revoke the app instead', 'error');
+        return;
+      }
+      try {
+        await updateAuthorization(button.dataset.grantId, { scopes });
+        showToast('App permissions narrowed', 'success');
+        await loadAuthorizations();
+      } catch (error) {
+        showToast(error.message || 'Failed to change app permissions', 'error', 5000);
+      }
+    });
+  }
+  for (const button of authorizationsList.querySelectorAll('.lower-limit')) {
+    button.addEventListener('click', async () => {
+      const card = button.closest('.account-authorization-card');
+      const dollars = Number(card.querySelector('.grant-limit').value);
+      if (!(dollars > 0)) {
+        showToast('Enter a positive dollar amount', 'error');
+        return;
+      }
+      const caveats = { ...(byGrant[button.dataset.grantId]?.caveats || {}), monthly_spend_limit_cents: Math.round(dollars * 100) };
+      try {
+        await updateAuthorization(button.dataset.grantId, { caveats });
+        showToast('Monthly limit lowered', 'success');
+        await loadAuthorizations();
+      } catch (error) {
+        showToast(error.message || 'Failed to lower the limit', 'error', 5000);
+      }
+    });
+  }
   for (const button of authorizationsList.querySelectorAll('.revoke-authorization')) {
     button.addEventListener('click', async () => {
-      const appId = button.getAttribute('data-app-id');
-      if (!appId) return;
+      const grantId = button.getAttribute('data-grant-id');
+      if (!grantId) return;
 
-      if (!window.confirm('Revoke this app? It will immediately lose publishing access until the user authorizes it again.')) {
+      if (!window.confirm('Revoke this app? It will immediately lose access until you authorize it again.')) {
         return;
       }
 
       button.disabled = true;
       try {
-        const response = await authenticatedFetch(`/api/account/authorizations/${encodeURIComponent(appId)}`, {
+        const response = await authenticatedFetch(`/api/account/authorizations/${encodeURIComponent(grantId)}`, {
           method: 'DELETE'
         });
         await handleApiError(response);

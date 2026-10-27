@@ -2,14 +2,15 @@
 /**
  * Publish files to HashBin from the command line through a scoped OAuth grant.
  *
- *   node scripts/publish.mjs authorize [--limit 5]   one-time browser approval
+ *   node scripts/publish.mjs authorize [--limit 5] [--max-retention 12]
+ *                                                    one-time browser approval
  *   node scripts/publish.mjs publish <file> [--type text/plain]
  *   node scripts/publish.mjs balance
  *   node scripts/publish.mjs forget                  revoke and delete the stored token
  *                                                    (revoke the whole grant on the Account page)
  *
- * The grant has only content:write and balance:read, and a monthly spending limit
- * that HashBin enforces. Its refresh token lives in the macOS Keychain, never in
+ * The grant has only content:write and balance:read, a monthly spending limit and
+ * optionally a retention cap, all enforced by HashBin; the approval page can narrow them. Its refresh token lives in the macOS Keychain, never in
  * the repo or in process arguments. Refresh tokens rotate on every use and expire
  * after 30 days without one; rerun `authorize` if publishing reports invalid_grant.
  * OAuth uploads use the account's default retention (Account settings).
@@ -62,7 +63,7 @@ export function createPkcePair() {
   return { verifier, challenge };
 }
 
-export function buildAuthorizeUrl({ baseUrl, clientId, challenge, state, spendingLimit, port = REDIRECT_PORT }) {
+export function buildAuthorizeUrl({ baseUrl, clientId, challenge, state, spendingLimit, maxRetentionMonths, port = REDIRECT_PORT }) {
   const url = new URL('/oauth/authorize', baseUrl);
   url.search = new URLSearchParams({
     client_id: clientId,
@@ -73,6 +74,7 @@ export function buildAuthorizeUrl({ baseUrl, clientId, challenge, state, spendin
     code_challenge: challenge,
     code_challenge_method: 'S256',
     spending_limit: String(spendingLimit),
+    ...(maxRetentionMonths ? { max_retention_months: String(maxRetentionMonths) } : {}),
   }).toString();
   return url.toString();
 }
@@ -216,11 +218,11 @@ export function waitForCallback({ state, port = REDIRECT_PORT, timeoutMs = AUTHO
 }
 
 // `port` exists for tests; the registered app accepts only REDIRECT_PORT.
-export async function authorize({ baseUrl, clientId, spendingLimit, fetchImpl = fetch, keychain, openUrl, log = console.log, port = REDIRECT_PORT }) {
+export async function authorize({ baseUrl, clientId, spendingLimit, maxRetentionMonths, fetchImpl = fetch, keychain, openUrl, log = console.log, port = REDIRECT_PORT }) {
   const { verifier, challenge } = createPkcePair();
   const state = randomBytes(16).toString('base64url');
   const callback = waitForCallback({ state, port });
-  const url = buildAuthorizeUrl({ baseUrl, clientId, challenge, state, spendingLimit, port });
+  const url = buildAuthorizeUrl({ baseUrl, clientId, challenge, state, spendingLimit, maxRetentionMonths, port });
   log(`Approve publishing in your browser (monthly limit $${spendingLimit}):\n${url}`);
   openUrl(url);
   const code = await callback;
@@ -266,7 +268,11 @@ async function main() {
   if (command === 'authorize') {
     const spendingLimit = Number(options.limit ?? 5);
     if (!(spendingLimit > 0)) throw new Error('--limit must be a positive number of dollars per month');
-    const { scope } = await authorize({ ...context, spendingLimit, openUrl: openInBrowser });
+    const maxRetentionMonths = options['max-retention'] === undefined ? undefined : Number(options['max-retention']);
+    if (maxRetentionMonths !== undefined && !(Number.isInteger(maxRetentionMonths) && maxRetentionMonths >= 1 && maxRetentionMonths <= 120)) {
+      throw new Error('--max-retention must be a whole number of months from 1 to 120');
+    }
+    const { scope } = await authorize({ ...context, spendingLimit, maxRetentionMonths, openUrl: openInBrowser });
     console.log(`Authorized (${scope}). The refresh token is in the Keychain as ${keychainService(baseUrl)}.`);
   } else if (command === 'publish') {
     const [file] = options._;

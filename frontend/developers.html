@@ -188,17 +188,49 @@
               <td style="padding: 0.5rem 0;">Publish content, billed to the user's balance using their default retention period</td>
             </tr>
             <tr>
-              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>content:read</code></td>
-              <td style="padding: 0.5rem 0;">Check whether content exists and read its metadata</td>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>content:extend</code></td>
+              <td style="padding: 0.5rem 0;">Extend how long content is kept, billed to the user's balance</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>content:delete</code></td>
+              <td style="padding: 0.5rem 0;">Delete content the user uploaded</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>uploads:read</code></td>
+              <td style="padding: 0.5rem 0;">List the content the user uploaded</td>
             </tr>
             <tr>
               <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>balance:read</code></td>
               <td style="padding: 0.5rem 0;">View the user's current balance (useful for pre-flight checks)</td>
             </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>transactions:read</code></td>
+              <td style="padding: 0.5rem 0;">Read the user's balance history</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>ratelimit:purchase</code></td>
+              <td style="padding: 0.5rem 0;">Buy download allowances for content, billed to the user's balance</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>downloads:spend</code></td>
+              <td style="padding: 0.5rem 0;">Pay for downloads from the user's balance, within their download caps</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>suppliers:read</code></td>
+              <td style="padding: 0.5rem 0;">List the alternate suppliers the user registered</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.5rem 1rem 0.5rem 0;"><code>suppliers:write</code></td>
+              <td style="padding: 0.5rem 0;">Register, change and remove alternate suppliers</td>
+            </tr>
           </tbody>
         </table>
         <p style="margin-top: 1rem; color: var(--color-text-light);">
-          Third-party apps can only publish. Deletion, retention extension, and account management are not available through OAuth tokens.
+          Ask only for what your app needs: the user sees each permission, can uncheck any of them, and sets a
+          monthly spending limit (required for anything that spends), a retention cap and an expiry. Your app can
+          suggest a cap with the <code>spending_limit</code> (US dollars) and <code>max_retention_months</code>
+          parameters; the user can only lower them. A token request may pass <code>scope</code> to get a token with
+          fewer of the granted scopes. Account management (keys, apps, settings, deposits) is never available to apps.
         </p>
       </div>
     </section>
@@ -247,9 +279,7 @@
               and HashBin checks that it matches. Someone who steals the code doesn't have the verifier,
               so they can't use it.</p>
             <p>HashBin uses PKCE for every app, including apps that run on a server, so there is no
-              secret to keep. The <code>/api/developers/apps</code> response still includes a
-              <code>client_secret</code> field, but <code>/oauth/token</code> never asks for or checks
-              it, and the SDK has no option for one. You can ignore it.</p>
+              secret to keep: registering an app gives you only a public <code>client_id</code>.</p>
             <p>Further reading:</p>
             <ul>
               <li><a href="https://oauth.net/2/client-types/" target="_blank" rel="noopener noreferrer">oauth.net: Client Types</a>: confidential and public clients in brief</li>

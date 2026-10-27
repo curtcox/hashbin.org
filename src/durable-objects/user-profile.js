@@ -196,7 +196,16 @@ export class UserProfile {
 
       if (url.pathname === '/oauth/grants' && method === 'POST') {
         const data = await request.json();
-        return await this.upsertOAuthGrant(data);
+        return await this.createOAuthGrant(data);
+      }
+
+      if (url.pathname.startsWith('/oauth/grants/') && method === 'PATCH') {
+        const grantId = url.pathname.split('/')[3];
+        return await this.narrowOAuthGrant(grantId, await request.json());
+      }
+
+      if (url.pathname === '/oauth/codes/redeem' && method === 'POST') {
+        return await this.redeemOAuthCode(await request.json());
       }
 
       if (url.pathname.startsWith('/oauth/grants/') && method === 'GET') {
@@ -205,8 +214,9 @@ export class UserProfile {
       }
 
       if (url.pathname.startsWith('/oauth/grants/') && method === 'DELETE') {
-        const appId = url.pathname.split('/')[3];
-        return await this.revokeOAuthGrantByApp(appId);
+        // A grant ID revokes that grant; an app ID revokes every grant the app holds
+        const id = url.pathname.split('/')[3];
+        return id.startsWith('grant_') ? await this.revokeOAuthGrantById(id) : await this.revokeOAuthGrantByApp(id);
       }
 
       if (url.pathname.startsWith('/oauth/grants-by-id/') && method === 'POST') {
@@ -909,7 +919,7 @@ export class UserProfile {
     return next.toISOString();
   }
 
-  async upsertOAuthGrant(data) {
+  async createOAuthGrant(data) {
     const profile = await this.state.storage.get('profile');
 
     if (!profile) {
@@ -920,28 +930,18 @@ export class UserProfile {
     }
 
     this.normalizeOAuthCollections(profile);
-    let grant = profile.oauth_grants.find((entry) => entry.app_id === data.app_id && !entry.revoked_at);
-
-    if (!grant) {
-      grant = {
-        grant_id: `grant_${crypto.randomUUID()}`,
-        user_id: profile.user_id,
-        app_id: data.app_id,
-        scopes: data.scopes || [],
-        caveats: data.caveats || {},
-        spend_used_cents: 0,
-        spend_reset: this.nextMonthlyReset(),
-        created_at: new Date().toISOString(),
-        revoked_at: null
-      };
-      profile.oauth_grants.push(grant);
-    } else {
-      grant.scopes = data.scopes || grant.scopes;
-      grant.caveats = data.caveats || grant.caveats || {};
-      if (!grant.spend_reset) {
-        grant.spend_reset = this.nextMonthlyReset();
-      }
-    }
+    const grant = {
+      grant_id: `grant_${crypto.randomUUID()}`,
+      user_id: profile.user_id,
+      app_id: data.app_id,
+      scopes: data.scopes || [],
+      caveats: data.caveats || {},
+      spend_used_cents: 0,
+      spend_reset: this.nextMonthlyReset(),
+      created_at: new Date().toISOString(),
+      revoked_at: null
+    };
+    profile.oauth_grants.push(grant);
 
     profile.updated_at = new Date().toISOString();
     await this.state.storage.put('profile', profile);
@@ -949,6 +949,55 @@ export class UserProfile {
     return new Response(JSON.stringify(grant), {
       headers: { 'content-type': 'application/json' }
     });
+  }
+
+  /**
+   * Narrow a grant's scopes or caveats; neither may be loosened.
+   * Body { scopes?, caveats? }, already parsed by the API handler.
+   */
+  async narrowOAuthGrant(grantId, data) {
+    const profile = await this.state.storage.get('profile');
+    if (!profile) {
+      return Response.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    this.normalizeOAuthCollections(profile);
+    const grant = profile.oauth_grants.find((entry) => entry.grant_id === grantId && !entry.revoked_at);
+    if (!grant) {
+      return Response.json({ error: 'Grant not found' }, { status: 404 });
+    }
+    if (data.scopes !== undefined && (data.scopes.length === 0 || data.scopes.some((scope) => !grant.scopes.includes(scope)))) {
+      return Response.json({ error: 'SCOPE_WIDENING', message: 'An app\'s access can only be narrowed' }, { status: 400 });
+    }
+    if (data.caveats !== undefined && !caveatsNarrower(grant.caveats || {}, data.caveats)) {
+      return Response.json({ error: 'CAVEAT_WIDENING', message: 'An app\'s limits can only be tightened' }, { status: 400 });
+    }
+
+    if (data.scopes !== undefined) grant.scopes = data.scopes;
+    if (data.caveats !== undefined) grant.caveats = data.caveats;
+    profile.updated_at = new Date().toISOString();
+    await this.state.storage.put('profile', profile);
+    return Response.json(grant);
+  }
+
+  /**
+   * Record a used authorization code; a second use fails. Entries are kept until the code expires.
+   */
+  async redeemOAuthCode(data) {
+    const profile = await this.state.storage.get('profile');
+    if (!profile) {
+      return Response.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const used = (profile.oauth_used_codes || []).filter((entry) => entry.expires_at > now);
+    if (typeof data.jti !== 'string' || used.some((entry) => entry.jti === data.jti)) {
+      return Response.json({ error: 'Code already used' }, { status: 409 });
+    }
+    used.push({ jti: data.jti, expires_at: Number(data.expires_at) || now + 600 });
+    profile.oauth_used_codes = used;
+    await this.state.storage.put('profile', profile);
+    return Response.json({ redeemed: true });
   }
 
   async listOAuthGrants() {
@@ -994,6 +1043,23 @@ export class UserProfile {
     });
   }
 
+  /**
+   * Revoke grants, with their refresh tokens
+   */
+  revokeGrants(profile, grants) {
+    const revokedAt = new Date().toISOString();
+    for (const grant of grants) {
+      grant.revoked_at = revokedAt;
+      for (const token of profile.oauth_refresh_tokens) {
+        if (token.grant_id === grant.grant_id && !token.revoked_at) {
+          token.revoked_at = revokedAt;
+        }
+      }
+    }
+    profile.updated_at = revokedAt;
+    return revokedAt;
+  }
+
   async revokeOAuthGrantByApp(appId) {
     const profile = await this.state.storage.get('profile');
 
@@ -1005,30 +1071,18 @@ export class UserProfile {
     }
 
     this.normalizeOAuthCollections(profile);
-    const grant = profile.oauth_grants.find((entry) => entry.app_id === appId && !entry.revoked_at);
-    if (!grant) {
+    const grants = profile.oauth_grants.filter((entry) => entry.app_id === appId && !entry.revoked_at);
+    if (grants.length === 0) {
       return new Response(JSON.stringify({ error: 'Grant not found' }), {
         status: 404,
         headers: { 'content-type': 'application/json' }
       });
     }
 
-    grant.revoked_at = new Date().toISOString();
-    for (const token of profile.oauth_refresh_tokens) {
-      if (token.grant_id === grant.grant_id && !token.revoked_at) {
-        token.revoked_at = grant.revoked_at;
-      }
-    }
-    profile.updated_at = new Date().toISOString();
+    const revokedAt = this.revokeGrants(profile, grants);
     await this.state.storage.put('profile', profile);
 
-    return new Response(JSON.stringify({
-      success: true,
-      app_id: appId,
-      revoked_at: grant.revoked_at
-    }), {
-      headers: { 'content-type': 'application/json' }
-    });
+    return Response.json({ success: true, app_id: appId, revoked: grants.length, revoked_at: revokedAt });
   }
 
   async revokeOAuthGrantById(grantId) {
@@ -1050,7 +1104,10 @@ export class UserProfile {
       });
     }
 
-    return this.revokeOAuthGrantByApp(grant.app_id);
+    const revokedAt = this.revokeGrants(profile, [grant]);
+    await this.state.storage.put('profile', profile);
+
+    return Response.json({ success: true, grant_id: grantId, app_id: grant.app_id, revoked_at: revokedAt });
   }
 
   async storeOAuthRefreshToken(data) {
@@ -1104,8 +1161,16 @@ export class UserProfile {
       });
     }
 
-    token.revoked_at = new Date().toISOString();
+    // A revoked or expired grant cannot mint more tokens, and a client may only narrow its scopes
     const grant = profile.oauth_grants.find((entry) => entry.grant_id === token.grant_id && !entry.revoked_at);
+    if (!grant || (grant.caveats?.expires_at && new Date(grant.caveats.expires_at) <= new Date())) {
+      return Response.json({ error: 'Grant not active' }, { status: 404 });
+    }
+    if (Array.isArray(data.requested_scopes) && data.requested_scopes.some((scope) => !grant.scopes.includes(scope))) {
+      return Response.json({ error: 'invalid_scope' }, { status: 422 });
+    }
+
+    token.revoked_at = new Date().toISOString();
     const replacement = {
       token_hash: data.new_token_hash,
       grant_id: token.grant_id,
@@ -1124,7 +1189,7 @@ export class UserProfile {
       grant_id: token.grant_id,
       app_id: token.app_id,
       user_id: profile.user_id,
-      scopes: grant?.scopes || []
+      scopes: grant.scopes
     }), {
       headers: { 'content-type': 'application/json' }
     });

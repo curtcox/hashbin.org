@@ -296,7 +296,8 @@ async function validateOAuthAccessToken(token, env) {
     }
 
     const grant = await grantResponse.json();
-    if (grant.revoked_at || grant.app_id !== payload.app_id) {
+    const grantExpired = grant.caveats?.expires_at && new Date(grant.caveats.expires_at) <= new Date();
+    if (grant.revoked_at || grant.app_id !== payload.app_id || grantExpired) {
       return {
         valid: false,
         error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,

@@ -7,7 +7,7 @@ import {
 } from './oauth.js';
 import { ApplicationRegistry } from '../durable-objects/application-registry.js';
 import { UserProfile } from '../durable-objects/user-profile.js';
-import { createPkceChallenge, verifyOAuthJwt } from '../auth/oauth.js';
+import { createPkceChallenge } from '../auth/oauth.js';
 
 function createMockState(initialData = {}) {
   const storage = new Map();
@@ -195,7 +195,8 @@ describe('OAuth API', () => {
         scope: 'content:write',
         state: 'json-state',
         code_challenge: await createPkceChallenge('verifier-value-for-tests-1234567890'),
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        spending_limit: '5'
       })
     }), env);
 
@@ -227,7 +228,8 @@ describe('OAuth API', () => {
         scope: 'content:write',
         state: 'native-state',
         code_challenge: await createPkceChallenge(codeVerifier),
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        spending_limit: '5'
       })
     }), env);
 
@@ -310,7 +312,8 @@ describe('OAuth API', () => {
         scope: 'content:write',
         state: 'mismatch-state',
         code_challenge: await createPkceChallenge('correct-verifier'),
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        spending_limit: '5'
       })
     }), env);
 
@@ -360,7 +363,8 @@ describe('OAuth API', () => {
         scope: 'content:write balance:read',
         state: 'refresh-state',
         code_challenge: await createPkceChallenge(codeVerifier),
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        spending_limit: '5'
       })
     }), env);
 
@@ -438,7 +442,8 @@ describe('OAuth API', () => {
         response_type: 'code',
         scope: 'content:write',
         code_challenge: await createPkceChallenge('missing-key-verifier'),
-        code_challenge_method: 'S256'
+        code_challenge_method: 'S256',
+        spending_limit: '5'
       })
     }), envWithoutSigningKey);
 

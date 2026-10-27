@@ -139,7 +139,8 @@ import {
   handleGetAccountSettings,
   handleUpdateAccountSettings,
   handleListAuthorizations,
-  handleRevokeAuthorization
+  handleRevokeAuthorization,
+  handleUpdateAuthorization
 } from './api/oauth.js';
 
 import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js';
@@ -669,6 +670,7 @@ const API_ROUTES = [
   { method: 'PATCH', path: '/api/account/settings', access: SESSION, handler: handleUpdateAccountSettings },
   { method: 'GET', path: '/api/account/authorizations', access: SESSION, handler: handleListAuthorizations },
   { method: 'DELETE', path: /^\/api\/account\/authorizations\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeAuthorization(request, env, m[1]) },
+  { method: 'PATCH', path: /^\/api\/account\/authorizations\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateAuthorization(request, env, m[1]) },
 
   // Balance and payments
   { method: 'GET', path: '/api/balance', access: 'balance:read', handler: handleGetBalance },

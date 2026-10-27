@@ -12,9 +12,7 @@ vi.mock('../auth/middleware.js', async () => {
   };
 });
 
-import { handleGetBalance, handleGetBalanceHistory } from './balance.js';
-import { handleGetUserUploads } from './user.js';
-import { handleExtendContent } from './content.js';
+import { handleGetBalance } from './balance.js';
 
 function createDurableObjectBinding(fetchHandler) {
   return {
