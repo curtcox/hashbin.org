@@ -44,17 +44,17 @@ If the last completed snapshot is more than 48 hours old or had failures, the cr
 ## Checking backups
 
 ```bash
-ADMIN_TOKEN=...   # the ADMIN_SECRET_TOKEN secret
+ADMIN_KEY=hba_...   # an admin key with admin:backups (issue one at /admin/keys.html)
 
 # Last completed run, any run in progress, and how many objects are indexed
-curl -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/backups
+curl -H "Authorization: ApiKey $ADMIN_KEY" https://hashbin.org/api/admin/backups
 
 # Start a run now
-curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/backups/run
+curl -X POST -H "Authorization: ApiKey $ADMIN_KEY" https://hashbin.org/api/admin/backups/run
 
 # List a run's files, and download one
-curl -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/backups/{run_id}/files
-curl -H "X-Admin-Token: $ADMIN_TOKEN" "https://hashbin.org/api/admin/backups/file?key=snapshots/{run_id}/manifest.json"
+curl -H "Authorization: ApiKey $ADMIN_KEY" https://hashbin.org/api/admin/backups/{run_id}/files
+curl -H "Authorization: ApiKey $ADMIN_KEY" "https://hashbin.org/api/admin/backups/file?key=snapshots/{run_id}/manifest.json"
 ```
 
 `failed` in `last_run` should be 0. `errors` lists up to 50 objects that couldn't be read.
@@ -66,7 +66,7 @@ Restores go through `POST /api/admin/restore` one object at a time.
 script refuses runs without a manifest).
 
 ```bash
-export ADMIN_TOKEN=...
+export ADMIN_KEY=hba_...   # an admin key with admin:backups and admin:restore
 
 # 1. See what a restore would touch
 node scripts/backup/restore-snapshot.mjs --run 2026-10-07T02-00-00-123Z --dry-run
@@ -84,4 +84,6 @@ snapshot time, and against `PAYMENT_RECORDS` for that user. A restore replays st
 was at snapshot time, so anything written after the snapshot is lost for that object.
 
 Use `--base-url http://localhost:8787` to rehearse against local dev
-(`npx wrangler dev --config wrangler.local.toml --local --var ADMIN_SECRET_TOKEN:<64 hex chars>`).
+(`npx wrangler dev --config wrangler.local.toml --local --var ADMIN_USER_ID:local_admin`, then
+issue a key with `POST /api/admin/keys` using `Authorization: LocalDev local_admin`). Until it is
+removed, the legacy `ADMIN_TOKEN` (the `ADMIN_SECRET_TOKEN` secret) also works.

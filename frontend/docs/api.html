@@ -93,9 +93,10 @@
 Content: https://256t.us/{cid}</div>
         
         <h3 style="margin-top: 1.5rem;">Authentication</h3>
-        <p>Most endpoints require authentication using an API key. Include your API key in the Authorization header:</p>
-        <div class="code-block">Authorization: Bearer YOUR_API_KEY</div>
-        <p>API keys can be created and managed from your <a href="/api-keys.html">dashboard</a>.</p>
+        <p>Programs authenticate with an API key, sent in either header:</p>
+        <div class="code-block">Authorization: ApiKey hbk_...
+X-API-Key: hbk_...</div>
+        <p>Each key holds only the scopes you give it (for example <code>content:write</code> to publish, <code>balance:read</code> to read the balance) and can carry limits: a monthly spending limit, largest upload, longest retention, allowed content types, or specific CIDs. Anything else answers <code>403</code>. Keys, apps, settings and deposits always need your own sign-in. Create and narrow keys from your <a href="/api-keys.html">dashboard</a>; the full scope list is in <code>docs/API.md</code>.</p>
         <p style="margin-top: 1rem;">For third-party browser integrations, use the hosted SDK at <code>https://hashbin.org/sdk/hashbin.js</code> and follow the <a href="/docs/sdk.html">SDK Guide</a>. Raw files are served from <code>256t.us</code>; see <a href="/docs/content-security.html">content security</a>.</p>
       </section>
 
@@ -108,7 +109,7 @@ Content: https://256t.us/{cid}</div>
             <span class="endpoint-method method-get">GET</span>
             <span class="endpoint-path">/api/auth/session</span>
           </div>
-          <p style="margin-top: 0.5rem; color: var(--color-text-light);">Get current user session information</p>
+          <p style="margin-top: 0.5rem; color: var(--color-text-light);">Get current user session information (signed-in session only)</p>
           
           <h4 style="margin-top: 1rem;">Response</h4>
           <div class="code-block">{
@@ -129,17 +130,18 @@ Content: https://256t.us/{cid}</div>
           <p style="margin-top: 0.5rem; color: var(--color-text-light);">List all API keys for authenticated user</p>
           
           <h4 style="margin-top: 1rem;">Response</h4>
-          <div class="code-block">{
-  "keys": [
-    {
-      "id": "key_abc123",
-      "name": "Production API Key",
-      "created": "2026-01-01T00:00:00Z",
-      "expires": "2027-01-01T00:00:00Z",
-      "lastUsed": "2026-01-24T12:00:00Z"
-    }
-  ]
-}</div>
+          <div class="code-block">[
+  {
+    "key_id": "6f1c...",
+    "name": "Publisher",
+    "scopes": ["content:write"],
+    "caveats": { "monthly_spend_limit_cents": 200 },
+    "created_at": "2026-10-27T00:00:00Z",
+    "expires_at": "2027-01-25T00:00:00Z",
+    "last_used_at": "2026-10-27T12:00:00Z",
+    "revoked": false
+  }
+]</div>
         </div>
 
         <div class="endpoint">
@@ -151,17 +153,21 @@ Content: https://256t.us/{cid}</div>
           
           <h4 style="margin-top: 1rem;">Request Body</h4>
           <div class="code-block">{
-  "name": "My API Key",
-  "expiresInDays": 365
+  "name": "Publisher",
+  "scopes": ["content:write"],
+  "caveats": { "max_upload_bytes": 1048576, "monthly_spend_limit_cents": 200 },
+  "expires_at": "2027-01-25T00:00:00Z"
 }</div>
           
           <h4 style="margin-top: 1rem;">Response</h4>
           <div class="code-block">{
-  "id": "key_abc123",
-  "key": "hb_live_...",
-  "name": "My API Key",
-  "created": "2026-01-24T00:00:00Z",
-  "expires": "2027-01-24T00:00:00Z"
+  "key_id": "6f1c...",
+  "api_key": "hbk_...",
+  "name": "Publisher",
+  "scopes": ["content:write"],
+  "caveats": { "max_upload_bytes": 1048576, "monthly_spend_limit_cents": 200 },
+  "created_at": "2026-10-27T00:00:00Z",
+  "expires_at": "2027-01-25T00:00:00Z"
 }</div>
           <p style="margin-top: 0.5rem; color: #ef4444;"><strong>Important:</strong> The key value is only shown once. Store it securely.</p>
         </div>

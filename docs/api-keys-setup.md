@@ -1,202 +1,70 @@
-# API Keys Setup Guide
+# API Keys Guide
 
-This guide explains how to set up and use the API keys feature in HashBin.org.
+API keys let a script or server act for your account, but only as far as you allow.
+Each key holds the scopes you pick and the limits (caveats) you set; everything else is
+refused. See [API.md](API.md#authentication) for the full scope and caveat tables.
 
-## Prerequisites
+## Setup
 
-- Cloudflare Workers account with API access
-- Wrangler CLI installed (`npm install -g wrangler`)
-- Clerk account configured (for authentication)
+Keys are signed with `DOWNLOAD_TOKEN_SECRET` (the same secret the 256t.us Worker uses), so
+it must be configured before keys can be created. No other secret is needed: HashBin
+stores only each key's SHA-256 hash and never keeps a recoverable copy.
 
-## Setup Steps
+## Creating a key
 
-### 1. Generate Encryption Key
+Sign in, open **API Keys → Create**, then:
 
-The API keys feature requires a 256-bit AES encryption key to securely store API keys for the reveal functionality.
+1. Pick what the key may do. Presets cover the common jobs ("Publish only", "Publish +
+   read balance", "Downloads only"); nothing is checked by default.
+2. Optionally set limits: monthly spending limit, largest upload, longest retention per
+   upload or extension, allowed content types, and the only CIDs it may act on.
+3. Pick an expiry: 90 days by default, at most a year.
 
-```bash
-# Generate a new encryption key
-./scripts/generate-encryption-key.sh
-```
+Copy the key when it is shown. It cannot be shown again; if it is lost, revoke it and
+create another.
 
-This will output a base64-encoded encryption key. **Save this key securely!**
-
-### 2. Add Encryption Key as Secret
-
-Add the encryption key as a Cloudflare secret using Wrangler:
-
-```bash
-# For production (there is only one environment)
-echo 'YOUR_KEY_HERE' | wrangler secret put API_KEY_ENCRYPTION_KEY
-```
-
-**Important:** Replace `YOUR_KEY_HERE` with the actual key from step 1.
-
-### 3. Deploy
-
-Deploy your Worker with the new API keys functionality:
+Or with the API, using your signed-in session:
 
 ```bash
-# Deploy to production
-npm run deploy
+curl -X POST https://hashbin.org/api/auth/apikeys \
+  -H "Authorization: Bearer <clerk-jwt>" -H "Content-Type: application/json" \
+  -d '{
+    "name": "CI publisher",
+    "scopes": ["content:write"],
+    "caveats": { "max_upload_bytes": 10485760, "max_retention_months": 12, "monthly_spend_limit_cents": 500 },
+    "expires_at": "2027-01-31T00:00:00Z"
+  }'
 ```
 
-## API Endpoints
-
-### Create API Key
+## Using a key
 
 ```bash
-POST /api/auth/apikeys
-Authorization: Bearer <clerk-jwt>
-Content-Type: application/json
-
-{
-  "name": "My CI/CD Key",  # Optional, defaults to "Hosting" or "Hosting n"
-  "expires_at": "2025-12-31T23:59:59Z"  # Optional, defaults to 5 years
-}
+curl -X POST "https://hashbin.org/api/content?retention_months=12" \
+  -H "Authorization: ApiKey hbk_..." -H "Content-Type: text/plain" --data-binary @notes.txt
 ```
 
-Response:
-```json
-{
-  "key_id": "uuid-here",
-  "name": "Hosting",
-  "created_at": "2024-01-15T12:00:00Z",
-  "expires_at": "2029-01-15T12:00:00Z",
-  "api_key": "hb_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234",
-  "warning": "Save this API key securely. It will not be shown again."
-}
-```
+`X-API-Key: hbk_...` works too. A key never reaches account management (keys, apps,
+settings, deposits); those always need your sign-in.
 
-**Note:** 
-- The `api_key` is only returned once during creation.
-- If no name is provided, defaults to "Hosting" for first key, or "Hosting n" (n >= 2) for subsequent keys.
+## Narrowing or revoking
 
-### List API Keys
+On the key's page, uncheck scopes it no longer needs. With the API,
+`PATCH /api/auth/apikeys/{key_id}` takes `{ "scopes"?, "caveats"?, "name"? }`; scopes can
+only be removed and caveats only tightened. `DELETE /api/auth/apikeys/{key_id}` revokes a
+key immediately.
 
-```bash
-GET /api/auth/apikeys
-Authorization: Bearer <clerk-jwt>
-```
+## Errors
 
-Response:
-```json
-[
-  {
-    "key_id": "uuid-here",
-    "name": "My CI/CD Key",
-    "created_at": "2024-01-15T12:00:00Z",
-    "expires_at": "2029-01-15T12:00:00Z",
-    "last_used_at": "2024-01-16T08:30:00Z",
-    "revoked": false
-  }
-]
-```
+| Response | Meaning |
+|---|---|
+| `401` | Missing, malformed, revoked or expired key |
+| `403 insufficient_scope` | The key lacks the scope for this route |
+| `403 session_required` | The route is for your own sign-in only |
+| `403 caveat_violation` | The request is outside one of the key's limits (the `caveat` field says which) |
+| `400 spending_limit_exceeded` | The key's monthly spending limit would be passed |
 
-### Reveal API Key
+## Older keys
 
-Requires a **fresh** Clerk session (authenticated within last 5 minutes).
-
-```bash
-POST /api/auth/apikeys/:keyId/reveal
-Authorization: Bearer <clerk-jwt>
-```
-
-Response:
-```json
-{
-  "key_id": "uuid-here",
-  "name": "My CI/CD Key",
-  "api_key": "hb_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234",
-  "created_at": "2024-01-15T12:00:00Z",
-  "expires_at": "2029-01-15T12:00:00Z",
-  "last_used_at": "2024-01-16T08:30:00Z",
-  "warning": "Keep this API key secure. Limit how often you reveal it."
-}
-```
-
-**Rate Limiting:** Maximum 3 reveals per hour per key.
-
-**Fresh Session Requirement:** If your session is older than 5 minutes, you'll receive a 403 error asking you to re-authenticate.
-
-### Revoke API Key
-
-```bash
-DELETE /api/auth/apikeys/:keyId
-Authorization: Bearer <clerk-jwt>
-```
-
-Response:
-```json
-{
-  "success": true,
-  "message": "API key revoked successfully"
-}
-```
-
-**Note:** Revoking an already revoked key returns the same success response (idempotent).
-
-### Use API Key for Authentication
-
-API keys can be used instead of Clerk sessions for authenticated requests:
-
-```bash
-# Method 1: Authorization header
-curl -H "Authorization: ApiKey hb_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234" \
-  https://hashbin.org/api/content
-
-# Method 2: X-API-Key header
-curl -H "X-API-Key: hb_ABCDEFGHIJKLMNOPQRSTUVWXYZab1234" \
-  https://hashbin.org/api/content
-```
-
-## Security Features
-
-1. **Encryption at Rest:** API keys are stored both hashed (SHA-256) and encrypted (AES-256-GCM)
-2. **Fresh Session Required:** Revealing keys requires recent authentication
-3. **Rate Limited:** Reveals are limited to 3 per hour per key
-4. **Backward Compatible:** Legacy formats (`hb_live_*`, `hb_test_*`) still supported
-5. **Non-Replicating:** API keys cannot create/list/revoke/reveal other keys
-6. **Expiration:** Keys expire after maximum 5 years
-7. **Revocable:** Keys can be immediately revoked
-
-## Testing
-
-Run the test suite to verify the implementation:
-
-```bash
-npm run test:apikeys
-```
-
-This runs 21 tests covering:
-- Key generation and format validation
-- Encryption/decryption
-- Session freshness validation
-- Reveal endpoint with rate limiting
-- Idempotent revoke operation
-
-## Troubleshooting
-
-### "API_KEY_ENCRYPTION_KEY not configured"
-
-The encryption key secret is missing. Follow setup steps 1-2 above.
-
-### "FRESH_AUTH_REQUIRED" when revealing key
-
-Your Clerk session is older than 5 minutes. Re-authenticate in your app to get a fresh session.
-
-### "REVEAL_RATE_LIMITED"
-
-You've revealed this key 3 times in the last hour. Wait for the rate limit to reset (check `retry_after_seconds` in response).
-
-### Backward Compatibility
-
-- New keys use the `hb_` prefix format
-- Legacy formats (`hb_test_*`, `hb_live_*`) are still accepted for existing keys
-- All formats work in production (there is only one environment)
-
-## Next Steps
-
-- **Frontend UI:** Build a user interface at `/settings/api-keys` for key management
-- **Production Rate Limiting:** Implement RateLimiter Durable Object for distributed rate limiting
-- **Documentation:** Add comprehensive API documentation with more examples
+Keys created before scopes existed (`hb_…`, `hb_live_…`, `hb_test_…`, `hb2_…`) are no
+longer accepted and show as revoked. Changing `DOWNLOAD_TOKEN_SECRET` invalidates every
+key, signed download link and download session.

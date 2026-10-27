@@ -11,12 +11,15 @@ all-powerful API key.
 - **Token storage:** the refresh token is kept in the macOS Keychain under the service
   `hashbin-publish:<host>`, never in the repo or in process arguments. HashBin rotates it on every
   use; it expires after 30 days without one.
-- **Retention:** OAuth uploads use your account's default retention, set on the Account page.
+- **Retention:** OAuth uploads use your account's default retention, set on the Account page,
+  held to the grant's retention cap if it has one (`--max-retention 12`).
+- **Your choice:** the approval page lets you uncheck either scope, lower the limit, cap
+  retention and make the grant expire after 30, 90 or 365 days. Each approval is a separate grant.
 
 ## Set up (once)
 
 ```bash
-node scripts/publish.mjs authorize --limit 5
+node scripts/publish.mjs authorize --limit 5 [--max-retention 12]
 ```
 
 Your browser opens HashBin's approval page showing the scopes and the monthly limit (here $5).
@@ -38,7 +41,7 @@ The content type comes from the file extension unless `--type` is given.
 - `node scripts/publish.mjs forget` revokes the stored refresh token and deletes it from the
   Keychain.
 - To cut off the whole grant, including tokens on other machines, revoke **Claude Code publisher**
-  under authorized apps on your Account page.
+  under authorized apps on your Account page. You can also uncheck a scope or lower the limit there.
 - If publishing reports `invalid_grant`, the token expired or was revoked; run `authorize` again.
 
 ## Configuration

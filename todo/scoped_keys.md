@@ -2,7 +2,50 @@
 
 ## Status
 
-**Phase:** Planned 2026-10-27. Nothing implemented.
+**Phase:** Implemented and deployed 2026-10-27 (commits 81b7dd9 through 405af40), except
+retiring `ADMIN_SECRET_TOKEN`, which waits on `ADMIN_USER_ID` being configured in
+production. Row B12 in `STATUS.md`.
+
+### Remaining
+
+- [ ] Set the production `ADMIN_USER_ID` secret (GitHub secret of the same name, or
+  `wrangler secret put ADMIN_USER_ID`) to the admin's Clerk user ID. Production has none,
+  so today the legacy token is the only way into admin.
+- [ ] Then remove `X-Admin-Token` support (`validateAdminToken` and its branch in
+  `authenticate()`, the token fallbacks in `frontend/js/admin-auth.js` and the admin
+  pages, scripts and docs), the deploy.yml step, and the `ADMIN_SECRET_TOKEN` secret.
+- [ ] Delete the unused `API_KEY_ENCRYPTION_KEY` Worker secret and GitHub secret.
+
+### How it differs from the plan
+
+- Phase 6 shipped before Phase 5, so admin keys were signed with their own derived key
+  from the start.
+- The KeyRegistry class was deleted in a second deploy (migration v11), after the 256t.us
+  Worker had shipped without its binding; deleting it in the same deploy would have
+  failed while the old content Worker still bound it.
+- The monthly spend limit also covers funded download leases, for keys and grants alike.
+  It is optional on keys and required on app grants that hold a spending scope.
+- Admin key use is recorded on the key (`last_used_at`, `usage_count`); admin actions
+  name the key in the admin action log. Reads are not logged one by one.
+- Admin pages act as the signed-in admin and keep the legacy token field as a fallback
+  until the token is retired.
+
+### Also fixed along the way
+
+- `/oauth/authorize` (POST) accepted API keys and app tokens, letting a delegated
+  credential approve new grants; it is now session-only.
+- `GET /api/auth/session` returned the whole profile to any credential; now session-only.
+- Re-uploading existing content and rate-limit purchases were outside the app spending limit.
+- The rate-limit purchase rollback called a profile route that does not exist, so a failed
+  purchase was never refunded.
+- Refresh-token rotation still minted tokens for a revoked grant.
+
+### Known unrelated issues
+
+- `U-034` and `E-005` in the local API suites ask for 1,000,000 months of retention, above
+  the 120-month cap, so they fail before reaching the balance check they mean to test.
+- The deploy workflow's native funded acceptance intermittently hits a workerd segmentation
+  fault in CI (also on commits before this work); re-running the failed job passes.
 
 ## Goal
 
@@ -164,97 +207,97 @@ IP or origin pinning is left out of the first pass (see open questions).
 
 ### Phase 1 — Central scope model and default deny
 
-- [ ] Add `src/auth/scopes.js`: scope list, descriptions, which credential kinds may
+- [x] Add `src/auth/scopes.js`: scope list, descriptions, which credential kinds may
   hold each, session-only route list.
-- [ ] Make `authenticate()` return the uniform principal; add `authorize()` and
+- [x] Make `authenticate()` return the uniform principal; add `authorize()` and
   `requireSession()`.
-- [ ] Declare a scope (or `public` / `session`) for every route in `src/index.js`;
+- [x] Declare a scope (or `public` / `session`) for every route in `src/index.js`;
   add a test that walks the route table and fails on undeclared routes.
-- [ ] Replace every `isOAuthAuth` / `authMethod !==` check with the declared guard.
-- [ ] Tests: for each route × credential kind, allowed vs 403 (closes G1, G3).
+- [x] Replace every `isOAuthAuth` / `authMethod !==` check with the declared guard.
+- [x] Tests: for each route × credential kind, allowed vs 403 (closes G1, G3).
 
 ### Phase 2 — Scoped API keys, no legacy
 
-- [ ] Key creation takes `scopes` (required, non-empty) and optional caveats;
+- [x] Key creation takes `scopes` (required, non-empty) and optional caveats;
   validate against the scope table.
-- [ ] Rename prefix to `hbk_`; delete `hb_`/`hb_live_`/`hb_test_` parsing in
+- [x] Rename prefix to `hbk_`; delete `hb_`/`hb_live_`/`hb_test_` parsing in
   `src/auth/utils.js`, the legacy branch in `workers/256t-content/src/funding.js`,
   and the `KEY_REGISTRY` Durable Object (bindings in both `wrangler*.toml`, backup
   list in `src/utils/backup.js`, health list in `src/index.js`, plus a
   `deleted_classes` migration).
-- [ ] Remove reveal: `encryptApiKey`, `POST /api/auth/apikeys/:id/reveal`, the
+- [x] Remove reveal: `encryptApiKey`, `POST /api/auth/apikeys/:id/reveal`, the
   `API_KEY_ENCRYPTION_KEY` secret and the reveal UI (closes G10).
-- [ ] Default expiry 90 days, max 1 year (G11).
-- [ ] `downloadIdentityValid` requires `downloads:spend` on keys too.
-- [ ] Revoke all existing keys at deploy; document reissuing in
+- [x] Default expiry 90 days, max 1 year (G11).
+- [x] `downloadIdentityValid` requires `downloads:spend` on keys too.
+- [x] Revoke all existing keys at deploy; document reissuing in
   `docs/api-keys-setup.md`.
-- [ ] UI (`frontend/api-keys-create.html`, `api-keys-detail.html`): scope checkboxes
+- [x] UI (`frontend/api-keys-create.html`, `api-keys-detail.html`): scope checkboxes
   with nothing pre-checked except a chosen preset ("Publish only", "Publish +
   balance", "Downloads only"), caveat fields, and a scope/caveat summary on detail.
   Allow narrowing an existing key (never widening).
 
 ### Phase 3 — Caveats
 
-- [ ] Store caveats on keys and grants; validate on creation/consent.
-- [ ] Enforce `max_upload_bytes`, `content_types`, `max_retention_months` in
+- [x] Store caveats on keys and grants; validate on creation/consent.
+- [x] Enforce `max_upload_bytes`, `content_types`, `max_retention_months` in
   `handleUploadContent`; `max_retention_months` and `cids` in extend.
-- [ ] `cids` in delete, rate-limit purchase and `downloads/sign`; carry the CID
+- [x] `cids` in delete, rate-limit purchase and `downloads/sign`; carry the CID
   check into the 256t.us funding path for direct key/OAuth downloads.
-- [ ] Move spend-limit enforcement to the single profile debit and call it from
+- [x] Move spend-limit enforcement to the single profile debit and call it from
   extend and rate-limit purchase (closes G5). Rename grant `spending_limit` (USD) to
   `monthly_spend_limit_cents` for keys and grants alike.
-- [ ] Tests per caveat: just inside allowed, just outside denied.
+- [x] Tests per caveat: just inside allowed, just outside denied.
 
 ### Phase 4 — OAuth narrowing
 
-- [ ] Replace `content:read` with `uploads:read` etc. from the shared table; update
+- [x] Replace `content:read` with `uploads:read` etc. from the shared table; update
   consent text, `frontend/developers.html`, `docs/API.md`,
   `docs/publishing-from-the-command-line.md`, examples and the video-series scope
   lists (G6).
-- [ ] Consent page: scope checkboxes (user may uncheck any), editable spend limit
+- [x] Consent page: scope checkboxes (user may uncheck any), editable spend limit
   (may only lower the app's request, and is required when a spending scope is
   granted), retention cap, optional grant expiry (G8, G9).
-- [ ] Account page: edit an existing grant's scopes/caveats downward.
-- [ ] Token endpoint accepts `scope` on `authorization_code` and `refresh_token`
+- [x] Account page: edit an existing grant's scopes/caveats downward.
+- [x] Token endpoint accepts `scope` on `authorization_code` and `refresh_token`
   requests to mint narrower access tokens (RFC 6749 §6); middleware intersects
   token and grant scopes (G7).
-- [ ] Allow several grants per (user, app), each with its own refresh tokens, so
+- [x] Allow several grants per (user, app), each with its own refresh tokens, so
   two installs can hold different scopes. Revoke by grant ID.
-- [ ] Single-use authorization codes: record the code `jti` in the profile until
+- [x] Single-use authorization codes: record the code `jti` in the profile until
   expiry (G14).
-- [ ] Stop generating client secrets (G12).
-- [ ] Update `scripts/publish.mjs` to request only `content:write balance:read` with
+- [x] Stop generating client secrets (G12).
+- [x] Update `scripts/publish.mjs` to request only `content:write balance:read` with
   a retention cap.
 
 ### Phase 5 — Scoped admin keys
 
-- [ ] Admin keys (`hba_`) issued only from the `ADMIN_USER_ID` session, with
+- [x] Admin keys (`hba_`) issued only from the `ADMIN_USER_ID` session, with
   `admin:*` scopes and caveats (expiry required, max 90 days). Store them in a
   dedicated admin-keys store, hash only.
-- [ ] Admin UI pages (`frontend/admin/*`) use the admin's Clerk session instead of a
+- [x] Admin UI pages (`frontend/admin/*`) use the admin's Clerk session instead of a
   pasted token; add an admin-keys management page.
-- [ ] `scripts/cost-safety-report.mjs` uses an `admin:costs` key;
+- [x] `scripts/cost-safety-report.mjs` uses an `admin:costs` key;
   `scripts/backup/restore-snapshot.mjs` uses `admin:backups admin:restore`.
-- [ ] `isAdminRequest` / `requireAdmin` become `authorize(principal, 'admin:…')`;
+- [x] `isAdminRequest` / `requireAdmin` become `authorize(principal, 'admin:…')`;
   user API keys and OAuth tokens can never hold `admin:*` (closes G2).
 - [ ] Remove `ADMIN_SECRET_TOKEN` and `X-Admin-Token` support, the deploy.yml step and
   the GitHub secret (G15). Break-glass is the admin's Clerk session.
-- [ ] Every admin key use is written to the admin action log with the key ID.
+- [x] Every admin key use is written to the admin action log with the key ID.
 
 ### Phase 6 — Token hygiene
 
-- [ ] HKDF per-purpose subkeys for download tokens and key tags (G13); one-time
+- [x] HKDF per-purpose subkeys for download tokens and key tags (G13); one-time
   rotation invalidates outstanding links and sessions, acceptable with one user.
-- [ ] Signed download URLs record the minting credential's caveats at check time
+- [x] Signed download URLs record the minting credential's caveats at check time
   (already re-validated through `downloadIdentityValid`; add CID caveat).
-- [ ] Rate limiting keyed by principal (`kind:id`) for every kind, not only keys.
+- [x] Rate limiting keyed by principal (`kind:id`) for every kind, not only keys.
 
 ### Phase 7 — Docs and status
 
-- [ ] `docs/API.md`, `docs/api-keys-setup.md`, `docs/ADMIN_SYSTEM.md`,
+- [x] `docs/API.md`, `docs/api-keys-setup.md`, `docs/ADMIN_SYSTEM.md`,
   `docs/backup-and-restore.md`, `frontend/docs/*`: scope table, caveats, key
   formats, admin keys.
-- [ ] Add a `STATUS.md` row pointing here.
+- [x] Add a `STATUS.md` row pointing here.
 
 ## Acceptance
 

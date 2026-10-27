@@ -87,7 +87,6 @@ The code injection approach (PR #132) failed because even though the SHA was har
    - CLERK_PUBLISHABLE_KEY  
    - STRIPE_SECRET_KEY
    - STRIPE_WEBHOOK_SECRET
-   - API_KEY_ENCRYPTION_KEY
    - **GIT_SHA** (NEW)
 5. **Wait**: 10 seconds for propagation
 6. **Verify**: Health endpoint should now show the gitSha field

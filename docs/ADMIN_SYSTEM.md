@@ -6,28 +6,38 @@ The HashBin.org admin system provides comprehensive monitoring and management ca
 
 ## Setup
 
-### 1. Generate Admin Token
+### 1. Name the admin
 
-The admin system uses a single secret token for authentication. Generate a secure 64-character hex token:
-
-```bash
-# Using Node.js
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-
-# Or using OpenSSL
-openssl rand -hex 32
-```
-
-### 2. Add Token to Cloudflare
-
-Add the token as a Cloudflare secret:
+Set `ADMIN_USER_ID` to the admin's Clerk user ID (shown as `user_id` by
+`GET /api/auth/session` while signed in):
 
 ```bash
-# For production
-wrangler secret put ADMIN_SECRET_TOKEN
-
-# When prompted, paste your generated token
+wrangler secret put ADMIN_USER_ID
 ```
+
+That account's own sign-in holds every admin scope. Its API keys and app tokens do not.
+
+### 2. Issue admin keys for scripts
+
+Signed in as the admin, open **`/admin/keys.html`** (or `POST /api/admin/keys`) and issue a
+key with only the admin scopes the script needs and an expiry of at most 90 days. Scripts
+send it as `Authorization: ApiKey hba_…`. Admin keys are stored as hashes, cannot issue
+other admin keys, and stop working if `ADMIN_USER_ID` changes.
+
+| Scope | Endpoints |
+|---|---|
+| `admin:disputes` | `/api/admin/disputes*`, `/api/admin/repeat-infringers`, `/api/admin/actions` |
+| `admin:takedown` | `POST /api/admin/content/{cid}/delete` |
+| `admin:stats` | `/api/admin/stats*`, `/api/admin/health`, `/api/admin/alerts*`, `/api/admin/audit-log` |
+| `admin:costs` | `/api/admin/costs*`, `/api/admin/profitability`, `/api/admin/cost-safety*` |
+| `admin:backups` | `/api/admin/backups*` |
+| `admin:restore` | `POST /api/admin/restore` |
+| `admin:export` | `GET /api/admin/export` |
+
+### Legacy admin token
+
+`ADMIN_SECRET_TOKEN`, sent as `X-Admin-Token`, still holds every admin scope. It will be
+removed once `ADMIN_USER_ID` is configured and admin keys replace it; prefer them now.
 
 ### 3. Verify Durable Objects Migration
 
@@ -53,7 +63,9 @@ npm run deploy
 
 ## API Endpoints
 
-All admin endpoints require the `X-Admin-Token` header with a valid token.
+Each admin endpoint needs its admin scope (table above): the admin's session, an admin key
+with that scope, or the legacy `X-Admin-Token` header. The examples below use the token
+header; replace it with `-H "Authorization: ApiKey $ADMIN_KEY"` to use an admin key.
 
 ### Platform Statistics
 
@@ -269,13 +281,13 @@ Snapshot status, on-demand runs, and restores: see [backup-and-restore.md](backu
 
 ## Content Moderation (Disputes and Takedowns)
 
-The easiest way is the moderation page, **`/admin/disputes.html`**: paste the admin token (kept
-only in that tab's session storage) to review open disputes with reporter contact details, mark
+The easiest way is the moderation page, **`/admin/disputes.html`**: signed in as the admin (or
+with the legacy token, kept only in that tab's session storage), review open disputes with reporter contact details, mark
 them under review, deny them (content restored), or uphold them (content taken down). The
 repeat-infringer list is on the same page. Everything below is the equivalent API.
 
-The dispute endpoints accept the same `X-Admin-Token` header. Alternatively, set the
-`ADMIN_USER_ID` secret to your Clerk user ID to moderate while signed in.
+The dispute endpoints need `admin:disputes` (takedowns `admin:takedown`): the admin's session,
+an admin key, or the legacy `X-Admin-Token` header.
 
 ```bash
 # List open disputes, including reporter contact info
@@ -376,18 +388,18 @@ async function listAlerts() {
 
 ## Security Considerations
 
-1. **Token Storage**: Store the admin token securely. Never commit it to version control.
+1. **Least privilege**: Give each script an admin key with only the scopes it needs and a short
+   expiry. Revoke it at `/admin/keys.html` when it is no longer needed or may be exposed.
 
-2. **Token Rotation**: If the token is compromised, immediately rotate it via Cloudflare dashboard:
-   ```bash
-   wrangler secret put ADMIN_SECRET_TOKEN
-   ```
+2. **Legacy token**: Until it is removed, store `ADMIN_SECRET_TOKEN` securely and rotate it with
+   `wrangler secret put ADMIN_SECRET_TOKEN` if it may be compromised.
 
 3. **Access Logging**: All admin actions are automatically logged in the audit log.
 
 4. **HTTPS Only**: Admin endpoints should only be accessed over HTTPS in production.
 
-5. **Single Admin**: The system supports exactly one administrator. There is no programmatic way to add or remove admin accounts.
+5. **Single Admin**: The system supports exactly one administrator, `ADMIN_USER_ID`. Changing it
+   invalidates every admin key.
 
 ## Testing
 

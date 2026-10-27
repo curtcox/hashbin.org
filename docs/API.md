@@ -15,45 +15,88 @@ Uploads are served from a dedicated content domain so user-controlled files do n
 
 ## Authentication
 
-HashBin.org supports two authentication methods:
+Every credential carries **scopes** (what it may do) and may carry **caveats** (how
+much). Each API route declares the scope it needs; anything undeclared is refused.
 
-### 1. Clerk OAuth Session (Web Applications)
+| Credential | How it is sent | What it may do |
+|---|---|---|
+| Signed-in session (Clerk) | `Authorization: Bearer <clerk-jwt>` | Everything for the account. The `ADMIN_USER_ID` session also holds every admin scope. |
+| API key | `Authorization: ApiKey hbk_…` or `X-API-Key: hbk_…` | Only its scopes, within its caveats |
+| App access token (OAuth) | `Authorization: Bearer <access-token>` | Only the scopes and limits the user approved |
+| Admin key | `Authorization: ApiKey hba_…` | Only its admin scopes |
 
-Use the Clerk frontend SDK to obtain a session token, then include it in requests:
+Account management is **session-only**: API keys, admin keys, developer apps, account
+settings, app authorizations, download budgets and sessions, deposits, provider linking
+and account deletion can never be reached with a key or app token.
 
-```http
-Authorization: Bearer <clerk-jwt-token>
-```
+### Scopes
 
-**Supported OAuth Providers:**
-- Google
-- Apple
-- Microsoft
-- GitHub
+| Scope | Allows |
+|---|---|
+| `content:write` | `POST /api/content` (spends) |
+| `content:extend` | `POST /api/content/{cid}/extend` (spends) |
+| `content:delete` | `DELETE /api/content/{cid}` for content you uploaded |
+| `uploads:read` | `GET /api/user/uploads` |
+| `balance:read` | `GET /api/balance` |
+| `transactions:read` | `GET /api/balance/history` |
+| `ratelimit:purchase` | `POST /api/content/rate-limit/purchase` (spends) |
+| `downloads:spend` | `POST /api/downloads/sign` and funded downloads on 256t.us (spends) |
+| `suppliers:read` | `GET /api/suppliers` |
+| `suppliers:write` | Create, change, remove and rescan suppliers |
+| `admin:disputes` | Dispute review and resolution, repeat infringers, admin action log |
+| `admin:takedown` | `POST /api/admin/content/{cid}/delete`, and deleting any content |
+| `admin:stats` | Statistics, admin health, alerts (read, acknowledge, test), audit log |
+| `admin:costs` | Costs, profitability, cost-safety brake |
+| `admin:backups` | Backup status, files and runs |
+| `admin:restore` | `POST /api/admin/restore` |
+| `admin:export` | `GET /api/admin/export` |
 
-### 2. API Keys (Programmatic Access)
+Admin scopes are held only by admin keys and the `ADMIN_USER_ID` session. A missing
+scope answers `403 insufficient_scope`; a session-only route answers `403 session_required`.
 
-Create API keys via the `/api/auth/apikeys` endpoint (requires Clerk session), then include in requests:
+### Caveats
 
-**Option A: Authorization Header**
-```http
-Authorization: ApiKey hb_abcd1234...
-```
+Optional limits on a key or app grant. They can be tightened later, never loosened.
 
-**Option B: X-API-Key Header**
-```http
-X-API-Key: hb_abcd1234...
-```
+| Caveat | Limits |
+|---|---|
+| `monthly_spend_limit_cents` | Total spent through the credential per month: uploads, extensions, rate-limit purchases and download leases. Required for apps that hold a spending scope. |
+| `max_retention_months` | Retention one upload or extension may buy (apps publish at the lower of this and your default) |
+| `max_upload_bytes` | Largest upload |
+| `content_types` | Media types an upload may declare |
+| `cids` | The only content the credential may extend, delete, buy rate limits for, sign or download |
+| `expires_at` | (App grants) when the grant stops working; keys use their own `expires_at` |
 
-**API Key Format:**
-- Current: `hb2_<base64url-route>.<43-character-secret>.<22-character-HMAC-tag>`
-- Legacy formats: `hb_<32-alphanumeric-characters>`, `hb_live_*` and `hb_test_*`
-- New keys route directly to UserProfile; the signed route contains user and key IDs.
+A request outside a caveat answers `403 caveat_violation` naming the caveat; spending past
+the monthly limit answers `400 spending_limit_exceeded`.
 
-**Constraints:**
-- Maximum 25 API keys per user
-- Maximum expiration: 5 years from creation
-- Keys can be revoked at any time
+### API keys
+
+Format: `hbk_<route>.<random>.<tag>`. The signed route names the account and key, so no
+lookup table is needed; HashBin stores only the key's SHA-256 hash and shows the key
+once. Keys need at least one scope, last 90 days by default and at most a year, and
+number at most 25 active per account. Keys from before scopes existed (`hb_…`, `hb2_…`)
+are revoked.
+
+### App tokens (OAuth)
+
+Authorization code with PKCE (S256). The consent page lets the user uncheck any requested
+scope and set a spending limit, retention cap and expiry; the app's `spending_limit`
+(US dollars) and `max_retention_months` parameters are ceilings. Each approval is its own
+grant. Codes are single-use; access tokens last an hour; refresh tokens rotate and last 30
+days. `POST /oauth/token` accepts `scope` to get an access token with fewer of the granted
+scopes. Apps are public clients: there is no client secret.
+
+### Admin keys
+
+Format: `hba_<route>.<random>.<tag>`. Issued, listed and revoked only by the
+`ADMIN_USER_ID` session (`POST|GET /api/admin/keys`, `DELETE /api/admin/keys/{key_id}`, or
+`/admin/keys.html`), each with chosen admin scopes and an expiry of 1–90 days. They stop
+working if `ADMIN_USER_ID` changes. The legacy `X-Admin-Token` header still holds every
+admin scope until it is retired.
+
+All key and download-token tags use separate keys derived from `DOWNLOAD_TOKEN_SECRET`, so
+one kind of credential can never verify as another.
 
 ## Rate Limits
 
@@ -62,8 +105,8 @@ Rate limits are enforced per authentication context:
 | Authentication | Limit |
 |----------------|-------|
 | Anonymous | 100 requests/minute |
-| Authenticated User | 1,000 requests/minute |
-| Per API Key | 500 requests/minute (within user limit) |
+| Signed-in session | 1,000 requests/minute |
+| Per API key, app grant or admin key | 500 requests/minute |
 
 The content download host (`256t.us`) separately allows 30 requests per IP per
 minute for anonymous or exhausted identities. Confirmed funded content requests bypass this limit; see Funded downloads below. An HTTP 429 means the request was throttled, not that the content is
@@ -96,6 +139,10 @@ Content-Type: application/json
 | `AUTH_ENV_MISMATCH` | Test key in prod or vice versa | 401 |
 | `AUTH_RATE_LIMITED` | Rate limit exceeded | 429 |
 | `AUTH_KEY_LIMIT` | Maximum API keys reached (25) | 400 |
+| `insufficient_scope` | The credential lacks the route's scope | 403 |
+| `session_required` | The route is for the account's own sign-in only | 403 |
+| `caveat_violation` | The request is outside one of the credential's caveats | 403 |
+| `spending_limit_exceeded` | The key's or app's monthly spending limit would be passed | 400 |
 
 ### Error Response Format
 
@@ -282,7 +329,7 @@ After linking a provider via Clerk's frontend, the `user.updated` webhook will a
 
 ### API Key Management
 
-These endpoints manage API keys for programmatic access.
+These endpoints manage API keys. They are session-only.
 
 ---
 
@@ -290,95 +337,48 @@ These endpoints manage API keys for programmatic access.
 
 Create a new API key.
 
-**Authentication:** Required (Clerk session only, not API key)
-
 **Request Body:**
 ```json
 {
-  "name": "Production API Key",
-  "expires_at": "2031-01-14T00:00:00.000Z"
+  "name": "Publisher",
+  "scopes": ["content:write"],
+  "caveats": { "max_upload_bytes": 1048576, "max_retention_months": 12, "monthly_spend_limit_cents": 200 },
+  "expires_at": "2027-01-27T00:00:00.000Z"
 }
 ```
 
 **Parameters:**
-- `name` (required): Human-readable name for the key (max 255 characters)
-- `expires_at` (optional): ISO 8601 timestamp, max 5 years from now. Defaults to 5 years if omitted.
+- `scopes` (required): at least one user scope
+- `caveats` (optional): see Caveats
+- `name` (optional): defaults to "Key", then "Key 2", "Key 3"…
+- `expires_at` (optional): at most a year ahead; defaults to 90 days
+- `download_budget` (optional): `{daily_cap_cents, monthly_cap_cents}` for `downloads:spend`
 
-**Response:**
-```json
-{
-  "key_id": "key_abc123",
-  "api_key": "hb_abcd1234efgh5678ijkl9012mnop3456",
-  "name": "Hosting",
-  "created_at": "2026-01-14T00:00:00.000Z",
-  "expires_at": "2031-01-14T00:00:00.000Z"
-}
-```
+**Response (201):** the key's metadata (`key_id`, `name`, `scopes`, `caveats`, `created_at`,
+`expires_at`) and `api_key`, which is shown only here.
 
-**⚠️ Important:** The `api_key` value is only shown once. Store it securely.
-
-**Note:** If no name is provided, the system defaults to "Hosting" for the first key, or "Hosting n" (where n >= 2) for subsequent keys.
-
-**Error Responses:**
-- `400` - Invalid key name or expiration
-- `400 AUTH_KEY_LIMIT` - Maximum 25 keys reached
-- `401 AUTH_MISSING` - No authentication provided
-- `403` - API keys cannot create other API keys
+**Error Responses:** `400` for invalid scopes, caveats, name or expiration, or `AUTH_KEY_LIMIT`.
 
 ---
 
 #### GET /api/auth/apikeys
 
-List all API keys for the authenticated user.
+List the account's keys with `scopes`, `caveats`, `last_used_at`, `usage_count` and `revoked`.
+Key values and hashes are never returned.
 
-**Authentication:** Required (Clerk session only, not API key)
+---
 
-**Response:**
-```json
-[
-  {
-    "key_id": "key_abc123",
-    "name": "Production API Key",
-    "created_at": "2026-01-14T00:00:00.000Z",
-    "expires_at": "2031-01-14T00:00:00.000Z",
-    "last_used_at": "2026-01-14T03:00:00.000Z",
-    "revoked_at": null
-  },
-  {
-    "key_id": "key_xyz789",
-    "name": "Development Key",
-    "created_at": "2026-01-13T00:00:00.000Z",
-    "expires_at": "2031-01-13T00:00:00.000Z",
-    "last_used_at": null,
-    "revoked_at": "2026-01-14T00:00:00.000Z"
-  }
-]
-```
+#### PATCH /api/auth/apikeys/{key_id}
 
-**Note:** The actual API key value is never returned. Only metadata is provided.
+Rename a key or narrow it: `{ "name"?, "scopes"?, "caveats"? }`. Scopes may only be removed
+(`400 SCOPE_WIDENING` otherwise) and caveats only tightened (`400 CAVEAT_WIDENING`). A Clerk
+session must be under 5 minutes old (`403 FRESH_AUTH_REQUIRED`).
 
 ---
 
 #### DELETE /api/auth/apikeys/{key_id}
 
-Revoke an API key.
-
-**Authentication:** Required (Clerk session only)
-
-**Path Parameters:**
-- `key_id`: The key ID to revoke
-
-**Response:**
-```json
-{
-  "success": true,
-  "message": "API key revoked successfully"
-}
-```
-
-**Error Responses:**
-- `404` - Key not found or belongs to another user
-- `400` - Key already revoked
+Revoke an API key. Revoking an already revoked key succeeds.
 
 ---
 
@@ -523,10 +523,9 @@ Download content (public, no cookies). Returns 451 for disputed content and 404 
 
 ## Developer App Endpoints
 
-Manage OAuth apps for third-party publishing (see `/developers`). Require a signed-in session or API
-key; OAuth access tokens are refused.
+Manage OAuth apps for third-party publishing (see `/developers`). Session-only.
 
-- `POST /api/developers/apps`: register `{app_name, redirect_uris[]}` and get `client_id` (the response also has a `client_secret`, which nothing checks: every app uses PKCE)
+- `POST /api/developers/apps`: register `{app_name, redirect_uris[]}` and get `client_id` (apps are public PKCE clients, with no secret)
 - `GET /api/developers/apps`: your apps
 - `PATCH /api/developers/apps/{app_id}`: change `app_name`, `redirect_uris`, `logo_url`, or `website_url`
 - `DELETE /api/developers/apps/{app_id}`: delete the app. Users can't authorize it anymore, refresh
@@ -535,6 +534,12 @@ key; OAuth access tokens are refused.
 Redirect URIs must be `https://` (or `http://localhost` / `http://127.0.0.1` for development), or a native app scheme named after a reversed domain such as `org.example.app://oauth` (RFC 8252), and have no fragment; at most 10.
 App names are 1–100 characters. Apps you don't own answer 404.
 
+App authorizations (session-only):
+
+- `GET /api/account/authorizations`: each grant with its app, `scopes`, `caveats` and `created_at`
+- `PATCH /api/account/authorizations/{grant_id}`: `{ "scopes"?, "caveats"? }`, narrowing only
+- `DELETE /api/account/authorizations/{grant_id}`: revoke one grant (an app ID revokes all of that app's grants)
+
 ---
 
 ## Examples
@@ -542,28 +547,22 @@ App names are 1–100 characters. Apps you don't own answer 404.
 ### Example: Creating an API Key
 
 ```bash
-# First, obtain a Clerk session token via OAuth (use Clerk frontend SDK)
-# Then create an API key:
-
+# With a Clerk session token from the signed-in web app:
 curl -X POST https://hashbin.org/api/auth/apikeys \
   -H "Authorization: Bearer <clerk-jwt-token>" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "My Application",
-    "expires_at": "2029-01-14T00:00:00.000Z"
-  }'
+  -d '{"name": "Publisher", "scopes": ["content:write"], "caveats": {"monthly_spend_limit_cents": 200}}'
 ```
 
 ### Example: Using an API Key
 
 ```bash
-# List your API keys
-curl -X GET https://hashbin.org/api/auth/apikeys \
-  -H "X-API-Key: hb_abcd1234efgh5678ijkl9012mnop3456"
+# Publish within the key's scope
+curl -X POST "https://hashbin.org/api/content?retention_months=12" \
+  -H "X-API-Key: hbk_..." -H "Content-Type: text/plain" --data-binary @notes.txt
 
-# Get session info
-curl -X GET https://hashbin.org/api/auth/session \
-  -H "Authorization: ApiKey hb_abcd1234efgh5678ijkl9012mnop3456"
+# Anything else is refused (403 insufficient_scope or session_required)
+curl https://hashbin.org/api/balance -H "Authorization: ApiKey hbk_..."
 ```
 
 ### Example: Checking Health
@@ -668,15 +667,15 @@ from the minting key/grant and stop working when it is revoked. A valid credenti
 whose budget cannot cover the request falls back to anonymous limits with
 `X-Budget: exhausted`.
 
-New API keys use `hb2_<route>.<random-secret>.<HMAC-tag>`. The route contains the
-account and key IDs. `POST /api/auth/apikeys` accepts optional `download_budget`
-with daily/monthly caps. Old `hb_` keys continue working on plain CID paths; rotate
-them to use the funded `/a/` path. Configure `DOWNLOAD_TOKEN_SECRET` before creating
-new keys. It must match across both Workers; changing it invalidates existing v2
-keys, signed links, and download sessions.
+API keys (`hbk_…`) need the `downloads:spend` scope to fund downloads, and
+`POST /api/auth/apikeys` accepts optional `download_budget` with daily/monthly caps. A
+key's or grant's `cids` caveat limits which content it may fund, and its monthly
+spending limit applies to download leases too. Configure `DOWNLOAD_TOKEN_SECRET` before
+creating keys. It must match across both Workers; changing it invalidates existing keys,
+signed links, and download sessions.
 
 - Header identity: `GET https://256t.us/a/<cid>[.ext]` with
-  `Authorization: ApiKey hb2_...`, `X-API-Key: hb2_...`, or
+  `Authorization: ApiKey hbk_...`, `X-API-Key: hbk_...`, or
   `Authorization: Bearer <OAuth-access-token>` with `downloads:spend`.
 - Signed link: `GET https://256t.us/s/<token>/<cid>[.ext]`. The signature binds the
   CID and spending identity. Use these for cross-site embeds.
