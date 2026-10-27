@@ -1,6 +1,7 @@
 /**
  * Admin Authentication Module
- * Provides authentication and authorization for administrative operations
+ * Validates the platform admin token. Which admin scopes a caller holds, and so
+ * which admin routes it may use, is decided in authenticate() and the route table.
  */
 
 /**
@@ -27,46 +28,6 @@ export function validateAdminToken(token, env) {
   }
 
   return mismatch === 0;
-}
-
-/**
- * Admin authentication middleware
- * Checks X-Admin-Token header and returns error response if invalid
- * @param {Request} request - HTTP request
- * @param {object} env - Environment bindings
- * @returns {Response|null} - Error response if authentication fails, null if successful
- */
-export function requireAdmin(request, env) {
-  const token = request.headers.get('X-Admin-Token');
-
-  if (!validateAdminToken(token, env)) {
-    return new Response(
-      JSON.stringify({
-        error: 'Unauthorized',
-        message: 'Valid admin token required'
-      }),
-      {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
-  }
-
-  return null; // Authentication successful
-}
-
-/**
- * Whether the caller is the platform admin: a valid X-Admin-Token, or a signed-in
- * user (request.user) whose ID matches ADMIN_USER_ID
- * @param {Request} request - HTTP request
- * @param {object} env - Environment bindings
- * @returns {boolean} - True if the caller is the admin
- */
-export function isAdminRequest(request, env) {
-  if (validateAdminToken(request.headers.get('X-Admin-Token'), env)) {
-    return true;
-  }
-  return Boolean(env.ADMIN_USER_ID && request.user?.userId === env.ADMIN_USER_ID);
 }
 
 /**

@@ -120,7 +120,7 @@ API_TEST_USER="api_key_test_user_$$"
 API_AUTH="Authorization: LocalDev $API_TEST_USER"
 
 # A-020: Create API key via LocalDev
-response=$(http_post "/api/auth/apikeys" '{"name":"test_key"}' "$API_AUTH")
+response=$(http_post "/api/auth/apikeys" '{"name":"test_key","scopes":["balance:read"]}' "$API_AUTH")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "201" "A-020: Create API key via LocalDev"
@@ -148,12 +148,24 @@ body=$(get_body "$response")
 assert_status "$status" "200" "A-022: List API keys"
 assert_contains "$body" "$key_id" "A-022: Created key appears in list"
 
-# A-023: Auth with new API key
-response=$(http_get "/api/auth/session" "Authorization: ApiKey $api_key")
+# A-023: Auth with new API key, within its scope
+response=$(http_get "/api/balance" "Authorization: ApiKey $api_key")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "200" "A-023: Auth with new API key"
-assert_json_value "$body" "auth_method" "apikey" "A-023: auth_method is apikey"
+assert_json_field "$body" "balance_cents" "A-023: Balance returned to a balance:read key"
+
+# A-023b: The key cannot go beyond its scopes or reach session-only routes
+response=$(http_get "/api/user/uploads" "Authorization: ApiKey $api_key")
+assert_status "$(get_status "$response")" "403" "A-023b: Key without uploads:read is refused"
+response=$(http_get "/api/auth/session" "Authorization: ApiKey $api_key")
+assert_status "$(get_status "$response")" "403" "A-023b: Key cannot read the account session"
+
+# A-023c: Keys must name their scopes
+response=$(http_post "/api/auth/apikeys" '{"name":"no_scopes"}' "$API_AUTH")
+assert_status "$(get_status "$response")" "400" "A-023c: Key without scopes is rejected"
+response=$(http_post "/api/auth/apikeys" '{"name":"admin_scope","scopes":["admin:stats"]}' "$API_AUTH")
+assert_status "$(get_status "$response")" "400" "A-023c: Key with an admin scope is rejected"
 
 # A-024: Revoke API key
 response=$(http_delete "/api/auth/apikeys/$key_id" "$API_AUTH")
@@ -161,7 +173,7 @@ status=$(get_status "$response")
 assert_status "$status" "200" "A-024: Revoke API key"
 
 # A-025: Revoked key is rejected
-response=$(http_get "/api/auth/session" "Authorization: ApiKey $api_key")
+response=$(http_get "/api/balance" "Authorization: ApiKey $api_key")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "401" "A-025: Revoked key is rejected"
@@ -173,7 +185,7 @@ status=$(get_status "$response")
 assert_status "$status" "200" "A-026: Revoke is idempotent"
 
 # A-027: API key creation with name
-response=$(http_post "/api/auth/apikeys" '{"name":"my_custom_key"}' "$API_AUTH")
+response=$(http_post "/api/auth/apikeys" '{"name":"my_custom_key","scopes":["balance:read"]}' "$API_AUTH")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "201" "A-027: API key creation with name"
@@ -181,7 +193,7 @@ assert_json_value "$body" "name" "my_custom_key" "A-027: Custom name is set"
 
 # A-028: API key with expiration
 future_date=$(utc_rfc3339_days_from_now 30)
-response=$(http_post "/api/auth/apikeys" "{\"name\":\"expiring_key\",\"expires_at\":\"$future_date\"}" "$API_AUTH")
+response=$(http_post "/api/auth/apikeys" "{\"name\":\"expiring_key\",\"scopes\":[\"balance:read\"],\"expires_at\":\"$future_date\"}" "$API_AUTH")
 status=$(get_status "$response")
 body=$(get_body "$response")
 assert_status "$status" "201" "A-028: API key with expiration"
@@ -193,7 +205,7 @@ info "Testing max API keys (may take a moment)..."
 keys_created=0
 max_attempts=30
 for i in $(seq 1 $max_attempts); do
-  response=$(http_post "/api/auth/apikeys" "{\"name\":\"key_$i\"}" "$API_AUTH")
+  response=$(http_post "/api/auth/apikeys" "{\"name\":\"key_$i\",\"scopes\":[\"balance:read\"]}" "$API_AUTH")
   status=$(get_status "$response")
   if [ "$status" = "400" ]; then
     body=$(get_body "$response")
@@ -205,7 +217,7 @@ for i in $(seq 1 $max_attempts); do
     keys_created=$((keys_created + 1))
     if [ $keys_created -ge 25 ]; then
       # Try one more - should fail
-      response=$(http_post "/api/auth/apikeys" "{\"name\":\"excess_key\"}" "$API_AUTH")
+      response=$(http_post "/api/auth/apikeys" "{\"name\":\"excess_key\",\"scopes\":[\"balance:read\"]}" "$API_AUTH")
       status=$(get_status "$response")
       if [ "$status" = "400" ]; then
         pass "A-029: Max API keys enforced at 25 keys"
@@ -230,10 +242,10 @@ assert_status "$status" "404" "A-030: Invalid key ID returns 404"
 # Create a new user to avoid API key limits
 X_API_USER="x_api_user_$$"
 X_API_AUTH="Authorization: LocalDev $X_API_USER"
-response=$(http_post "/api/auth/apikeys" '{"name":"x_header_test"}' "$X_API_AUTH")
+response=$(http_post "/api/auth/apikeys" '{"name":"x_header_test","scopes":["balance:read"]}' "$X_API_AUTH")
 body=$(get_body "$response")
 x_api_key=$(json_get "$body" "api_key")
-response=$(http_get "/api/auth/session" "X-API-Key: $x_api_key")
+response=$(http_get "/api/balance" "X-API-Key: $x_api_key")
 status=$(get_status "$response")
 assert_status "$status" "200" "A-031: X-API-Key header works"
 

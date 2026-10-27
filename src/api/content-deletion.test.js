@@ -121,17 +121,6 @@ describe('Content Deletion API', () => {
   });
 
   describe('DELETE /api/content/{cid}', () => {
-    it('should return 401 if user is not authenticated', async () => {
-      const request = new Request('http://localhost/api/content/test-cid', {
-        method: 'DELETE'
-      });
-
-      const response = await handleDeleteContent(request, mockEnv, 'test-cid');
-      expect(response.status).toBe(401);
-
-      const data = await response.json();
-      expect(data.error).toBe('UNAUTHORIZED');
-    });
 
     it('should allow uploader to delete their content', async () => {
       const request = new Request('http://localhost/api/content/test-cid', {
@@ -154,6 +143,7 @@ describe('Content Deletion API', () => {
         headers: { 'Content-Type': 'application/json' }
       });
       request.user = { userId: 'admin-user-123' };
+      request.auth = { authenticated: true, user: { userId: 'admin-user-123', scopes: ['admin:takedown'] } };
 
       const response = await handleDeleteContent(request, mockEnv, 'test-cid');
       expect(response.status).toBe(200);
@@ -237,34 +227,6 @@ describe('Content Deletion API', () => {
   });
 
   describe('POST /api/admin/content/{cid}/delete', () => {
-    it('should return 401 if user is not authenticated', async () => {
-      const request = new Request('http://localhost/api/admin/content/test-cid/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Violation of terms' })
-      });
-
-      const response = await handleAdminDeleteContent(request, mockEnv, 'test-cid');
-      expect(response.status).toBe(401);
-
-      const data = await response.json();
-      expect(data.error).toBe('UNAUTHORIZED');
-    });
-
-    it('should return 403 if user is not admin', async () => {
-      const request = new Request('http://localhost/api/admin/content/test-cid/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Violation of terms' })
-      });
-      request.user = { userId: 'regular-user-456' };
-
-      const response = await handleAdminDeleteContent(request, mockEnv, 'test-cid');
-      expect(response.status).toBe(403);
-
-      const data = await response.json();
-      expect(data.error).toBe('NOT_ADMIN');
-    });
 
     it('should allow admin to delete with custom reason', async () => {
       const request = new Request('http://localhost/api/admin/content/test-cid/delete', {
@@ -276,6 +238,7 @@ describe('Content Deletion API', () => {
         })
       });
       request.user = { userId: 'admin-user-123' };
+      request.auth = { authenticated: true, user: { userId: 'admin-user-123', scopes: ['admin:takedown'] } };
 
       const response = await handleAdminDeleteContent(request, mockEnv, 'test-cid');
       expect(response.status).toBe(200);
@@ -299,24 +262,13 @@ describe('Content Deletion API', () => {
       expect(data.deleted.deleted_by).toBe('admin');
       expect(data.deleted.dispute_closed).toBe(true);
     });
-
-    it('should reject an invalid X-Admin-Token', async () => {
-      mockEnv.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
-      const request = new Request('http://localhost/api/admin/content/test-cid/delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'b'.repeat(64) },
-        body: JSON.stringify({})
-      });
-
-      const response = await handleAdminDeleteContent(request, mockEnv, 'test-cid');
-      expect(response.status).toBe(401);
-    });
   });
 
   describe('repeat-infringer strikes', () => {
     it('records a strike against the uploader when an admin removes copyright-disputed content', async () => {
       const request = new Request('http://localhost/api/content/test-cid', { method: 'DELETE' });
       request.user = { userId: 'admin-user-123' };
+      request.auth = { authenticated: true, user: { userId: 'admin-user-123', scopes: ['admin:takedown'] } };
 
       expect((await handleDeleteContent(request, mockEnv, 'test-cid')).status).toBe(200);
       const strikeCall = mockEnv.ADMIN_ACTION_LOG.calls.find(c => c.path === '/strike');
@@ -336,6 +288,7 @@ describe('Content Deletion API', () => {
     it('records the deletion in the uploader history and closes the open dispute', async () => {
       const request = new Request('http://localhost/api/content/test-cid', { method: 'DELETE' });
       request.user = { userId: 'admin-user-123' };
+      request.auth = { authenticated: true, user: { userId: 'admin-user-123', scopes: ['admin:takedown'] } };
 
       const response = await handleDeleteContent(request, mockEnv, 'test-cid');
       expect(response.status).toBe(200);

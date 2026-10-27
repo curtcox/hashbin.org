@@ -3,7 +3,7 @@
  * Admin-only dispute management endpoints
  */
 
-import { adminActorId, isAdminRequest } from '../auth/admin.js';
+import { adminActorId } from '../auth/admin.js';
 import { handleDeleteContent } from './content-deletion.js';
 
 /**
@@ -12,15 +12,6 @@ import { handleDeleteContent } from './content-deletion.js';
  */
 export async function handleAdminListDisputes(request, env) {
   try {
-    // Check admin authorization
-    if (!isAdminRequest(request, env)) {
-      return new Response(JSON.stringify({ 
-        error: request.user?.userId ? 'NOT_ADMIN' : 'UNAUTHORIZED' 
-      }), {
-        status: request.user?.userId ? 403 : 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
 
     const url = new URL(request.url);
     
@@ -103,15 +94,6 @@ export async function handleAdminListDisputes(request, env) {
  */
 export async function handleAdminUpdateDispute(request, env, cid) {
   try {
-    // Check admin authorization
-    if (!isAdminRequest(request, env)) {
-      return new Response(JSON.stringify({ 
-        error: request.user?.userId ? 'NOT_ADMIN' : 'UNAUTHORIZED' 
-      }), {
-        status: request.user?.userId ? 403 : 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
 
     // Parse request body
     const data = await request.json();
@@ -274,15 +256,6 @@ export async function handleAdminUpdateDispute(request, env, cid) {
  */
 export async function handleGetAdminActions(request, env) {
   try {
-    // Check admin authorization
-    if (!isAdminRequest(request, env)) {
-      return new Response(JSON.stringify({ 
-        error: request.user?.userId ? 'NOT_ADMIN' : 'UNAUTHORIZED' 
-      }), {
-        status: request.user?.userId ? 403 : 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
 
     const url = new URL(request.url);
     
@@ -346,12 +319,6 @@ export async function getRepeatInfringers(env, min = REPEAT_INFRINGER_THRESHOLD,
  * Accounts with repeated upheld copyright removals (admin only)
  */
 export async function handleGetRepeatInfringers(request, env) {
-  if (!isAdminRequest(request, env)) {
-    return new Response(JSON.stringify({ error: request.user?.userId ? 'NOT_ADMIN' : 'UNAUTHORIZED' }), {
-      status: request.user?.userId ? 403 : 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  }
   const url = new URL(request.url);
   const min = Math.max(1, parseInt(url.searchParams.get('min') || String(REPEAT_INFRINGER_THRESHOLD)));
   const days = Math.max(1, parseInt(url.searchParams.get('days') || String(REPEAT_INFRINGER_WINDOW_DAYS)));

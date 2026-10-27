@@ -68,7 +68,7 @@ TEMP_FILES+=("$temp_keys")
 
 # Launch 3 concurrent API key creations
 for i in {1..3}; do
-  (http_post "/api/auth/apikeys" "{\"name\":\"concurrent_key_$i\"}" "$AUTH_HEADER" | get_body | json_get "api_key" >> "$temp_keys") &
+  (http_post "/api/auth/apikeys" "{\"name\":\"concurrent_key_$i\",\"scopes\":[\"content:write\"]}" "$AUTH_HEADER" | get_body | json_get "api_key" >> "$temp_keys") &
 done
 wait
 

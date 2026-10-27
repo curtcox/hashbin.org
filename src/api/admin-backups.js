@@ -4,7 +4,6 @@
  * All endpoints require X-Admin-Token. See docs/backup-and-restore.md.
  */
 
-import { requireAdmin } from '../auth/admin.js';
 import { INDEXED_BINDINGS, RESTORABLE_BINDINGS, RESTORE_PATH } from '../utils/backup.js';
 
 const RUN_ID_PATTERN = /^[0-9T-]+Z$/;
@@ -18,8 +17,6 @@ function backupIndex(env) {
  * Last completed snapshot, any run in progress, and index sizes
  */
 export async function handleGetBackupStatus(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   const index = backupIndex(env);
   const [status, counts] = await Promise.all([
@@ -34,8 +31,6 @@ export async function handleGetBackupStatus(request, env) {
  * Start a snapshot now (it also runs nightly from the cron trigger)
  */
 export async function handleRunBackup(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   return backupIndex(env).fetch(new Request('https://backup-index/snapshot/start', { method: 'POST' }));
 }
@@ -45,8 +40,6 @@ export async function handleRunBackup(request, env) {
  * List the files in one snapshot
  */
 export async function handleListBackupFiles(request, env, runId) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
   if (!RUN_ID_PATTERN.test(runId)) {
     return Response.json({ error: 'INVALID_RUN_ID' }, { status: 400 });
   }
@@ -67,8 +60,6 @@ export async function handleListBackupFiles(request, env, runId) {
  * Download one snapshot file
  */
 export async function handleGetBackupFile(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   const key = new URL(request.url).searchParams.get('key') || '';
   if (!key.startsWith('snapshots/') || key.includes('..')) {
@@ -91,8 +82,6 @@ export async function handleGetBackupFile(request, env) {
  * unless overwrite is true.
  */
 export async function handleRestoreObject(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   const { binding, name, entries, overwrite = false } = await request.json();
   if (!RESTORABLE_BINDINGS.has(binding) || !env[binding]) {

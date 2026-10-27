@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateAdminToken, requireAdmin } from '../../src/auth/admin.js';
+import { validateAdminToken } from '../../src/auth/admin.js';
 
 describe('Admin Authentication', () => {
   describe('validateAdminToken', () => {
@@ -85,65 +85,4 @@ describe('Admin Authentication', () => {
     });
   });
 
-  describe('requireAdmin', () => {
-    it('returns null for valid admin token', () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'test-token-12345'
-      };
-      const request = new Request('https://example.com', {
-        headers: {
-          'X-Admin-Token': 'test-token-12345'
-        }
-      });
-      
-      const result = requireAdmin(request, env);
-      expect(result).toBe(null);
-    });
-
-    it('returns 401 response for missing token', async () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'test-token-12345'
-      };
-      const request = new Request('https://example.com');
-      
-      const result = requireAdmin(request, env);
-      expect(result).toBeInstanceOf(Response);
-      expect(result.status).toBe(401);
-      
-      const body = await result.json();
-      expect(body.error).toBe('Unauthorized');
-    });
-
-    it('returns 401 response for invalid token', async () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'test-token-12345'
-      };
-      const request = new Request('https://example.com', {
-        headers: {
-          'X-Admin-Token': 'wrong-token'
-        }
-      });
-      
-      const result = requireAdmin(request, env);
-      expect(result).toBeInstanceOf(Response);
-      expect(result.status).toBe(401);
-      
-      const body = await result.json();
-      expect(body.error).toBe('Unauthorized');
-      expect(body.message).toContain('admin token required');
-    });
-
-    it('returns 401 when admin secret not configured', async () => {
-      const env = {};
-      const request = new Request('https://example.com', {
-        headers: {
-          'X-Admin-Token': 'any-token'
-        }
-      });
-      
-      const result = requireAdmin(request, env);
-      expect(result).toBeInstanceOf(Response);
-      expect(result.status).toBe(401);
-    });
-  });
 });

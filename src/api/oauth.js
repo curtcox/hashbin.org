@@ -1,5 +1,4 @@
 import { authenticate, requireAuth } from '../auth/middleware.js';
-import { isOAuthAuth, oauthNotAllowedResponse } from '../auth/oauth-access.js';
 import {
   createPkceChallenge,
   generateOAuthSecret,
@@ -228,7 +227,6 @@ export async function handleCreateDeveloperApp(request, env) {
   const authResult = await authenticate(request, env);
   const authError = requireAuth(authResult);
   if (authError) return authError;
-  if (isOAuthAuth(authResult)) return oauthNotAllowedResponse();
 
   const data = await request.json();
   const registryId = env.APPLICATION_REGISTRY.idFromName('global');
@@ -247,7 +245,6 @@ export async function handleListDeveloperApps(request, env) {
   const authResult = await authenticate(request, env);
   const authError = requireAuth(authResult);
   if (authError) return authError;
-  if (isOAuthAuth(authResult)) return oauthNotAllowedResponse();
 
   const registryId = env.APPLICATION_REGISTRY.idFromName('global');
   const registryStub = env.APPLICATION_REGISTRY.get(registryId);
@@ -258,7 +255,6 @@ export async function handleUpdateDeveloperApp(request, env, appId) {
   const authResult = await authenticate(request, env);
   const authError = requireAuth(authResult);
   if (authError) return authError;
-  if (isOAuthAuth(authResult)) return oauthNotAllowedResponse();
 
   const data = await request.json();
   const registryStub = env.APPLICATION_REGISTRY.get(env.APPLICATION_REGISTRY.idFromName('global'));
@@ -273,7 +269,6 @@ export async function handleDeleteDeveloperApp(request, env, appId) {
   const authResult = await authenticate(request, env);
   const authError = requireAuth(authResult);
   if (authError) return authError;
-  if (isOAuthAuth(authResult)) return oauthNotAllowedResponse();
 
   const registryStub = env.APPLICATION_REGISTRY.get(env.APPLICATION_REGISTRY.idFromName('global'));
   return registryStub.fetch(new Request(

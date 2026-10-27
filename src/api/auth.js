@@ -6,6 +6,7 @@
 import { generateDownloadApiKey } from '../auth/download-tokens.js';
 import { validDownloadCaps } from '../utils/download-budget.js';
 import { authenticate, requireAuth } from '../auth/middleware.js';
+import { ALL_USER_SCOPES, parseScopes } from '../auth/scopes.js';
 import { hashApiKey, generateKeyId, validateKeyName, validateExpiration, encryptApiKey, decryptApiKey, isSessionFresh } from '../auth/utils.js';
 import { createClerkClient } from '@clerk/backend';
 
@@ -350,6 +351,15 @@ export async function handleCreateApiKey(request, env) {
     );
   }
 
+  // Scopes: required, and only ever the user scopes
+  const scopes = parseScopes(body.scopes, 'key');
+  if (!scopes || scopes.length === 0) {
+    return Response.json({
+      error: 'Invalid scopes',
+      message: `scopes must be a non-empty list drawn from: ${ALL_USER_SCOPES.join(', ')}`
+    }, { status: 400 });
+  }
+
   // Validate expiration
   const expirationValidation = validateExpiration(body.expires_at);
   if (!expirationValidation.valid) {
@@ -401,6 +411,7 @@ export async function handleCreateApiKey(request, env) {
         key_encrypted: keyEncrypted,
         download_budget: body.download_budget,
         name: keyName,
+        scopes,
         expires_at: expirationValidation.expiresAt
       })
     })

@@ -139,30 +139,6 @@ describe('Admin Disputes API', () => {
   });
 
   describe('GET /api/admin/disputes', () => {
-    it('should return 401 if user is not authenticated', async () => {
-      const request = new Request('http://localhost/api/admin/disputes', {
-        method: 'GET'
-      });
-
-      const response = await handleAdminListDisputes(request, mockEnv);
-      expect(response.status).toBe(401);
-
-      const data = await response.json();
-      expect(data.error).toBe('UNAUTHORIZED');
-    });
-
-    it('should return 403 if user is not admin', async () => {
-      const request = new Request('http://localhost/api/admin/disputes', {
-        method: 'GET'
-      });
-      request.user = { userId: 'regular-user-456' };
-
-      const response = await handleAdminListDisputes(request, mockEnv);
-      expect(response.status).toBe(403);
-
-      const data = await response.json();
-      expect(data.error).toBe('NOT_ADMIN');
-    });
 
     it('should return all disputes with full details for admin', async () => {
       const request = new Request('http://localhost/api/admin/disputes', {
@@ -209,40 +185,6 @@ describe('Admin Disputes API', () => {
   });
 
   describe('PATCH /api/admin/disputes/{cid}', () => {
-    it('should return 401 if user is not authenticated', async () => {
-      const request = new Request('http://localhost/api/admin/disputes/test-cid', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          status: 'closed_denied',
-          resolution_reason: 'Insufficient evidence'
-        })
-      });
-
-      const response = await handleAdminUpdateDispute(request, mockEnv, 'test-cid');
-      expect(response.status).toBe(401);
-
-      const data = await response.json();
-      expect(data.error).toBe('UNAUTHORIZED');
-    });
-
-    it('should return 403 if user is not admin', async () => {
-      const request = new Request('http://localhost/api/admin/disputes/test-cid', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          status: 'closed_denied',
-          resolution_reason: 'Insufficient evidence'
-        })
-      });
-      request.user = { userId: 'regular-user-456' };
-
-      const response = await handleAdminUpdateDispute(request, mockEnv, 'test-cid');
-      expect(response.status).toBe(403);
-
-      const data = await response.json();
-      expect(data.error).toBe('NOT_ADMIN');
-    });
 
     it('should update dispute status with valid data', async () => {
       const request = new Request('http://localhost/api/admin/disputes/test-cid', {
@@ -358,30 +300,6 @@ describe('Admin Disputes API', () => {
   });
 
   describe('GET /api/admin/actions', () => {
-    it('should return 401 if user is not authenticated', async () => {
-      const request = new Request('http://localhost/api/admin/actions', {
-        method: 'GET'
-      });
-
-      const response = await handleGetAdminActions(request, mockEnv);
-      expect(response.status).toBe(401);
-
-      const data = await response.json();
-      expect(data.error).toBe('UNAUTHORIZED');
-    });
-
-    it('should return 403 if user is not admin', async () => {
-      const request = new Request('http://localhost/api/admin/actions', {
-        method: 'GET'
-      });
-      request.user = { userId: 'regular-user-456' };
-
-      const response = await handleGetAdminActions(request, mockEnv);
-      expect(response.status).toBe(403);
-
-      const data = await response.json();
-      expect(data.error).toBe('NOT_ADMIN');
-    });
 
     it('should return admin action log for admin', async () => {
       const request = new Request('http://localhost/api/admin/actions', {

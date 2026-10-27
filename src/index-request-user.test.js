@@ -31,21 +31,21 @@ describe('request.user wiring', () => {
   it('lets a signed-in user reach the deletion handler', async () => {
     authenticateMock.mockResolvedValue({
       authenticated: true,
-      user: { userId: 'user_1', authMethod: 'clerk' }
+      user: { userId: 'user_1', authMethod: 'clerk', session: true, scopes: ['content:delete'] }
     });
 
     const response = await worker.fetch(deleteRequest(), env, {});
     expect(response.status).toBe(404);
   });
 
-  it('does not give OAuth tokens deletion rights', async () => {
+  it('does not give a credential without content:delete deletion rights', async () => {
     authenticateMock.mockResolvedValue({
       authenticated: true,
-      user: { userId: 'user_1', authMethod: 'oauth', oauth: { scopes: ['content:write'] } }
+      user: { userId: 'user_1', authMethod: 'oauth', session: false, scopes: ['content:write'], oauth: { scopes: ['content:write'] } }
     });
 
     const response = await worker.fetch(deleteRequest(), env, {});
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(403);
   });
 
   it('rejects anonymous callers', async () => {

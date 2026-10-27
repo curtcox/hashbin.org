@@ -4,7 +4,6 @@
  */
 
 import { authenticate } from '../auth/middleware.js';
-import { hasOAuthScope, insufficientScopeResponse, isOAuthAuth, oauthNotAllowedResponse } from '../auth/oauth-access.js';
 
 /**
  * GET /api/balance
@@ -24,10 +23,6 @@ export async function handleGetBalance(request, env) {
         headers: { 'content-type': 'application/json' }
       }
     );
-  }
-
-  if (isOAuthAuth(authResult) && !hasOAuthScope(authResult, 'balance:read')) {
-    return insufficientScopeResponse('balance:read');
   }
 
   try {
@@ -83,10 +78,6 @@ export async function handleGetBalanceHistory(request, env) {
         headers: { 'content-type': 'application/json' }
       }
     );
-  }
-
-  if (isOAuthAuth(authResult)) {
-    return oauthNotAllowedResponse();
   }
 
   try {

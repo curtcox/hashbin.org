@@ -3,13 +3,10 @@
  * Endpoints for system management and monitoring
  */
 
-import { requireAdmin } from '../auth/admin.js';
 import { deliverAlert } from '../durable-objects/alert-store.js';
 import { COST_POLICY } from '../utils/cost-policy.js';
 
 export async function handleCostSafety(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
   const stub = env.INFRASTRUCTURE_COST.get(env.INFRASTRUCTURE_COST.idFromName('global'));
   const url = new URL(request.url);
   if (url.pathname.endsWith('/history') && request.method === 'GET') {
@@ -32,8 +29,6 @@ export async function handleCostSafety(request, env) {
  * GET /api/admin/stats
  */
 export async function handleGetStats(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     // Get PlatformStats Durable Object
@@ -70,8 +65,6 @@ export async function handleGetStats(request, env) {
  * GET /api/admin/stats/financial
  */
 export async function handleGetFinancialStats(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const statsId = env.PLATFORM_STATS.idFromName('global');
@@ -106,8 +99,6 @@ export async function handleGetFinancialStats(request, env) {
  * GET /api/admin/stats/content
  */
 export async function handleGetContentStats(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const statsId = env.PLATFORM_STATS.idFromName('global');
@@ -142,8 +133,6 @@ export async function handleGetContentStats(request, env) {
  * GET /api/admin/stats/users
  */
 export async function handleGetUserStats(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const statsId = env.PLATFORM_STATS.idFromName('global');
@@ -178,8 +167,6 @@ export async function handleGetUserStats(request, env) {
  * GET /api/admin/health
  */
 export async function handleGetAdminHealth(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const startTime = Date.now();
@@ -265,8 +252,6 @@ export async function handleGetAdminHealth(request, env) {
  * GET /api/admin/alerts
  */
 export async function handleGetAlerts(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const url = new URL(request.url);
@@ -307,8 +292,6 @@ export async function handleGetAlerts(request, env) {
  * POST /api/admin/alerts/:id/acknowledge
  */
 export async function handleAcknowledgeAlert(request, env, alertId) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const alertStoreId = env.ALERT_STORE.idFromName('global');
@@ -350,8 +333,6 @@ export async function handleAcknowledgeAlert(request, env, alertId) {
  * GET /api/admin/audit-log
  */
 export async function handleGetAuditLog(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const url = new URL(request.url);
@@ -390,8 +371,6 @@ export async function handleGetAuditLog(request, env) {
  * GET /api/admin/export?type=transactions|users|content|audit
  */
 export async function handleExportData(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const url = new URL(request.url);
@@ -591,8 +570,6 @@ async function logAuditEntry(env, entry) {
  * GET /api/admin/costs
  */
 export async function handleGetCosts(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const url = new URL(request.url);
@@ -634,8 +611,6 @@ export async function handleGetCosts(request, env) {
  * GET /api/admin/costs/by-service
  */
 export async function handleGetCostsByService(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const url = new URL(request.url);
@@ -675,8 +650,6 @@ export async function handleGetCostsByService(request, env) {
  * GET /api/admin/profitability
  */
 export async function handleGetProfitability(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const url = new URL(request.url);
@@ -746,8 +719,6 @@ export async function handleGetProfitability(request, env) {
  * POST /api/admin/costs/record
  */
 export async function handleRecordCost(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   try {
     const data = await request.json();
@@ -787,8 +758,6 @@ export async function handleRecordCost(request, env) {
  * POST /api/admin/alerts/test
  */
 export async function handleTestAlertWebhook(request, env) {
-  const authError = requireAdmin(request, env);
-  if (authError) return authError;
 
   if (!env.ALERT_WEBHOOK_URL) {
     return Response.json({ delivered: false, error: 'ALERT_WEBHOOK_URL is not configured' }, { status: 400 });

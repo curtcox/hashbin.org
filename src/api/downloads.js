@@ -14,11 +14,9 @@ async function routeDownloads(request, env) {
   const url = new URL(request.url), path = url.pathname, method = request.method;
   const auth = await authenticate(request, env);
   const error = requireAuth(auth); if (error) return error;
+  // Access (session-only management, downloads:spend for signing) is declared in the route table.
   const user = auth.user;
-  const owner = user.authMethod === 'clerk' || (env.ENVIRONMENT === 'local' && user.authMethod === 'local');
   const minting = path === '/api/downloads/sign';
-  if (!owner && !minting) return json({ error: 'Account session required to manage download budgets' }, 403);
-  if (user.authMethod === 'oauth' && !user.oauth.scopes.includes('downloads:spend')) return json({ error: 'insufficient_scope' }, 403);
   const stub = env.USER_PROFILES.get(env.USER_PROFILES.idFromName(user.userId));
   const call = (route, verb = method, data) => stub.fetch(new Request(`https://internal${route}`, { method: verb,
     ...(data === undefined ? {} : { body: JSON.stringify(data) }) }));

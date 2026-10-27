@@ -144,9 +144,9 @@ import {
   handleRevokeAuthorization
 } from './api/oauth.js';
 
-import { applyRateLimit, authenticate } from './auth/middleware.js';
+import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js';
 import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
-import { isOAuthAuth } from './auth/oauth-access.js';
+import { PUBLIC, SESSION, checkAccess, isSessionAuth } from './auth/scopes.js';
 import { handleClerkWebhook } from './api/clerk-webhook.js';
 
 // Configuration constants
@@ -193,12 +193,6 @@ export default {
     const authResult = await authenticate(request, env);
     const rateLimitError = applyRateLimit(request, authResult);
     if (rateLimitError) return rateLimitError;
-
-    // Handlers for deletion and dispute moderation read the caller from request.user.
-    // OAuth tokens are publish-only, so they never get user-level powers here.
-    if (authResult.authenticated && !isOAuthAuth(authResult)) {
-      request.user = authResult.user;
-    }
 
     // API and OAuth routes
     if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/oauth/') || url.pathname === '/health') {
@@ -639,369 +633,147 @@ async function fetchAssetPage(env, request, url, assetPath) {
 }
 
 /**
- * Handle API routes
+ * API route table. Every route declares its access: PUBLIC, SESSION (the account's
+ * own sign-in only), or the scope(s) a delegated credential needs, any one of which
+ * suffices. The dispatcher enforces it before the handler runs; a test fails for any
+ * route without a valid declaration.
  */
-function handleApiRoutes(url, request, env) {
-  if (url.pathname.startsWith('/api/downloads/') || /^\/api\/(auth\/apikeys|oauth\/grants)\/[^/]+\/download-budget$/.test(url.pathname)) return handleDownloads(request, env);
-  // Basic routing
-  if (url.pathname === '/health') {
-    return handleHealth(env);
-  }
+const API_ROUTES = [
+  // Downloads (budgets and sessions belong to the account; signing spends)
+  { method: ['GET', 'PUT'], path: '/api/downloads/budget', access: SESSION, handler: handleDownloads },
+  { method: 'PUT', path: /^\/api\/(auth\/apikeys|oauth\/grants)\/[^/]+\/download-budget$/, access: SESSION, handler: handleDownloads },
+  { method: ['GET', 'DELETE'], path: '/api/downloads/sessions', access: SESSION, handler: handleDownloads },
+  { method: 'POST', path: '/api/downloads/session', access: SESSION, handler: handleDownloads },
+  { method: 'POST', path: '/api/downloads/sign', access: 'downloads:spend', handler: handleDownloads },
 
-  // Public config endpoint (serves non-secret configuration to frontend)
-  if (url.pathname === '/api/config' && request.method === 'GET') {
-    return handleConfig(env);
-  }
+  { method: ['GET', 'HEAD'], path: '/health', access: PUBLIC, handler: (request, env) => handleHealth(env) },
+  { method: 'GET', path: '/api/config', access: PUBLIC, handler: (request, env) => handleConfig(env) },
 
-  // Authentication API routes
-  if (url.pathname === '/api/auth/callback' && request.method === 'POST') {
-    return handleAuthCallback(request, env);
-  }
+  // Account and credentials
+  { method: 'POST', path: '/api/auth/callback', access: PUBLIC, handler: handleAuthCallback },
+  { method: 'GET', path: '/api/auth/session', access: SESSION, handler: handleSessionInfo },
+  { method: 'POST', path: '/api/auth/logout', access: SESSION, handler: handleLogout },
+  { method: 'POST', path: '/api/auth/link', access: SESSION, handler: handleLinkProvider },
+  { method: 'POST', path: '/api/auth/apikeys', access: SESSION, handler: handleCreateApiKey },
+  { method: 'GET', path: '/api/auth/apikeys', access: SESSION, handler: handleListApiKeys },
+  { method: 'DELETE', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeApiKey(request, env, m[1]) },
+  { method: 'POST', path: /^\/api\/auth\/apikeys\/([^/]+)\/reveal$/, access: SESSION, handler: (request, env, m) => handleRevealApiKey(request, env, m[1]) },
+  { method: 'PATCH', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateApiKey(request, env, m[1]) },
+  { method: 'DELETE', path: '/api/auth/account', access: SESSION, handler: handleDeleteAccount },
+  { method: 'POST', path: '/api/developers/apps', access: SESSION, handler: handleCreateDeveloperApp },
+  { method: 'GET', path: '/api/developers/apps', access: SESSION, handler: handleListDeveloperApps },
+  { method: 'PATCH', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateDeveloperApp(request, env, m[1]) },
+  { method: 'DELETE', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleDeleteDeveloperApp(request, env, m[1]) },
+  { method: 'POST', path: '/oauth/authorize', access: SESSION, handler: handleOAuthAuthorize },
+  { method: 'GET', path: '/oauth/authorize', access: PUBLIC, handler: handleGetOAuthAuthorizePage },
+  { method: 'POST', path: '/oauth/token', access: PUBLIC, handler: handleOAuthToken },
+  { method: 'POST', path: '/oauth/revoke', access: PUBLIC, handler: handleOAuthRevoke },
+  { method: 'GET', path: '/api/account/settings', access: SESSION, handler: handleGetAccountSettings },
+  { method: 'PATCH', path: '/api/account/settings', access: SESSION, handler: handleUpdateAccountSettings },
+  { method: 'GET', path: '/api/account/authorizations', access: SESSION, handler: handleListAuthorizations },
+  { method: 'DELETE', path: /^\/api\/account\/authorizations\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeAuthorization(request, env, m[1]) },
 
-  if (url.pathname === '/api/auth/session' && request.method === 'GET') {
-    return handleSessionInfo(request, env);
-  }
+  // Balance and payments
+  { method: 'GET', path: '/api/balance', access: 'balance:read', handler: handleGetBalance },
+  { method: 'GET', path: '/api/balance/history', access: 'transactions:read', handler: handleGetBalanceHistory },
+  { method: 'POST', path: '/api/balance/deposit', access: SESSION, handler: handleCreateDeposit },
+  { method: 'POST', path: '/api/balance/dev-deposit', access: SESSION, handler: handleLocalDevDeposit },
+  { method: 'POST', path: '/api/payments/calculate', access: PUBLIC, handler: handleCalculateRetention },
 
-  if (url.pathname === '/api/auth/logout' && request.method === 'POST') {
-    return handleLogout(request, env);
-  }
+  // Content
+  { method: 'POST', path: '/api/content', access: 'content:write', handler: handleUploadContent },
+  { method: 'POST', path: '/api/content/rate-limit/purchase', access: 'ratelimit:purchase', handler: handlePurchaseRateLimit },
+  { method: 'GET', path: /^\/api\/content\/([^/]+)\/exists$/, access: PUBLIC, handler: (request, env, m) => handleCheckContentExists(request, env, m[1]) },
+  { method: 'GET', path: /^\/api\/content\/([^/]+)\/rate-limit$/, access: PUBLIC, handler: (request, env, m) => handleGetRateLimit(request, env, m[1]) },
+  { method: 'GET', path: /^\/api\/content\/([^/]+)\/disputes$/, access: PUBLIC, handler: (request, env, m) => handleGetContentDisputes(request, env, m[1], request.user?.userId || null) },
+  { method: 'GET', path: /^\/api\/content\/([^/]+)\/suppliers$/, access: PUBLIC, handler: (request, env, m) => handleGetCIDSuppliers(request, env, m[1]) },
+  { method: 'GET', path: /^\/api\/content\/([^/]+)$/, access: PUBLIC, handler: (request, env, m) => handleGetContent(request, env, m[1]) },
+  { method: 'POST', path: /^\/api\/content\/([^/]+)\/extend$/, access: 'content:extend', handler: (request, env, m) => handleExtendContent(request, env, m[1]) },
+  { method: 'DELETE', path: /^\/api\/content\/([^/]+)$/, access: ['content:delete', 'admin:takedown'], handler: (request, env, m) => handleDeleteContent(request, env, m[1]) },
+  { method: 'POST', path: /^\/api\/donate\/cid\/([^/]+)$/, access: PUBLIC, handler: (request, env, m) => handleCreateDonation(request, env, m[1]) },
+  { method: 'GET', path: '/api/user/uploads', access: 'uploads:read', handler: handleGetUserUploads },
 
-  if (url.pathname === '/api/auth/link' && request.method === 'POST') {
-    return handleLinkProvider(request, env);
-  }
+  // Disputes (public; signed-in users see contact details)
+  { method: 'POST', path: '/api/disputes', access: PUBLIC, handler: handleCreateDispute },
+  { method: 'GET', path: '/api/disputes', access: PUBLIC, handler: handleListDisputes },
+  { method: 'GET', path: /^\/api\/disputes\/([^/]+)$/, access: PUBLIC, handler: (request, env, m) => handleGetDispute(request, env, m[1], request.user?.userId || null) },
 
-  if (url.pathname === '/api/auth/apikeys' && request.method === 'POST') {
-    return handleCreateApiKey(request, env);
-  }
+  // Suppliers
+  { method: 'POST', path: '/api/suppliers', access: 'suppliers:write', handler: handleCreateSupplier },
+  { method: 'GET', path: '/api/suppliers', access: 'suppliers:read', handler: handleListSuppliers },
+  { method: 'GET', path: /^\/api\/suppliers\/([^/]+)$/, access: PUBLIC, handler: (request, env, m) => handleGetSupplier(request, env, m[1]) },
+  { method: 'DELETE', path: /^\/api\/suppliers\/([^/]+)$/, access: 'suppliers:write', handler: (request, env, m) => handleDeleteSupplier(request, env, m[1]) },
+  { method: 'PATCH', path: /^\/api\/suppliers\/([^/]+)$/, access: 'suppliers:write', handler: (request, env, m) => handleUpdateSupplier(request, env, m[1]) },
+  { method: 'POST', path: /^\/api\/suppliers\/([^/]+)\/scan$/, access: 'suppliers:write', handler: (request, env, m) => handleRescanSupplier(request, env, m[1]) },
 
-  if (url.pathname === '/api/auth/apikeys' && request.method === 'GET') {
-    return handleListApiKeys(request, env);
-  }
+  // Admin
+  { method: 'GET', path: '/api/admin/disputes', access: 'admin:disputes', handler: handleAdminListDisputes },
+  { method: 'PATCH', path: /^\/api\/admin\/disputes\/([^/]+)$/, access: 'admin:disputes', handler: (request, env, m) => handleAdminUpdateDispute(request, env, m[1]) },
+  { method: 'POST', path: /^\/api\/admin\/content\/([^/]+)\/delete$/, access: 'admin:takedown', handler: (request, env, m) => handleAdminDeleteContent(request, env, m[1]) },
+  { method: 'GET', path: '/api/admin/repeat-infringers', access: 'admin:disputes', handler: handleGetRepeatInfringers },
+  { method: 'GET', path: '/api/admin/actions', access: 'admin:disputes', handler: handleGetAdminActions },
+  { method: 'GET', path: '/api/admin/stats', access: 'admin:stats', handler: handleGetStats },
+  { method: 'GET', path: '/api/admin/stats/financial', access: 'admin:stats', handler: handleGetFinancialStats },
+  { method: 'GET', path: '/api/admin/stats/content', access: 'admin:stats', handler: handleGetContentStats },
+  { method: 'GET', path: '/api/admin/stats/users', access: 'admin:stats', handler: handleGetUserStats },
+  { method: 'GET', path: '/api/admin/health', access: 'admin:stats', handler: handleGetAdminHealth },
+  { method: 'POST', path: '/api/admin/alerts/test', access: 'admin:stats', handler: handleTestAlertWebhook },
+  { method: 'GET', path: '/api/admin/alerts', access: 'admin:stats', handler: handleGetAlerts },
+  { method: 'POST', path: /^\/api\/admin\/alerts\/([^/]+)\/acknowledge$/, access: 'admin:stats', handler: (request, env, m) => handleAcknowledgeAlert(request, env, m[1]) },
+  { method: 'GET', path: '/api/admin/audit-log', access: 'admin:stats', handler: handleGetAuditLog },
+  { method: 'GET', path: '/api/admin/export', access: 'admin:export', handler: handleExportData },
+  { method: ['GET', 'POST'], path: '/api/admin/cost-safety', access: 'admin:costs', handler: handleCostSafety },
+  { method: 'GET', path: '/api/admin/cost-safety/history', access: 'admin:costs', handler: handleCostSafety },
+  { method: 'GET', path: '/api/admin/costs', access: 'admin:costs', handler: handleGetCosts },
+  { method: 'GET', path: '/api/admin/costs/by-service', access: 'admin:costs', handler: handleGetCostsByService },
+  { method: 'POST', path: '/api/admin/costs/record', access: 'admin:costs', handler: handleRecordCost },
+  { method: 'GET', path: '/api/admin/profitability', access: 'admin:costs', handler: handleGetProfitability },
+  { method: 'GET', path: '/api/admin/backups', access: 'admin:backups', handler: handleGetBackupStatus },
+  { method: 'POST', path: '/api/admin/backups/run', access: 'admin:backups', handler: handleRunBackup },
+  { method: 'GET', path: '/api/admin/backups/file', access: 'admin:backups', handler: handleGetBackupFile },
+  { method: 'GET', path: /^\/api\/admin\/backups\/([^/]+)\/files$/, access: 'admin:backups', handler: (request, env, m) => handleListBackupFiles(request, env, m[1]) },
+  { method: 'POST', path: '/api/admin/restore', access: 'admin:restore', handler: handleRestoreObject },
 
-  if (url.pathname.startsWith('/api/auth/apikeys/') && request.method === 'DELETE') {
-    const keyId = url.pathname.split('/')[4];
-    return handleRevokeApiKey(request, env, keyId);
-  }
+  // Public deletion records (transparency)
+  { method: 'GET', path: '/api/public/deletions/stats', access: PUBLIC, handler: handleGetDeletionStats },
+  { method: 'GET', path: /^\/api\/public\/deletions\/([^/]+)$/, access: PUBLIC, handler: (request, env, m) => handleGetDeletion(request, env, m[1]) },
+  { method: 'GET', path: '/api/public/deletions', access: PUBLIC, handler: handleListDeletions }
+];
 
-  if (url.pathname.startsWith('/api/auth/apikeys/') && url.pathname.endsWith('/reveal') && request.method === 'POST') {
-    const keyId = url.pathname.split('/')[4];
-    return handleRevealApiKey(request, env, keyId);
-  }
+/**
+ * The declared API routes, for tests that check every route's access.
+ */
+export function apiRoutes() {
+  return API_ROUTES;
+}
 
-  if (url.pathname.startsWith('/api/auth/apikeys/') && request.method === 'PATCH') {
-    const parts = url.pathname.split('/');
-    // Ensure exact pattern: /api/auth/apikeys/{keyId} (5 parts)
-    if (parts.length === 5 && parts[4]) {
-      const keyId = parts[4];
-      return handleUpdateApiKey(request, env, keyId);
+function matchRoute(route, method, pathname) {
+  const methods = Array.isArray(route.method) ? route.method : [route.method];
+  if (!methods.includes(method)) return null;
+  if (typeof route.path === 'string') return route.path === pathname ? [pathname] : null;
+  return pathname.match(route.path);
+}
+
+/**
+ * Handle API routes: find the declared route, enforce its access, then run it
+ */
+async function handleApiRoutes(url, request, env) {
+  for (const route of API_ROUTES) {
+    const match = matchRoute(route, request.method, url.pathname);
+    if (!match) continue;
+
+    const authResult = await authenticate(request, env);
+    const denied = checkAccess(authResult, route.access, () => requireAuth(authResult));
+    if (denied) return denied;
+
+    // Handlers read the caller from request.user. On public routes only the account's
+    // own session counts, so keys and app tokens never act as the user there.
+    request.auth = authResult;
+    if (authResult.authenticated && (route.access !== PUBLIC || isSessionAuth(authResult))) {
+      request.user = authResult.user;
     }
+    return route.handler(request, env, match);
   }
-
-  if (url.pathname === '/api/auth/account' && request.method === 'DELETE') {
-    return handleDeleteAccount(request, env);
-  }
-
-  if (url.pathname === '/api/developers/apps' && request.method === 'POST') {
-    return handleCreateDeveloperApp(request, env);
-  }
-
-  if (url.pathname === '/api/developers/apps' && request.method === 'GET') {
-    return handleListDeveloperApps(request, env);
-  }
-
-  const developerAppMatch = url.pathname.match(/^\/api\/developers\/apps\/([^/]+)$/);
-  if (developerAppMatch && request.method === 'PATCH') {
-    return handleUpdateDeveloperApp(request, env, developerAppMatch[1]);
-  }
-
-  if (developerAppMatch && request.method === 'DELETE') {
-    return handleDeleteDeveloperApp(request, env, developerAppMatch[1]);
-  }
-
-  if (url.pathname === '/oauth/authorize' && request.method === 'POST') {
-    return handleOAuthAuthorize(request, env);
-  }
-
-  if (url.pathname === '/oauth/authorize' && request.method === 'GET') {
-    return handleGetOAuthAuthorizePage(request, env);
-  }
-
-  if (url.pathname === '/oauth/token' && request.method === 'POST') {
-    return handleOAuthToken(request, env);
-  }
-
-  if (url.pathname === '/oauth/revoke' && request.method === 'POST') {
-    return handleOAuthRevoke(request, env);
-  }
-
-  if (url.pathname === '/api/account/settings' && request.method === 'GET') {
-    return handleGetAccountSettings(request, env);
-  }
-
-  if (url.pathname === '/api/account/settings' && request.method === 'PATCH') {
-    return handleUpdateAccountSettings(request, env);
-  }
-
-  if (url.pathname === '/api/account/authorizations' && request.method === 'GET') {
-    return handleListAuthorizations(request, env);
-  }
-
-  if (url.pathname.match(/^\/api\/account\/authorizations\/[^\/]+$/) && request.method === 'DELETE') {
-    const appId = url.pathname.split('/')[4];
-    return handleRevokeAuthorization(request, env, appId);
-  }
-
-  // Balance API routes
-  if (url.pathname === '/api/balance' && request.method === 'GET') {
-    return handleGetBalance(request, env);
-  }
-
-  if (url.pathname === '/api/balance/history' && request.method === 'GET') {
-    return handleGetBalanceHistory(request, env);
-  }
-
-  if (url.pathname === '/api/balance/deposit' && request.method === 'POST') {
-    return handleCreateDeposit(request, env);
-  }
-
-  if (url.pathname === '/api/balance/dev-deposit' && request.method === 'POST') {
-    return handleLocalDevDeposit(request, env);
-  }
-
-  // Payment calculation endpoint (public)
-  if (url.pathname === '/api/payments/calculate' && request.method === 'POST') {
-    return handleCalculateRetention(request, env);
-  }
-
-  // Content API routes
-  if (url.pathname === '/api/content' && request.method === 'POST') {
-    return handleUploadContent(request, env);
-  }
-
-  if (url.pathname.startsWith('/api/content/') && request.method === 'GET') {
-    const parts = url.pathname.split('/');
-    const cid = parts[3];
-    const action = parts[4];
-
-    if (!action) {
-      return handleGetContent(request, env, cid);
-    } else if (action === 'exists') {
-      return handleCheckContentExists(request, env, cid);
-    }
-  }
-
-  if (url.pathname.startsWith('/api/content/') && url.pathname.endsWith('/extend') && request.method === 'POST') {
-    const cid = url.pathname.split('/')[3];
-    return handleExtendContent(request, env, cid);
-  }
-
-  // Rate limit API routes
-  if (url.pathname === '/api/content/rate-limit/purchase' && request.method === 'POST') {
-    return handlePurchaseRateLimit(request, env);
-  }
-
-  if (url.pathname.startsWith('/api/content/') && url.pathname.endsWith('/rate-limit') && request.method === 'GET') {
-    const cid = url.pathname.split('/')[3];
-    return handleGetRateLimit(request, env, cid);
-  }
-
-  // Donation API route (public - no auth required)
-  if (url.pathname.startsWith('/api/donate/cid/') && request.method === 'POST') {
-    const cid = url.pathname.split('/')[4];
-    return handleCreateDonation(request, env, cid);
-  }
-
-  // User API routes
-  if (url.pathname === '/api/user/uploads' && request.method === 'GET') {
-    return handleGetUserUploads(request, env);
-  }
-
-  // Dispute API routes
-  if (url.pathname === '/api/disputes' && request.method === 'POST') {
-    return handleCreateDispute(request, env);
-  }
-
-  if (url.pathname === '/api/disputes' && request.method === 'GET') {
-    return handleListDisputes(request, env);
-  }
-
-  if (url.pathname.match(/^\/api\/disputes\/[^\/]+$/) && request.method === 'GET') {
-    const disputeId = url.pathname.split('/')[3];
-    // Get user ID from request if authenticated
-    const userId = request.user?.userId || null;
-    return handleGetDispute(request, env, disputeId, userId);
-  }
-
-  if (url.pathname.match(/^\/api\/content\/[^\/]+\/disputes$/) && request.method === 'GET') {
-    const cid = url.pathname.split('/')[3];
-    // Get user ID from request if authenticated
-    const userId = request.user?.userId || null;
-    return handleGetContentDisputes(request, env, cid, userId);
-  }
-
-  // Content deletion API routes
-  if (url.pathname.match(/^\/api\/content\/[^\/]+$/) && request.method === 'DELETE') {
-    const cid = url.pathname.split('/')[3];
-    return handleDeleteContent(request, env, cid);
-  }
-
-  // Admin API routes
-  if (url.pathname === '/api/admin/disputes' && request.method === 'GET') {
-    return handleAdminListDisputes(request, env);
-  }
-
-  if (url.pathname.match(/^\/api\/admin\/disputes\/[^\/]+$/) && request.method === 'PATCH') {
-    const cid = url.pathname.split('/')[4];
-    return handleAdminUpdateDispute(request, env, cid);
-  }
-
-  if (url.pathname.match(/^\/api\/admin\/content\/[^\/]+\/delete$/) && request.method === 'POST') {
-    const cid = url.pathname.split('/')[4];
-    return handleAdminDeleteContent(request, env, cid);
-  }
-
-  if (url.pathname === '/api/admin/repeat-infringers' && request.method === 'GET') {
-    return handleGetRepeatInfringers(request, env);
-  }
-
-  if (url.pathname === '/api/admin/actions' && request.method === 'GET') {
-    return handleGetAdminActions(request, env);
-  }
-
-  // Supplier API routes
-  if (url.pathname === '/api/suppliers' && request.method === 'POST') {
-    return handleCreateSupplier(request, env);
-  }
-
-  if (url.pathname === '/api/suppliers' && request.method === 'GET') {
-    return handleListSuppliers(request, env);
-  }
-
-  if (url.pathname.match(/^\/api\/suppliers\/[^\/]+$/) && request.method === 'GET') {
-    const supplierId = url.pathname.split('/')[3];
-    return handleGetSupplier(request, env, supplierId);
-  }
-
-  if (url.pathname.match(/^\/api\/suppliers\/[^\/]+$/) && request.method === 'DELETE') {
-    const supplierId = url.pathname.split('/')[3];
-    return handleDeleteSupplier(request, env, supplierId);
-  }
-
-  if (url.pathname.match(/^\/api\/suppliers\/[^\/]+$/) && request.method === 'PATCH') {
-    const supplierId = url.pathname.split('/')[3];
-    return handleUpdateSupplier(request, env, supplierId);
-  }
-
-  if (url.pathname.match(/^\/api\/suppliers\/[^\/]+\/scan$/) && request.method === 'POST') {
-    const supplierId = url.pathname.split('/')[3];
-    return handleRescanSupplier(request, env, supplierId);
-  }
-
-  if (url.pathname.match(/^\/api\/content\/[^\/]+\/suppliers$/) && request.method === 'GET') {
-    const cid = url.pathname.split('/')[3];
-    return handleGetCIDSuppliers(request, env, cid);
-  }
-
-  // Admin API routes (no rate limiting or auth - admin token checked in handlers)
-  if (url.pathname === '/api/admin/stats' && request.method === 'GET') {
-    return handleGetStats(request, env);
-  }
-
-  if (url.pathname === '/api/admin/stats/financial' && request.method === 'GET') {
-    return handleGetFinancialStats(request, env);
-  }
-
-  if (url.pathname === '/api/admin/stats/content' && request.method === 'GET') {
-    return handleGetContentStats(request, env);
-  }
-
-  if (url.pathname === '/api/admin/stats/users' && request.method === 'GET') {
-    return handleGetUserStats(request, env);
-  }
-
-  if (url.pathname === '/api/admin/health' && request.method === 'GET') {
-    return handleGetAdminHealth(request, env);
-  }
-
-  if (url.pathname === '/api/admin/alerts/test' && request.method === 'POST') {
-    return handleTestAlertWebhook(request, env);
-  }
-
-  if (url.pathname === '/api/admin/alerts' && request.method === 'GET') {
-    return handleGetAlerts(request, env);
-  }
-
-  if (url.pathname.match(/^\/api\/admin\/alerts\/[^\/]+\/acknowledge$/) && request.method === 'POST') {
-    const alertId = url.pathname.split('/')[4];
-    return handleAcknowledgeAlert(request, env, alertId);
-  }
-
-  if (url.pathname === '/api/admin/audit-log' && request.method === 'GET') {
-    return handleGetAuditLog(request, env);
-  }
-
-  if (url.pathname === '/api/admin/export' && request.method === 'GET') {
-    return handleExportData(request, env);
-  }
-
-  // Admin cost and profitability endpoints
-  if (['/api/admin/cost-safety', '/api/admin/cost-safety/history'].includes(url.pathname) && ['GET', 'POST'].includes(request.method)) {
-    return handleCostSafety(request, env);
-  }
-
-  if (url.pathname === '/api/admin/costs' && request.method === 'GET') {
-    return handleGetCosts(request, env);
-  }
-
-  if (url.pathname === '/api/admin/costs/by-service' && request.method === 'GET') {
-    return handleGetCostsByService(request, env);
-  }
-
-  if (url.pathname === '/api/admin/costs/record' && request.method === 'POST') {
-    return handleRecordCost(request, env);
-  }
-
-  if (url.pathname === '/api/admin/profitability' && request.method === 'GET') {
-    return handleGetProfitability(request, env);
-  }
-
-  // Admin backup routes
-  if (url.pathname === '/api/admin/backups' && request.method === 'GET') {
-    return handleGetBackupStatus(request, env);
-  }
-
-  if (url.pathname === '/api/admin/backups/run' && request.method === 'POST') {
-    return handleRunBackup(request, env);
-  }
-
-  if (url.pathname === '/api/admin/backups/file' && request.method === 'GET') {
-    return handleGetBackupFile(request, env);
-  }
-
-  if (url.pathname.match(/^\/api\/admin\/backups\/[^/]+\/files$/) && request.method === 'GET') {
-    return handleListBackupFiles(request, env, url.pathname.split('/')[4]);
-  }
-
-  if (url.pathname === '/api/admin/restore' && request.method === 'POST') {
-    return handleRestoreObject(request, env);
-  }
-
-  // Public deletion records API routes (no auth required for transparency)
-  if (url.pathname === '/api/public/deletions/stats' && request.method === 'GET') {
-    return handleGetDeletionStats(request, env);
-  }
-
-  if (url.pathname.match(/^\/api\/public\/deletions\/[^\/]+$/) && request.method === 'GET') {
-    const hash = url.pathname.split('/')[4];
-    return handleGetDeletion(request, env, hash);
-  }
-
-  if (url.pathname === '/api/public/deletions' && request.method === 'GET') {
-    return handleListDeletions(request, env);
-  }
-
-  // TODO: Add API routes for:
-  // - Contests
 
   return new Response(
     JSON.stringify({

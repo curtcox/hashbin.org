@@ -8,6 +8,8 @@ import { verifyToken } from '@clerk/backend';
 import { hashApiKey, validateApiKeyFormat } from './utils.js';
 import { getOrCreateLocalProfile, validateLocalUserId } from './local-auth.js';
 import { verifyOAuthJwt } from './oauth.js';
+import { validateAdminToken } from './admin.js';
+import { ALL_ADMIN_SCOPES, ALL_USER_SCOPES } from './scopes.js';
 
 // Error codes for authentication failures
 export const AUTH_ERROR_CODES = {
@@ -234,6 +236,8 @@ async function validateApiKey(apiKey, env) {
       valid: true,
       userId,
       keyId,
+      scopes: Array.isArray(apiKeyData.scopes) ? apiKeyData.scopes : [],
+      caveats: apiKeyData.caveats || {},
       profile
     };
   } catch (error) {
@@ -312,7 +316,9 @@ async function validateOAuthAccessToken(token, env) {
       userId: payload.user_id,
       appId: payload.app_id,
       grantId: payload.grant_id,
-      scopes: grant.scopes || payload.scopes || [],
+      // A token may carry fewer scopes than its grant, never more.
+      scopes: (grant.scopes || []).filter(scope => !Array.isArray(payload.scopes) || payload.scopes.includes(scope)),
+      caveats: grant.caveats || {},
       profile
     };
   } catch (error) {
@@ -361,12 +367,42 @@ function checkRateLimit(identifier, limit) {
 }
 
 /**
- * Main authentication middleware
- * Returns user context or null for anonymous requests
+ * Scopes held by a signed-in session: the account's root credential.
  */
-export async function authenticate(request, env) {
+function sessionScopes(env, userId) {
+  const isAdmin = Boolean(env.ADMIN_USER_ID && userId === env.ADMIN_USER_ID);
+  return isAdmin ? [...ALL_USER_SCOPES, ...ALL_ADMIN_SCOPES] : [...ALL_USER_SCOPES];
+}
+
+const authCache = new WeakMap();
+
+/**
+ * Main authentication middleware
+ * Returns user context or null for anonymous requests. Each user carries
+ * `session` (true only for the account's own sign-in), `scopes` and `caveats`.
+ * Results are cached per request, so the router and handlers share one lookup.
+ */
+export function authenticate(request, env) {
+  if (!authCache.has(request)) authCache.set(request, authenticateUncached(request, env));
+  return authCache.get(request);
+}
+
+async function authenticateUncached(request, env) {
   const auth = extractAuth(request);
   const isLocalMode = env.ENVIRONMENT === 'local';
+
+  // Platform admin token (X-Admin-Token) on a request carrying no other credential
+  const adminToken = request.headers.get('x-admin-token');
+  if (adminToken && auth.type === 'none') {
+    if (!validateAdminToken(adminToken, env)) {
+      return { authenticated: false, user: null, error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT };
+    }
+    return {
+      authenticated: true,
+      user: { userId: null, authMethod: 'admin_token', session: false, scopes: [...ALL_ADMIN_SCOPES], caveats: {} },
+      error: null
+    };
+  }
 
   // No authentication provided
   if (auth.type === 'none') {
@@ -422,6 +458,9 @@ export async function authenticate(request, env) {
           userId: profile.user_id,
           sessionId: null,
           authMethod: 'local',
+          session: true,
+          scopes: sessionScopes(env, profile.user_id),
+          caveats: {},
           profile
         },
         error: null
@@ -460,6 +499,9 @@ export async function authenticate(request, env) {
                   userId,
                   sessionId: validation.sessionId,
                   authMethod: 'clerk',
+                  session: true,
+                  scopes: sessionScopes(env, userId),
+                  caveats: {},
                   profileExists: false
                 },
                 error: null
@@ -489,6 +531,9 @@ export async function authenticate(request, env) {
               userId: profile.user_id,
               sessionId: validation.sessionId,
               authMethod: 'clerk',
+              session: true,
+              scopes: sessionScopes(env, profile.user_id),
+              caveats: {},
               profile
             },
             error: null
@@ -525,6 +570,9 @@ export async function authenticate(request, env) {
       user: {
         userId: oauthValidation.userId,
         authMethod: 'oauth',
+        session: false,
+        scopes: oauthValidation.scopes,
+        caveats: oauthValidation.caveats,
         profile: oauthValidation.profile,
         oauth: {
           appId: oauthValidation.appId,
@@ -553,6 +601,9 @@ export async function authenticate(request, env) {
         userId: validation.userId,
         keyId: validation.keyId,
         authMethod: 'apikey',
+        session: false,
+        scopes: validation.scopes,
+        caveats: validation.caveats,
         profile: validation.profile
       },
       error: null

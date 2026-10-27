@@ -3,7 +3,8 @@
  * Handles uploader and admin content deletion with dispute management
  */
 
-import { adminActorId, isAdminRequest } from '../auth/admin.js';
+import { adminActorId } from '../auth/admin.js';
+import { hasScope } from '../auth/scopes.js';
 
 /**
  * DELETE /api/content/{cid}
@@ -11,16 +12,9 @@ import { adminActorId, isAdminRequest } from '../auth/admin.js';
  */
 export async function handleDeleteContent(request, env, cid) {
   try {
-    // Authentication required (admin token callers arrive via handleAdminDeleteContent)
-    if (!request.user?.userId && !request.isAdmin) {
-      return new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
-    const isAdmin = request.isAdmin === true || isAdminRequest(request, env);
-    const userId = request.user?.userId || adminActorId(request);
+    // The route requires content:delete or admin:takedown; only the latter reaches other users' content.
+    const isAdmin = request.isAdmin === true || hasScope(request.auth, 'admin:takedown');
+    const userId = adminActorId(request);
 
     // Get content metadata
     const contentId = env.CONTENT_METADATA.idFromName(cid);
@@ -264,14 +258,6 @@ export async function handleDeleteContent(request, env, cid) {
  */
 export async function handleAdminDeleteContent(request, env, cid) {
   try {
-    if (!isAdminRequest(request, env)) {
-      const authenticated = Boolean(request.user?.userId);
-      return new Response(JSON.stringify({ error: authenticated ? 'NOT_ADMIN' : 'UNAUTHORIZED' }), {
-        status: authenticated ? 403 : 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
-    }
-
     // Parse request body
     const data = await request.json();
     const reason = data.reason || 'Admin action';
@@ -284,6 +270,7 @@ export async function handleAdminDeleteContent(request, env, cid) {
       body: JSON.stringify({ reason })
     });
     modifiedRequest.user = request.user;
+    modifiedRequest.auth = request.auth;
     modifiedRequest.isAdmin = true;
 
     // Call standard delete handler

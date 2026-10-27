@@ -6,7 +6,6 @@
 import { authenticate } from '../auth/middleware.js';
 import { COST_POLICY, retentionWithinCap } from '../utils/cost-policy.js';
 import { MAX_UPLOAD_BYTES, uploadTooLargeResponse } from '../utils/upload-limits.js';
-import { hasOAuthScope, insufficientScopeResponse, isOAuthAuth, oauthNotAllowedResponse } from '../auth/oauth-access.js';
 import { 
   calculateRetentionCost, 
   generateInsufficientBalanceMessage,
@@ -91,10 +90,7 @@ export async function handleUploadContent(request, env) {
   try {
     const url = new URL(request.url);
     const requestContentType = request.headers.get('content-type') || '';
-    const isOAuthPublish = isOAuthAuth(authResult);
-    if (isOAuthPublish && !hasOAuthScope(authResult, 'content:write')) {
-      return insufficientScopeResponse('content:write');
-    }
+    const isOAuthPublish = authResult.user.authMethod === 'oauth';
 
     let retention_months = isOAuthPublish
       ? Number(authResult.user.profile?.default_retention_months || '1')
@@ -600,10 +596,6 @@ export async function handleExtendContent(request, env, cid) {
         headers: { 'content-type': 'application/json' }
       }
     );
-  }
-
-  if (isOAuthAuth(authResult)) {
-    return oauthNotAllowedResponse();
   }
 
   try {

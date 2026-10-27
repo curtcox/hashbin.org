@@ -72,11 +72,4 @@ describe('cost safety at API boundaries', () => {
     expect(refunds).toHaveBeenCalledWith({ payment_intent: 'pi_test' }, { idempotencyKey: 'retention-cap-session' });
     expect(stats).not.toHaveBeenCalled();
   });
-
-  it('requires admin authorization to read or change the brake', async () => {
-    for (const method of ['GET', 'POST']) {
-      const response = await handleCostSafety(new Request('https://hashbin.org/api/admin/cost-safety', { method }), {});
-      expect(response.status).toBe(401);
-    }
-  });
 });

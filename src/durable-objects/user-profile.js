@@ -444,6 +444,8 @@ export class UserProfile {
       key_hash: data.key_hash,
       key_encrypted: data.key_encrypted, // AES-256-GCM encrypted key for reveal
       name: data.name,
+      scopes: Array.isArray(data.scopes) ? data.scopes : [],
+      caveats: data.caveats || {},
       created_at: new Date().toISOString(),
       expires_at: data.expires_at,
       last_used_at: null,
@@ -463,6 +465,8 @@ export class UserProfile {
       JSON.stringify({
         key_id: apiKey.key_id,
         name: apiKey.name,
+        scopes: apiKey.scopes,
+        caveats: apiKey.caveats,
         created_at: apiKey.created_at,
         expires_at: apiKey.expires_at
       }),
@@ -495,6 +499,8 @@ export class UserProfile {
     const keys = profile.api_keys.map(key => ({
       key_id: key.key_id,
       name: key.name,
+      scopes: key.scopes || [],
+      caveats: key.caveats || {},
       created_at: key.created_at,
       expires_at: key.expires_at,
       last_used_at: key.last_used_at,

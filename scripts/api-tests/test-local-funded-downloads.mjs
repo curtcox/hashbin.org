@@ -24,7 +24,7 @@ await api('/api/auth/session');
 const before = await api('/api/balance');
 const caps = { daily_cap_cents: 1, monthly_cap_cents: 1 };
 await api('/api/downloads/budget', 'PUT', { account: caps });
-const key = await api('/api/auth/apikeys', 'POST', { name: 'Native funded acceptance', download_budget: caps });
+const key = await api('/api/auth/apikeys', 'POST', { name: 'Native funded acceptance', scopes: ['downloads:spend'], download_budget: caps });
 const authorization = `ApiKey ${key.api_key}`;
 // Inline content requires no shared R2 emulation. It exercises actual funding,
 // caps, receipts and alarms in the main Worker's Durable Object namespace.
