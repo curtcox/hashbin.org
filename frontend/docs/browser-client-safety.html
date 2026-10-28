@@ -29,6 +29,27 @@ saveButton.onclick = async () =&gt; {
 <h2>Give each app its own origin</h2>
 <p>A custom domain on a GitHub user site still puts project paths on one origin. Isolation requires a custom domain per project (for example <code>pages.example.com</code> and <code>editor.example.com</code>), a separate GitHub organization per app, or a host that assigns a distinct origin per project. Never share parent-domain cookies. Release a migration build before switching origins: GitHub's redirect can strand drafts and settings on the old origin. Revoke and clear old tokens as part of migration.</p>
 <p>Use a Content Security Policy to restrict executable code, verify app-code caches before serving them, and keep HashBin price and credential prompts outside all user-content areas. These are app responsibilities; HashBin cannot protect drafts or code stored on a shared origin.</p>
+<ul>
+<li><strong>Content Security Policy.</strong> Keep scripts in files so <code>script-src</code> can name only your site and pinned paths, such as <code>https://hashbin.org/sdk/v0.2.0/</code>. A policy set in a <code>&lt;meta&gt;</code> tag also governs <code>srcdoc</code> iframes, so an editor that previews user HTML that way cannot restrict scripts without restricting the preview too; serve such previews from another origin. <code>frame-ancestors</code> works only as a response header.</li>
+<li><strong>Offline caches.</strong> Every app on the origin can write your Cache Storage. Have the service worker check each entry against a SHA-256 manifest, including pinned CDN files, before storing or serving it, and fetch again on a mismatch.</li>
+<li><strong>Links and restored state.</strong> Treat share links, fragments and stored drafts as untrusted input. Ask before a link replaces work kept in the browser.</li>
+<li><strong>Old tokens.</strong> After moving to <code>publish()</code>, call <code>disconnect()</code> once for any token the previous version stored, so copies elsewhere stop working.</li>
+</ul>
+<h2>What each measure protects against</h2>
+<p>Threats: another app on the same origin is compromised; your own app has an XSS or compromised dependency; untrusted content your app runs escapes its sandbox; a server or CDN returns different bytes; a fake consent or price prompt tricks the user.</p>
+<div style="overflow-x:auto"><table>
+<thead><tr><th>Measure</th><th>Co-hosted app</th><th>Your own XSS</th><th>Untrusted content</th><th>Substituted bytes</th><th>Fake prompts</th><th>Friction</th></tr></thead>
+<tbody>
+<tr><td>Per-save approval: <code>publish()</code></td><td>✅ no token</td><td>✅ no token</td><td>✅ no token</td><td>✅ with CID check</td><td>✅</td><td>a click per save</td></tr>
+<tr><td>Device-bound allowance (DPoP)</td><td>◐ only while running</td><td>◐</td><td>◐</td><td>–</td><td>–</td><td>none</td></tr>
+<tr><td>CID verification: <code>retrieve()</code>, <code>verifyCID()</code></td><td>–</td><td>–</td><td>–</td><td>✅</td><td>–</td><td>none</td></tr>
+<tr><td>Refresh reuse revocation, short-lived tokens</td><td>◐ shorter window</td><td>◐</td><td>◐</td><td>–</td><td>–</td><td>rare sign-in</td></tr>
+<tr><td>Shared-origin warnings</td><td>◐ informs</td><td>–</td><td>–</td><td>–</td><td>–</td><td>none</td></tr>
+<tr><td>Price ceiling: <code>maxCostCents</code></td><td>◐ caps a charge</td><td>◐</td><td>◐</td><td>–</td><td>–</td><td>none</td></tr>
+<tr><td>An origin of its own per app</td><td>✅</td><td>–</td><td>◐ sibling escapes only</td><td>–</td><td>–</td><td>migration</td></tr>
+<tr><td>Sandboxed iframe without <code>allow-same-origin</code>, or another origin</td><td>–</td><td>–</td><td>✅</td><td>–</td><td>–</td><td>none</td></tr>
+</tbody></table></div>
+<p>✅ blocks it · ◐ reduces it · – no effect</p>
 <p>DPoP follows <a href="https://www.rfc-editor.org/rfc/rfc9449.html">RFC 9449</a>; refresh reuse revocation follows <a href="https://www.rfc-editor.org/rfc/rfc9700.html">RFC 9700</a>. Test real sign-in and popup behavior in your supported browsers, particularly Safari with tracking prevention.</p>
 <h2>Upgrade an existing client</h2>
 <p>For credential-free saves, remove OAuth setup and use <code>publish()</code> with <code>handlePublishCallback()</code> for redirect results. To keep silent uploads, move old token-based <code>publish()</code> calls to <code>save()</code> and add <code>maxCostCents</code>. Include <code>client_id</code> on raw refreshes and serialize renewals. Use <code>disconnect()</code> for server revocation. Custom <code>authorizedFetch()</code> calls still need their own CID checks and price ceiling. The <a href="/docs/sdk#migration">SDK migration instructions</a> include the separate publish and OAuth callbacks.</p>

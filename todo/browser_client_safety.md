@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase:** HashBin measures deployed 2026-10-28 from `b36c126`; the production workflow and main-site health SHA were verified for that release. Real-provider browser acceptance remains. Row B13 in `STATUS.md`. Sections B and C remain owner/client work outside this repository.
+**Phase:** HashBin measures deployed 2026-10-28 from `b36c126`; the production workflow and main-site health SHA were verified for that release. Section A was re-verified on 2026-10-28 (see below). Section C was implemented and pushed in all six curtcox client apps on 2026-10-28, and section D's guidance, including its protection table, is in `frontend/docs/browser-client-safety.html`. Real-provider browser acceptance and the owner hosting decision (section B) remain. Row B13 in `STATUS.md`.
 
 ### Implemented HashBin measures
 
@@ -15,6 +15,23 @@
 - **A7:** account activity includes last use, monthly spend/cap and recent uploads per grant. Bounded in-app security notifications cover first use, refresh reuse revocation and 80% of the cap (once per spend window, including funded downloads). Account-wide OAuth revocation and SDK `disconnect()` revoke server-side; separately managed API keys remain under their existing controls.
 - **A8:** immutable self-contained `/sdk/v0.2.0/hashbin.js`, SHA-384 SRI manifest/docs and immutable cache headers; the release script refuses existing versions. `/sdk/hashbin.js` stays latest.
 - **A9:** published `frontend/docs/browser-client-safety.html` and linked it from registration, consent, Publish, SDK/API docs and the docs index.
+
+**A re-verification (2026-10-28):** 721 unit tests pass. Production `/health` reports `3ff0010`; `/publish` serves `frame-ancestors 'none'`, `X-Frame-Options: DENY` and `no-store`; `/oauth/dpop-nonce` issues nonces; `/sdk/v0.2.0/hashbin.js` is immutable and its SHA-384 matches `integrity.json`; `/sdk/hashbin.js` revalidates; the guide is served. `/api/publish/app` accepts the Pages, Python, Manim, Gnuplot and Sheets registrations and lists shared-origin apps. The cross-origin spec passes 5/5 in Chromium against the local Worker. `wrangler.local.toml` has no `OAUTH_SIGNING_KEY`, so local runs need one passed with `--var` (or a `.dev.vars`); without it publish and DPoP return 500. WebKit was not rerun because this machine's Playwright browser download was stuck on its install lock.
+
+### Implemented client measures (section C)
+
+All six apps save with the pinned SDK's `publish()` and hold no HashBin credential. Each revokes tokens left by its earlier OAuth flow server-side before clearing them (C2; none keeps an allowance), and draws no price or credential prompt (C7). Redirect saves restore the document, including after a cancellation, which the SDK reports without `clientState`.
+
+| App | Commit | C1/C2/C7 | C3 | C4 verified cache | C5 links ask first | C6 CSP |
+|---|---|---|---|---|---|---|
+| Pages Online | `e264ad8`, `c2ee027` | ✅ | ✅ opaque `srcdoc` preview; escape flags reviewed | ✅ (`a98d857`) | ✅ link/sample/CID; view links never overwrite | ✗ a meta policy also binds `srcdoc` previews, so any useful `script-src` blocks user code; needs a preview origin (B) |
+| PythonOnline | `3a89d7f` | ✅ | ◐ HTML output sandboxed with its own CSP; Python runs in a same-origin worker | ✅ local, pinned Pyodide and lockfile packages | ✅ | ✅ |
+| ManimOnline | `e802429` | ✅ | ◐ Pyodide in a same-origin worker | ✅ `offline-hashes.js` | ✅ CID hash changes over typed edits (no stored drafts) | ✅ inline editor script moved to `src/editor.js` |
+| GnuplotOnline | `883cf43` | ✅ | ✅ SVG output sanitized | ✅ | ✅ | ✅ |
+| Sheets | `e68cfa3` | ✅ | ✅ DOMPurify; runtimes in workers | ✅ (existing SRI manifest) | n/a: state lives in the URL | ✅ |
+| Apptron | `0e2b8a6` | ✅ redirect-only (COOP), manual upload above 512 KiB; no client ID registered yet | ✅ VM-origin split prepared | ✅ runtime SHA-256 checks | ✅ (existing) | ✅ (existing `page-policy.js`) |
+
+Apptron's uncommitted third-origin credential vault was retired in favour of HashBin Publish and kept on its local, unpushed `wip/credential-vault` branch; its snapshot-scoped network grants were carried onto `main`. Same-origin Python workers in PythonOnline and ManimOnline can still reach that origin's IndexedDB and Cache Storage; with no credentials and verified caches, the remaining exposure is other apps' unverified storage, which only an origin per app (B) removes.
 
 **SDK migration:** `publish()` now means hosted per-save approval. Previous token-based callers use `save()` to retain silent saves, or remove OAuth and adopt the new `publish()`. Raw refresh clients must include `client_id`; the bundled Expo/Flutter examples and their embedded documentation were updated. Other repositories are unchanged.
 
