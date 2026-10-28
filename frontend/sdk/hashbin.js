@@ -17,14 +17,18 @@ async function contentBytes(content) {
   return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice();
 }
 
-export async function verifyCID(cid, content) {
+export async function computeCID(content) {
   const bytes = await contentBytes(content);
   const length = new Uint8Array(6);
   const view = new DataView(length.buffer);
   view.setUint16(0, Math.floor(bytes.length / 0x100000000));
   view.setUint32(2, bytes.length >>> 0);
   const digest = bytes.length <= 64 ? bytes : new Uint8Array(await crypto.subtle.digest('SHA-512', bytes));
-  return cid === base64UrlEncode(length) + base64UrlEncode(digest);
+  return base64UrlEncode(length) + base64UrlEncode(digest);
+}
+
+export async function verifyCID(cid, content) {
+  return cid === await computeCID(content);
 }
 
 function decodeBytes(value) {
@@ -104,6 +108,18 @@ function memoryStorage() {
   return { getItem: key => map.get(key) || null, setItem: (key, value) => map.set(key, value), removeItem: key => map.delete(key) };
 }
 
+// Redirect handoffs above this size go by file: the URL fragment would be too long.
+const REDIRECT_BYTES = 512 * 1024;
+
+function downloadBytes(bytes, type, name) {
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([bytes], { type }));
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
 function centeredPopupFeatures(width = 560, height = 720) {
   if (typeof window === 'undefined') {
     return '';
@@ -178,25 +194,40 @@ export class HashBinClient {
   }
 
   // Open synchronously so a user click remains a valid popup gesture.
-  publish(content, { mode = 'popup', contentType = 'application/octet-stream', clientState = null } = {}) {
+  publish(content, { mode = 'popup', contentType = 'application/octet-stream', clientState = null, fileName = 'hashbin-document' } = {}) {
     if (typeof window === 'undefined') return Promise.reject(new Error('publish() requires a browser; use save() for token-based uploads.'));
+    // A cross-origin-isolated page's popups lose their opener (COOP), so only a redirect can return.
+    if (mode === 'popup' && globalThis.crossOriginIsolated) mode = 'redirect';
     const state = randomString(32);
     const popup = mode === 'popup' ? window.open('about:blank', '_blank', centeredPopupFeatures()) : null;
-    return this.beginPublish(content, { mode, contentType, clientState, state, popup });
+    return this.beginPublish(content, { mode, contentType, clientState, state, popup, fileName });
   }
 
-  async beginPublish(content, { mode, contentType, clientState, state, popup }) {
+  async beginPublish(content, { mode, contentType, clientState, state, popup, fileName = 'hashbin-document' }) {
     const bytes = await contentBytes(content);
     if (!bytes.length || bytes.length > 5 * 1024 * 1024) { popup?.close(); throw new Error('Content must contain 1 byte to 5 MiB.'); }
     if (!['popup', 'redirect'].includes(mode)) throw new Error('Unknown publish mode.');
     const url = new URL('/publish', this.baseUrl);
     url.search = new URLSearchParams({ client_id: this.clientId, redirect_uri: this.redirectUri, state, mode });
     if (!popup) {
-      // Fragment handoffs must fit comfortably within browser URL limits.
-      if (bytes.length > 512 * 1024) throw new Error('Popup required for documents above 512 KiB. Enable popups and retry.');
+      // A blocked popup falls back to a redirect only when the fragment fits browser URL limits.
+      if (bytes.length > REDIRECT_BYTES && mode !== 'redirect') throw new Error('Popup required for documents above 512 KiB. Enable popups and retry.');
       if (this.memoryTransactions) throw new Error('Session storage is required for redirect publishing. Enable popups and retry.');
-      this.transactionStorage.setItem(`hashbin:publish:${this.clientId}:${state}`, JSON.stringify({ bytes: base64UrlEncode(bytes), clientState, createdAt: Date.now() }));
+      const key = `hashbin:publish:${this.clientId}:${state}`;
       url.searchParams.set('mode', 'redirect');
+      if (bytes.length > REDIRECT_BYTES) {
+        // Too large for a URL: the user saves the file and chooses it on HashBin, which checks it against this CID.
+        const cid = await computeCID(bytes);
+        const name = String(fileName).replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').slice(0, 120) || 'hashbin-document';
+        this.transactionStorage.setItem(key, JSON.stringify({ cid, clientState, createdAt: Date.now() }));
+        url.hash = encodeURIComponent(JSON.stringify({ state, encoding: 'file', cid, size: bytes.length, contentType, fileName: name }));
+        downloadBytes(bytes, contentType, name);
+        // Let the download start before this page unloads.
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        window.location.href = url.href;
+        return { redirected: true, state, fileHandoff: true };
+      }
+      this.transactionStorage.setItem(key, JSON.stringify({ bytes: base64UrlEncode(bytes), clientState, createdAt: Date.now() }));
       url.hash = encodeURIComponent(JSON.stringify({ state, bytes: base64UrlEncode(bytes), contentType, encoding: 'base64url' }));
       window.location.href = url.href;
       return { redirected: true, state };
@@ -205,8 +236,11 @@ export class HashBinClient {
     return new Promise((resolve, reject) => {
       const cleanup = () => { window.removeEventListener('message', onMessage); clearInterval(timer); clearTimeout(timeout); };
       const fail = error => { cleanup(); popup.close(); reject(error); };
+      let ready = false;
+      const opened = Date.now();
       const onMessage = async event => {
         if (event.source !== popup || event.origin !== hashbinOrigin || event.data?.state !== state) return;
+        if (event.data.type === 'hashbin:publish:ready') ready = true;
         if (event.data.type === 'hashbin:publish:ready') popup.postMessage({ type: 'hashbin:publish:request', state, bytes, contentType }, hashbinOrigin);
         if (event.data.type !== 'hashbin:publish:result') return;
         cleanup();
@@ -215,7 +249,9 @@ export class HashBinClient {
         resolve(event.data);
       };
       window.addEventListener('message', onMessage);
-      const timer = setInterval(() => { if (popup.closed) fail(new Error('Publish window closed.')); }, 500);
+      // Cross-Origin-Opener-Policy severs the popup as it loads, so it looks closed before HashBin is ready.
+      const severed = () => Object.assign(new Error('The publish window lost its connection to this page, usually because of Cross-Origin-Opener-Policy. Use mode: \'redirect\'.'), { code: 'popup_severed' });
+      const timer = setInterval(() => { if (popup.closed) fail(!ready && Date.now() - opened < 3000 ? severed() : new Error('Publish window closed.')); }, 500);
       const timeout = setTimeout(() => fail(new Error('Publish approval timed out.')), 10 * 60 * 1000);
       popup.location.href = url.href;
     });
@@ -229,10 +265,13 @@ export class HashBinClient {
     if (!state || !raw) throw new Error('Publish transaction not found.');
     const transaction = JSON.parse(raw);
     this.transactionStorage.removeItem(key);
-    if (Date.now() - transaction.createdAt > 15 * 60 * 1000) throw new Error('Publish transaction expired.');
-    if (params.get('error')) throw new Error(params.get('error'));
+    // Errors carry clientState, so an app can restore its state after a cancelled or failed save.
+    const fail = message => Object.assign(new Error(message), { clientState: transaction.clientState });
+    if (Date.now() - transaction.createdAt > 15 * 60 * 1000) throw fail('Publish transaction expired.');
+    if (params.get('error')) throw fail(params.get('error'));
     const cid = params.get('cid');
-    if (!await verifyCID(cid, decodeBytes(transaction.bytes))) throw new Error('Published CID does not match content.');
+    const matches = transaction.cid ? cid === transaction.cid : await verifyCID(cid, decodeBytes(transaction.bytes));
+    if (!matches) throw fail('Published CID does not match content.');
     return { cid, clientState: transaction.clientState };
   }
 
@@ -603,6 +642,123 @@ export class HashBinClient {
   }
 }
 
+// The sandbox frame's only script. Its hash goes in the embedding page's script-src,
+// because an srcdoc frame inherits that page's Content-Security-Policy.
+export const SANDBOX_BOOTSTRAP = "onmessage=function(e){var d=e.data;if(e.source!==parent||!d||d.type!=='hashbin:sandbox:boot'||!e.ports[0])return;onmessage=null;var p=e.ports[0],w=new Worker(URL.createObjectURL(new Blob([d.source],{type:'text/javascript'})));w.onmessage=function(x){p.postMessage(x.data)};w.onerror=function(x){x.preventDefault();p.postMessage({type:'hashbin:sandbox:error',message:String(x.message||'Sandbox worker failed to start.')})};p.onmessage=function(x){w.postMessage(x.data)}}";
+export const SANDBOX_BOOTSTRAP_HASH = 'sha256-IMEqdP+AkCKdxhM3X7mQM4pV/chykJXPvdtndD+XeH8=';
+
+// Runs first in the sandbox worker: approved URLs are fetched by the embedding page,
+// so they come from its verified offline cache; everything else uses the network directly.
+function sandboxPrelude(config) {
+  const pending = new Map();
+  let next = 0;
+  const direct = self.fetch.bind(self);
+  const absolute = input => new URL(typeof input === 'object' && input && 'url' in input ? input.url : String(input), config.base).href;
+  addEventListener('message', event => {
+    const data = event.data;
+    if (!data || data.type !== 'hashbin:sandbox:response') return;
+    event.stopImmediatePropagation();
+    const request = pending.get(data.id);
+    if (!request) return;
+    pending.delete(data.id);
+    if (data.error) request.reject(new TypeError(data.error));
+    else request.resolve(new Response(data.body, { status: data.status, headers: { 'Content-Type': data.contentType || 'application/octet-stream' } }));
+  });
+  const proxied = url => new Promise((resolve, reject) => {
+    const id = ++next;
+    pending.set(id, { resolve, reject });
+    postMessage({ type: 'hashbin:sandbox:fetch', id, url });
+  });
+  self.fetch = (input, init = {}) => {
+    const url = absolute(input);
+    const method = String(init.method || (typeof input === 'object' && input?.method) || 'GET').toUpperCase();
+    if (method === 'GET' && config.proxy.some(prefix => url.startsWith(prefix))) return proxied(url);
+    return direct(typeof input === 'string' || input instanceof URL ? url : input, init);
+  };
+  const scripts = new Map();
+  const scriptURL = url => {
+    url = absolute(url);
+    if (!scripts.has(url)) scripts.set(url, self.fetch(url).then(async response => {
+      if (!response.ok) throw new Error(`Failed to load ${url}`);
+      return URL.createObjectURL(new Blob([await response.text()], { type: 'text/javascript' }));
+    }));
+    return scripts.get(url);
+  };
+  self.hashbinSandbox = Object.freeze({
+    base: config.base,
+    // Module scripts: dynamic import of the fetched text.
+    import: async url => import(await scriptURL(url)),
+    // Classic scripts: fetched, then run synchronously with importScripts.
+    importScripts: async (...urls) => { const loaded = await Promise.all(urls.map(scriptURL)); importScripts(...loaded); }
+  });
+}
+
+/**
+ * Run untrusted code in a worker inside an opaque-origin iframe, isolated from the page's
+ * storage, cookies, service worker and DOM. Returns a Worker-like object.
+ *
+ * source: classic worker script text (or a promise of it); it runs after a prelude that
+ *   defines `hashbinSandbox.import()`, `hashbinSandbox.importScripts()` and `hashbinSandbox.base`.
+ *   Chromium cannot start module workers in opaque-origin frames; use hashbinSandbox.import() for modules.
+ * proxy: URL prefixes the page fetches on the worker's behalf (GET only, without credentials).
+ * base: the URL that relative paths in the worker resolve against.
+ */
+export function createSandbox({ source, proxy = [], base = globalThis.location?.href, fetch: fetchImpl = globalThis.fetch?.bind(globalThis), container = globalThis.document?.body } = {}) {
+  if (!source) throw new Error('source is required');
+  if (!container) throw new Error('createSandbox() requires a document.');
+  const prefixes = proxy.map(prefix => new URL(prefix, base).href);
+  const allowed = url => {
+    try {
+      const target = new URL(url);
+      return (target.protocol === 'https:' || target.origin === new URL(base).origin) && prefixes.some(prefix => target.href.startsWith(prefix));
+    } catch { return false; }
+  };
+  const channel = new MessageChannel();
+  const port = channel.port1;
+  const frame = container.ownerDocument.createElement('iframe');
+  let closed = false;
+  const sandbox = {
+    frame,
+    onmessage: null,
+    onerror: null,
+    postMessage(data, transfer = []) { if (!closed) port.postMessage(data, transfer); },
+    terminate() { closed = true; port.close(); frame.remove(); }
+  };
+  const fail = message => { if (!closed) sandbox.onerror?.({ message, preventDefault() {} }); };
+  const respond = async ({ id, url }) => {
+    try {
+      if (typeof url !== 'string' || !allowed(url)) throw new Error('Sandbox request blocked.');
+      const response = await fetchImpl(url, { credentials: 'omit' });
+      const body = await response.arrayBuffer();
+      const status = response.status >= 200 && response.status <= 599 ? response.status : 502;
+      if (!closed) port.postMessage({ type: 'hashbin:sandbox:response', id, status, contentType: response.headers.get('content-type'), body }, [body]);
+    } catch (error) {
+      if (!closed) port.postMessage({ type: 'hashbin:sandbox:response', id, error: String(error?.message || error) });
+    }
+  };
+  port.onmessage = ({ data }) => {
+    if (closed) return;
+    if (data?.type === 'hashbin:sandbox:fetch') { respond(data); return; }
+    if (data?.type === 'hashbin:sandbox:error') { fail(String(data.message)); return; }
+    sandbox.onmessage?.({ data });
+  };
+  // No allow-same-origin: the frame and its worker get an opaque origin.
+  frame.setAttribute('sandbox', 'allow-scripts');
+  frame.setAttribute('aria-hidden', 'true');
+  frame.tabIndex = -1;
+  frame.title = 'Code sandbox';
+  frame.style.display = 'none';
+  frame.srcdoc = `<!doctype html><meta charset="utf-8"><script>${SANDBOX_BOOTSTRAP}</script>`;
+  frame.addEventListener('load', async () => {
+    try {
+      const text = `(${sandboxPrelude})(${JSON.stringify({ base: new URL(base).href, proxy: prefixes })});\n${await source}`;
+      if (!closed) frame.contentWindow.postMessage({ type: 'hashbin:sandbox:boot', source: text }, '*', [channel.port2]);
+    } catch (error) { fail(String(error?.message || error)); }
+  }, { once: true });
+  container.append(frame);
+  return sandbox;
+}
+
 let defaultClient = null;
 
 export function configure(options) {
@@ -660,6 +816,10 @@ export function clearTokens() {
 export const hashbin = {
   HashBinClient,
   verifyCID,
+  computeCID,
+  createSandbox,
+  SANDBOX_BOOTSTRAP,
+  SANDBOX_BOOTSTRAP_HASH,
   save,
   disconnect,
   handlePublishCallback,

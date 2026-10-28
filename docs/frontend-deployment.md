@@ -66,7 +66,7 @@ For manual deployments, use the repository's documented production procedure in
   bytes to apply a fix; create a new version. Unversioned `/sdk/hashbin.js` stays latest.
 
 After deployment, verify `/health` reports the deployed commit, inspect `/publish` framing
-headers, and fetch both `/docs/browser-client-safety` and `/sdk/v0.2.0/integrity.json`.
+headers, and fetch both `/docs/browser-client-safety` and `/sdk/v0.3.0/integrity.json`.
 Local Chromium/WebKit tests cover the protocol, but live Clerk/social sign-in in Safari with
 tracking prevention and Firefox still needs acceptance. Do not describe that as covered by local auth.
 

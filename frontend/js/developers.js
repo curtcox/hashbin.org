@@ -44,7 +44,9 @@ function renderAppList(apps) {
             <button type="submit" class="btn btn-primary btn-sm">Save</button>
             <button type="button" class="btn btn-secondary btn-sm cancel-edit">Cancel</button>
           </form>
+          <section class="developers-safety" aria-live="polite"><p class="developers-safety-state">Safety check: loading…</p></section>
           <div class="developers-app-actions">
+            <button type="button" class="btn btn-secondary btn-sm check-safety">Check safety</button>
             <button type="button" class="btn btn-secondary btn-sm edit-app">Edit</button>
             <button type="button" class="btn btn-secondary btn-sm delete-app">Delete</button>
           </div>
@@ -67,7 +69,39 @@ function renderAppList(apps) {
       });
     });
     card.querySelector('.delete-app').addEventListener('click', () => deleteApp(appId));
+    card.querySelector('.check-safety').addEventListener('click', () => loadSafety(card, 'POST'));
+    loadSafety(card, 'GET');
   }
+}
+
+const SAFETY_LABELS = { warn: 'Fix', info: 'Consider', ok: 'OK' };
+
+// HashBin reads each published redirect page and reports problems from the security notes.
+async function loadSafety(card, method) {
+  const section = card.querySelector('.developers-safety');
+  const button = card.querySelector('.check-safety');
+  if (method === 'POST') { button.disabled = true; section.innerHTML = '<p class="developers-safety-state">Checking your published pages…</p>'; }
+  try {
+    const response = await authenticatedFetch(`/api/developers/apps/${encodeURIComponent(card.dataset.appId)}/safety`, { method });
+    const result = await checkAppResponse(response);
+    renderSafety(section, result);
+  } catch (error) {
+    section.innerHTML = `<p class="developers-safety-state">${escapeHtml(error.message || 'Safety check failed.')}</p>`;
+  } finally { button.disabled = false; }
+}
+
+function renderSafety(section, result) {
+  if (!result.checked_at) { section.innerHTML = '<p class="developers-safety-state">Safety check: not run yet. HashBin also checks registered apps nightly.</p>'; return; }
+  const order = { warn: 0, info: 1, ok: 2 };
+  section.innerHTML = `
+    <h4>Safety check <small>${escapeHtml(new Date(result.checked_at).toLocaleString())}${result.throttled ? ' (checked within the last minute)' : ''}</small></h4>
+    ${result.pages.map(page => `
+      <p><code>${escapeHtml(page.url)}</code></p>
+      ${page.error ? `<p>${escapeHtml(page.error)}</p>` : `<ul>${[...page.findings].sort((a, b) => order[a.level] - order[b.level]).map(item => `
+        <li><strong>${SAFETY_LABELS[item.level] || ''}:</strong> ${escapeHtml(item.message)} <a href="${escapeHtml(item.link)}">Details</a></li>`).join('')}</ul>`}
+    `).join('')}
+    ${result.skipped?.length ? `<p>Not checked (local or non-HTTPS): ${result.skipped.map(uri => `<code>${escapeHtml(uri)}</code>`).join(', ')}</p>` : ''}
+    <p><a href="/docs/security/">Security notes</a></p>`;
 }
 
 async function checkAppResponse(response) {

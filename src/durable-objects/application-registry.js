@@ -118,6 +118,11 @@ export class ApplicationRegistry {
       return this.listApplications(url.searchParams.get('owner_user_id'));
     }
 
+    const safety = url.pathname.match(/^\/apps\/([^/]+)\/safety$/);
+    if (safety && request.method === 'GET') return this.getSafety(safety[1], url.searchParams.get('owner_user_id'));
+    if (safety && request.method === 'PUT') return this.putSafety(safety[1], await request.json());
+    if (url.pathname === '/safety/due' && request.method === 'GET') return this.dueSafety(Number(url.searchParams.get('limit')) || 20);
+
     if (url.pathname.startsWith('/apps/') && request.method === 'GET') {
       return this.getApplication(url.pathname.split('/')[2]);
     }
@@ -276,6 +281,26 @@ export class ApplicationRegistry {
     return new Response(JSON.stringify({ ...app, origin_warnings: originWarnings(app.redirect_uris, apps, appId) }), {
       headers: { 'content-type': 'application/json' }
     });
+  }
+
+  // Safety check results (H4). The check itself runs in the Worker; this stores the latest result.
+  async getSafety(appId, ownerUserId) {
+    const { apps, index, error } = await this.findOwnedApplication(appId, ownerUserId);
+    if (error) return error;
+    return Response.json({ app: apps[index], apps: apps.filter(app => app.status === 'active'), last: await this.state.storage.get(`safety:${appId}`) || null });
+  }
+
+  async putSafety(appId, result) {
+    await this.state.storage.put(`safety:${appId}`, result);
+    return new Response(null, { status: 204 });
+  }
+
+  /** Active apps, least recently checked first, for the nightly run. */
+  async dueSafety(limit) {
+    const apps = (await this.loadApplications()).filter(app => app.status === 'active');
+    const checked = await Promise.all(apps.map(async app => (await this.state.storage.get(`safety:${app.app_id}`))?.checked_at || ''));
+    const due = apps.map((app, index) => ({ app, at: checked[index] })).sort((a, b) => a.at.localeCompare(b.at)).slice(0, limit).map(entry => entry.app);
+    return Response.json({ apps, due });
   }
 
   async checkOrigin(origin) {

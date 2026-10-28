@@ -144,6 +144,7 @@ import {
   handleRevokeAuthorization,
   handleUpdateAuthorization
 } from './api/oauth.js';
+import { handleDeveloperAppSafety, runAppSafetyChecks } from './api/app-safety.js';
 
 import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js';
 import { handlePublish, handlePublishApp } from './api/publish.js';
@@ -291,7 +292,7 @@ export default {
     }
     if (now.getUTCHours() !== 2) return;
     for (const job of [this.processExpiredContent, this.computePlatformSnapshot, this.cleanupAuditLog,
-      this.processExpiredDisputes, this.cleanupR2PendingDeletion, this.startBackupSnapshot]) {
+      this.processExpiredDisputes, this.cleanupR2PendingDeletion, this.startBackupSnapshot, runAppSafetyChecks]) {
       try { await job.call(this, env); } catch (error) { console.error('Nightly job failed:', error); }
     }
   },
@@ -665,6 +666,8 @@ const API_ROUTES = [
   { method: 'DELETE', path: '/api/auth/account', access: SESSION, handler: handleDeleteAccount },
   { method: 'POST', path: '/api/developers/apps', access: SESSION, handler: handleCreateDeveloperApp },
   { method: 'GET', path: '/api/developers/apps', access: SESSION, handler: handleListDeveloperApps },
+  { method: 'GET', path: /^\/api\/developers\/apps\/([^/]+)\/safety$/, access: SESSION, handler: (request, env, m) => handleDeveloperAppSafety(request, env, m[1]) },
+  { method: 'POST', path: /^\/api\/developers\/apps\/([^/]+)\/safety$/, access: SESSION, handler: (request, env, m) => handleDeveloperAppSafety(request, env, m[1]) },
   { method: 'PATCH', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateDeveloperApp(request, env, m[1]) },
   { method: 'DELETE', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleDeleteDeveloperApp(request, env, m[1]) },
   { method: 'GET', path: '/api/publish/app', access: PUBLIC, handler: handlePublishApp },

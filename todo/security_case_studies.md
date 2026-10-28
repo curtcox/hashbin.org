@@ -2,19 +2,25 @@
 
 ## Status
 
-**Phase:** step 1 partly done 2026-10-28. Row B14 in `STATUS.md`.
+**Phase:** Parts 1 and 2 done and H1–H4 built 2026-10-28 (local; deploy pending). Row B14 in `STATUS.md`.
 
-- Done: `/docs/security/` index with the entry template, disclosure rule and private
-  reporting link. Backlog notes SN-2026-003 to SN-2026-009 are published. The index is
-  linked from the docs index, sitemap, developer page, SDK guide and browser client
-  safety guide (new "Known pitfalls" list). `src/docs-security-notes.test.js` checks
-  index/page consistency and that local links resolve. `.dev.vars.example` closes
-  SN-2026-008.
-- Not done: the SN-2026-001 (PythonOnline) and SN-2026-002 (ManimOnline) pages. They are
-  listed on the index as "analysis being written" without detail. Drafting their analysis
-  in this session was stopped by an automated safety filter, so the owner writes them or
-  they are drafted another way.
-Follows `browser_client_safety.md`, whose section C review raised the first two cases.
+- **Record:** `/docs/security/` with SN-2026-001–009. SN-001/002 (the case studies), 005, 006 and 007 are
+  `fixed`; 004 is open; 003 and 008 fixed; 009 accepted. `src/docs-security-notes.test.js` checks the index.
+- **Case studies:** Python Online and Manim Online run all user code through `createSandbox()`. Their browser
+  suites assert the code's origin is `null` (Chromium and WebKit; Firefox not run here). The ask-before-run
+  stopgap (step 3) was dropped because the fix shipped in the same pass. Demonstration material is limited to
+  that regression check.
+- **SDK v0.3.0** (`frontend/sdk/v0.3.0/`, `hashbin.js` and `hashbin-cache.js`): H1 `createSandbox()`;
+  H2 `hashbin-cache.js` verified cache; H3 `clientState` on publish errors, automatic redirect when
+  `crossOriginIsolated`, `popup_severed` error code, and a file handoff above 512 KiB (Publish page accepts
+  only a file matching the recorded CID).
+- **Clients:** Python and Manim vendor v0.3.0 (SRI-checked) and use `hashbin-cache.js`; Pages, Gnuplot,
+  Sheets and apptron pin `https://hashbin.org/sdk/v0.3.0/hashbin.js`. All six dropped their pending-save
+  copies; apptron dropped its manual-upload message. Gnuplot and Sheets service workers still use their own
+  (equivalent) verification code; adopting `hashbin-cache.js` there is optional cleanup.
+- **H4:** `src/app-safety.js` and `src/api/app-safety.js`: per-app check on the developer page
+  (`GET`/`POST /api/developers/apps/:id/safety`) and nightly for the 20 least recently checked apps.
+- **H5/H6:** plans below; not started, pending cost and abuse review.
 
 ## Goals
 
@@ -130,6 +136,38 @@ Retroactive entries, mostly short, to seed the record:
    SDK helper rather than two hand-rolled copies.
 4. H3 and H2 in the same SDK release. Then migrate the clients.
 5. H4. Then decide on H5/H6.
+
+## H5 plan: hosted isolated run origin
+
+Only needed for code that must run with a stable origin of its own (persistent storage for the sandboxed
+code, or APIs an opaque origin lacks). `createSandbox()` covers the current apps without it.
+
+1. **Domain.** Register a separate registrable domain (not a `hashbin.org` subdomain), listed on the Public
+   Suffix List so each `<app>.<domain>` is its own site for cookies and storage partitioning.
+2. **Serving.** A Worker serves only immutable files addressed by CID (pinned runtimes such as Pyodide, and the
+   SDK's frame document), with `Cross-Origin-Resource-Policy: cross-origin`, a strict CSP, no cookies and no
+   HashBin session.
+3. **SDK.** `createSandbox({ origin: 'hosted' })` frames `https://<app_id>.<domain>/frame/<cid>` instead of
+   `srcdoc`, so the sandbox has a stable per-app origin and its own service worker for offline use.
+4. **Abuse and cost.** Serve only CIDs on an allow-list (runtimes HashBin pins) plus content registered apps
+   publish; per-app request quotas; a kill switch per app; R2 egress estimate before launch.
+5. **Open:** storage partitioning when framed from `*.github.io` (Safari, Firefox) may make per-app storage
+   per-embedder anyway; measure before committing.
+
+## H6 plan: per-app hosting from CIDs
+
+1. **Model.** A registered app publishes a manifest CID (path → CID map). HashBin serves it at
+   `https://<app_id>.<apps-domain>/` (same PSL-listed domain family as H5, separate from H5's run origin).
+2. **Updates.** The developer page sets the current manifest CID; old manifests stay addressable for rollback.
+   Users see a stable origin, so drafts survive releases.
+3. **Safety.** Default CSP and `X-Content-Type-Options` headers; no HashBin cookies; the H4 check runs on every
+   manifest change.
+4. **Costs and moderation.** Hosted bytes count against the developer's balance like other content; abuse
+   reports and takedown use the existing dispute flow; rate limits per app.
+5. **Migration.** For github.io apps, ship a build that copies drafts to the new origin through a one-time
+   export link before switching (see the guide's migration advice).
+6. **Decision needed:** whether HashBin wants to be an app host at all. It removes section B of
+   `browser_client_safety.md` for every customer, but it adds moderation duties.
 
 ## Open questions
 

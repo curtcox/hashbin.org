@@ -3,13 +3,15 @@
 <p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a></p>
 <h1>SN-2026-007: Redirect saves are limited to 512 KiB</h1>
 <p>Redirect mode carries the document in the URL fragment, so the SDK limits it to 512 KiB. Apps that must use redirect mode, such as cross-origin isolated apps, cannot publish larger documents directly.</p>
-<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-28, migrating apptron, whose disk overlays can reach 5 MiB</td></tr><tr><th>Affected</th><td>Redirect-only apps</td></tr><tr><th>Severity</th><td>Low: a usability limit</td></tr><tr><th>Status</th><td>Open</td></tr></table></div>
+<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-28, migrating apptron, whose disk overlays can reach 5 MiB</td></tr><tr><th>Affected</th><td>Redirect-only apps</td></tr><tr><th>Severity</th><td>Low: a usability limit</td></tr><tr><th>Status</th><td>Fixed in SDK v0.3.0 (2026-10-28)</td></tr></table></div>
 <h2>What was wrong</h2>
 <p>Fragment length is the only channel a redirect offers without a server-side handoff.</p>
 <h2>How it was detected</h2>
 <p>Comparing apptron's overlay size limit with the SDK's redirect limit.</p>
 <h2>How it can be demonstrated</h2>
-<p>Call <code>publish()</code> in redirect mode with more than 512 KiB: the SDK refuses.</p>
-<h2>How it can be fixed</h2>
-<ul><li><strong>App-side:</strong> apptron asks the user to download the file and upload it on hashbin.org.</li><li><strong>HashBin-side (planned):</strong> a larger handoff, such as a file chooser on the Publish page.</li></ul>
+<p>With SDK v0.2.0, call <code>publish()</code> in redirect mode with more than 512 KiB: the SDK refuses. The SDK and Publish page tests now cover the file handoff instead.</p>
+<h2>How it was fixed</h2>
+<ul><li><strong>App-side:</strong> apptron asks the user to download the file and upload it on hashbin.org.</li><li><strong>HashBin-side (SDK v0.3.0):</strong> an explicit redirect save above 512 KiB downloads the document as a file and records its CID. The Publish page asks the user to choose that file and accepts only bytes matching the CID; the callback checks the returned CID against the recorded one.</li></ul>
+<h2>How to avoid it</h2>
+<p>Upgrade to SDK v0.3.0 and pass <code>fileName</code> so the downloaded file is easy to find. A blocked popup still falls back to the fragment only up to 512 KiB; larger documents need the popup or explicit <code>mode: 'redirect'</code>.</p>
 </main></body></html>

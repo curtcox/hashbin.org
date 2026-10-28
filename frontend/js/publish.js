@@ -24,12 +24,38 @@ async function accept(payload) {
     status('Review the allowance on HashBin to continue.');
     return;
   }
+  if (payload.encoding === 'file') { awaitFile(payload); return; }
   const input = payload.encoding === 'base64url' ? Uint8Array.from(atob(payload.bytes.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)) : payload.bytes;
   const blob = input instanceof Blob ? input : new Blob([input]);
   if (!blob.size || blob.size > 5 * 1024 * 1024) throw new Error('Documents must contain 1 byte to 5 MiB.');
   busy = true;
-  bytes = await blob.arrayBuffer();
-  contentType = payload.contentType || 'application/octet-stream';
+  show(await blob.arrayBuffer(), payload.contentType);
+}
+
+// Large redirect saves: the app downloaded the file, and only bytes matching its CID are accepted.
+function awaitFile(payload) {
+  if (typeof payload.cid !== 'string' || !Number.isInteger(payload.size) || payload.size < 1 || payload.size > 5 * 1024 * 1024) throw new Error('Invalid file handoff.');
+  accepted = true;
+  $('document-review').hidden = true;
+  $('file-handoff').hidden = false;
+  $('file-name').textContent = `${String(payload.fileName || 'hashbin-document')} (${payload.size} bytes)`;
+  status('Choose the file your app saved.');
+  $('file').addEventListener('change', async () => {
+    const file = $('file').files[0];
+    if (!file || busy) return;
+    if (file.size !== payload.size) { status('That file is a different size from the one your app saved. Choose the saved file.'); return; }
+    busy = true;
+    const data = await file.arrayBuffer();
+    if (!await verifyCID(payload.cid, data)) { busy = false; status('That file does not match the document your app saved. Choose the saved file.'); return; }
+    $('file-handoff').hidden = true;
+    $('document-review').hidden = false;
+    show(data, payload.contentType);
+  });
+}
+
+function show(data, type) {
+  bytes = data;
+  contentType = type || 'application/octet-stream';
   accepted = true;
   $('details').textContent = `${bytes.byteLength} bytes, ${contentType}`;
   // Never render user HTML, SVG, scripts or embedded resources. Preview only text.

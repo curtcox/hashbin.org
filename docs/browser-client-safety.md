@@ -159,17 +159,24 @@ for known GitHub/GitLab shared hosts or origins already used by another active a
 A zero count is not proof that no other app uses that origin. CORS permits active registered
 origins only; there is no special GitHub Pages exception or environment allow-list bypass.
 
-Prefer one origin per allowance app, sandbox untrusted content without `allow-same-origin`,
+Prefer one origin per allowance app, run untrusted code with the SDK's `createSandbox()`
+(an opaque-origin worker; never `allow-same-origin`),
 and verify restored state and app-code caches. HashBin's hosted approval does not protect
 client drafts, settings or service-worker storage from a compromised sibling app.
 
-The self-contained release `/sdk/v0.2.0/hashbin.js` is immutable. To enforce its integrity:
+The self-contained release `/sdk/v0.3.0/hashbin.js` is immutable (v0.2.0 also remains). To
+enforce its integrity:
 
 ```html
-<script type="module" src="https://hashbin.org/sdk/v0.2.0/hashbin.js"
-  integrity="sha384-mB0YKaK9+BVa8ALdgsr2t2s8ZmFuY9DpcrvITMPb3+CZQMIQrPq+E5zBdLMYp1dX"
+<script type="module" src="https://hashbin.org/sdk/v0.3.0/hashbin.js"
+  integrity="sha384-OrIu52nODd4k+SsDRTZjfEQq7Nu4NO7x1AtXqngPk3r2Pm5eI2Afv7nu33exMJ+a"
   crossorigin="anonymous"></script>
 ```
+
+v0.3.0 adds `createSandbox()`, the service-worker helper `hashbin-cache.js`, `clientState` on
+publish errors, automatic redirect on cross-origin-isolated pages and a file handoff for redirect
+saves above 512 KiB. `integrity.json` lists SRI and SHA-256 hashes for both files; offline-first
+apps may vendor the exact files and check them against it.
 
 It exposes `window.hashbin`; use it from a subsequent module script after the SDK loads.
 A plain JavaScript `import` of a version URL pins the version but does not by itself enforce

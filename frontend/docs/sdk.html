@@ -28,10 +28,11 @@
     <p>Use <code>publish()</code> for a save button: the user approves on HashBin and your app never holds a credential. Use an allowance with <code>authorize()</code> and <code>save()</code> for silent saves. <a href="/docs/browser-client-safety">Choose a safe flow</a> · <a href="/docs/security/">Security notes</a> · <a href="#migration">Upgrade an existing client</a> · <a href="/docs/api#browser-publishing">API contracts</a>.</p>
 
     <section class="card" id="load"><h2>1. Load and configure</h2>
-      <p>The immutable <a href="/sdk/v0.2.0/hashbin.js">v0.2.0 release</a> has no mutable module dependencies. This tag enforces Subresource Integrity and exposes <code>window.hashbin</code>:</p>
-      <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.2.0/hashbin.js"
-  integrity="sha384-mB0YKaK9+BVa8ALdgsr2t2s8ZmFuY9DpcrvITMPb3+CZQMIQrPq+E5zBdLMYp1dX"
+      <p>The immutable <a href="/sdk/v0.3.0/hashbin.js">v0.3.0 release</a> has no mutable module dependencies. This tag enforces Subresource Integrity and exposes <code>window.hashbin</code>:</p>
+      <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.3.0/hashbin.js"
+  integrity="sha384-OrIu52nODd4k+SsDRTZjfEQq7Nu4NO7x1AtXqngPk3r2Pm5eI2Afv7nu33exMJ+a"
   crossorigin="anonymous"&gt;&lt;/script&gt;</code></pre>
+      <p>Each release's <a href="/sdk/v0.3.0/integrity.json">integrity.json</a> lists SRI and SHA-256 hashes for its files. Offline-first apps can vendor the exact file instead and check it against those hashes in their tests; a vendored copy loads offline and is served by your own verified cache. v0.2.0 remains available unchanged.</p>
       <p>Use <code>window.hashbin.createClient()</code> from a following module script after the SDK loads. Pinning requires deliberate upgrades for fixes. For automatic updates, import the latest module instead:</p>
       <pre><code>import { createClient } from 'https://hashbin.org/sdk/hashbin.js';
 
@@ -53,16 +54,22 @@ saveButton.onclick = async () =&gt; {
 };</code></pre>
       <p>HashBin shows the registered app, a safe text preview, CID, size, retention, exact price and balance. The user signs in and approves there. The five-minute approval is single-use and bound to the exact bytes, content type, user, app, retention and charge. Your client receives a verified CID, not tokens or the approval ticket.</p>
       <table><thead><tr><th>Mode</th><th>Limit and behavior</th></tr></thead><tbody>
-        <tr><td><code>popup</code> (default)</td><td>1 byte to 5 MiB. Origin, opener and random state checks protect the handoff. A blocked popup falls back to a redirect for documents up to 512 KiB; larger documents require enabling popups and retrying.</td></tr>
-        <tr><td><code>redirect</code></td><td>Up to 512 KiB. Data travels in the URL fragment, never in a server request. The SDK preserves bytes and optional <code>clientState</code> in session storage. It returns <code>{redirected: true, state}</code> while navigating.</td></tr>
+        <tr><td><code>popup</code> (default)</td><td>1 byte to 5 MiB. Origin, opener and random state checks protect the handoff. A blocked popup falls back to a redirect for documents up to 512 KiB; larger documents require enabling popups and retrying. On a cross-origin-isolated page (<code>crossOriginIsolated</code>) v0.3.0 uses <code>redirect</code> automatically.</td></tr>
+        <tr><td><code>redirect</code></td><td>1 byte to 5 MiB. Up to 512 KiB, data travels in the URL fragment, never in a server request, and the SDK keeps the bytes and optional <code>clientState</code> in session storage. Above 512 KiB (v0.3.0), the SDK downloads the document as a file (name it with <code>fileName</code>), records its CID and asks the user to choose that file on HashBin, which accepts only bytes matching the CID. It returns <code>{redirected: true, state}</code> while navigating, with <code>fileHandoff: true</code> for files.</td></tr>
       </tbody></table>
-      <p>For a client using <code>Cross-Origin-Opener-Policy: same-origin</code>, choose redirect mode, or use <code>same-origin-allow-popups</code> where appropriate. A lost opener connection does not silently retry a paid save. A rejected, expired or reused approval needs a new review.</p>
+      <p>With <code>Cross-Origin-Opener-Policy: same-origin</code> the popup loses its opener. v0.3.0 rejects such a save with <code>error.code === 'popup_severed'</code> instead of a generic closed-window error; use redirect mode, or <code>same-origin-allow-popups</code> where appropriate. A lost opener connection does not silently retry a paid save. A rejected, expired or reused approval needs a new review.</p>
       <h3>Handle a publish redirect</h3>
       <p>Create the same client on the registered callback page, then verify the saved transaction before restoring your editor state:</p>
       <pre><code>if (new URLSearchParams(location.hash.slice(1)).has('hashbin_publish')) {
-  const { cid, clientState } = await client.handlePublishCallback();
-  restoreEditorState(clientState); // Your application's own restore function.
-  showSavedCID(cid);
+  try {
+    const { cid, clientState } = await client.handlePublishCallback();
+    restoreEditorState(clientState); // Your application's own restore function.
+    showSavedCID(cid);
+  } catch (error) {
+    // v0.3.0: cancelled, expired and mismatched saves still return clientState.
+    if (error.clientState) restoreEditorState(error.clientState);
+    showError(error.message); // 'access_denied' when the user cancelled.
+  }
   history.replaceState(null, '', location.pathname + location.search);
 }</code></pre>
     </section>
@@ -105,6 +112,36 @@ const bytes = await response.arrayBuffer(); // Already verified before retrieve(
 const valid = await hashbin.verifyCID(saved.cid, bytes);
 if (!valid) throw new Error('Content does not match its CID');</code></pre>
       <p><code>retrieve()</code> reads the complete body, verifies the length prefix and inline bytes up to 64 bytes or SHA-512 above that, then returns a Response. It does not stream unverified content. <code>publish()</code> and <code>save()</code> verify their returned CID. <code>verifyCID(cid, content)</code> accepts strings, Blobs, ArrayBuffers and typed-array views; a false result means the bytes must not be used.</p>
+    </section>
+
+    <section class="card" id="sandbox"><h2>5. Run untrusted code in a sandbox</h2>
+      <p>Apps that run code from users or links (an editor's Run button, a shared link that renders on load) should never run it with their page's origin. <code>createSandbox()</code> (v0.3.0) runs a worker inside an iframe with <code>sandbox="allow-scripts"</code> and no <code>allow-same-origin</code>. The code gets an opaque origin: no access to your origin's storage, cookies, service worker or pages. It returns a Worker-like object.</p>
+      <pre><code>const sandbox = hashbin.createSandbox({
+  source: workerSourceText,   // classic worker script, or a promise of it
+  base: new URL('src/', location.href).href,
+  proxy: ['https://cdn.jsdelivr.net/pyodide/v0.27.0/full/', new URL('src/runtime/', location.href).href]
+});
+sandbox.onmessage = ({ data }) =&gt; showOutput(data); // Untrusted: render as text.
+sandbox.onerror = ({ message }) =&gt; showError(message);
+sandbox.postMessage({ run: source });
+sandbox.terminate();         // Stops the code and removes the frame.</code></pre>
+      <ul>
+        <li><strong>Content-Security-Policy.</strong> The frame is an <code>srcdoc</code> document, so it inherits your page's policy. Add <code>'sha256-IMEqdP+AkCKdxhM3X7mQM4pV/chykJXPvdtndD+XeH8='</code> (exported as <code>SANDBOX_BOOTSTRAP_HASH</code>) and <code>blob:</code> to <code>script-src</code>, <code>blob:</code> to <code>worker-src</code>, <code>'wasm-unsafe-eval'</code> for WebAssembly runtimes, and the hosts the code fetches directly to <code>connect-src</code>.</li>
+        <li><strong>Offline and verified bytes.</strong> Sandboxed frames are not controlled by your service worker. GET requests under a <code>proxy</code> prefix are fetched by your page, without credentials, through its service worker and verified cache, then handed to the worker. Other requests go to the network directly, as cross-origin requests from an opaque origin.</li>
+        <li><strong>Loading runtimes.</strong> In the worker, <code>hashbinSandbox.importScripts(url)</code> and <code>hashbinSandbox.import(url)</code> load classic and module scripts through the proxy; <code>hashbinSandbox.base</code> is the base URL. Chromium cannot start module workers in opaque-origin frames, so the worker itself is classic.</li>
+        <li><strong>Messages.</strong> Only your page holds the channel to the worker. Treat every message from it as untrusted data.</li>
+      </ul>
+      <p>Python Online and Manim Online run all user code this way; see <a href="/docs/security/sn-2026-001">SN-2026-001</a> and <a href="/docs/security/sn-2026-002">SN-2026-002</a>.</p>
+    </section>
+
+    <section class="card" id="offline-cache"><h2>6. Verify service worker caches</h2>
+      <p>Every app on an origin can write its Cache Storage. A service worker on a shared host must check bytes before storing or serving them. <code>hashbin-cache.js</code> (v0.3.0) is a classic script for <code>importScripts</code>:</p>
+      <pre><code>importScripts('vendor/hashbin-cache.js'); // the exact release file, checked against integrity.json
+const hashFor = HashBinCache.lookup(PINNED_SHA256, self.registration.scope);
+const cache = HashBinCache.create({ cacheName: 'myapp-v42', hashFor });
+await cache.download(urls);                 // install: throws on any mismatch
+const response = await cache.match(url);    // fetch: null if another app altered it</code></pre>
+      <p><code>HashBinCache.verify(response, sha256, url)</code> returns a fresh response with headers rebuilt from the extension, or <code>null</code>. <code>HashBinCache.lockfileHashes(response, base)</code> reads package hashes from a Pyodide-style lockfile; verify the lockfile itself first.</p>
     </section>
 
     <section class="card" id="security"><h2>Storage, lifetime and recovery</h2>

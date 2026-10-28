@@ -6,9 +6,9 @@
 <li><strong>Save only when the user clicks Save?</strong> Use <code>publish()</code>. The user reviews the document, retention and exact price on HashBin and approves each save. Your app receives the CID and never holds a credential.</li>
 <li><strong>Need autosave or background saves?</strong> Call <code>authorize()</code> to open HashBin Publish's allowance entry page, then ask the user to set up silent saves. The SDK suggests $1/month, a maximum file size of 1 MiB and a 30-day expiry. Consent also offers 1- and 7-day expiries. Users can tighten the cap, file size and expiry on HashBin. Call <code>save()</code> for silent uploads, with a <code>maxCostCents</code> ceiling. Call <code>disconnect()</code> to revoke the grant server-side; <code>clearTokens()</code> only removes the local copy.</li>
 <li><strong>Hosted on a shared origin?</strong> All apps under <code>https://username.github.io/</code> share browser storage, regardless of their paths. The same applies to GitLab user sites, university <code>~user</code> pages and other path-based hosts. Registration requires acknowledging known shared hosts and origins already used by another registered app. Consent lists matching registered apps. A count of zero does not mean the origin has no other apps. Prefer per-save approval, or give each allowance app its own origin.</li>
-<li><strong>Run code from users or the internet?</strong> Put it in an opaque-origin sandboxed iframe without <code>allow-same-origin</code>, or on another origin. Treat restored drafts, caches and share links as untrusted. Ask before replacing unsaved work.</li>
+<li><strong>Run code from users or the internet?</strong> Use the SDK's <a href="/docs/sdk#sandbox"><code>createSandbox()</code></a>, which runs it in a worker inside an opaque-origin sandboxed iframe without <code>allow-same-origin</code>, or run it on another origin. Treat restored drafts, caches and share links as untrusted. Ask before replacing unsaved work.</li>
 <li><strong>Read content?</strong> <code>retrieve()</code> reads and verifies the full body against its CID before returning a Response. It checks inline bytes up to 64 bytes and SHA-512 for larger content, including the CID's length prefix. For your own fetches use <code>await verifyCID(cid, bytes)</code>. A false result means the content must not be used.</li>
-<li><strong>Pin the SDK for apps that spend money.</strong> Use the immutable version URL and SRI script tag in the <a href="/docs/sdk">SDK guide</a>. A plain JavaScript import pins a version but does not enforce SRI. Pinned clients must upgrade deliberately to receive fixes. The unversioned URL receives automatic updates and is convenient for experiments.</li>
+<li><strong>Pin the SDK for apps that spend money.</strong> The current release is v0.3.0. Use the immutable version URL and SRI script tag in the <a href="/docs/sdk">SDK guide</a>. A plain JavaScript import pins a version but does not enforce SRI. Pinned clients must upgrade deliberately to receive fixes. The unversioned URL receives automatic updates and is convenient for experiments.</li>
 </ol>
 <h2>Per-save approval</h2>
 <pre><code>const client = hashbin.createClient({
@@ -31,20 +31,21 @@ saveButton.onclick = async () =&gt; {
 <p>Use a Content Security Policy to restrict executable code, verify app-code caches before serving them, and keep HashBin price and credential prompts outside all user-content areas. These are app responsibilities; HashBin cannot protect drafts or code stored on a shared origin.</p>
 <ul>
 <li><strong>Content Security Policy.</strong> Keep scripts in files so <code>script-src</code> can name only your site and pinned paths, such as <code>https://hashbin.org/sdk/v0.2.0/</code>. A policy set in a <code>&lt;meta&gt;</code> tag also governs <code>srcdoc</code> iframes, so an editor that previews user HTML that way cannot restrict scripts without restricting the preview too; serve such previews from another origin. <code>frame-ancestors</code> works only as a response header.</li>
-<li><strong>Offline caches.</strong> Every app on the origin can write your Cache Storage. Have the service worker check each entry against a SHA-256 manifest, including pinned CDN files, before storing or serving it, and fetch again on a mismatch.</li>
+<li><strong>Offline caches.</strong> Every app on the origin can write your Cache Storage. Have the service worker check each entry against a SHA-256 manifest, including pinned CDN files, before storing or serving it, and fetch again on a mismatch. The SDK's <a href="/docs/sdk#offline-cache"><code>hashbin-cache.js</code></a> does the checking.</li>
 <li><strong>Links and restored state.</strong> Treat share links, fragments and stored drafts as untrusted input. Ask before a link replaces work kept in the browser.</li>
 <li><strong>Old tokens.</strong> After moving to <code>publish()</code>, call <code>disconnect()</code> once for any token the previous version stored, so copies elsewhere stop working.</li>
 </ul>
 <h2>Known pitfalls</h2>
 <ul>
+<li>Code from links run in a worker keeps your shared origin; use the sandbox: <a href="/docs/security/sn-2026-001">SN-2026-001</a>, <a href="/docs/security/sn-2026-002">SN-2026-002</a>.</li>
 <li>Tokens in Web Storage are readable by every app on the origin: <a href="/docs/security/sn-2026-003">SN-2026-003</a>.</li>
 <li>A meta policy also binds <code>srcdoc</code> previews: <a href="/docs/security/sn-2026-004">SN-2026-004</a>.</li>
-<li>Cross-origin isolation severs the Publish popup; use redirect mode: <a href="/docs/security/sn-2026-005">SN-2026-005</a>.</li>
-<li>Keep your own copy of <code>clientState</code> until the SDK returns it on cancellation: <a href="/docs/security/sn-2026-006">SN-2026-006</a>.</li>
-<li>Redirect saves are limited to 512 KiB: <a href="/docs/security/sn-2026-007">SN-2026-007</a>.</li>
+<li>Cross-origin isolation severs the Publish popup; SDK v0.3.0 redirects instead: <a href="/docs/security/sn-2026-005">SN-2026-005</a>.</li>
+<li>On SDK v0.2.0 a cancelled redirect loses <code>clientState</code>; v0.3.0 returns it with the error: <a href="/docs/security/sn-2026-006">SN-2026-006</a>.</li>
+<li>Redirect saves above 512 KiB need SDK v0.3.0's file handoff: <a href="/docs/security/sn-2026-007">SN-2026-007</a>.</li>
 <li>Sanitizers can trigger policy reports in tests: <a href="/docs/security/sn-2026-009">SN-2026-009</a>.</li>
 </ul>
-<p>See all <a href="/docs/security/">security notes</a>.</p>
+<p>See all <a href="/docs/security/">security notes</a>. The <a href="/developers">developer page</a> can check your registered app for these problems, and HashBin rechecks registered apps nightly.</p>
 <h2>What each measure protects against</h2>
 <p>Threats: another app on the same origin is compromised; your own app has an XSS or compromised dependency; untrusted content your app runs escapes its sandbox; a server or CDN returns different bytes; a fake consent or price prompt tricks the user.</p>
 <div style="overflow-x:auto"><table>

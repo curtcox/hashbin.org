@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SN-2026-002: Manim Online ran linked code with its own shared origin — HashBin</title><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css"><style>main{max-width:850px;margin:2rem auto;padding:1rem}li{margin:.5rem 0}td,th{padding:.5rem;text-align:left;border-bottom:1px solid #ccc;vertical-align:top}</style></head><body><main>
+<p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a> · <a href="/docs/sdk#sandbox">SDK sandbox</a></p>
+<h1>SN-2026-002: Manim Online ran linked code with its own shared origin</h1>
+<p>Manim Online runs code from the editor and from shared links in the browser. That code ran in a worker with the app's origin, <code>https://curtcox.github.io</code>, which every curtcox app shares. Code from a link could therefore use browser storage that belongs to that origin. No misuse is known. Since the 2026-10-28 rollout no curtcox app keeps a HashBin credential, which limited the exposure. Code now runs in the HashBin SDK sandbox with an opaque origin.</p>
+<div style="overflow-x:auto"><table>
+<tr><th>Found</th><td>2026-10-28, browser client safety review (C3)</td></tr>
+<tr><th>Fixed</th><td>2026-10-28, HashBin SDK v0.3.0 <code>createSandbox()</code>, adopted by Manim Online</td></tr>
+<tr><th>Affected</th><td><a href="https://curtcox.github.io/ManimOnline/">Manim Online</a> before the sandbox release</td></tr>
+<tr><th>Severity</th><td>Moderate: code from a link ran with the app's origin on a shared host. No credential was stored there.</td></tr>
+<tr><th>Status</th><td>Fixed</td></tr>
+<tr><th>Related</th><td><a href="/docs/security/sn-2026-001">SN-2026-001</a> and <a href="/docs/security/sn-2026-002">SN-2026-002</a> share this cause; see also <a href="/docs/security/sn-2026-003">SN-2026-003</a></td></tr>
+</table></div>
+<h2>What was wrong</h2>
+<p>A shared link to a Manim scene rendered as soon as the page opened. The code ran in a classic Pyodide worker loaded from <code>src/unified-worker.js</code>. A worker loaded from the app's own files runs with the app's origin, so origin-scoped storage and same-origin requests were available to it, as they are to the app itself. On <code>github.io</code> that origin is shared by every project of the account.</p>
+<p>Unlike Python Online, the worker removed no storage APIs, so the origin's storage was available to scene code as it was to the app.</p>
+<h2>How it was detected</h2>
+<p>The review asked one question of every app: where does untrusted code run, and with which origin? Both Python Online and Manim Online answered "a worker, with the app's origin". An automated check would have caught it sooner: the <a href="/developers">registered-app safety check</a> now reports apps that start workers without the SDK sandbox.</p>
+<h2>How it can be demonstrated</h2>
+<p>The app's browser test runs a small program, with local test data only, that reports the origin its code runs with. Before the fix it reported the app's origin; after it, <code>null</code>, the opaque origin of a sandbox. The check now runs on every change as a regression test.</p>
+<h2>How it was fixed</h2>
+<ul>
+<li><strong>HashBin-side:</strong> SDK v0.3.0 adds <code>createSandbox()</code>. It starts the worker inside an iframe with <code>sandbox="allow-scripts"</code>, which gives it an opaque origin. Sandboxed frames are not controlled by the app's service worker, so the page fetches runtime files through its verified cache and hands them in. Any app using HashBin gets the same isolation without writing it.</li>
+<li><strong>App-side:</strong> Manim Online starts its worker with <code>createSandbox()</code>, loads its runtime through the sandbox proxy, adds the sandbox's bootstrap hash and <code>blob:</code> to its Content-Security-Policy, and vendors the exact v0.3.0 release, checked against its published hashes.</li>
+<li><strong>Rejected:</strong> removing storage APIs from the worker or Pyodide's JavaScript bridge. That narrows what code can reach, but it is not a boundary. An origin per app (a custom domain per project) protects sibling apps but not the app's own storage, so it complements the sandbox rather than replacing it.</li>
+<li><strong>Not needed:</strong> a prompt before running linked code was planned as a stopgap and dropped, because the fix shipped in the same release.</li>
+</ul>
+<h2>How to avoid it</h2>
+<p>Never run code from users or links with your page's origin, in a worker or in a frame with <code>allow-same-origin</code>. Use <a href="/docs/sdk#sandbox"><code>createSandbox()</code></a>, or a separate origin you control. Treat every message from that code as untrusted data.</p>
+<h2>Lessons</h2>
+<ul><li>"It runs in a worker" is not isolation. Ask which origin the code runs with.</li><li>An isolation mechanism belongs in HashBin once, not in each app. The registered-app safety check now looks for this pattern.</li></ul>
+</main></body></html>

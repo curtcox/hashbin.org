@@ -8,13 +8,13 @@
 <div style="overflow-x:auto"><table>
 <thead><tr><th>ID</th><th>Problem</th><th>Affected</th><th>Status</th><th>HashBin-side fix</th></tr></thead>
 <tbody>
-<tr><td>SN-2026-001</td><td>Case study: PythonOnline (analysis being written)</td><td>PythonOnline</td><td>Open</td><td>Planned</td></tr>
-<tr><td>SN-2026-002</td><td>Case study: ManimOnline (analysis being written)</td><td>ManimOnline</td><td>Open</td><td>Planned</td></tr>
+<tr><td><a href="/docs/security/sn-2026-001">SN-2026-001</a></td><td>Case study: Python Online ran linked code with its own shared origin</td><td>Python Online</td><td>Fixed</td><td>Yes: SDK sandbox, <code>createSandbox()</code></td></tr>
+<tr><td><a href="/docs/security/sn-2026-002">SN-2026-002</a></td><td>Case study: Manim Online ran linked code with its own shared origin</td><td>Manim Online</td><td>Fixed</td><td>Yes: SDK sandbox, <code>createSandbox()</code></td></tr>
 <tr><td><a href="/docs/security/sn-2026-003">SN-2026-003</a></td><td>JavaScript-readable tokens on shared origins</td><td>Browser apps holding HashBin OAuth tokens</td><td>Fixed</td><td>Yes: hosted per-save approval, DPoP</td></tr>
 <tr><td><a href="/docs/security/sn-2026-004">SN-2026-004</a></td><td>A meta Content-Security-Policy also binds <code>srcdoc</code> previews</td><td>Pages Online</td><td>Open</td><td>Planned: hosted isolated origin</td></tr>
-<tr><td><a href="/docs/security/sn-2026-005">SN-2026-005</a></td><td>Cross-origin isolation severs the Publish popup</td><td>Apps sending <code>Cross-Origin-Opener-Policy: same-origin</code></td><td>Mitigated</td><td>Planned: SDK falls back to redirect</td></tr>
-<tr><td><a href="/docs/security/sn-2026-006">SN-2026-006</a></td><td>A cancelled redirect save loses the app's saved state</td><td>SDK v0.2.0 <code>handlePublishCallback()</code></td><td>Mitigated</td><td>Planned: SDK returns state with errors</td></tr>
-<tr><td><a href="/docs/security/sn-2026-007">SN-2026-007</a></td><td>Redirect saves are limited to 512 KiB</td><td>Redirect-only apps</td><td>Open</td><td>Planned: larger handoff</td></tr>
+<tr><td><a href="/docs/security/sn-2026-005">SN-2026-005</a></td><td>Cross-origin isolation severs the Publish popup</td><td>Apps sending <code>Cross-Origin-Opener-Policy: same-origin</code></td><td>Fixed</td><td>Yes: SDK v0.3.0 redirects isolated pages</td></tr>
+<tr><td><a href="/docs/security/sn-2026-006">SN-2026-006</a></td><td>A cancelled redirect save loses the app's saved state</td><td>SDK v0.2.0 <code>handlePublishCallback()</code></td><td>Fixed</td><td>Yes: SDK v0.3.0 returns state with errors</td></tr>
+<tr><td><a href="/docs/security/sn-2026-007">SN-2026-007</a></td><td>Redirect saves are limited to 512 KiB</td><td>Redirect-only apps</td><td>Fixed</td><td>Yes: SDK v0.3.0 file handoff</td></tr>
 <tr><td><a href="/docs/security/sn-2026-008">SN-2026-008</a></td><td>Local security tests failed without a signing key</td><td>HashBin development</td><td>Fixed</td><td>Yes</td></tr>
 <tr><td><a href="/docs/security/sn-2026-009">SN-2026-009</a></td><td>Sanitizers trigger Content-Security-Policy reports</td><td>Apps testing a CSP with DOMPurify</td><td>Accepted</td><td>Guidance only</td></tr>
 </tbody></table></div>
@@ -29,6 +29,7 @@
 <li><strong>How to avoid it</strong>: the general rule for other developers.</li>
 <li><strong>Lessons</strong> for HashBin's process, checks and documentation.</li>
 </ol>
+<p>HashBin also runs a <a href="/developers">safety check on registered apps</a>, on request and nightly, that looks for the problems recorded here.</p>
 <p>Analysis and the fix plan are published when a note opens. Demonstration material for a problem on a live, shared origin is published after the fix ships, or 30 days after the affected owner is told. Owners of third-party apps are told before their note opens.</p>
 <h2>Report a problem</h2>
 <p>Report a security problem privately through <a href="https://github.com/curtcox/hashbin.org/security/advisories/new">GitHub security advisories</a>. Please do not open a public issue.</p>

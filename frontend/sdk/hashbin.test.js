@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { HashBinClient } from './hashbin.js';
+import { HashBinClient, computeCID, verifyCID, SANDBOX_BOOTSTRAP, SANDBOX_BOOTSTRAP_HASH } from './hashbin.js';
+import { createHash } from 'node:crypto';
 
 function createMemoryStorage() {
   const store = new Map();
@@ -136,5 +137,44 @@ describe('HashBin browser SDK', () => {
 
     expect(client.getContentUrl('cid_123')).toBe('https://256t.us/cid_123');
     expect(client.getContentUrl('cid_123', { extension: 'txt', download: true })).toBe('https://256t.us/cid_123.txt?download=true');
+  });
+
+  it('returns clientState with cancelled, expired and mismatched redirect saves', async () => {
+    const transactionStorage = createMemoryStorage();
+    const client = new HashBinClient({ clientId: 'app_123', redirectUri: 'https://app.example/', storage: createMemoryStorage(), transactionStorage });
+    const bytes = new TextEncoder().encode('document');
+    const store = (state, extra = {}) => transactionStorage.setItem(`hashbin:publish:app_123:${state}`, JSON.stringify({ bytes: Buffer.from(bytes).toString('base64url'), clientState: { draft: state }, createdAt: Date.now(), ...extra }));
+    store('cancelled');
+    await expect(client.handlePublishCallback({ hash: '#hashbin_publish=cancelled&error=access_denied' })).rejects.toMatchObject({ message: 'access_denied', clientState: { draft: 'cancelled' } });
+    store('old', { createdAt: Date.now() - 16 * 60 * 1000 });
+    await expect(client.handlePublishCallback({ hash: '#hashbin_publish=old&cid=x' })).rejects.toMatchObject({ clientState: { draft: 'old' } });
+    store('wrong');
+    await expect(client.handlePublishCallback({ hash: `#hashbin_publish=wrong&cid=${await computeCID('other')}` })).rejects.toMatchObject({ message: 'Published CID does not match content.', clientState: { draft: 'wrong' } });
+    store('ok');
+    await expect(client.handlePublishCallback({ hash: `#hashbin_publish=ok&cid=${await computeCID(bytes)}` })).resolves.toEqual({ cid: await computeCID(bytes), clientState: { draft: 'ok' } });
+  });
+
+  it('completes file handoffs by the CID recorded before leaving', async () => {
+    const transactionStorage = createMemoryStorage();
+    const client = new HashBinClient({ clientId: 'app_123', redirectUri: 'https://app.example/', storage: createMemoryStorage(), transactionStorage });
+    const cid = await computeCID(new Uint8Array(600 * 1024).fill(7));
+    transactionStorage.setItem('hashbin:publish:app_123:big', JSON.stringify({ cid, clientState: 1, createdAt: Date.now() }));
+    await expect(client.handlePublishCallback({ hash: `#hashbin_publish=big&cid=${cid}` })).resolves.toEqual({ cid, clientState: 1 });
+    transactionStorage.setItem('hashbin:publish:app_123:big', JSON.stringify({ cid, clientState: 1, createdAt: Date.now() }));
+    await expect(client.handlePublishCallback({ hash: `#hashbin_publish=big&cid=${await computeCID('x')}` })).rejects.toThrow('does not match');
+  });
+
+  it('computes CIDs with inline bytes up to 64 bytes and SHA-512 above', async () => {
+    expect(await computeCID('hi')).toBe('AAAAAAACaGk');
+    expect(await verifyCID(await computeCID('a'.repeat(65)), 'a'.repeat(65))).toBe(true);
+    expect((await computeCID('a'.repeat(65))).length).toBe(94);
+  });
+
+  it('publishes the sandbox bootstrap hash pages put in their Content-Security-Policy', () => {
+    expect(SANDBOX_BOOTSTRAP_HASH).toBe(`sha256-${createHash('sha256').update(SANDBOX_BOOTSTRAP).digest('base64')}`);
+    expect(SANDBOX_BOOTSTRAP).not.toContain('</script');
+    // Only the embedding page may boot the sandbox, once.
+    expect(SANDBOX_BOOTSTRAP).toContain('e.source!==parent');
+    expect(SANDBOX_BOOTSTRAP).toContain('onmessage=null');
   });
 });
