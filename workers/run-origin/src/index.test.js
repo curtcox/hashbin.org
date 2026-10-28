@@ -56,7 +56,7 @@ describe('hosted run origin', () => {
     expect(policy).toContain('frame-ancestors https://app.example');
     expect(policy.includes('http://localhost:8080')).toBe(allowLocal);
     expect(policy).not.toContain('org.example');
-    expect(response.headers.get('cache-control')).toBe('no-cache');
+    expect(response.headers.get('cache-control')).toBe('no-cache, no-transform');
     expect(response.headers.get('vary')).toBe('Host');
     expect(response.headers.get('set-cookie')).toBeNull();
     for (const [internal] of registryFetch.mock.calls) expect(internal.headers.get('cookie')).toBeNull();
@@ -83,7 +83,13 @@ describe('hosted run origin', () => {
   it('serves only supported bootstrap versions with immutable headers', async () => {
     const { env } = setup();
     const worker = createRunWorker();
-    const response = await worker.fetch(request('/frame/v0.4.0.js'), env);
+    const frame = await worker.fetch(request(), env);
+    expect(await frame.text()).toContain('/frame/v0.4.1.js');
+    const legacy = await worker.fetch(request('/frame/v0.4.0.js'), env);
+    expect(legacy.status).toBe(302);
+    expect(legacy.headers.get('location')).toBe('/frame/v0.4.1.js');
+    expect(legacy.headers.get('cache-control')).toBe('no-store');
+    const response = await worker.fetch(request('/frame/v0.4.1.js'), env);
     expect(response.headers.get('cache-control')).toContain('immutable');
     expect(response.headers.get('content-type')).toContain('text/javascript');
     expect(await response.text()).toContain('embedders.includes(event.origin)');

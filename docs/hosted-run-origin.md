@@ -154,9 +154,16 @@ Engine query and records its actor; it accepts no request-count or brake overrid
 use `toDateTime`, because Analytics Engine rejects comparisons between DateTime and bare strings.
 
 
-Current rollout gate (2026-10-28): `CLOUDFLARE_ANALYTICS_TOKEN` is absent from both the production
-Worker and repository Actions secrets. A prepared token request grants only Account Analytics Read
-for the existing account, expiring January 26, 2027. The owner must create it and enter it into
-GitHub's Actions secret form. Redeploy after configuration, run the measurement above and confirm
-`run_brake` clears before running Python Online's `npm run test:hosted:live`. Rotate before expiry;
-never commit or paste the token into chat. The pilot frame currently returns 503 as intended.
+Production acceptance (2026-10-28): the owner configured `CLOUDFLARE_ANALYTICS_TOKEN` with only
+Account Analytics Read for the existing account. The Actions deployment installed it, and an audited
+real measurement cleared the run brake (39 requests, less than one cent). Rotate before 2027-01-26;
+never commit or paste the token into chat. `npm run test:hosted:live` passed against production HTTPS:
+files survive a fresh worker and reload, editor DOM/storage are inaccessible, and incoming linked
+code runs opaque again. Screenshots are generated in Python Online's `test-results/live-hosted.png`.
+
+The hosted frame remains `/frame/v0.4.0` for SDK v0.4.0 compatibility and loads the corrected
+immutable `/frame/v0.4.1.js` bootstrap. A patch script URL avoids browsers' cached initial bundle.
+The script is stored as literal text: serializing a function after bundling captured esbuild helper
+references that did not exist in the served script. A production-bundle regression test covers this.
+Frame HTML uses `Cache-Control: no-cache, no-transform` to prevent automatic beacon injection while
+retaining fresh registry policies. Published SDK v0.4.0 files are unchanged.

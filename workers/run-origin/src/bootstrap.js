@@ -1,6 +1,8 @@
 // Versioned with the hosted frame. Only a registered parent may connect a port;
 // top-level navigation (parent === self) never creates a worker.
-function hostedBootstrap() {
+// Keep executable text literal: bundlers add name helpers inside functions,
+// which become undefined globals when Function#toString serializes them.
+export const HOSTED_BOOTSTRAP = String.raw`(function hostedBootstrap() {
   const embedders = JSON.parse(document.querySelector('meta[name="hashbin-embedders"]').content);
   addEventListener('message', function connect(event) {
     const data = event.data;
@@ -33,7 +35,6 @@ function hostedBootstrap() {
     };
     port.postMessage({ type: 'hashbin:sandbox:ready', origin: location.origin });
   });
-}
-
-export const HOSTED_BOOTSTRAP = `(${hostedBootstrap})();`;
-export const FRAME_VERSIONS = ['v0.4.0'];
+})();`;
+export const BOOTSTRAP_VERSION = 'v0.4.1';
+export const FRAME_VERSIONS = ['v0.4.0', 'v0.4.1'];

@@ -3,21 +3,23 @@
 ## Status
 
 **Phase:** Deployed 2026-10-28 on `hashbin.app`; SDK v0.4.0 published and Python Online's
-opt-in persistent-home implementation deployed. Production acceptance is blocked by the missing `CLOUDFLARE_ANALYTICS_TOKEN`; the safety brake
-correctly returns 503 for pilot frames until real current-month evidence is available. The owner approved apex/wildcard DNS, TLS 1.2, deployment and enabling only Python Online.
+opt-in persistent-home implementation deployed. The owner configured the read-only analytics credential, a real current-month measurement cleared
+the brake, and production HTTPS acceptance passed: files survive fresh workers and reloads while
+editor storage/DOM remain isolated. Incoming linked programs return to opaque mode. The owner approved apex/wildcard DNS, TLS 1.2, deployment and enabling only Python Online.
 D3–D5 use the defaults below. Split out of [security_case_studies.md](security_case_studies.md) (Part 3, H5),
 tracked under B14 in `STATUS.md`. Related plan: [app_hosting.md](app_hosting.md) (H6).
 
 - [x] Owner: configurable implementation, production domain `hashbin.app` and Python Online pilot
 - [ ] Phase 0: complete browser retention acceptance (local Chromium/WebKit restart/partitioning passed;
-      Python Online Chromium/Firefox/WebKit CI passed; Safari seven-day and Firefox restart measurements remain)
+      Python Online Chromium/Firefox CI passed; WebKit offline lifecycle checks are being stabilized; Safari seven-day and Firefox restart measurements remain)
 - [x] Phase 1: domain, proxied apex/wildcard DNS, Universal SSL, HTTPS and minimum TLS 1.2
 - [ ] Phase 1: PSL eligibility and submission (registration expires 2027-10-28; pilot scale is also a concern)
 - [x] Phase 2: deployed run-origin Worker, routes and CI deployment/verification
 - [x] Phase 3: deployed registry, API and developer controls; only Python Online enabled
 - [x] Phase 4: published immutable SDK v0.4.0, integrity hashes and docs
 - [x] Phase 5: H4 check, docs and Python Online persistent-home implementation
-- [ ] Phase 5: production live acceptance and direct runtime pinning
+- [x] Phase 5: production live acceptance
+- [ ] Phase 5: direct runtime pinning (the working pilot retains its verified runtime proxy)
 - [ ] Phase 6: offline hosted service worker (optional; opaque offline execution remains supported)
 
 ## Why
@@ -87,7 +89,7 @@ runtime pinning/renewal and the remaining Python Online acceptance checklist.
   checks every download before uploads, uses the publisher grant, verifies CID/maximum retention and
   writes the manifest atomically. Configure the operator account's default retention to 120 months;
   the existing OAuth API deliberately ignores caller overrides and applies grant caveats.
-- Validation: 782 unit tests passed; 16 hosted SDK/developer browser tests passed in Chromium/WebKit; Wrangler
+- Validation: 783 unit tests passed; 16 hosted SDK/developer browser tests passed in Chromium/WebKit; Wrangler
   production bundle dry runs cover the main, content and run Workers. SDK v0.3.0 files are unchanged.
 
 
@@ -103,18 +105,26 @@ runtime pinning/renewal and the remaining Python Online acceptance checklist.
 - The first live analytics query exposed a DateTime/String mismatch. Queries now convert both bounds
   with `toDateTime`; the corrected query succeeded in Cloudflare Studio. The admin costs page can run
   a real, audited measurement with **Measure hosted run costs now**; it cannot override evidence.
-  Production and GitHub currently have no `CLOUDFLARE_ANALYTICS_TOKEN`. Configure Account Analytics Read
-  for the existing Cloudflare account, save that GitHub Actions secret, redeploy and measure before
-  running production persistence acceptance. No synthetic zero-count snapshot was installed.
+  The owner created the account-scoped Account Analytics Read credential and saved it as the
+  `CLOUDFLARE_ANALYTICS_TOKEN` Actions secret. Deployment installed it and the real measurement returned
+  39 requests (less than one cent), clearing the brake. It expires 2027-01-26 and needs rotation.
+  No synthetic zero-count snapshot was installed.
 - Public registry RDAP reports registration 2026-10-28 and expiration 2027-10-28, with transfer lock.
   [PSL guidelines](https://github.com/publicsuffix/list/wiki/Guidelines) require more than two years
   remaining and warn that small pilots may be declined. No renewal purchase or premature PSL PR was made.
   Extend the term and establish qualifying public usage before preparing the PRIVATE entry, then add the
   `_psl` TXT reference to the actual PR. PSL remains a follow-up, not a storage-origin prerequisite.
 - Python Online's [plan](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md)
-  and implementation are pushed. Its Linux CI is green in Chromium, Firefox and WebKit, with
+  and implementation are pushed. Its Chromium and Firefox CI pass; WebKit functional checks pass with an intermittent offline
+  lifecycle error under investigation. The previous three-engine run passed, with
   30 Node/package tests and 19 Python tests passing. Its real runtime is Pyodide 314.0.7 (CPython 3.14.2), initially using
   the existing verified embedding-page proxy. Direct `/r/` loading waits for approved runtime uploads.
+
+- Production bundling exposed `Function#toString` capturing esbuild's `__name` helper. The bootstrap
+  is now literal executable text and a regression test executes its bundled form with name preservation.
+  The v0.4.0 frame uses the corrected immutable `/frame/v0.4.1.js` URL, avoiding browsers' old cached
+  script; v0.4.0 SDK bytes are unchanged. Frames send `no-transform` so Cloudflare cannot inject its
+  Web Analytics beacon. The live Python check passes persistence, reload, isolation and linked-code guards.
 
 ### Domain, DNS and TLS (Phase 1)
 

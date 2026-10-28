@@ -4,7 +4,7 @@ import { readCostSafety } from '../../../src/utils/cost-safety-state.js';
 import { CID_PATTERN, isInlineContent, extractInlineContent } from '../../shared/content.js';
 import { securityHeaders } from '../../shared/headers.js';
 import { exclusive } from '../../256t-content/src/mutex.js';
-import { HOSTED_BOOTSTRAP, FRAME_VERSIONS } from './bootstrap.js';
+import { HOSTED_BOOTSTRAP, BOOTSTRAP_VERSION, FRAME_VERSIONS } from './bootstrap.js';
 
 const states = new WeakMap();
 const MAX_ENTRIES = 10000;
@@ -104,7 +104,7 @@ async function takeRequest(env, appId, ctx) {
 
 function frameDocument(embedders) {
   const content = JSON.stringify(embedders).replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll("'", '&#39;');
-  return `<!doctype html><meta charset="utf-8"><meta name="hashbin-embedders" content="${content}"><script src="/frame/v0.4.0.js"></script>`;
+  return `<!doctype html><meta charset="utf-8"><meta name="hashbin-embedders" content="${content}"><script src="/frame/${BOOTSTRAP_VERSION}.js"></script>`;
 }
 function framePolicy(embedders) {
   // Only canonical origins produced by the registry may enter CSP syntax.
@@ -168,9 +168,10 @@ export function createRunWorker(manifest = pins) {
       else {
         const match = url.pathname.match(/^\/frame\/(v\d+\.\d+\.\d+)(\.js)?$/);
         if (!match || !FRAME_VERSIONS.includes(match[1])) response = reply(404, 'Not found');
+        else if (match[2] && match[1] !== BOOTSTRAP_VERSION) response = reply(302, '', { Location: `/frame/${BOOTSTRAP_VERSION}.js` });
         else if (match[2]) response = reply(200, HOSTED_BOOTSTRAP, { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': IMMUTABLE });
         else response = reply(200, frameDocument(config.embedders), {
-          'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache', Vary: 'Host',
+          'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache, no-transform', Vary: 'Host',
           'Content-Security-Policy': framePolicy(config.embedders)
         });
       }
