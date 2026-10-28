@@ -2,21 +2,15 @@
 
 ## Status
 
-**Phase:** Implemented and deployed 2026-10-27 (commits 81b7dd9 through 405af40), except
-retiring `ADMIN_SECRET_TOKEN`, which waits on `ADMIN_USER_ID` being configured in
-production. Row B12 in `STATUS.md`.
+**Phase:** Done. Implemented and deployed 2026-10-27; the shared admin token was retired
+2026-10-28 (afb66e6) after the move to a production Clerk instance
+([clerk_remaining.md](clerk_remaining.md) CL12–CL15). Row B12 in `STATUS.md`.
 
-### Remaining
+### Remaining (owner)
 
-- [ ] Set the production `ADMIN_USER_ID` secret (GitHub secret of the same name, or
-  `wrangler secret put ADMIN_USER_ID`) to the admin's Clerk user ID. Production has none,
-  so today the legacy token is the only way into admin.
-- [ ] Keep the token through the move to a production Clerk instance, which changes the
-  admin's user ID: [clerk_remaining.md](clerk_remaining.md) CL12–CL15. Retiring it is CL15.
-- [ ] Then (CL15) remove `X-Admin-Token` support (`validateAdminToken` and its branch in
-  `authenticate()`, the token fallbacks in `frontend/js/admin-auth.js` and the admin
-  pages, scripts and docs), the deploy.yml step, and the `ADMIN_SECRET_TOKEN` secret.
-- [ ] Delete the unused `API_KEY_ENCRYPTION_KEY` Worker secret and GitHub secret.
+- [ ] Delete the unused `ADMIN_SECRET_TOKEN` and `API_KEY_ENCRYPTION_KEY` secrets, both the
+  GitHub secrets and the Worker secrets. Nothing reads them; my attempt to delete them was
+  refused by the permission check, so they are left to the owner.
 
 ### How it differs from the plan
 
@@ -282,7 +276,7 @@ IP or origin pinning is left out of the first pass (see open questions).
   `scripts/backup/restore-snapshot.mjs` uses `admin:backups admin:restore`.
 - [x] `isAdminRequest` / `requireAdmin` become `authorize(principal, 'admin:…')`;
   user API keys and OAuth tokens can never hold `admin:*` (closes G2).
-- [ ] Remove `ADMIN_SECRET_TOKEN` and `X-Admin-Token` support, the deploy.yml step and
+- [x] Remove `ADMIN_SECRET_TOKEN` and `X-Admin-Token` support, the deploy.yml step and
   the GitHub secret (G15). Break-glass is the admin's Clerk session.
 - [x] Every admin key use is written to the admin action log with the key ID.
 

@@ -2,10 +2,30 @@
 
 ## Status
 
-**Phase:** production configuration and acceptance; not verified in the production
-account. Backend implementation is in [done/clerk.md](../done/clerk.md).
-Updated 2026-10-27 (account move and admin token retirement, section 3). This plan takes precedence over older dashboard recipes in
-[deployment_checklist.md](deployment_checklist.md).
+**Phase:** production instance live since 2026-10-28 (UTC); account moved and the shared
+admin token retired. Left: GitHub and account-linking browser checks (CL10) and two secret
+deletions (see Record). Backend implementation is in [done/clerk.md](../done/clerk.md).
+
+## Record (2026-10-27/28)
+
+- Application `app_38E0Pl2VsM8eIOdqkFLQ4deRyic` ("hashbin"). Development instance
+  `ins_38E0PlVSro9jnNgWo2rVoOODQ8t` (`related-elephant-26.clerk.accounts.dev`); production
+  instance `ins_3LIhms1sLj4rVve16QTFGTi4ZXV`, domain `hashbin.org`, Frontend API
+  `clerk.hashbin.org`. Platform API was not used: configuration went through the Dashboard.
+- Production was created as a **default** instance, not a clone: the development instance used
+  two Pro features (SMS-code MFA, phone numbers) that a clone would have required paying for.
+  Phone sign-in is therefore not offered in production.
+- Sign-in: Google and GitHub with custom OAuth credentials (callback
+  `https://clerk.hashbin.org/v1/oauth_callback`); Apple and Microsoft not configured.
+- DNS: five DNS-only CNAMEs added in Cloudflare (`clerk`, `accounts`, `clkmail`,
+  `clk._domainkey`, `clk2._domainkey`); Clerk verified all and issued certificates.
+- Webhook endpoint `https://hashbin.org/api/webhooks/clerk` for `user.created`,
+  `user.updated`, `user.deleted`.
+- Account move: development `user_38GdYtGefSFlnXdWvvASbsITF6j` to production
+  `user_3LIpL4St2QaL3qATkuIAGQB3fwx` after snapshot `2026-10-28T01-40-14-422Z`. Moved $43.09,
+  94 history entries, 87 uploads (85 files) and 10 developer apps; revoked 6 app grants.
+- Owner actions still open: delete the `ADMIN_SECRET_TOKEN` and `API_KEY_ENCRYPTION_KEY`
+  secrets (GitHub and Worker); re-run `node scripts/publish.mjs authorize --limit 5`.
 
 ## Access preference: API and CLI first
 
@@ -26,25 +46,25 @@ acceptance remains necessary regardless of how configuration is applied.
 
 ## 1. Production instance, domain and providers
 
-- [ ] **CL1 — Discover access.** Identify the existing workspace/application and
+- [x] **CL1 — Discover access.** Done 2026-10-27 in the Dashboard (see Record). Original brief: Identify the existing workspace/application and
   production instance. With Platform API access, list applications at
   `GET /v1/platform/applications` and inspect the target application before
   creating anything. Record API availability, application/instance IDs and mode.
-- [ ] **CL2 — Instance configuration.** Prefer Platform API instance creation at
+- [x] **CL2 — Instance configuration.** Done: default production instance (see Record for why not a clone). Original brief: Prefer Platform API instance creation at
   `POST /v1/platform/applications/{applicationID}/instances` when needed. Read
   `/v1/platform/applications/{applicationID}/instances/{envOrInsID}/config/schema`
   and `/config`, then PATCH only required supported settings. Configure the
   intended social providers, account-linking/verification policy and minimal
   profile fields using the schema, without silently changing existing policy.
   Backend `GET/PATCH /v1/instance` covers only its documented subset.
-- [ ] **CL3 — Production providers.** Configure Google, Apple and Microsoft with
+- [x] **CL3 — Production providers.** Done for Google and GitHub; Apple and Microsoft not configured. Original brief: Configure Google, Apple and Microsoft with
   production credentials; GitHub remains optional unless selected for launch.
   Prefer Platform config API fields available to this workspace. Provider-side
   credential creation/verification may require that provider's API or console;
   record each unavoidable manual step. Clerk's Backend `/oauth_applications`
   resource configures Clerk as an OAuth server and is not a replacement for
   social sign-in provider configuration.
-- [ ] **CL4 — Domain and origins.** Prefer Platform domain operations under
+- [x] **CL4 — Domain and origins.** Done: five CNAMEs verified, certificates issued. Original brief: Prefer Platform domain operations under
   `/v1/platform/applications/{applicationID}/domains` and schema-supported
   settings for `hashbin.org`. Apply the returned DNS records via Cloudflare's
   DNS API, then verify resolution and Clerk's status. Inspect documented origin/
@@ -61,7 +81,7 @@ acceptance check complete.
 
 ## 2. Webhook and secret provisioning
 
-- [ ] **CL5 — Webhook.** Inspect available documented webhook management first.
+- [x] **CL5 — Webhook.** Done: endpoint created; first `user.created` delivered with 0% errors. Original brief: Inspect available documented webhook management first.
   The Backend API exposes `POST /v1/webhooks/svix` to provision the associated
   Svix app and `POST /v1/webhooks/svix_url` for a management URL; neither is a
   generic endpoint-configuration API. If this Clerk instance provides an
@@ -75,7 +95,7 @@ acceptance check complete.
   duplicates. Record endpoint ID and delivery evidence without secrets.
   [Clerk webhooks](https://clerk.com/docs/guides/development/webhooks/overview),
   [Svix endpoint API](https://api.svix.com/docs).
-- [ ] **CL6 — Secrets.** Obtain production credentials through the supported
+- [x] **CL6 — Secrets.** Done: the owner set the three secrets with `gh secret set`. Original brief: Obtain production credentials through the supported
   provisioning response or secret-management surface; use a browser only for
   credential bootstrap/reveal not exposed by an authorized API. Store
   `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` and `CLERK_WEBHOOK_SECRET` in GitHub
@@ -83,7 +103,7 @@ acceptance check complete.
   source. `gh secret list` verifies names, never values. GitHub remains the
   source of truth under Decision 21; deploy through the existing workflow,
   which already publishes these values to Cloudflare when configured.
-- [ ] **CL7 — Deploy and inspect.** Use `gh workflow run deploy.yml --ref main`
+- [x] **CL7 — Deploy and inspect.** Done: deploy run 40615766177; `/api/config` serves `pk_live_` for `clerk.hashbin.org`. Original brief: Use `gh workflow run deploy.yml --ref main`
   and `gh run view` to deploy/inspect the result. Verify the intended revision,
   production instance and secret names using CI/Workers API metadata. This step
   deploys the repository revision and must follow the normal release process.
@@ -122,7 +142,7 @@ What is keyed by the user ID, and what happens to it:
   the old profile `deleted_at` with `migrated_to` so its balance cannot be spent
   twice. It must be idempotent, report counts, and support a dry run. Cover it
   with unit tests and a local rehearsal (two LocalDev users).
-- [ ] **CL13 — Move each account.** Run `POST /api/admin/backups/run` and confirm the
+- [x] **CL13 — Move each account.** Done 2026-10-28 (see Record); a repeat dry run finds nothing left to move. Original brief: Run `POST /api/admin/backups/run` and confirm the
   snapshot completed (see [backup-and-restore.md](../docs/backup-and-restore.md)).
   Sign up once on the production instance with the same provider, record the new
   user ID (`GET /api/auth/session`), and do nothing else in that account. Dry-run,
@@ -130,11 +150,11 @@ What is keyed by the user ID, and what happens to it:
   list, deleting/extending an own upload, suppliers and developer apps under the
   new ID. Authenticate this step with the legacy admin token: admin keys and the
   admin session both depend on `ADMIN_USER_ID`, which is about to change.
-- [ ] **CL14 — Re-point the admin.** Set the `ADMIN_USER_ID` GitHub secret to the new
+- [x] **CL14 — Re-point the admin.** Done: `ADMIN_USER_ID` set and deployed (run 40616180230); the owner's session reaches admin routes. Original brief: Set the `ADMIN_USER_ID` GitHub secret to the new
   ID and deploy (`gh workflow run deploy.yml --ref main`). Confirm
   `/admin/keys.html` works while signed in, then reissue admin keys, API keys and
   app approvals (`node scripts/publish.mjs authorize --limit 5`).
-- [ ] **CL15 — Retire the shared admin token.** Only after CL14 is verified, remove
+- [x] **CL15 — Retire the shared admin token.** Done in afb66e6: `X-Admin-Token` answers 401 in production. The owner deletes the `ADMIN_SECRET_TOKEN` secrets. Original brief: Only after CL14 is verified, remove
   `X-Admin-Token` support as listed under "Remaining" in
   [scoped_keys.md](scoped_keys.md), drop its deploy step, and delete the
   `ADMIN_SECRET_TOKEN` Worker and GitHub secrets. Until then it is the way back
@@ -142,7 +162,7 @@ What is keyed by the user ID, and what happens to it:
 
 ## 4. API and browser acceptance
 
-- [ ] **CL8 — HTTP checks.** Check `/health` and `/api/config` via HTTP. Current
+- [x] **CL8 — HTTP checks.** Done: `/health` healthy, Clerk operational, `usingTestKeysInProduction: false`. Original brief: Check `/health` and `/api/config` via HTTP. Current
   `/health` Clerk details expose `secretKeyConfigured`,
   `publishableKeyConfigured` and `usingTestKeysInProduction`; these validate
   configuration presence/mode and do not establish authentication or webhook
@@ -155,18 +175,18 @@ What is keyed by the user ID, and what happens to it:
   curl -fsS https://hashbin.org/api/config | jq '{authMode,isLocalMode,productionKey:(.clerkPublishableKey | startswith("pk_live_"))}'
   ```
 
-- [ ] **CL9 — Webhook acceptance.** Use Backend API/SDK calls to create, update
+- [ ] **CL9 — Webhook acceptance.** Partly done: the owner's production sign-up delivered `user.created` and created the profile. Update and delete events not exercised. Original brief: Use Backend API/SDK calls to create, update
   and delete designated test users. Verify signed delivery creates/updates the
   HashBin profile and deletion disables its keys. Prefer authorized Svix API
   delivery inspection/replay when available; otherwise use the embedded UI
   only for delivery details/replay. Retain event IDs and observed application
   results. Never delete real users to test the integration.
-- [ ] **CL10 — Real authentication.** In a browser, exercise each enabled launch
+- [ ] **CL10 — Real authentication.** Google sign-in, session, `/api/auth/session` and admin pages verified 2026-10-28; GitHub sign-in, account linking, logout and mobile layout not yet exercised. Original brief: In a browser, exercise each enabled launch
   provider's login/consent, callback, account linking, session and logout flow.
   Verify `/api/auth/session`, dashboard state and `/api/balance` through the
   authenticated session. API-created users alone do not verify OAuth/browser
   redirects or cookies. Test mobile layout and Clerk SDK initialization too.
-- [ ] **CL11 — Smoke test.** Run and inspect the production smoke workflow via
+- [x] **CL11 — Smoke test.** Done by running the workflow's read-only checks directly: the workflow is disabled by GitHub for inactivity. Original brief: Run and inspect the production smoke workflow via
   CLI; record its successful run ID. Smoke checks supplement CL9/CL10.
 
   ```bash
