@@ -9,3 +9,6 @@ When a plan in `todo/` is fully implemented, move it here (`git mv todo/x.md don
 update any links to it, and update its row in `STATUS.md` in the same commit.
 
 Content lifecycle docs: start with `content_lifecycle_complete.md`.
+
+`history/` holds implementation write-ups that used to sit in the repository root and `docs/`.
+They describe the code as it was when written; check `STATUS.md` and the code before relying on them.

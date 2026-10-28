@@ -206,16 +206,10 @@ Validates R2 storage buckets are bound and accessible.
 curl https://hashbin.org/health
 ```
 
-### Development Environment Check
+### workers.dev Check
 
 ```bash
-curl https://hashbin-worker-dev.<account-id>.workers.dev/health
-```
-
-### Production Environment Check
-
-```bash
-curl https://hashbin-worker-prod.<account-id>.workers.dev/health
+curl https://hashbin-worker-prod.<workers-subdomain>.workers.dev/health
 ```
 
 ### Pretty Print with jq
@@ -390,7 +384,7 @@ The health endpoint is used by:
 See also:
 - `scripts/verify-deployment.sh` - Automated deployment verification
 - `docs/deployment.md` - Full deployment guide
-- `todo/health.md` - Validation coverage mapping
+- `done/health_validation.md` - Validation coverage mapping
 
 ## Response Time
 

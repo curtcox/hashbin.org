@@ -691,4 +691,4 @@ All 31 unit tests passing:
    - This determines all pricing in the system
 
 2. **Should edge caching be disabled for rate-limited content?**
-   - **Decision:** See [todo/edge_cache.md](edge_cache.md) for detailed analysis and recommendation
+   - **Decision:** See [todo/edge_cache.md](../docs/decisions/edge_cache.md) for detailed analysis and recommendation

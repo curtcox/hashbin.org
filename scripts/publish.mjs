@@ -12,7 +12,7 @@
  * The grant has only content:write and balance:read, a monthly spending limit and
  * optionally a retention cap, all enforced by HashBin; the approval page can narrow them. Its refresh token lives in the macOS Keychain, never in
  * the repo or in process arguments. Refresh tokens rotate on every use and expire
- * after 30 days without one; rerun `authorize` if publishing reports invalid_grant.
+ * after 7 days without one; rerun `authorize` if publishing reports invalid_grant.
  * OAuth uploads use the account's default retention (Account settings).
  *
  * HASHBIN_URL and HASHBIN_CLIENT_ID override the defaults (e.g. for npm run dev:local).

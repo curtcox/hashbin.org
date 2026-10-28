@@ -128,7 +128,7 @@ DEBUG=1 BASE_URL=http://localhost:9000 npm run test:api:health
 
 Tests run automatically on pull requests via GitHub Actions (`.github/workflows/local-api-tests.yml`):
 
-- Triggers on PRs to `main` or `develop` branches
+- Triggers on PRs to `main`
 - Starts local server automatically
 - Runs full test suite
 - Reports results in PR checks

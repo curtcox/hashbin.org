@@ -272,15 +272,11 @@ The scripts describe how HashBin is meant to work. In these places production do
 Items 1, 2, 4, and 8 are marked in the scripts with a ⚠ note under the affected beat. Fix the code
 or change the narration before recording that episode.
 
-1. **X2 (Paying for Popularity): per-content allowances aren't enforced on 256t.us** (STATUS B9). The MTBR
-   check and the purchase API exist, and the info page shows the allowance, but the 256t.us
-   worker that serves every production download only applies the per-IP limit (30 a minute). The
-   MTBR check runs only in hashbin.org's own download handler (`handleDownloadContent`), which
-   answers only in local development. Separately, the defaults deserve a second look before you
-   explain them on camera: one request per 30 days for the first month, then none, applies to each
-   file globally, and the 256t.us worker runs on every request (it doesn't use Cloudflare's cache),
-   so once enforced, a new file could be downloaded about once a month in total.
-   **Recommendation:** hold X2 until the intended model is settled and enforced.
+1. **X2 (Paying for Popularity): the allowance model changed** (STATUS L22, B9). Per-content
+   MTBR allowances were replaced on 256t.us by prepaid download reservations tied to paid storage,
+   and cache hits now consume allowance too. The script still explains the old MTBR defaults
+   ("one request every thirty days" for a new file). **Recommendation:** rewrite X2 around the
+   L22 model (`docs/cost-safety.md`) before recording.
 2. **X3 (Anyone Can Serve It): fallback to alternate suppliers isn't live** (STATUS B10). Registering, scanning,
    and listing suppliers work in production. Redirecting or proxying a download to a supplier when
    HashBin can't serve it is in the same local-only download handler, so 256t.us doesn't do it.
@@ -288,13 +284,12 @@ or change the narration before recording that episode.
 3. **Fixed: expired disputes now unblock content** (STATUS S15). Before the fix, closing an
    expired dispute left the `.disputed` marker in R2, so 256t.us kept answering 451. X1 Beat 4 is
    accurate once the fix is deployed.
-4. **X1 and U3: cached copies outlive a block or deletion.** 256t.us sends every successful
-   response with `Cache-Control: public, max-age=31536000, immutable`. The worker doesn't use
-   Cloudflare's cache, so the network itself won't keep serving a removed file, but a browser or shared
-   proxy that already fetched it may keep showing its copy for up to a year. The scripts say a deleted
-   or blocked link "stops working", which is true for anyone without a cached copy, and U3 notes that
-   people who downloaded a file keep it. Also confirm no Cloudflare Cache Rule caches 256t.us at the
-   edge; if one does, purge `https://256t.us/{cid}` on deletion, takedown, and new disputes.
+4. **X1 and U3: cached copies outlive a block or deletion.** 256t.us now caches downloads at the
+   edge for at most an hour (STATUS S22) and rechecks takedowns every minute, and browsers or shared
+   proxies that already fetched a file may keep their copy. The scripts say a deleted or blocked link
+   "stops working", which is true for anyone without a cached copy once the edge cache expires, and
+   U3 notes that people who downloaded a file keep it. Check the exact `Cache-Control` the worker
+   sends today before recording.
 5. **Fixed: pricing page and FAQ examples** (STATUS S16) now match billing, and use only sizes
    that can be uploaded.
 6. **Fixed: retention wording.** The docs now say whole calendar months, matching billing, as
@@ -307,3 +302,6 @@ or change the narration before recording that episode.
 9. **Launch state.** The scripts are written as if HashBin is launched: no beta banner, live
    sign-in keys, final legal pages. Don't publish them until the launch blockers in
    [STATUS.md](../../STATUS.md) are closed.
+10. **D2 (OAuth and PKCE): token lifetimes.** The script says access tokens last an hour and
+   refresh tokens thirty days. Today access tokens last 15 minutes, refresh tokens expire after
+   seven idle days, and a refresh family lasts at most 90 days (`src/api/oauth.js`).

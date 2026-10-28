@@ -83,7 +83,7 @@ read the actual subdomain/deployed URL from the API or deployment output.
 Run the repository verification and production smoke checks:
 
 ```bash
-npm run verify:prod
+npm run verify
 curl -fsS https://hashbin.org/health | jq '{status,environment,checks}'
 gh workflow run smoke-test.yml --repo curtcox/hashbin.org --ref main --field environment=production
 ```

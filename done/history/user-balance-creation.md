@@ -241,4 +241,4 @@ The balance is displayed in a user-friendly format:
 
 - [Clerk Authentication](https://clerk.com/docs)
 - [Cloudflare Durable Objects](https://developers.cloudflare.com/workers/learning/using-durable-objects/)
-- [HashBin.org User Profile Schema](../src/durable-objects/user-profile.js)
+- [HashBin.org User Profile Schema](../../src/durable-objects/user-profile.js)

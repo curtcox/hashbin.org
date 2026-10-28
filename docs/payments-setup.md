@@ -1,6 +1,6 @@
 # Payment System Environment Setup
 
-This guide explains how to configure the HashBin.org payment system for development and production environments.
+This guide explains how to configure the HashBin.org payment system.
 
 Prefer the API/CLI procedures in the [Stripe plan](../todo/cost_safety_stripe.md)
 and [deployment setup](../todo/deployment_setup.md). Configure webhook endpoints
@@ -8,7 +8,6 @@ with the Stripe API, test/replay with Stripe CLI, and provision secrets through
 GitHub CLI/Actions. Dashboard steps below are fallbacks only for specific
 settings or credential bootstrap unavailable through supported APIs. Record the
 limitation and verification; hosted Checkout acceptance still uses a browser.
-Check older environment commands against the current workflow before use.
 
 ## Prerequisites
 
@@ -38,141 +37,58 @@ Check older environment commands against the current workflow before use.
 4. Copy your **Publishable key** (starts with `pk_live_`)
 5. Copy your **Secret key** (starts with `sk_live_`)
 
-### 3. Configure Webhooks
+### 3. Configure the Webhook
 
-#### Development Webhook
-1. Go to Developers → Webhooks
-2. Click "Add endpoint"
-3. URL: `https://hashbin-worker-dev.YOUR_SUBDOMAIN.workers.dev/api/payments/webhook`
-4. Select events to listen for:
+Production is the only deployed environment. Create one live endpoint:
+
+1. URL: `https://hashbin.org/api/payments/webhook`
+2. Events:
    - `checkout.session.completed`
    - `checkout.session.expired`
    - `charge.dispute.created`
-5. Copy the **Signing secret** (starts with `whsec_`)
+3. Copy the **Signing secret** (starts with `whsec_`)
 
-#### Production Webhook
-1. Create another endpoint for production
-2. URL: `https://hashbin.org/api/payments/webhook`
-3. Select the same events
-4. Copy the production **Signing secret**
+For test-mode development, run `npm run dev` and forward events with the Stripe CLI (below).
+`npm run dev:local` needs no Stripe at all; see [local-development.md](local-development.md).
 
-## Cloudflare Secrets Configuration
+## Secrets
 
-### Development Environment
+Set these as **GitHub Actions secrets**; the deploy workflow pushes them to the Worker with
+`wrangler secret put` on every deploy (`.github/workflows/deploy.yml`, "Configure Stripe secrets"):
 
-Set secrets using Wrangler CLI:
-
-```bash
-# Clerk authentication secrets (existing)
-wrangler secret put CLERK_SECRET_KEY --env development
-# Paste your Clerk secret key when prompted
-
-wrangler secret put CLERK_PUBLISHABLE_KEY --env development
-# Paste your Clerk publishable key when prompted
-
-wrangler secret put CLERK_WEBHOOK_SECRET --env development
-# Paste your Clerk webhook secret when prompted
-
-# Stripe payment secrets (new)
-wrangler secret put STRIPE_SECRET_KEY --env development
-# Paste your Stripe TEST secret key (sk_test_...)
-
-wrangler secret put STRIPE_WEBHOOK_SECRET --env development
-# Paste your Stripe webhook signing secret (whsec_...)
-```
-
-### Production Environment
-
-Set secrets for production:
+| Secret | Value |
+|--------|-------|
+| `STRIPE_SECRET_KEY` | Live secret key (`sk_live_…`) |
+| `STRIPE_WEBHOOK_SECRET` | Live webhook signing secret (`whsec_…`) |
 
 ```bash
-# Clerk authentication secrets (existing)
-wrangler secret put CLERK_SECRET_KEY --env production
-# Paste your production Clerk secret key
-
-wrangler secret put CLERK_PUBLISHABLE_KEY --env production
-# Paste your production Clerk publishable key
-
-wrangler secret put CLERK_WEBHOOK_SECRET --env production
-# Paste your production Clerk webhook secret
-
-# Stripe payment secrets (new)
-wrangler secret put STRIPE_SECRET_KEY --env production
-# Paste your Stripe LIVE secret key (sk_live_...)
-
-wrangler secret put STRIPE_WEBHOOK_SECRET --env production
-# Paste your production Stripe webhook signing secret
+gh secret set STRIPE_SECRET_KEY --repo curtcox/hashbin.org
+gh secret set STRIPE_WEBHOOK_SECRET --repo curtcox/hashbin.org
 ```
 
-## Environment Variables
+For `npm run dev`, add test-mode `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET` to `.dev.vars` (gitignored).
 
-These are already configured in `wrangler.toml`:
-
-### Development
-```toml
-[env.development]
-vars = { 
-  ENVIRONMENT = "development", 
-  LOG_LEVEL = "debug" 
-}
-```
-
-### Production
-```toml
-[env.production]
-vars = { 
-  ENVIRONMENT = "production", 
-  LOG_LEVEL = "warn" 
-}
-```
+`/health` reports `checks.stripe.details.usingTestKeysInProduction` when production holds a test key.
 
 ## Testing the Setup
 
-### 1. Deploy to Development
+### 1. Verify Pricing
 
 ```bash
-npm run deploy:dev
-```
-
-### 2. Verify Deployment
-
-```bash
-# Check health endpoint
-curl https://hashbin-worker-dev.YOUR_SUBDOMAIN.workers.dev/health
-
-# Test payment calculation (no auth required)
-curl -X POST https://hashbin-worker-dev.YOUR_SUBDOMAIN.workers.dev/api/payments/calculate \
+# Payment calculation (no auth required)
+curl -X POST https://hashbin.org/api/payments/calculate \
   -H "Content-Type: application/json" \
   -d '{"size_bytes": 1073741824, "retention_months": 1}'
 
 # Should return: {"size_bytes":1073741824,"retention_months":1,"cost_cents":3,"cost_formatted":"$0.03"}
 ```
 
-### 3. Test Deposit Flow (Requires Authentication)
+### 2. Test the Webhook Locally
 
 ```bash
-# First, authenticate and get a session token
-# Then create a deposit
-curl -X POST https://hashbin-worker-dev.YOUR_SUBDOMAIN.workers.dev/api/balance/deposit \
-  -H "Authorization: Bearer YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"amount_cents": 500}'
-
-# Should return a Stripe checkout URL
-```
-
-### 4. Test Webhook
-
-Use Stripe CLI for local webhook testing:
-
-```bash
-# Install Stripe CLI
 # https://stripe.com/docs/stripe-cli
-
-# Forward webhooks to local dev
-stripe listen --forward-to https://hashbin-worker-dev.YOUR_SUBDOMAIN.workers.dev/api/payments/webhook
-
-# Trigger a test webhook
+npm run dev
+stripe listen --forward-to http://localhost:8787/api/payments/webhook
 stripe trigger checkout.session.completed
 ```
 
@@ -208,7 +124,7 @@ To change pricing, edit these constants and redeploy.
 ### Deposits Not Crediting Balance
 
 1. Check Stripe webhook logs in dashboard (Developers → Webhooks)
-2. Check Cloudflare Worker logs: `wrangler tail --env development`
+2. Check Cloudflare Worker logs: `npx wrangler tail`
 3. Verify webhook is receiving `checkout.session.completed` events
 4. Ensure `client_reference_id` is set correctly with user ID
 
@@ -281,4 +197,4 @@ After completing environment setup:
 For issues:
 - Check Cloudflare Worker logs: `wrangler tail`
 - Check Stripe webhook logs in dashboard
-- Review `todo/payments.md` for implementation details
+- Review `done/payments.md` for implementation details

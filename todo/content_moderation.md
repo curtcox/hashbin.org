@@ -29,7 +29,7 @@
 - ❌ Phase 9: Transaction History Updates (STATUS.md S5)
 - ❌ Phase 10: Final integration testing and plan archival (STATUS.md L11)
 
-**Fixed 2026-10-07 (STATUS.md L15):** the deletion and admin endpoints were unreachable (`request.user` never set) and crashed once reachable. Admin endpoints now also accept `X-Admin-Token`.
+**Fixed 2026-10-07 (STATUS.md L15):** the deletion and admin endpoints were unreachable (`request.user` never set) and crashed once reachable. Admin endpoints take the admin session or a scoped `hba_` admin key (the shared `X-Admin-Token` was retired 2026-10-28).
 
 ---
 

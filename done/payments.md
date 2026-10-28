@@ -82,7 +82,7 @@ HashBin.org operates on a **prepaid wallet, pay-per-upload** model:
 | 22 | Balance display | **Current balance only** (no burn rate) |
 | 23 | Negative balance | **Not allowed** - hard floor at $0.00 |
 | 24 | CID donations | **Extend that CID's TTL** (not uploader's balance) |
-| 25 | Peer-to-peer balance transfer | **TBD** - see [balance_transfer.md](balance_transfer.md) |
+| 25 | Peer-to-peer balance transfer | **TBD** - see [balance_transfer.md](../todo/balance_transfer.md) |
 | 26 | Upload rejection message | "Your account balance is too low for the minimum retention of 30 days. That would cost {X} and you only have {Y} in your account. {Link}" |
 | 27 | Retention duration selection | **Both** - presets + custom input |
 | 28 | Minimum retention duration | **30 days**; no maximum for single payment |
@@ -317,7 +317,7 @@ Existing upload endpoint gains payment logic:
 
 *All payment questions resolved. See Decisions #1-46 above.*
 
-*Peer-to-peer balance transfer is tracked separately in [balance_transfer.md](balance_transfer.md).*
+*Peer-to-peer balance transfer is tracked separately in [balance_transfer.md](../todo/balance_transfer.md).*
 
 ---
 

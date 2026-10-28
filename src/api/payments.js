@@ -109,10 +109,10 @@ export async function handleCreateDeposit(request, env) {
       apiVersion: '2024-11-20.acacia'
     });
 
-    // Determine URLs based on environment
-    const baseUrl = env.ENVIRONMENT === 'production' 
-      ? 'https://hashbin.org' 
-      : 'https://hashbin-worker-dev.curtcox.workers.dev';
+    // Stripe returns the browser here; outside production, back to the origin that asked
+    const baseUrl = env.ENVIRONMENT === 'production'
+      ? 'https://hashbin.org'
+      : new URL(request.url).origin;
 
     // Create Stripe Checkout session
     const session = await stripe.checkout.sessions.create({
@@ -561,10 +561,10 @@ export async function handleCreateDonation(request, env, cid) {
       apiVersion: '2024-11-20.acacia'
     });
 
-    // Determine URLs based on environment
-    const baseUrl = env.ENVIRONMENT === 'production' 
-      ? 'https://hashbin.org' 
-      : 'https://hashbin-worker-dev.curtcox.workers.dev';
+    // Stripe returns the browser here; outside production, back to the origin that asked
+    const baseUrl = env.ENVIRONMENT === 'production'
+      ? 'https://hashbin.org'
+      : new URL(request.url).origin;
 
     // Get optional donor user ID
     const authResult = await authenticate(request, env);

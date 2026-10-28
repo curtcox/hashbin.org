@@ -10,7 +10,7 @@ raw uploaded content is isolated on `256t.us`. There is no frontend build step.
 | --- | --- |
 | `publish.html`, `js/publish.js` | First-party per-save approval and allowance setup entry page |
 | `sdk/hashbin.js` | Latest self-contained browser SDK |
-| `sdk/v0.2.0/`, `sdk/v0.3.0/` | Immutable SDK releases with SRI/SHA-256 integrity manifests (v0.3.0 adds `hashbin-cache.js`) |
+| `sdk/v0.2.0/`, `sdk/v0.3.0/`, `sdk/v0.4.0/` | Immutable SDK releases with SRI/SHA-256 integrity manifests (v0.3.0 adds `hashbin-cache.js`; v0.4.0 adds hosted sandboxes) |
 | `docs/browser-client-safety.html` | Choosing save flows, shared origins, storage and recovery |
 | `docs/sdk.html` | SDK usage, callbacks, SRI and migration |
 | `docs/api.html` | Public API reference |

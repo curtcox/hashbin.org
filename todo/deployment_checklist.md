@@ -104,8 +104,8 @@ Expected result: All tests pass
 ### 2. Deploy to Production
 
 ```bash
-# Deploy to production environment
-npm run deploy:prod
+# Deploy (there is only the production environment)
+npm run deploy
 ```
 
 Expected output:
@@ -120,7 +120,7 @@ Expected output:
 
 ```bash
 # Run deployment verification
-npm run verify:prod
+npm run verify
 ```
 
 Check:
@@ -234,7 +234,7 @@ If deployment fails or critical issues are found:
    ```bash
    # Revert to previous deployment
    git checkout <previous-commit>
-   npm run deploy:prod
+   npm run deploy
    ```
 
 2. **Disable Webhooks**
@@ -318,7 +318,7 @@ Consider adding:
 wrangler secret list --env production
 
 # Redeploy if needed
-npm run deploy:prod
+npm run deploy
 ```
 
 ### Issue: Durable Objects Not Connected

@@ -102,11 +102,16 @@ For full details, see [docs/local-development.md](docs/local-development.md).
 
 ### Available Scripts
 
-- `npm run dev` - Start local development server
+- `npm run dev` - Start local development server (needs Clerk/Stripe test keys in `.dev.vars`)
 - `npm run dev:local` - Start local development with local auth/payments
-- `npm run deploy` - Deploy to production
-- `npm run verify` - Verify production deployment
-- `npm test` - Run test suite
+- `npm run test:unit` - Unit tests (Vitest; no server needed)
+- `npm run lint` - ESLint for `src/`, `workers/` and `scripts/`
+- `npm test` - Unit tests plus the shell checks (some need `npm run dev:local` running)
+- `npm run status` - One-screen summary of `STATUS.md`
+- `npm run deploy` - Deploy the main Worker by hand (CI deploys every push to `main`)
+- `npm run verify` - Verify the production deployment at `https://hashbin.org`
+
+Working in this repo as an agent or new contributor? Start with [AGENTS.md](AGENTS.md).
 
 ## Architecture
 
@@ -129,14 +134,21 @@ For full details, see [docs/local-development.md](docs/local-development.md).
 └───────────┘ └────────┘ └──────────┘ └───────────┘
 ```
 
+### Workers
+
+| Worker | Code | Serves |
+|--------|------|--------|
+| `hashbin-worker-prod` | `src/`, `frontend/` | `hashbin.org`: API, static frontend, cron jobs, Durable Objects |
+| `256t-content-prod` | `workers/256t-content/` | `256t.us`: content downloads, isolated from sessions |
+| `hashbin-run-prod` | `workers/run-origin/` | `hashbin.app`: hosted sandbox origins for registered apps |
+
 ### Durable Objects
 
-1. **ContentMetadata** - Content hash records and metadata
-2. **UserProfile** - User accounts, API keys, upload history
-3. **ApplicationRegistry** - Public app registrations, registered-origin checks and per-key DPoP replay receipts
-4. **PaymentRecord** - Payment tracking and history
-5. **ContestRecord** - Content dispute tracking
-6. **MessageThread** - User-to-contester communication
+State lives in 17 Durable Object classes in `src/durable-objects/`, bound in `wrangler.toml`.
+The central ones are **ContentMetadata** (per-CID records, retention, allowances),
+**UserProfile** (accounts, balances, API keys, OAuth grants), **ApplicationRegistry**
+(registered apps and DPoP replay receipts), **PaymentRecord**, **DisputeRecord**/**DisputeIndex**
+(content reports) and **BackupIndex** (nightly metadata snapshots).
 
 ## API Documentation
 
@@ -180,9 +192,10 @@ See [docs/API.md](docs/API.md) for complete API reference documentation.
 
 ## Rate Limits
 
-- **Anonymous**: 100 requests/minute
-- **Authenticated**: 1,000 requests/minute
-- **Per API Key**: 500 requests/minute (within user's total limit)
+The API applies per-minute limits of 100 requests (anonymous, per IP), 1,000 (per account) and
+500 (per API key, within the account limit). These counters live in each Worker isolate's memory
+(`src/auth/middleware.js`), so they are best-effort rather than global. Download volume on
+256t.us is bounded separately by prepaid download allowances ([cost safety](docs/cost-safety.md)).
 
 ## Security
 
@@ -207,44 +220,33 @@ See [done/user_authorization.md#security-considerations](done/user_authorization
 
 ### Deployment Steps
 
-See [done/user_authorization.md#production-deployment-checklist](done/user_authorization.md#production-deployment-checklist) for the complete deployment checklist.
+Every push to `main` runs the tests and deploys (`.github/workflows/deploy.yml`); the workflow
+pushes Worker secrets from GitHub secrets. See [docs/deployment.md](docs/deployment.md) for a
+fork and [todo/deployment_setup.md](todo/deployment_setup.md) for hashbin.org itself.
 
 Quick summary:
 1. Configure OAuth providers in Clerk Dashboard
 2. Generate an OAuth signing key: `./scripts/generate-oauth-signing-key.sh`
-3. Add secrets to GitHub Actions and Cloudflare: `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `OAUTH_SIGNING_KEY`
-4. Deploy: `npm run deploy:prod`
-5. Verify: `npm run verify:prod`
+3. Add the GitHub secrets checked by the workflow's "Verify required secrets" step
+   (including `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `OAUTH_SIGNING_KEY`, Stripe keys)
+4. Push to `main` (or `npm run deploy` by hand)
+5. Verify: `npm run verify`
 
 ## Testing
 
-### Automated Tests
+| Command | What it runs | Needs |
+|---------|--------------|-------|
+| `npm run test:unit` | Vitest unit tests (`**/*.test.js`) | nothing |
+| `npm run test:e2e` | Playwright browser tests (`frontend/tests/`) | starts `npm run dev:local` if needed |
+| `npm run test:hosted` | Hosted sandbox tests in Chromium/WebKit | Playwright browsers |
+| `npm run test:funded:local` | Native funded-download acceptance in two isolated local Workers | nothing |
+| `npm test` | Unit tests plus legacy grep-based shell checks | `npm run dev:local` for the supplier checks |
+| `npm run test:api` | Local API suites (`scripts/api-tests/`) | `npm run dev:local` |
 
-```bash
-# Start dev server (in one terminal)
-npm run dev
-
-# Run tests (in another terminal)
-./scripts/test-auth-system.sh
-```
-
-Unit tests: `npm run test:unit`. Browser tests: `npm run test:e2e` (starts `npm run dev:local` if
-needed). Full suite: `npm test` (its supplier checks call the API, so run `npm run dev:local` first).
-Local API suites: `npm run test:api` against `npm run dev:local`.
-Native funded-download acceptance: `npm run test:funded:local` starts and cleans
-up two isolated local Workers, without provider credentials. Deployment CI
-requires this check and the unit suite. Cost history export/invoice reconciliation:
-`npm run cost-safety:report -- ...`; see [the runbook](docs/cost-safety.md#export-and-invoice-reconciliation)
-and the separate [Cloudflare](todo/cost_safety_cloudflare.md) /
-[Stripe](todo/cost_safety_stripe.md) operator checklists.
-
-Test categories:
-- Anonymous access to public endpoints
-- Authentication rejection on protected endpoints
-- API key format validation
-- Environment-specific key validation
-- Session management endpoints
-- Durable Objects health checks
+Deployment CI requires the unit, hosted-sandbox and funded-download checks. Cost history
+export/invoice reconciliation: `npm run cost-safety:report -- ...`; see
+[the runbook](docs/cost-safety.md#export-and-invoice-reconciliation) and the separate
+[Cloudflare](todo/cost_safety_cloudflare.md) / [Stripe](todo/cost_safety_stripe.md) operator checklists.
 
 ### Manual Testing
 
@@ -252,9 +254,11 @@ See [todo/manual_testing_guide.md](todo/manual_testing_guide.md) for comprehensi
 
 ## Documentation
 
+- **[AGENTS.md](AGENTS.md)** - Repository map, commands and conventions for agents and contributors
+- **[Documentation index](docs/README.md)** - Every guide and runbook in `docs/`
 - **[Browser Client Safety](docs/browser-client-safety.md)** - Save flows, token lifetimes, shared origins, SRI and migration
-- **[API Reference](docs/API.md)** - Complete API endpoint documentation with examples ✨
-- **[Frontend Deployment](docs/frontend-deployment.md)** - Frontend setup and Clerk configuration ✨
+- **[API Reference](docs/API.md)** - Complete API endpoint documentation with examples
+- **[Frontend Deployment](docs/frontend-deployment.md)** - Frontend setup and Clerk configuration
 - **[Project Status](STATUS.md)** - Launch readiness and current work
 - **[Master Plan](todo/master_plan.md)** - Vision, architecture, and decisions
 - **[User Authorization](done/user_authorization.md)** - Authentication system (Phase 3) ✅
@@ -270,17 +274,17 @@ This is an open-source project. Contributions are welcome!
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes with tests
+3. Make your changes with tests (see [AGENTS.md](AGENTS.md) for commands and conventions)
 4. Submit a pull request
 
 ## License
 
-MIT License - see LICENSE file for details
+MIT License - see [LICENSE](LICENSE) for details
 
 ## Support
 
 - **Issues**: [GitHub Issues](https://github.com/curtcox/hashbin.org/issues)
-- **Documentation**: [todo/](todo/) directory
+- **Documentation**: [docs/README.md](docs/README.md)
 - **Email**: Contact via GitHub
 
 ## Acknowledgments

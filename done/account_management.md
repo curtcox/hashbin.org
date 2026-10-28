@@ -219,7 +219,7 @@ An account becomes "orphaned" when the user can no longer authenticate (e.g., th
 ## Related Documents
 
 - [User Authorization](./user_authorization.md) - Core authentication, API keys, rate limiting
-- [Content Dispute Resolution](./content_dispute_resolution.md) - Contests, DMCA, escalation system
+- [Content Dispute Resolution](../todo/content_dispute_resolution.md) - Contests, DMCA, escalation system
 
 ---
 

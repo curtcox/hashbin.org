@@ -224,7 +224,7 @@ Test result formatting and reporting:
 
 ### Adding New Tests
 
-1. Add test specification to `todo/deployment_validation.md`
+1. Add test specification to `done/deployment_validation.md`
 2. Choose appropriate test script file
 3. Implement test using library functions:
    ```bash
@@ -273,6 +273,6 @@ Test result formatting and reporting:
 
 ## References
 
-- Plan document: `todo/deployment_validation.md`
+- Plan document: `done/deployment_validation.md`
 - GitHub Actions workflow: `.github/workflows/deployment-validation.yml`
 - Existing smoke tests: `.github/workflows/smoke-test.yml`

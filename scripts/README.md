@@ -366,11 +366,8 @@ Comprehensive deployment verification script that tests all critical endpoints a
 ### Usage
 
 ```bash
-# Verify development deployment
-./scripts/verify-deployment.sh development <account-id>
-
-# Verify production deployment
-./scripts/verify-deployment.sh production <account-id>
+# Verify production on workers.dev
+./scripts/verify-deployment.sh production <workers-subdomain>
 
 # Verify custom domain
 ./scripts/verify-deployment.sh https://hashbin.org
@@ -381,14 +378,11 @@ Comprehensive deployment verification script that tests all critical endpoints a
 For convenience, you can use npm scripts:
 
 ```bash
-# Verify development (requires CLOUDFLARE_ACCOUNT_ID env var)
-npm run verify:dev -- <account-id>
+# Verify https://hashbin.org
+npm run verify
 
-# Verify production (requires CLOUDFLARE_ACCOUNT_ID env var)
-npm run verify:prod -- <account-id>
-
-# Verify custom domain
-npm run verify:custom
+# Verify hashbin-worker-prod.<subdomain>.workers.dev
+npm run verify:workers-dev -- <workers-subdomain>
 ```
 
 ### What It Tests
@@ -425,7 +419,7 @@ The verification script performs 4 comprehensive tests:
 ```
 ==========================================
 Verifying deployment: development
-Base URL: https://hashbin-worker-dev.abc123.workers.dev
+Base URL: https://hashbin-worker-prod.my-subdomain.workers.dev
 ==========================================
 
 Test 1: Root endpoint
@@ -455,7 +449,7 @@ HTTP Status: 404
 ✅ All verification tests passed!
 ==========================================
 Environment: development
-Base URL: https://hashbin-worker-dev.abc123.workers.dev
+Base URL: https://hashbin-worker-prod.my-subdomain.workers.dev
 Status: All systems operational
 
 Endpoints tested:
@@ -544,8 +538,7 @@ For production:
 
 The verification tests are automatically run in GitHub Actions after each deployment:
 
-- **Development:** Tests run after deploying to `develop` branch
-- **Production:** Tests run after deploying to `main` branch
+- **Production:** Tests run after each deploy from `main` (the only environment)
 
 If verification fails, the deployment is marked as failed in GitHub Actions.
 
@@ -575,8 +568,8 @@ If verification fails, the deployment is marked as failed in GitHub Actions.
 You can run the verification script locally after deploying:
 
 ```bash
-# Deploy to development
-npm run deploy:dev
+# Deploy
+npm run deploy
 
 # Wait a few seconds for propagation
 sleep 10

@@ -2,6 +2,11 @@
 
 This document describes the API endpoints for managing content rate limits.
 
+> **Enforcement changed (STATUS L22, B9).** On 256t.us, purchases through this API prepay
+> download counts that the prepaid reservation system enforces, at no less than $4 per million.
+> MTBR itself is checked only by the main Worker's local-development download handler. See
+> [cost-safety.md](cost-safety.md) for the production model.
+
 ## Overview
 
 Content rate limiting allows users to pay for bandwidth by purchasing the right to serve specific content at a defined frequency for a defined duration. This is a bandwidth payment system, not an access control mechanism.

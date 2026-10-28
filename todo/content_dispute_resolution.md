@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document covers the content dispute resolution system for HashBin.org, including the escalation system for handling contests and DMCA takedown requests. For core authentication, see [user_authorization.md](./user_authorization.md).
+This document covers the content dispute resolution system for HashBin.org, including the escalation system for handling contests and DMCA takedown requests. For core authentication, see [user_authorization.md](../done/user_authorization.md).
 
 ---
 
@@ -303,8 +303,8 @@ POST /api/dmca
 
 ## Related Documents
 
-- [User Authorization](./user_authorization.md) - Core authentication, API keys, rate limiting
-- [Account Management](./account_management.md) - Account linking, deletion, orphaned accounts
+- [User Authorization](../done/user_authorization.md) - Core authentication, API keys, rate limiting
+- [Account Management](../done/account_management.md) - Account linking, deletion, orphaned accounts
 
 ---
 

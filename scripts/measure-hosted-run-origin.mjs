@@ -55,7 +55,7 @@ function frameScript() {
       await navigator.serviceWorker.register('/sw.js');
       const registration = await Promise.race([
         navigator.serviceWorker.ready,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Service worker activation timed out')), 5000))
+        new Promise((_resolve, reject) => setTimeout(() => reject(new Error('Service worker activation timed out')), 5000))
       ]);
       return new Promise((resolve, reject) => {
         const channel = new MessageChannel();

@@ -797,7 +797,7 @@ src/
 - [256t Specification](https://256t.org) (assumed)
 - [WebCrypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API)
 - [Cloudflare R2 Documentation](https://developers.cloudflare.com/r2/)
-- [Master Plan](master_plan.md)
+- [Master Plan](../todo/master_plan.md)
 - [Payments Plan](payments.md)
 - [Download Plan](download.md) - content retrieval, MIME types, caching
 

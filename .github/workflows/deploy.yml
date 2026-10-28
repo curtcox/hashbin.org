@@ -16,10 +16,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -32,6 +32,9 @@ jobs:
 
       - name: Run unit and cost safety tests
         run: npm run test:unit
+
+      - name: Lint Worker and script code
+        run: npm run lint
 
       - name: Install hosted-sandbox test browsers
         run: npx playwright install --with-deps chromium webkit
@@ -52,10 +55,10 @@ jobs:
       url: https://hashbin.org
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'
@@ -576,7 +579,7 @@ jobs:
             exit 0
           fi
           echo "Testing worker on workers.dev..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker.${WORKERS_SUBDOMAIN}.workers.dev/health)
+          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-prod.${WORKERS_SUBDOMAIN}.workers.dev/health)
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n-1)
 
@@ -620,8 +623,8 @@ jobs:
       name: production
       url: https://hashbin.app
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: 'npm'

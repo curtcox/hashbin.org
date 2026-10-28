@@ -57,14 +57,14 @@ The core user authorization system has been fully implemented and tested:
 - Integration testing with actual Clerk authentication flows
 - Monitor rate limiting in production environment
 
-**Note:** Phase 3.6 (Escalation System) has been moved to [Content Dispute Resolution](./content_dispute_resolution.md) as it belongs to Phase 6 (Contestation System), not core authorization.
+**Note:** Phase 3.6 (Escalation System) has been moved to [Content Dispute Resolution](../todo/content_dispute_resolution.md) as it belongs to Phase 6 (Contestation System), not core authorization.
 
 ---
 
 ## Related Documents
 
 - [Account Management](./account_management.md) - Account linking, deletion, orphaned accounts
-- [Content Dispute Resolution](./content_dispute_resolution.md) - Contests, DMCA, escalation system
+- [Content Dispute Resolution](../todo/content_dispute_resolution.md) - Contests, DMCA, escalation system
 
 ---
 
@@ -119,7 +119,7 @@ This document outlines the plan for implementing user authorization in HashBin.o
 | **Authenticated** | Valid Clerk session or API key | Upload content, view own uploads, manage API keys, delete own account |
 | **Payer** | Authenticated + has paid for specific content | View contester contact info for their content |
 
-**Note**: There is no admin role. The system operates without administrative users. Contest moderation and DMCA requests are handled through a tiered automated escalation system (see [Content Dispute Resolution](./content_dispute_resolution.md)).
+**Note**: There is no admin role. The system operates without administrative users. Contest moderation and DMCA requests are handled through a tiered automated escalation system (see [Content Dispute Resolution](../todo/content_dispute_resolution.md)).
 
 ---
 
@@ -233,7 +233,7 @@ See [Account Management](./account_management.md) for details.
 
 **Note:** The escalation system is part of the content dispute resolution system and belongs to Phase 6 (Contestation System), not Phase 3 (Authentication & Authorization). 
 
-See [Content Dispute Resolution](./content_dispute_resolution.md) for details on:
+See [Content Dispute Resolution](../todo/content_dispute_resolution.md) for details on:
 - Escalation state machine
 - Tier 1 automated rules engine
 - AI integration for Tier 2 review
@@ -545,7 +545,7 @@ hb_test_<32-character-random-string>
 | INT-10 | Cross-user isolation | User A cannot access User B's keys | 404 for other user's resources |
 
 See [Account Management](./account_management.md) for INT-06, INT-11, INT-12 tests.
-See [Content Dispute Resolution](./content_dispute_resolution.md) for INT-13, INT-14 tests.
+See [Content Dispute Resolution](../todo/content_dispute_resolution.md) for INT-13, INT-14 tests.
 
 ### Edge Case Tests
 
@@ -564,7 +564,7 @@ See [Content Dispute Resolution](./content_dispute_resolution.md) for INT-13, IN
 | EDGE-12 | Key expires during request | Key expires mid-request | Request completes or fails atomically |
 
 See [Account Management](./account_management.md) for EDGE-07, EDGE-13 tests.
-See [Content Dispute Resolution](./content_dispute_resolution.md) for EDGE-14, EDGE-15 tests.
+See [Content Dispute Resolution](../todo/content_dispute_resolution.md) for EDGE-14, EDGE-15 tests.
 
 ### Security Tests
 
@@ -582,7 +582,7 @@ See [Content Dispute Resolution](./content_dispute_resolution.md) for EDGE-14, E
 | SEC-10 | Webhook signature validation | Forged Clerk webhook | Signature verified |
 
 See [Account Management](./account_management.md) for SEC-11, SEC-12 tests.
-See [Content Dispute Resolution](./content_dispute_resolution.md) for SEC-13, SEC-14 tests.
+See [Content Dispute Resolution](../todo/content_dispute_resolution.md) for SEC-13, SEC-14 tests.
 
 ---
 
@@ -728,7 +728,7 @@ No open questions remain. All decisions have been made.
   - `CLERK_SECRET_KEY`
   - `CLERK_WEBHOOK_SECRET`
 
-See [Content Dispute Resolution](./content_dispute_resolution.md) for AI and escalation dependencies.
+See [Content Dispute Resolution](../todo/content_dispute_resolution.md) for AI and escalation dependencies.
 
 ---
 
@@ -748,7 +748,7 @@ See [Content Dispute Resolution](./content_dispute_resolution.md) for AI and esc
 **Phase 3 (User Authorization) Success Criteria: COMPLETE ✅**
 
 See [Account Management](./account_management.md) for account deletion success criteria.
-See [Content Dispute Resolution](./content_dispute_resolution.md) for escalation success criteria.
+See [Content Dispute Resolution](../todo/content_dispute_resolution.md) for escalation success criteria.
 
 ---
 

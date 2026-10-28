@@ -81,7 +81,7 @@ If we decide to proceed, the feature would include:
 
 ## Related Decisions
 
-- See [payments.md](payments.md) Decision #25
+- See [payments.md](../done/payments.md) Decision #25
 
 ## Decision Log
 

@@ -1,21 +1,22 @@
 #!/bin/bash
 # Deployment Verification Script
-# Usage: ./scripts/verify-deployment.sh [environment] [account-id]
-# Example: ./scripts/verify-deployment.sh production abc123...
-# Note: 'environment' parameter kept for backward compatibility but only 'production' is used
+# Usage: ./scripts/verify-deployment.sh [production|<url>] [workers-dev-subdomain]
+# Examples:
+#   ./scripts/verify-deployment.sh https://hashbin.org         (npm run verify)
+#   ./scripts/verify-deployment.sh production my-subdomain     (hashbin-worker-prod.my-subdomain.workers.dev)
 
 set -e
 
 ENVIRONMENT=${1:-production}
-ACCOUNT_ID=$2
+WORKERS_SUBDOMAIN=$2
 
 if [ -z "$ENVIRONMENT" ]; then
-  echo "Usage: $0 [environment] [account-id]"
-  echo "  environment: production or custom URL (default: production)"
-  echo "  account-id: Cloudflare account ID (required for production)"
+  echo "Usage: $0 [production|<url>] [workers-dev-subdomain]"
+  echo "  production: check hashbin-worker-prod.<subdomain>.workers.dev"
+  echo "  workers-dev-subdomain: the account's workers.dev subdomain (required for production)"
   echo ""
   echo "Examples:"
-  echo "  $0 production abc123def456"
+  echo "  $0 production my-subdomain"
   echo "  $0 https://hashbin.org"
   exit 1
 fi
@@ -25,11 +26,11 @@ if [[ "$ENVIRONMENT" == http* ]]; then
   BASE_URL="$ENVIRONMENT"
   ENV_NAME="custom"
 elif [ "$ENVIRONMENT" = "development" ] || [ "$ENVIRONMENT" = "production" ]; then
-  if [ -z "$ACCOUNT_ID" ]; then
-    echo "Error: Account ID required for workers.dev URL"
+  if [ -z "$WORKERS_SUBDOMAIN" ]; then
+    echo "Error: workers.dev subdomain required (or pass a full URL, e.g. https://hashbin.org)"
     exit 1
   fi
-  BASE_URL="https://hashbin-worker.${ACCOUNT_ID}.workers.dev"
+  BASE_URL="https://hashbin-worker-prod.${WORKERS_SUBDOMAIN}.workers.dev"
   ENV_NAME="production"
 else
   echo "Error: Invalid environment '$ENVIRONMENT'"

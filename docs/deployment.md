@@ -20,9 +20,8 @@ still tests the real customer journey.
 - [Step 2: Configure for Your Domain](#step-2-configure-for-your-domain)
 - [Step 3: Set Up Cloudflare Account](#step-3-set-up-cloudflare-account)
 - [Step 4: Configure GitHub Secrets](#step-4-configure-github-secrets)
-- [Step 5: Deploy to Development](#step-5-deploy-to-development)
-- [Step 6: Deploy to Production](#step-6-deploy-to-production)
-- [Step 7: Configure Custom Domain](#step-7-configure-custom-domain)
+- [Step 5: Deploy](#step-5-deploy)
+- [Step 6: Configure Custom Domain](#step-6-configure-custom-domain)
 - [Verification and Testing](#verification-and-testing)
 - [Troubleshooting](#troubleshooting)
 - [Manual Deployment](#manual-deployment)
@@ -37,21 +36,19 @@ HashBin.org is deployed on Cloudflare's edge computing platform:
 - **R2 Storage**: Object storage for content and backups
 - **GitHub Actions**: Automated CI/CD pipeline
 
-### Environments
+### Environment and Workers
 
-The platform supports two environments:
+There is a single environment: production. Every push to `main` runs the tests and then
+deploys three Workers (`.github/workflows/deploy.yml`):
 
-1. **Development** (`develop` branch)
-   - Worker: `hashbin-worker-dev`
-   - URL: `https://hashbin-worker-dev.<account-id>.workers.dev`
-   - R2 Buckets: `hashbin-content-dev`, `hashbin-backups-dev`
+| Worker | Config | Serves | R2 bucket |
+|--------|--------|--------|-----------|
+| `hashbin-worker-prod` | `wrangler.toml` | `hashbin.org` (API, frontend assets, cron) | `hashbin-content-256t-prod`, `hashbin-backups-prod` |
+| `256t-content-prod` | `workers/256t-content/wrangler.toml` | `256t.us` (content downloads) | `hashbin-content-256t-prod` |
+| `hashbin-run-prod` | `workers/run-origin/wrangler.toml` | `hashbin.app` (hosted sandbox origins) | `hashbin-content-256t-prod` |
 
-2. **Production** (`main` branch)
-   - Worker: `hashbin-worker-prod`
-   - URL: `https://hashbin-worker-prod.<account-id>.workers.dev`
-   - Custom Domain: `https://yourdomain.com`
-   - R2 Buckets: `hashbin-content-256t-prod`, `hashbin-backups-prod`
-   - Content Domain: `https://256t.us`
+Each has a matching `wrangler.local.toml` for `npm run dev:local`. The authoritative list of
+Durable Object classes and bindings is `wrangler.toml`.
 
 ## Prerequisites
 
@@ -99,49 +96,19 @@ cd hashbin.org
 
 Update the configuration files to use your domain instead of `hashbin.org`.
 
-### Update wrangler.toml
+### Update the Wrangler configs
 
-Edit `wrangler.toml` and change the production route and zone:
-
-```toml
-# Production environment
-[env.production]
-name = "hashbin-worker-prod"
-route = { pattern = "yourdomain.com/*", zone_name = "yourdomain.com" }
-vars = { ENVIRONMENT = "production", LOG_LEVEL = "warn" }
-```
-
-**Important**: Replace `yourdomain.com` with your actual domain in both `pattern` and `zone_name`.
-
-### Update Worker Names (Optional)
-
-If you want custom worker names, update the `name` fields:
+Edit the top-level `routes`, `CONTENT_DOMAIN` and `RUN_DOMAIN` in `wrangler.toml`, and the
+`routes` in `workers/256t-content/wrangler.toml` and `workers/run-origin/wrangler.toml`:
 
 ```toml
-# Development environment
-[env.development]
-name = "yourproject-worker-dev"
-
-# Production environment
-[env.production]
-name = "yourproject-worker-prod"
+routes = [
+  { pattern = "yourdomain.com/*", zone_name = "yourdomain.com" }
+]
 ```
 
-### Update R2 Bucket Names (Optional)
-
-You can customize bucket names in `wrangler.toml`:
-
-```toml
-[[r2_buckets]]
-binding = "CONTENT_BUCKET"
-bucket_name = "yourproject-content-prod"
-preview_bucket_name = "yourproject-content-dev"
-
-[[r2_buckets]]
-binding = "BACKUP_BUCKET"
-bucket_name = "yourproject-backups-prod"
-preview_bucket_name = "yourproject-backups-dev"
-```
+Optionally rename the Workers (`name`) and R2 buckets (`bucket_name`) in all three files;
+keep the bucket names consistent, since the Workers share the content bucket.
 
 ### Commit Your Changes
 
@@ -311,90 +278,28 @@ Add the secret:
 
 **Security Note**: Never commit these values to your repository or share them publicly.
 
-## Step 5: Deploy to Development
+## Step 5: Deploy
 
-The development environment is automatically deployed when you push to the `develop` branch.
-
-### Create and Push to Develop Branch
+Push to `main`; GitHub Actions deploys production:
 
 ```bash
-# Create develop branch from main
-git checkout -b develop
-git push origin develop
-```
-
-### Monitor Deployment
-
-1. Go to your GitHub repository
-2. Click **Actions** tab
-3. You'll see "Deploy to Cloudflare" workflow running
-4. Click on the workflow to see detailed logs
-
-The workflow will:
-1. Run tests
-2. Install dependencies
-3. Create R2 buckets (`hashbin-content-dev`, `hashbin-backups-dev`)
-4. Deploy Worker to development environment
-5. Verify deployment with automated tests
-
-### Test Development Deployment
-
-Once deployment succeeds, test your development environment:
-
-```bash
-# Replace <account-id> with your actual Account ID
-curl https://hashbin-worker-dev.<account-id>.workers.dev/health
-```
-
-Expected response:
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-01-12T...",
-  "environment": "development",
-  "services": {
-    "worker": "operational",
-    "durableObjects": "operational",
-    "r2": "operational"
-  }
-}
-```
-
-## Step 6: Deploy to Production
-
-The production environment is automatically deployed when you push to the `main` branch.
-
-### Merge Develop to Main
-
-```bash
-git checkout main
-git merge develop
 git push origin main
 ```
 
-### Monitor Production Deployment
+In the **Actions** tab, the "Deploy to Cloudflare" workflow:
+1. Runs the unit, hosted-sandbox and funded-download tests
+2. Creates the R2 buckets if needed and pushes Worker secrets from GitHub secrets
+3. Deploys the three Workers listed above
+4. Verifies the workers.dev URL, the custom domain, and the git SHA embedded in the health
+   endpoint and HTML pages
 
-1. Go to **Actions** tab in GitHub
-2. Watch the production deployment workflow
-3. Review the deployment verification results
-
-The workflow will:
-1. Run tests
-2. Install dependencies
-3. Create R2 buckets (`hashbin-content-256t-prod`, `hashbin-backups-prod`)
-4. Deploy Worker to production environment
-5. Verify deployment on workers.dev URL
-6. Attempt to verify custom domain (may fail initially)
-
-### Test Production Deployment (Workers URL)
+Check the Worker on workers.dev (your account's workers.dev subdomain, not the account ID):
 
 ```bash
-curl https://hashbin-worker-prod.<account-id>.workers.dev/health
+curl https://hashbin-worker-prod.<workers-subdomain>.workers.dev/health
 ```
 
-At this point, your production worker is running on Cloudflare's workers.dev subdomain.
-
-## Step 7: Configure Custom Domain
+## Step 6: Configure Custom Domain
 
 Connect your custom domain to the production Worker.
 
@@ -467,11 +372,8 @@ The GitHub Actions workflow automatically verifies deployments by testing:
 Run the included verification script:
 
 ```bash
-# Verify development
-./scripts/verify-deployment.sh development <account-id>
-
-# Verify production (workers.dev)
-./scripts/verify-deployment.sh production <account-id>
+# Verify production on workers.dev
+./scripts/verify-deployment.sh production <workers-subdomain>
 
 # Verify custom domain
 ./scripts/verify-deployment.sh https://yourdomain.com
@@ -480,9 +382,8 @@ Run the included verification script:
 Or using npm:
 
 ```bash
-npm run verify:dev -- <account-id>
-npm run verify:prod -- <account-id>
-npm run verify:custom
+npm run verify                                  # https://hashbin.org
+npm run verify:workers-dev -- <workers-subdomain>   # hashbin-worker-prod.<subdomain>.workers.dev
 ```
 
 ### Manual Testing with curl
@@ -565,7 +466,7 @@ Check real-time logs in Cloudflare Dashboard:
 **Solution**:
 1. Verify `.github/workflows/deploy.yml` exists
 2. Check workflow file syntax is valid (YAML)
-3. Ensure you're pushing to `main` or `develop` branch
+3. Ensure you're pushing to `main`
 4. Check repository settings for branch protection rules
 
 ### Durable Objects Not Working
@@ -598,16 +499,12 @@ npx wrangler login
 
 This opens a browser window to authorize Wrangler.
 
-### Deploy to Development
+### Deploy
+
+There is one environment (production). Pushing to `main` deploys through CI; to deploy by hand:
 
 ```bash
-npm run deploy:dev
-```
-
-### Deploy to Production
-
-```bash
-npm run deploy:prod
+npm run deploy
 ```
 
 ### Local Development
@@ -620,123 +517,20 @@ npm run dev
 
 This starts a local development server at `http://localhost:8787`
 
-**Note**: Durable Objects and R2 in local mode use simulated storage that doesn't persist between restarts.
+For development without Clerk, Stripe or Cloudflare, use `npm run dev:local` instead; see
+[local-development.md](local-development.md).
 
 ## Architecture Details
 
-### Project Structure
+The sources of truth, rather than copies that go stale:
 
-```
-hashbin.org/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml           # CI/CD pipeline
-├── docs/
-│   └── deployment.md            # This file
-├── scripts/
-│   ├── verify-deployment.sh     # Deployment verification
-│   └── README.md                # Scripts documentation
-├── src/
-│   ├── index.js                 # Main Worker entry point
-│   └── durable-objects/         # Durable Object classes
-│       ├── content-metadata.js  # Content metadata storage
-│       ├── user-profile.js      # User profiles
-│       ├── payment-record.js    # Payment tracking
-│       ├── contest-record.js    # Contest management
-│       └── message-thread.js    # Message threads
-├── todo/
-│   ├── master_plan.md           # Project roadmap
-│   └── site_creation.md         # Detailed setup steps
-├── package.json                 # Node.js dependencies
-├── wrangler.toml                # Cloudflare Workers config
-├── DEPLOYMENT_SETUP.md          # Quick setup guide
-└── README.md                    # Project overview
-```
-
-### Cloudflare Resources
-
-Your deployment creates these resources:
-
-#### Workers
-- **hashbin-worker-dev**: Development environment worker
-- **hashbin-worker-prod**: Production environment worker
-
-#### Durable Objects (5 classes)
-- **ContentMetadata**: Stores content metadata and access tracking
-- **UserProfile**: Manages user accounts and preferences
-- **PaymentRecord**: Tracks payments and subscriptions
-- **ContestRecord**: Manages contest data and winners
-- **MessageThread**: Handles user messages and notifications
-
-#### R2 Buckets
-- **hashbin-content-dev**: Development content storage
-- **hashbin-backups-dev**: Development backup storage
-- **hashbin-content-256t-prod**: Production content storage
-- **hashbin-backups-prod**: Production backup storage
-
-### API Endpoints
-
-Currently implemented:
-
-- `GET /` - Service information and status
-- `GET /health` - Health check with service status
-
-Future endpoints (Phase 2+):
-- `/api/content` - Content upload/download
-- `/api/auth` - Authentication
-- `/api/payments` - Payment processing
-- `/api/contests` - Contest management
-- `/api/messages` - Messaging system
-
-### Environment Variables
-
-Set in `wrangler.toml` for each environment:
-
-- `ENVIRONMENT`: `"development"` or `"production"`
-- `LOG_LEVEL`: `"debug"` (dev) or `"warn"` (prod)
-
-### Cost Estimation
-
-**Cloudflare Workers Paid Plan**: $5/month includes:
-- Unlimited Worker requests
-- Durable Objects: 1M reads/writes free, then $0.15/M reads, $1.00/M writes
-- R2 Storage: 10GB free, then $0.015/GB/month
-- R2 Operations: Class A (writes): $4.50/M, Class B (reads): $0.36/M
-
-**Typical usage for small site**:
-- Workers: $5/month (base plan)
-- R2 Storage: $0 (under 10GB)
-- R2 Operations: < $1/month
-- **Total: ~$6/month**
-
-### Security Considerations
-
-1. **API Token Permissions**: Use minimum required permissions
-2. **GitHub Secrets**: Never commit secrets to repository
-3. **CORS Headers**: Configured with `access-control-allow-origin: *` (adjust for production)
-4. **HTTPS Only**: All traffic uses HTTPS (enforced by Cloudflare)
-5. **Rate Limiting**: Consider adding rate limiting for production (TODO)
-
-### Scaling
-
-Cloudflare Workers automatically scale to handle traffic:
-- No servers to manage
-- Deployed to 200+ datacenters worldwide
-- Requests routed to nearest datacenter
-- Durable Objects provide strong consistency when needed
-- R2 provides global object storage
-
-## Next Steps
-
-After successful deployment:
-
-1. **Test thoroughly**: Run verification scripts and manual tests
-2. **Monitor logs**: Check Cloudflare Dashboard for errors
-3. **Set up monitoring**: Consider Cloudflare Analytics or external monitoring
-4. **Review roadmap**: See `todo/master_plan.md` for next phases
-5. **Implement Phase 2**: Add content operations (upload/download)
-6. **Add authentication**: Implement user authentication system
-7. **Add tests**: Expand test coverage (currently minimal)
+- **Repository layout and conventions:** [`AGENTS.md`](../AGENTS.md)
+- **Durable Objects, R2 buckets, cron and variables:** `wrangler.toml` (and the two
+  `workers/*/wrangler.toml` files)
+- **Required secrets:** the comment block in `wrangler.toml` and the "Verify required secrets"
+  step in `.github/workflows/deploy.yml`
+- **API endpoints:** [API.md](API.md); the route table (`API_ROUTES`) in `src/index.js`
+- **Costs:** [cost-safety.md](cost-safety.md) and `src/utils/cost-policy.js`
 
 ## Getting Help
 
@@ -747,12 +541,6 @@ After successful deployment:
 
 ## Additional Documentation
 
-- `todo/deployment_setup.md` - Quick setup guide for hashbin.org
+- `todo/deployment_setup.md` - Setup checklist for hashbin.org itself
 - `scripts/README.md` - Deployment verification scripts
-- `todo/master_plan.md` - Project roadmap and phases
-- `done/site_creation.md` - Detailed implementation plan (Phase 1 complete)
-
----
-
-**Last Updated**: January 2026
-**Version**: 0.1.0 (Phase 1 - Infrastructure Setup)
+- `STATUS.md` - Launch blockers and current work
