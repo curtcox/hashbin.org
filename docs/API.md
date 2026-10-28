@@ -50,6 +50,7 @@ and account deletion can never be reached with a key or app token.
 | `admin:backups` | Backup status, files and runs |
 | `admin:restore` | `POST /api/admin/restore` |
 | `admin:export` | `GET /api/admin/export` |
+| `admin:accounts` | `POST /api/admin/accounts/move`: move an account to a new user ID (`{from, to, dry_run}`) |
 
 Admin scopes are held only by admin keys and the `ADMIN_USER_ID` session. A missing
 scope answers `403 insufficient_scope`; a session-only route answers `403 session_required`.

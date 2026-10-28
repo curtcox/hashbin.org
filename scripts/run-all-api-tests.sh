@@ -61,6 +61,7 @@ run_suite() {
 run_suite "Health & Configuration Tests" "$SCRIPT_DIR/api-tests/test-local-health.sh"
 run_suite "Authentication Tests" "$SCRIPT_DIR/api-tests/test-local-auth.sh"
 run_suite "Scoped Key Tests" "$SCRIPT_DIR/api-tests/test-local-scoped-keys.mjs"
+run_suite "Account Move Rehearsal" "$SCRIPT_DIR/api-tests/test-local-account-move.mjs"
 run_suite "Balance Tests" "$SCRIPT_DIR/api-tests/test-local-balance.sh"
 run_suite "Upload Tests" "$SCRIPT_DIR/api-tests/test-local-upload.sh"
 run_suite "Download Tests" "$SCRIPT_DIR/api-tests/test-local-download.sh"

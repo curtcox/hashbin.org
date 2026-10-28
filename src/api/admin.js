@@ -547,7 +547,7 @@ async function exportContent(_env, _limit, _offset) {
 /**
  * Helper: Log audit entry
  */
-async function logAuditEntry(env, entry) {
+export async function logAuditEntry(env, entry) {
   try {
     const auditId = env.AUDIT_LOG.idFromName('global');
     const auditStub = env.AUDIT_LOG.get(auditId);

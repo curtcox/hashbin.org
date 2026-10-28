@@ -112,7 +112,10 @@ What is keyed by the user ID, and what happens to it:
 | Download sessions and signed links | token payload names the old user ID | Cannot move: they expire; create new ones |
 | Rate-limit purchases, deletion records, admin action log | historical `payer_id` / actor IDs | Leave as history |
 
-- [ ] **CL12 — Build the move.** Add a one-off admin-only operation (route or script
+- [x] **CL12 — Build the move.** Done 2026-10-27: `POST /api/admin/accounts/move`
+  (`admin:accounts`), `src/services/account-move.js`, unit tests and
+  `scripts/api-tests/test-local-account-move.mjs` (run with `ADMIN_USER`).
+  Original brief: Add a one-off admin-only operation (route or script
   over the restore API) that, given an old and new user ID, copies the profile and
   payment records, rewrites ownership in content metadata, suppliers and developer
   apps, revokes keys, grants and refresh tokens in the copied profile, and marks

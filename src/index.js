@@ -147,6 +147,7 @@ import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js'
 import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
 import { ADMIN_SESSION, PUBLIC, SESSION, USER_SCOPES, checkAccess, isSessionAuth } from './auth/scopes.js';
 import { handleCreateAdminKey, handleListAdminKeys, handleRevokeAdminKey } from './api/admin-keys.js';
+import { handleMoveAccount } from './api/admin-accounts.js';
 import { handleClerkWebhook } from './api/clerk-webhook.js';
 
 // Configuration constants
@@ -736,6 +737,7 @@ const API_ROUTES = [
   { method: 'GET', path: '/api/admin/backups/file', access: 'admin:backups', handler: handleGetBackupFile },
   { method: 'GET', path: /^\/api\/admin\/backups\/([^/]+)\/files$/, access: 'admin:backups', handler: (request, env, m) => handleListBackupFiles(request, env, m[1]) },
   { method: 'POST', path: '/api/admin/restore', access: 'admin:restore', handler: handleRestoreObject },
+  { method: 'POST', path: '/api/admin/accounts/move', access: 'admin:accounts', handler: handleMoveAccount },
 
   // Public deletion records (transparency)
   { method: 'GET', path: '/api/public/deletions/stats', access: PUBLIC, handler: handleGetDeletionStats },

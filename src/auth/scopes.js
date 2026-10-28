@@ -31,7 +31,8 @@ export const ADMIN_SCOPES = {
   'admin:costs': 'Read and record costs; read and set the cost-safety brake.',
   'admin:backups': 'Read backup status and files; start a backup.',
   'admin:restore': 'Restore an object from a backup.',
-  'admin:export': 'Export platform data.'
+  'admin:export': 'Export platform data.',
+  'admin:accounts': 'Move an account\'s data to a new user ID.'
 };
 
 // Scopes that move money out of the balance; a monthly_spend_limit_cents caveat bounds them all.

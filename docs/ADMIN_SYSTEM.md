@@ -33,6 +33,7 @@ other admin keys, and stop working if `ADMIN_USER_ID` changes.
 | `admin:backups` | `/api/admin/backups*` |
 | `admin:restore` | `POST /api/admin/restore` |
 | `admin:export` | `GET /api/admin/export` |
+| `admin:accounts` | `POST /api/admin/accounts/move` (see `todo/clerk_remaining.md` CL13) |
 
 ### Legacy admin token
 
