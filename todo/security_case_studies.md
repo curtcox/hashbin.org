@@ -20,9 +20,9 @@
   (equivalent) verification code; adopting `hashbin-cache.js` there is optional cleanup.
 - **H4:** `src/app-safety.js` and `src/api/app-safety.js`: per-app check on the developer page
   (`GET`/`POST /api/developers/apps/:id/safety`) and nightly for the 20 least recently checked apps.
-- **H5:** implemented locally with configurable domain, run Worker, registry/developer controls, SDK v0.4.0,
-  H4/docs, and Chromium/WebKit measurements/tests. Domain/deployment, runtime pins, the external Python
-  Online pilot and remaining browser acceptance are pending. **H6:** not started. Standalone plans:
+- **H5:** deployed on hashbin.app with approved DNS/TLS, run Worker, registry/developer controls, published
+  SDK v0.4.0 and H4/docs. Python Online's opt-in persistent home is implemented and deployed; only that
+  pilot is enabled, with traffic safely stopped until its analytics credential is configured. PSL eligibility, direct runtime pins and remaining retention acceptance are pending. **H6:** not started. Standalone plans:
   [hosted_run_origin.md](hosted_run_origin.md) (H5) and [app_hosting.md](app_hosting.md) (H6).
 
 ## Goals

@@ -281,6 +281,9 @@ export async function runCostMonitor(env, now = new Date()) {
 }
 
 export async function runRunOriginCostMonitor(env, now = new Date()) {
+  if (!env.CLOUDFLARE_ANALYTICS_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) {
+    throw new Error('Configure CLOUDFLARE_ANALYTICS_TOKEN and CLOUDFLARE_ACCOUNT_ID');
+  }
   const start = `${now.toISOString().slice(0, 7)}-01 00:00:00`;
   const end = now.toISOString().replace('T', ' ').slice(0, 19);
   const response = await fetch(`${API}/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/analytics_engine/sql`, {

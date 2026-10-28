@@ -7,7 +7,8 @@ import { ApplicationRegistry } from '../src/durable-objects/application-registry
 
 const appId = 'app_1932999d-125c-4cf6-bf56-806d6df1fa3a';
 const app = { app_id: appId, app_name: 'Hosted test app', status: 'active', owner_user_id: 'test', redirect_uris: ['http://127.0.0.1:8789/callback'], run: { status: 'active', allow_local: true, daily_request_cap: 20000 } };
-const data = new Map([['apps', [app]]]);
+const secondApp = { ...app, app_id: 'app_2eabd9ad-8b90-4635-accd-7583e5241f96', owner_user_id: 'other', app_name: 'Second isolated test app' };
+const data = new Map([['apps', [app, secondApp]]]);
 const registry = new ApplicationRegistry({ storage: { get: async key => structuredClone(data.get(key)), put: async (key, value) => data.set(key, structuredClone(value)) } }, { RUN_DOMAIN: 'localhost:8790' });
 const env = { ENVIRONMENT: 'local', RUN_DOMAIN: 'localhost:8790', APPLICATION_REGISTRY: { idFromName: x => x, get: () => registry } };
 const servers = [];

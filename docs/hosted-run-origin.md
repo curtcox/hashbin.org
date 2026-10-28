@@ -1,9 +1,9 @@
 # Hosted sandbox operations
 
 H5 uses **hashbin.app** as its dedicated production domain. Both Worker configs and
-zone routes now name it; domain/DNS/TLS and deployment acceptance remain to be verified.
-There are no pinned runtimes, and every
-existing or new registered app defaults to `run.status = 'off'`.
+zone routes name it, and production DNS/TLS and deployment are complete. Python Online is the
+only enabled pilot, for its registered `https://curtcox.github.io` embedder with local origins off.
+There are no pinned runtimes; other existing and new registered apps default to `run.status = 'off'`.
 
 The domain must be separate from `hashbin.org`, `256t.us`, and the future H6 app-hosting
 domain. Set the same `RUN_DOMAIN` in the main Worker and
@@ -134,11 +134,29 @@ registered embedding origin, can access it. Treat stored data as untrusted. Opaq
 mode remains the default for code from share links. Cross-origin isolation and an
 offline service worker are not enabled by this rollout.
 
-## Python Online acceptance still required
+## Python Online pilot and remaining acceptance
 
-The Python Online implementation plan is [tracked in its repository](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md). Its pilot must
-add an explicit “Keep files between runs” preference, mount IDBFS at `/home/pyodide`,
-load stored files with `FS.syncfs(true)`, and flush writes with `FS.syncfs(false)`
+The Python Online implementation plan is [tracked in its repository](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md). The deployed pilot adds an explicit “Keep files between runs” preference, mounts IDBFS at `/home/pyodide`,
+loads stored files with `FS.syncfs(true)`, and flushes writes with `FS.syncfs(false)`
 before confirming save. Only opt-in runs use hosted mode; link code stays opaque by
-default. Pin the selected runtime files, test persistence/isolation in its own
-browser suite, and test real Safari retention before promising long-lived storage.
+default. Its browser suite checks persistence, fresh-worker/reload restoration, editor isolation, incoming-link
+guards and failed-save reporting. Runtime files still use the existing verified proxy; direct runtime
+pins need approved uploads. Test real Safari retention before promising long-lived storage.
+
+The domain expires 2027-10-28 according to public RDAP checked 2026-10-28. PSL submission needs
+a longer registration term and qualifying public usage under the current
+[PSL guidelines](https://github.com/publicsuffix/list/wiki/Guidelines). No PSL PR or renewal purchase
+was made during rollout.
+
+Operators can obtain fresh run-budget evidence from `/admin/costs` with **Measure hosted run costs
+now** (`POST /api/admin/cost-safety/run/refresh`, `admin:costs`). The action runs the actual Analytics
+Engine query and records its actor; it accepts no request-count or brake overrides. SQL timestamp bounds
+use `toDateTime`, because Analytics Engine rejects comparisons between DateTime and bare strings.
+
+
+Current rollout gate (2026-10-28): `CLOUDFLARE_ANALYTICS_TOKEN` is absent from both the production
+Worker and repository Actions secrets. A prepared token request grants only Account Analytics Read
+for the existing account, expiring January 26, 2027. The owner must create it and enter it into
+GitHub's Actions secret form. Redeploy after configuration, run the measurement above and confirm
+`run_brake` clears before running Python Online's `npm run test:hosted:live`. Rotate before expiry;
+never commit or paste the token into chat. The pilot frame currently returns 503 as intended.

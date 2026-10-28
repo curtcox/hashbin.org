@@ -2,21 +2,23 @@
 
 ## Status
 
-**Phase:** Implemented locally 2026-10-28 with a configurable domain; production rollout and the external
-Python Online pilot remain pending. The owner requested implementation, then selected `hashbin.app` as the production domain,
-leaving registration, deployment and the external pilot pending. D3–D5 use the defaults below; D1 now builds
-the implementation ahead of the pilot. Split out of [security_case_studies.md](security_case_studies.md) (Part 3, H5). It is tracked
-under row B14 in `STATUS.md`. The related plan is [app_hosting.md](app_hosting.md) (H6).
+**Phase:** Deployed 2026-10-28 on `hashbin.app`; SDK v0.4.0 published and Python Online's
+opt-in persistent-home implementation deployed. Production acceptance is blocked by the missing `CLOUDFLARE_ANALYTICS_TOKEN`; the safety brake
+correctly returns 503 for pilot frames until real current-month evidence is available. The owner approved apex/wildcard DNS, TLS 1.2, deployment and enabling only Python Online.
+D3–D5 use the defaults below. Split out of [security_case_studies.md](security_case_studies.md) (Part 3, H5),
+tracked under B14 in `STATUS.md`. Related plan: [app_hosting.md](app_hosting.md) (H6).
 
-- [x] Owner: implement with configurable domain and recommended label/access/cost defaults
-- [ ] Phase 0: all-browser acceptance (Chromium/WebKit measurements passed; Firefox and Safari 7-day retention pending)
-- [ ] Phase 1: domain, DNS and Public Suffix List request
-- [x] Phase 2: run-origin Worker and local/production configuration (not deployed)
-- [x] Phase 3: registry, API and developer page
-- [x] Phase 4: SDK v0.4.0 `createSandbox({ origin: 'hosted' })` artifacts, integrity and headers (not published)
-- [x] Phase 5: H4 check and docs
-- [ ] Phase 5: external Python Online pilot and runtime selection/pinning
-- [ ] Phase 6: offline service worker (optional)
+- [x] Owner: configurable implementation, production domain `hashbin.app` and Python Online pilot
+- [ ] Phase 0: complete browser retention acceptance (local Chromium/WebKit restart/partitioning passed;
+      Python Online Chromium/Firefox/WebKit CI passed; Safari seven-day and Firefox restart measurements remain)
+- [x] Phase 1: domain, proxied apex/wildcard DNS, Universal SSL, HTTPS and minimum TLS 1.2
+- [ ] Phase 1: PSL eligibility and submission (registration expires 2027-10-28; pilot scale is also a concern)
+- [x] Phase 2: deployed run-origin Worker, routes and CI deployment/verification
+- [x] Phase 3: deployed registry, API and developer controls; only Python Online enabled
+- [x] Phase 4: published immutable SDK v0.4.0, integrity hashes and docs
+- [x] Phase 5: H4 check, docs and Python Online persistent-home implementation
+- [ ] Phase 5: production live acceptance and direct runtime pinning
+- [ ] Phase 6: offline hosted service worker (optional; opaque offline execution remains supported)
 
 ## Why
 
@@ -63,7 +65,7 @@ runtime pinning/renewal and the remaining Python Online acceptance checklist.
 
 - `RUN_DOMAIN` is `hashbin.app` in both production configs, with wildcard/apex zone routes.
   SDK callers default to `hashbin.app` and can override `runDomain` for tests. Local defaults use
-  `localhost:8790`; domain registration/DNS/TLS, deployment and runtime pins still need acceptance. The
+  `localhost:8790`; production DNS/TLS and deployment are complete. Runtime pins remain a separate follow-up. The
   [Python Online integration plan](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md)
   tracks the consumer changes.
 - `workers/shared/` contains the CID and response header helpers shared with the content Worker.
@@ -85,8 +87,34 @@ runtime pinning/renewal and the remaining Python Online acceptance checklist.
   checks every download before uploads, uses the publisher grant, verifies CID/maximum retention and
   writes the manifest atomically. Configure the operator account's default retention to 120 months;
   the existing OAuth API deliberately ignores caller overrides and applies grant caveats.
-- Validation: 777 unit tests passed; 14 hosted SDK/developer browser tests passed in Chromium/WebKit; Wrangler
+- Validation: 782 unit tests passed; 16 hosted SDK/developer browser tests passed in Chromium/WebKit; Wrangler
   production bundle dry runs cover the main, content and run Workers. SDK v0.3.0 files are unchanged.
+
+
+### Production rollout evidence (2026-10-28)
+
+- Cloudflare zone `hashbin.app` is active. Both apex and wildcard are proxied AAAA `100::` placeholders;
+  the Worker supplies the content. Universal SSL covers the apex and flat app labels. Always Use HTTPS
+  is enabled and the approved minimum TLS version is 1.2.
+- `hashbin-run-prod` and both routes deployed successfully. CI deploys the main Worker first, then the
+  run Worker and verifies the apex. SDK v0.4.0 is public on hashbin.org.
+- Only Python Online (`app_2eabd9ad-8b90-4635-accd-7583e5241f96`) is active, with
+  `https://curtcox.github.io` as its embedder, no local origins and the 20,000/day default cap.
+- The first live analytics query exposed a DateTime/String mismatch. Queries now convert both bounds
+  with `toDateTime`; the corrected query succeeded in Cloudflare Studio. The admin costs page can run
+  a real, audited measurement with **Measure hosted run costs now**; it cannot override evidence.
+  Production and GitHub currently have no `CLOUDFLARE_ANALYTICS_TOKEN`. Configure Account Analytics Read
+  for the existing Cloudflare account, save that GitHub Actions secret, redeploy and measure before
+  running production persistence acceptance. No synthetic zero-count snapshot was installed.
+- Public registry RDAP reports registration 2026-10-28 and expiration 2027-10-28, with transfer lock.
+  [PSL guidelines](https://github.com/publicsuffix/list/wiki/Guidelines) require more than two years
+  remaining and warn that small pilots may be declined. No renewal purchase or premature PSL PR was made.
+  Extend the term and establish qualifying public usage before preparing the PRIVATE entry, then add the
+  `_psl` TXT reference to the actual PR. PSL remains a follow-up, not a storage-origin prerequisite.
+- Python Online's [plan](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md)
+  and implementation are pushed. Its Linux CI is green in Chromium, Firefox and WebKit, with
+  30 Node/package tests and 19 Python tests passing. Its real runtime is Pyodide 314.0.7 (CPython 3.14.2), initially using
+  the existing verified embedding-page proxy. Direct `/r/` loading waits for approved runtime uploads.
 
 ### Domain, DNS and TLS (Phase 1)
 

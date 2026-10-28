@@ -7,9 +7,9 @@ test.beforeEach(async ({ page, context, browserName }) => {
   if (browserName === 'webkit') {
     // WebKit needs help resolving *.localhost on macOS. Preserve the original
     // URL/origin and response headers while transporting over loopback.
-    await context.route(`${runOrigin}/**`, async route => {
+    await context.route('http://*.localhost:8790/**', async route => {
       const url = new URL(route.request().url());
-      const response = await context.request.get(`http://127.0.0.1:8790${url.pathname}${url.search}`, { headers: { ...route.request().headers(), host: runHost } });
+      const response = await context.request.get(`http://127.0.0.1:8790${url.pathname}${url.search}`, { headers: { ...route.request().headers(), host: url.host } });
       await route.fulfill({ response });
     });
   }
@@ -32,8 +32,7 @@ test('reports the hosted origin and starts module workers', async ({ page }) => 
   expect(await run(page, 'export {}; postMessage(hashbinSandbox.origin)', { workerType: 'module' })).toBe(runOrigin);
 });
 
-test('persists IndexedDB across separate sandboxes and page reloads', async ({ page }) => {
-  const source = write => `(async () => {
+const storageSource = (write, value = 'persisted') => `(async () => {
     const db = await new Promise((resolve, reject) => {
       const request = indexedDB.open('h5-sdk-e2e', 1);
       request.onupgradeneeded = () => request.result.createObjectStore('data');
@@ -43,16 +42,27 @@ test('persists IndexedDB across separate sandboxes and page reloads', async ({ p
     const value = await new Promise((resolve, reject) => {
       const transaction = db.transaction('data', '${write ? 'readwrite' : 'readonly'}');
       const store = transaction.objectStore('data');
-      const request = ${write ? "store.put('persisted', 'value')" : "store.get('value')"};
+      const request = ${write ? `store.put(${JSON.stringify(value)}, 'value')` : "store.get('value')"};
       transaction.oncomplete = () => resolve(${write ? "'written'" : 'request.result'});
       transaction.onabort = () => reject(transaction.error);
     });
     db.close(); postMessage(value);
   })().catch(error => postMessage({ error: String(error) }));`;
-  expect(await run(page, source(true))).toBe('written');
-  expect(await run(page, source(false))).toBe('persisted');
+
+test('persists IndexedDB across separate sandboxes and page reloads', async ({ page }) => {
+  expect(await run(page, storageSource(true))).toBe('written');
+  expect(await run(page, storageSource(false))).toBe('persisted');
   await page.reload();
-  expect(await run(page, source(false))).toBe('persisted');
+  expect(await run(page, storageSource(false))).toBe('persisted');
+});
+
+test('different app labels cannot read or overwrite each other IndexedDB', async ({ page }) => {
+  const second = { clientId: 'app_2eabd9ad-8b90-4635-accd-7583e5241f96' };
+  expect(await run(page, storageSource(true, 'first app'))).toBe('written');
+  expect(await run(page, storageSource(false), second)).toBeUndefined();
+  expect(await run(page, storageSource(true, 'second app'), second)).toBe('written');
+  expect(await run(page, storageSource(false))).toBe('first app');
+  expect(await run(page, storageSource(false), second)).toBe('second app');
 });
 
 test('prevents the embedding page and run frame reading each other storage', async ({ page }) => {

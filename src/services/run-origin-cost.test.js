@@ -64,4 +64,13 @@ describe('hosted run cost cap', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('Unknown table hashbin_run', { status: 400 })));
     await expect(runRunOriginCostMonitor(env)).rejects.toThrow('Run analytics HTTP 400: Unknown table hashbin_run');
   });
+
+  it('reports missing analytics credentials before attempting a request', async () => {
+    const { env } = setup();
+    const fetch = vi.fn(); vi.stubGlobal('fetch', fetch);
+    delete env.CLOUDFLARE_ANALYTICS_TOKEN;
+    await expect(runRunOriginCostMonitor(env)).rejects.toThrow('Configure CLOUDFLARE_ANALYTICS_TOKEN');
+    expect(fetch).not.toHaveBeenCalled();
+    expect((await readCostSafety(env)).run_brake).toBe(true);
+  });
 });
