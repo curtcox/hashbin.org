@@ -41,7 +41,7 @@ async function fixture(options = {}) {
   vi.stubGlobal('fetch', async (url, init) => {
     if (url.endsWith('/analytics_engine/sql')) {
       if (init.body.includes("AND blob4 = 'funded'")) return Response.json({ data: [{ downloads: null, price_dollars: null, lease_cost_dollars: null }] });
-      const closed = init.body.includes("timestamp < '2026-11-01 00:00:00'");
+      const closed = init.body.includes("timestamp < toDateTime('2026-11-01 00:00:00')");
       if (closed && flags.fail === 'attribution') return new Response('', { status: 503 });
       return Response.json({ data: [{ cid: closed ? 'tail-burst' : 'live-file', downloads: 2e8, status: '200', payer: 'funded' }] });
     }

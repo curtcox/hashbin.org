@@ -27,6 +27,8 @@ describe('hosted run cost cap', () => {
     expect(report.brake).toBe(false);
     expect(alert).toHaveBeenCalledTimes(1);
     expect(fetch.mock.calls[0][1].body).toContain('FROM hashbin_run');
+    expect(fetch.mock.calls[0][1].body).toContain("timestamp >= toDateTime('2026-10-01 00:00:00')");
+    expect(fetch.mock.calls[0][1].body).toContain("timestamp < toDateTime('2026-10-28 15:00:00')");
     vi.setSystemTime(Date.now() + 3600000);
     fetch.mockResolvedValue(Response.json({ data: [{ requests: 1000000 }] }));
     report = await runRunOriginCostMonitor(env);
@@ -59,5 +61,7 @@ describe('hosted run cost cap', () => {
     }
     vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 503 })));
     await expect(runRunOriginCostMonitor(env)).rejects.toThrow('503');
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('Unknown table hashbin_run', { status: 400 })));
+    await expect(runRunOriginCostMonitor(env)).rejects.toThrow('Run analytics HTTP 400: Unknown table hashbin_run');
   });
 });

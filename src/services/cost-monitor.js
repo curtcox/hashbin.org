@@ -129,7 +129,7 @@ async function queryDownloadRows(env, now, aggregate = false) {
   const group = aggregate ? " AND blob4 = 'funded'" : ' GROUP BY cid, status, payer ORDER BY downloads DESC LIMIT 20';
   const response = await fetch(`${API}/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/analytics_engine/sql`, {
     method: 'POST', headers: { Authorization: `Bearer ${env.CLOUDFLARE_ANALYTICS_TOKEN}` },
-    body: `SELECT ${select}SUM(_sample_interval * double1) AS downloads, SUM(_sample_interval * double2) AS price_dollars, SUM(_sample_interval * double3) AS lease_cost_dollars FROM hashbin_downloads WHERE timestamp >= '${start}' AND timestamp < '${end}'${group} FORMAT JSON`,
+    body: `SELECT ${select}SUM(_sample_interval * double1) AS downloads, SUM(_sample_interval * double2) AS price_dollars, SUM(_sample_interval * double3) AS lease_cost_dollars FROM hashbin_downloads WHERE timestamp >= toDateTime('${start}') AND timestamp < toDateTime('${end}')${group} FORMAT JSON`,
     signal: AbortSignal.timeout(15000)
   });
   if (!response.ok) throw new Error(`Download analytics HTTP ${response.status}`);
@@ -285,10 +285,15 @@ export async function runRunOriginCostMonitor(env, now = new Date()) {
   const end = now.toISOString().replace('T', ' ').slice(0, 19);
   const response = await fetch(`${API}/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/analytics_engine/sql`, {
     method: 'POST', headers: { Authorization: `Bearer ${env.CLOUDFLARE_ANALYTICS_TOKEN}` },
-    body: `SELECT SUM(_sample_interval * double1) AS requests FROM hashbin_run WHERE timestamp >= '${start}' AND timestamp < '${end}' FORMAT JSON`,
+    body: `SELECT SUM(_sample_interval * double1) AS requests FROM hashbin_run WHERE timestamp >= toDateTime('${start}') AND timestamp < toDateTime('${end}') FORMAT JSON`,
     signal: AbortSignal.timeout(15000)
   });
-  if (!response.ok) throw new Error(`Run analytics HTTP ${response.status}`);
+  if (!response.ok) {
+    // The operator needs the provider's query error to repair a closed gate.
+    // This endpoint returns SQL diagnostics, never the request's bearer token.
+    const detail = (await response.text()).replace(/[\r\n\t]+/g, ' ').slice(0, 500);
+    throw new Error(`Run analytics HTTP ${response.status}${detail ? `: ${detail}` : ''}`);
+  }
   const data = await response.json();
   const raw = data.data?.[0]?.requests;
   if (raw === undefined || (raw !== null && !['number', 'string'].includes(typeof raw)) || raw === '') throw new Error('Invalid run analytics');
