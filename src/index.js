@@ -145,7 +145,7 @@ import {
   handleUpdateAuthorization
 } from './api/oauth.js';
 import { handleDeveloperAppSafety, runAppSafetyChecks } from './api/app-safety.js';
-import { handleDeveloperRun, handleAdminRun } from './api/run-origin.js';
+import { handleDeveloperRun, handleAdminRun, handleRefreshRunCost } from './api/run-origin.js';
 
 import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js';
 import { handlePublish, handlePublishApp } from './api/publish.js';
@@ -740,6 +740,7 @@ const API_ROUTES = [
   { method: 'GET', path: '/api/admin/audit-log', access: 'admin:stats', handler: handleGetAuditLog },
   { method: 'GET', path: '/api/admin/export', access: 'admin:export', handler: handleExportData },
   { method: ['GET', 'POST'], path: '/api/admin/cost-safety', access: 'admin:costs', handler: handleCostSafety },
+  { method: 'POST', path: '/api/admin/cost-safety/run/refresh', access: 'admin:costs', handler: handleRefreshRunCost },
   { method: 'GET', path: '/api/admin/cost-safety/history', access: 'admin:costs', handler: handleCostSafety },
   { method: 'GET', path: '/api/admin/costs', access: 'admin:costs', handler: handleGetCosts },
   { method: 'GET', path: '/api/admin/costs/by-service', access: 'admin:costs', handler: handleGetCostsByService },

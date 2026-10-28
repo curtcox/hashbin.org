@@ -62,6 +62,7 @@ export class InfrastructureCost {
         const latest = await this.state.storage.get('safety:latest');
         const run = await this.state.storage.get(`run:snapshot:${getCurrentMonthPeriod()}`);
         return Response.json({ ...latest, brake: this.env.COST_SAFETY_ALLOWANCE_ONLY === 'true' || Boolean(await this.state.storage.get('safety:brake')),
+          run: run || null,
           run_brake: this.env.ENVIRONMENT !== 'local' && Boolean(this.env.RUN_DOMAIN) &&
             (!run || run.brake || Date.now() - Date.parse(run.recorded_at) > 2 * 3600000),
           manual_brake: this.env.COST_SAFETY_ALLOWANCE_ONLY === 'true',

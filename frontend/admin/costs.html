@@ -30,6 +30,7 @@
     <form id="cost-form" class="card">
       <p>Sign in as the admin to load costs. <a href="/admin/keys.html">Admin keys</a></p>
       <button class="btn btn-primary" type="submit">Refresh</button>
+      <button id="run-cost-refresh" class="btn btn-secondary" type="button">Measure hosted run costs now</button>
     </form>
     <p id="cost-status" role="status" aria-live="polite">Loading costs...</p>
     <section id="cost-report" class="card" hidden>
@@ -39,6 +40,7 @@
         <dt>Projected month end</dt><dd id="cost-projected"></dd>
         <dt>Last snapshot</dt><dd id="cost-updated"></dd>
         <dt>Brake</dt><dd id="cost-brake"></dd>
+        <dt>Hosted run origin</dt><dd id="run-cost-state"></dd>
       </dl>
       <p>Conservative list-price estimates before included usage. Fixed costs: $7.01/month. Download estimates use a 1% sample.</p>
       <button id="brake-enable" class="btn btn-secondary" type="button">Enable allowance-only service</button>

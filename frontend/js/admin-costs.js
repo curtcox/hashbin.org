@@ -24,6 +24,7 @@ async function load(brake) {
     byId('cost-updated').textContent = report.recorded_at || 'No snapshot yet';
     byId('cost-brake').textContent = report.hard_stop ? 'Hard stop: all downloads return 503' : report.manual_brake || report.brake ? 'Anonymous: file allowance only; funded downloads enabled' : 'File allowances and funded downloads enabled';
     byId('brake-disable').disabled = Boolean(report.manual_brake);
+    byId('run-cost-state').textContent = `${report.run_brake ? 'Stopped' : 'Available'}; ${report.run?.requests ?? 'unmeasured'} requests; ${money(report.run?.cost_cents)} this month`;
     byId('cost-files').replaceChildren(...(report.top_files || []).map(file => {
       const row = document.createElement('tr');
       for (const value of [file.cid, file.downloads, file.status, file.payer || 'unknown']) {
@@ -39,4 +40,16 @@ async function load(brake) {
 byId('cost-form').addEventListener('submit', event => { event.preventDefault(); load(); });
 byId('brake-enable').addEventListener('click', () => load(true));
 byId('brake-disable').addEventListener('click', () => load(false));
+byId('run-cost-refresh').addEventListener('click', async event => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  byId('cost-status').textContent = 'Measuring hosted run costs…';
+  try {
+    const response = await fetch('/api/admin/cost-safety/run/refresh', { method: 'POST', headers: await adminHeaders() });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.message || result.error || 'Hosted run measurement failed');
+    await load();
+  } catch (error) { byId('cost-status').textContent = error.message; }
+  finally { button.disabled = false; }
+});
 load();
