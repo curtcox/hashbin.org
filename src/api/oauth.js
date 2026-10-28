@@ -1,3 +1,4 @@
+import { verifyDPoP, dpopNonce } from '../auth/dpop.js';
 import { authenticate, requireAuth } from '../auth/middleware.js';
 import { SPENDING_SCOPES, parseCaveats, parseScopes, scopeDescription } from '../auth/scopes.js';
 import {
@@ -8,11 +9,11 @@ import {
   verifyOAuthJwt
 } from '../auth/oauth.js';
 
-const ACCESS_TOKEN_TTL_SECONDS = 60 * 60;
+const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const AUTHORIZATION_CODE_TTL_SECONDS = 10 * 60;
-const REFRESH_TOKEN_TTL_DAYS = 30;
+const REFRESH_TOKEN_TTL_DAYS = 7;
 const MAX_SPENDING_LIMIT_USD = 1000000;
-const GRANT_EXPIRY_CHOICES_DAYS = [30, 90, 365];
+const GRANT_EXPIRY_CHOICES_DAYS = [1, 7, 30, 90, 365];
 // Fuller wording for the consent page where the shared description is too terse
 const CONSENT_DESCRIPTIONS = {
   'downloads:spend': 'Pay for downloads from your balance, within your account and app download caps. Downloads stay disabled until both caps are configured in Account settings.',
@@ -42,6 +43,7 @@ function jsonResponse(body, status = 200, extraHeaders = {}) {
     status,
     headers: {
       'content-type': 'application/json',
+      'Cache-Control': 'no-store',
       ...extraHeaders
     }
   });
@@ -69,7 +71,11 @@ function htmlResponse(html, status = 200) {
   return new Response(html, {
     status,
     headers: {
-      'content-type': 'text/html; charset=utf-8'
+      'content-type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': "frame-ancestors 'none'",
+      'X-Frame-Options': 'DENY',
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer'
     }
   });
 }
@@ -128,12 +134,17 @@ function validateAuthorizeRequest(data, app) {
     return { valid: false, error: 'invalid_request', message: 'The spending limit must be a positive amount in US dollars.' };
   }
 
+  if (data.dpop_jkt && (typeof data.dpop_jkt !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(data.dpop_jkt))) {
+    return { valid: false, error: 'invalid_request', message: 'Invalid DPoP key thumbprint.' };
+  }
+  const maxUpload = parseOptionalInteger(data.max_upload_bytes, 1, 5 * 1024 * 1024);
+  if (maxUpload === undefined) return { valid: false, error: 'invalid_request', message: 'max_upload_bytes must be 1 to 5242880 bytes.' };
   const maxRetention = parseOptionalInteger(data.max_retention_months, 1, 120);
   if (maxRetention === undefined) {
     return { valid: false, error: 'invalid_request', message: 'max_retention_months must be a whole number of months from 1 to 120.' };
   }
 
-  return { valid: true, scopes, spendingLimit, maxRetention };
+  return { valid: true, scopes, spendingLimit, maxRetention, maxUpload };
 }
 
 // A whole number within bounds; null when absent, undefined when invalid.
@@ -169,7 +180,11 @@ function grantedAccess(data, validation) {
     return { error: 'invalid_request', message: 'The retention cap must be 1 to 120 months, no higher than the app requested.' };
   }
 
-  const expiryDays = parseOptionalInteger(data.expires_in_days, 1, 365);
+  const maxUpload = data.granted_max_upload_bytes === undefined ? validation.maxUpload : parseOptionalInteger(data.granted_max_upload_bytes, 1, 5 * 1024 * 1024);
+  if (maxUpload === undefined || (validation.maxUpload !== null && (maxUpload === null || maxUpload > validation.maxUpload))) {
+    return { error: 'invalid_request', message: 'Choose a file size no higher than the app requested.' };
+  }
+  const expiryDays = parseOptionalInteger(data.expires_in_days === undefined ? 30 : data.expires_in_days, 1, 365);
   if (expiryDays === undefined || (expiryDays !== null && !GRANT_EXPIRY_CHOICES_DAYS.includes(expiryDays))) {
     return { error: 'invalid_request', message: `Choose an expiry of ${GRANT_EXPIRY_CHOICES_DAYS.join(', ')} days, or none.` };
   }
@@ -177,6 +192,7 @@ function grantedAccess(data, validation) {
   const caveats = {};
   if (limit !== null) caveats.monthly_spend_limit_cents = Math.round(limit * 100);
   if (retention !== null) caveats.max_retention_months = retention;
+  if (maxUpload !== null) caveats.max_upload_bytes = maxUpload;
   if (expiryDays !== null) caveats.expires_at = new Date(Date.now() + expiryDays * 24 * 60 * 60 * 1000).toISOString();
   return { scopes, caveats };
 }
@@ -371,6 +387,7 @@ export async function handleOAuthAuthorize(request, env) {
       user_id: authResult.user.userId,
       redirect_uri: data.redirect_uri,
       scopes,
+      dpop_jkt: data.dpop_jkt || null,
       code_challenge: data.code_challenge,
       code_challenge_method: 'S256',
       iat: now,
@@ -418,7 +435,9 @@ export async function handleGetOAuthAuthorizePage(request, env) {
     code_challenge: url.searchParams.get('code_challenge'),
     code_challenge_method: url.searchParams.get('code_challenge_method'),
     spending_limit: url.searchParams.get('spending_limit'),
-    max_retention_months: url.searchParams.get('max_retention_months')
+    max_retention_months: url.searchParams.get('max_retention_months'),
+    dpop_jkt: url.searchParams.get('dpop_jkt'),
+    max_upload_bytes: url.searchParams.get('max_upload_bytes')
   };
   const validation = validateAuthorizeRequest(requestData, app);
 
@@ -451,6 +470,7 @@ export async function handleGetOAuthAuthorizePage(request, env) {
 
   requestData.spending_limit = validation.spendingLimit;
   requestData.max_retention_months = validation.maxRetention;
+  requestData.max_upload_bytes = validation.maxUpload;
   const spends = validation.scopes.some((scope) => SPENDING_SCOPES.has(scope));
 
   // Each requested permission can be unchecked; limits can be lowered, never raised
@@ -460,6 +480,7 @@ export async function handleGetOAuthAuthorizePage(request, env) {
         <span>${escapeHtml(CONSENT_DESCRIPTIONS[scope] || scopeDescription(scope))}</span>
       </li>`).join('');
 
+  const sharedWarning = (app.origin_warnings || []).map(warning => `<p role="note">This app runs on <strong>${escapeHtml(warning.origin)}</strong>, which also hosts ${warning.apps.length} other HashBin apps${warning.apps.length ? ': ' + warning.apps.map(other => escapeHtml(other.app_name)).join(', ') : ''}. Any app on this origin could use what you approve here. Prefer a small spending cap and short expiry, or per-save approval. <a href="/docs/browser-client-safety">Browser client safety guide</a>.</p>`).join('');
   const limitsHtml = `
         <h2>Limits</h2>
         <div class="limits">
@@ -471,10 +492,13 @@ export async function handleGetOAuthAuthorizePage(request, env) {
             <input id="grant-retention" type="number" min="1" max="${validation.maxRetention ?? 120}" step="1"${validation.maxRetention === null ? '' : ` value="${validation.maxRetention}"`}>
           </label>
           <p class="hint">Empty means your default retention applies.</p>
+          <label>Maximum file size (bytes)
+            <input id="grant-upload" type="number" min="1" max="${validation.maxUpload ?? 5242880}" step="1" value="${validation.maxUpload ?? 1048576}">
+          </label>
           <label>Access expires
             <select id="grant-expiry">
               <option value="">When you revoke it</option>
-              ${GRANT_EXPIRY_CHOICES_DAYS.map((days) => `<option value="${days}">In ${days} days</option>`).join('')}
+              ${GRANT_EXPIRY_CHOICES_DAYS.map((days) => `<option value="${days}"${days === 30 ? ' selected' : ''}>In ${days} days</option>`).join('')}
             </select>
           </label>
         </div>`;
@@ -641,6 +665,7 @@ export async function handleGetOAuthAuthorizePage(request, env) {
       </section>
       <aside class="panel">
         <h2>App details</h2>
+        ${sharedWarning}
         <dl>
           <div>
             <dt>Application</dt>
@@ -744,7 +769,8 @@ export async function handleGetOAuthAuthorizePage(request, env) {
             granted_scopes: grantedScopes,
             granted_spending_limit: optional('grant-spend'),
             granted_max_retention_months: optional('grant-retention'),
-            expires_in_days: optional('grant-expiry')
+            expires_in_days: optional('grant-expiry'),
+            granted_max_upload_bytes: optional('grant-upload')
           })
         });
 
@@ -802,10 +828,11 @@ async function redeemCode(env, codePayload) {
   return response.ok;
 }
 
-async function issueTokenPair(env, codePayload, scopes) {
+async function issueTokenPair(env, codePayload, scopes, dpopJkt) {
   const now = Math.floor(Date.now() / 1000);
   const accessToken = await signOAuthJwt({
     token_type: 'access',
+    ...(dpopJkt ? { cnf: { jkt: dpopJkt } } : {}),
     grant_id: codePayload.grant_id,
     app_id: codePayload.app_id,
     user_id: codePayload.user_id,
@@ -820,6 +847,7 @@ async function issueTokenPair(env, codePayload, scopes) {
 
   await storeRefreshToken(env, codePayload.user_id, {
     token_hash: refreshTokenHash,
+    dpop_jkt: dpopJkt || null,
     grant_id: codePayload.grant_id,
     app_id: codePayload.app_id,
     expires_at: expiresAt
@@ -828,14 +856,23 @@ async function issueTokenPair(env, codePayload, scopes) {
   return {
     access_token: accessToken,
     refresh_token: refreshToken,
-    token_type: 'Bearer',
+    token_type: dpopJkt ? 'DPoP' : 'Bearer',
     expires_in: ACCESS_TOKEN_TTL_SECONDS,
     scope: scopes.join(' ')
   };
 }
 
+export async function handleDPoPNonce(_request, env) {
+  return jsonResponse({ nonce: await dpopNonce(env) });
+}
+
 export async function handleOAuthToken(request, env) {
   const data = await request.json();
+  let dpopJkt = null;
+  if (request.headers.has('dpop')) {
+    try { dpopJkt = await verifyDPoP(request, env); }
+    catch { return jsonResponse({ error: 'invalid_dpop_proof' }, 400); }
+  }
 
   if (data.grant_type === 'authorization_code') {
     let codePayload;
@@ -861,14 +898,20 @@ export async function handleOAuthToken(request, env) {
       return jsonResponse({ error: 'invalid_scope' }, 400);
     }
 
+    if (codePayload.dpop_jkt && codePayload.dpop_jkt !== dpopJkt) return jsonResponse({ error: 'invalid_dpop_proof' }, 400);
     if (!await redeemCode(env, codePayload)) {
       return jsonResponse({ error: 'invalid_grant' }, 400);
     }
 
-    return jsonResponse(await issueTokenPair(env, codePayload, scopes));
+    return jsonResponse(await issueTokenPair(env, codePayload, scopes, dpopJkt));
   }
 
   if (data.grant_type === 'refresh_token') {
+    if (typeof data.client_id !== 'string' || !data.client_id) {
+      return jsonResponse({ error: 'invalid_client' }, 400);
+    }
+    const app = await getApplication(env, data.client_id);
+    if (!app || app.status !== 'active') return jsonResponse({ error: 'invalid_client' }, 400);
     const userId = extractRefreshTokenUserId(data.refresh_token);
     if (!userId) {
       return jsonResponse({ error: 'invalid_grant' }, 400);
@@ -883,6 +926,8 @@ export async function handleOAuthToken(request, env) {
     const refreshTokenHash = await sha256Hex(data.refresh_token || '');
     const newRefreshToken = createRefreshToken(userId);
     const rotated = await rotateRefreshToken(env, userId, {
+      client_id: data.client_id,
+      dpop_jkt: dpopJkt,
       current_token_hash: refreshTokenHash,
       new_token_hash: await sha256Hex(newRefreshToken),
       new_expires_at: new Date(Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString(),
@@ -900,6 +945,7 @@ export async function handleOAuthToken(request, env) {
 
     const accessToken = await signOAuthJwt({
       token_type: 'access',
+      ...(rotated.dpop_jkt ? { cnf: { jkt: rotated.dpop_jkt } } : {}),
       grant_id: rotated.grant_id,
       app_id: rotated.app_id,
       user_id: rotated.user_id,
@@ -911,7 +957,7 @@ export async function handleOAuthToken(request, env) {
     return jsonResponse({
       access_token: accessToken,
       refresh_token: newRefreshToken,
-      token_type: 'Bearer',
+      token_type: rotated.dpop_jkt ? 'DPoP' : 'Bearer',
       expires_in: ACCESS_TOKEN_TTL_SECONDS,
       scope: scopes.join(' ')
     });
@@ -968,12 +1014,20 @@ export async function handleListAuthorizations(request, env) {
     };
   }));
 
-  return jsonResponse({ authorizations });
+  return jsonResponse({ authorizations, security_events: grantsData.security_events || [] });
 }
 
 /**
  * DELETE /api/account/authorizations/:id — a grant ID revokes that grant, an app ID every grant the app holds
  */
+export async function handleRevokeAllAuthorizations(request, env) {
+  const authResult = await authenticate(request, env);
+  const authError = requireAuth(authResult);
+  if (authError) return authError;
+  const stub = env.USER_PROFILES.get(env.USER_PROFILES.idFromName(authResult.user.userId));
+  return stub.fetch(new Request('http://internal/oauth/grants', { method: 'DELETE' }));
+}
+
 export async function handleRevokeAuthorization(request, env, id) {
   const authResult = await authenticate(request, env);
   const authError = requireAuth(authResult);

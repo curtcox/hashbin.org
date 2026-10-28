@@ -484,7 +484,7 @@ Future&lt;void&gt; _renewTokens() async {
   final response = await _http.post(
     Uri.parse('$baseUrl/oauth/token'),
     headers: {'content-type': 'application/json'},
-    body: jsonEncode({'grant_type': 'refresh_token', 'refresh_token': _refreshToken}),
+    body: jsonEncode({'grant_type': 'refresh_token', 'client_id': clientId, 'refresh_token': _refreshToken}),
   );
   final body = _jsonObject(response);
   if (body['error'] == 'invalid_grant') {
@@ -959,7 +959,7 @@ class HashBinAccount {
     final response = await _http.post(
       Uri.parse('$baseUrl/oauth/token'),
       headers: {'content-type': 'application/json'},
-      body: jsonEncode({'grant_type': 'refresh_token', 'refresh_token': _refreshToken}),
+      body: jsonEncode({'grant_type': 'refresh_token', 'client_id': clientId, 'refresh_token': _refreshToken}),
     );
     final body = _jsonObject(response);
     if (body['error'] == 'invalid_grant') {

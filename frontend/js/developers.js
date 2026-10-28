@@ -40,6 +40,7 @@ function renderAppList(apps) {
             <label class="form-label">Redirect URIs (one per line)
               <textarea class="form-input edit-uris" rows="3">${escapeHtml(app.redirect_uris.join('\n'))}</textarea>
             </label>
+            <label><input type="checkbox" class="edit-origin-ack"> I acknowledge the <a href="/docs/browser-client-safety">shared-origin storage risk</a>.</label>
             <button type="submit" class="btn btn-primary btn-sm">Save</button>
             <button type="button" class="btn btn-secondary btn-sm cancel-edit">Cancel</button>
           </form>
@@ -61,11 +62,23 @@ function renderAppList(apps) {
       event.preventDefault();
       updateApp(appId, {
         app_name: editForm.querySelector('.edit-name').value.trim(),
-        redirect_uris: parseRedirectUris(editForm.querySelector('.edit-uris').value)
+        redirect_uris: parseRedirectUris(editForm.querySelector('.edit-uris').value),
+        shared_origin_acknowledged: editForm.querySelector('.edit-origin-ack').checked
       });
     });
     card.querySelector('.delete-app').addEventListener('click', () => deleteApp(appId));
   }
+}
+
+async function checkAppResponse(response) {
+  if (!response.ok) {
+    const data = await response.clone().json().catch(() => ({}));
+    if (data.error === 'shared_origin_acknowledgement_required') {
+      const origins = (data.warnings || []).map(warning => `${warning.origin} (${warning.apps.length} other registered apps${warning.apps.length ? ': ' + warning.apps.map(app => app.app_name).join(', ') : ''})`).join('; ');
+      throw new Error(`${data.message} Origins: ${origins}`);
+    }
+  }
+  return handleApiError(response);
 }
 
 async function updateApp(appId, changes) {
@@ -75,7 +88,7 @@ async function updateApp(appId, changes) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(changes)
     });
-    await handleApiError(response);
+    await checkAppResponse(response);
     showToast('Application updated', 'success');
     await loadApps();
   } catch (error) {
@@ -85,12 +98,12 @@ async function updateApp(appId, changes) {
 
 async function deleteApp(appId) {
   const confirmed = window.confirm(
-    'Delete this application? Users can no longer authorize it, existing tokens stop refreshing, and access tokens expire within an hour. This cannot be undone.'
+    'Delete this application? Users can no longer authorize it, existing tokens stop refreshing, and access tokens expire within 15 minutes. This cannot be undone.'
   );
   if (!confirmed) return;
   try {
     const response = await authenticatedFetch(`/api/developers/apps/${encodeURIComponent(appId)}`, { method: 'DELETE' });
-    await handleApiError(response);
+    await checkAppResponse(response);
     showToast('Application deleted', 'success');
     await loadApps();
   } catch (error) {
@@ -103,7 +116,7 @@ async function loadApps() {
 
   try {
     const response = await authenticatedFetch('/api/developers/apps');
-    await handleApiError(response);
+    await checkAppResponse(response);
     const data = await response.json();
     renderAppList(data.apps || []);
   } catch (error) {
@@ -127,10 +140,11 @@ form.addEventListener('submit', async (event) => {
       },
       body: JSON.stringify({
         app_name: document.getElementById('app-name').value.trim(),
-        redirect_uris: redirectUris
+        redirect_uris: redirectUris,
+        shared_origin_acknowledged: document.getElementById('shared-origin-ack').checked
       })
     });
-    await handleApiError(response);
+    await checkAppResponse(response);
 
     const app = await response.json();
     statusEl.textContent = 'Application created.';

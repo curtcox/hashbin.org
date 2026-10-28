@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HashBin Publish</title>
+  <link rel="stylesheet" href="/css/base.css">
+  <style>body{font:16px system-ui;line-height:1.6;background:#f4f7fb;color:#14283f}main{max-width:760px;margin:3rem auto;padding:2rem;background:white;border-radius:16px}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;background:#f4f7fb;padding:1rem}button,input{font:inherit;padding:.6rem}button{cursor:pointer;border:1px solid #bdcbdc;border-radius:8px;background:white;color:#14283f;margin:.25rem .25rem .25rem 0}#approve{background:#164c88;color:white;border-color:#164c88;font-weight:700}button:disabled{opacity:.45;cursor:default}button:focus-visible,a:focus-visible{outline:3px solid #3889da;outline-offset:3px}code{overflow-wrap:anywhere}#warnings{color:#8a3500}label{display:block;margin:1rem 0}</style>
+</head>
+<body><main>
+  <h1>Publish to HashBin</h1>
+  <p id="app">Waiting for the app…</p><div id="warnings"></div>
+  <p>Your app receives the content ID. Your HashBin credentials stay here.</p>
+  <section id="document-review"><p id="details"></p><pre id="preview"></pre>
+  <label>Retention (months) <input id="retention" type="number" min="1" max="120" value="1"></label>
+  <p id="quote"></p>
+  <button id="review" disabled>Sign in and review price</button>
+  <button id="approve" disabled>Approve this save</button>
+  </section><button id="cancel">Cancel</button>
+  <p id="status" role="status"></p>
+  <section id="allowance" hidden><h2>Silent saves</h2><p>This gives the app a limited allowance on this device. Other apps sharing its origin can use that allowance while running. Choose a small cap and short expiry on the next page.</p><a id="allowance-link">Set up allowance</a></section>
+  <p><a href="/docs/browser-client-safety">Browser client safety guide</a></p>
+</main><script type="module" src="/js/publish.js"></script></body>
+</html>

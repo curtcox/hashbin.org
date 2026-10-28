@@ -151,7 +151,14 @@ export async function handleDownloadBudget(owner, request) {
       b.float_uc -= amount;
       b.spend.account.day_uc += amount; b.spend.account.month_uc += amount;
       if (usage) { usage.day_uc += amount; usage.month_uc += amount; }
-      if (credential) recordSpend(credential, amount / UC);
+      if (credential) {
+        const before = credential.spend_used_cents || 0;
+        recordSpend(credential, amount / UC);
+        const limit = credential.caveats?.monthly_spend_limit_cents;
+        if (credential.grant_id && limit && before < limit * 0.8 && credential.spend_used_cents >= limit * 0.8) {
+          owner.securityEvent(profile, 'grant_spend_80_percent', credential.grant_id);
+        }
+      }
       // Keep old leases long enough for delayed returns; evicted isolates remain spent.
       for (const [id, l] of Object.entries(b.leases)) if (l.expires_at < now.getTime() - 86400000) delete b.leases[id];
       const expires_at = Math.min(now.getTime() + 60000, Date.parse(`${b.spend.day}T00:00:00Z`) + 86400000,

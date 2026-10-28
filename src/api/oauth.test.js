@@ -171,7 +171,7 @@ describe('OAuth API', () => {
     expect(tokenData.scope).toBe('content:write balance:read');
     expect(tokenData.access_token).toBeTruthy();
     expect(tokenData.refresh_token).toBeTruthy();
-    expect(tokenData.expires_in).toBe(3600);
+    expect(tokenData.expires_in).toBe(900);
   });
 
   it('returns the redirect as JSON when the caller asks for JSON', async () => {
@@ -387,6 +387,7 @@ describe('OAuth API', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         grant_type: 'refresh_token',
+        client_id: app.client_id,
         refresh_token: initialTokens.refresh_token
       })
     }), env);
@@ -402,6 +403,7 @@ describe('OAuth API', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         grant_type: 'refresh_token',
+        client_id: app.client_id,
         refresh_token: initialTokens.refresh_token
       })
     }), env);

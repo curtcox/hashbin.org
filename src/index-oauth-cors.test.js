@@ -71,6 +71,7 @@ async function registerApp(env, origin) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
+      shared_origin_acknowledged: true,
       app_name: 'CORS App',
       owner_user_id: 'developer_1',
       redirect_uris: [`${origin}/callback`]
@@ -97,7 +98,7 @@ describe('OAuth CORS handling', () => {
     expect(response.headers.get('Access-Control-Allow-Headers')).toContain('authorization');
   });
 
-  it('allows preflight for trusted GitHub Pages origin', async () => {
+  it('rejects preflight for an unregistered GitHub Pages origin', async () => {
     const env = createEnv();
 
     const response = await worker.fetch(new Request('https://hashbin.test/api/content', {
@@ -109,8 +110,8 @@ describe('OAuth CORS handling', () => {
       }
     }), env, {});
 
-    expect(response.status).toBe(204);
-    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://curtcox.github.io');
+    expect(response.status).toBe(403);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBeNull();
   });
 
   it('rejects preflight for unknown origins', async () => {
@@ -144,8 +145,9 @@ describe('OAuth CORS handling', () => {
     expect(response.headers.get('Vary')).toContain('Origin');
   });
 
-  it('adds CORS headers to API responses for trusted GitHub Pages origin', async () => {
+  it('adds CORS headers to API responses for a registered GitHub Pages origin', async () => {
     const env = createEnv();
+    await registerApp(env, 'https://curtcox.github.io');
 
     const response = await worker.fetch(new Request('https://hashbin.test/api/balance', {
       headers: {

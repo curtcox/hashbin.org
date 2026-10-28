@@ -320,7 +320,7 @@ export default {
     }
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: baseHeaders({
-      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, X-API-Key', 'Access-Control-Max-Age': '86400'
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS', 'Access-Control-Allow-Headers': 'Authorization, X-API-Key, DPoP', 'Access-Control-Max-Age': '86400'
     }) });
     if (url.pathname === '/_/session' && request.method === 'GET') {
       try { return await handshake(request, env); }

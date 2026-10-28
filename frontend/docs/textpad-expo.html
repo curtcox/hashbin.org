@@ -457,7 +457,7 @@ async renewTokens() {
   const response = await fetch(`${this.baseUrl}/oauth/token`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ grant_type: "refresh_token", refresh_token: this.tokens.refreshToken })
+    body: JSON.stringify({ grant_type: "refresh_token", client_id: this.clientId, refresh_token: this.tokens.refreshToken })
   });
   const body = await response.json().catch(() =&gt; ({}));
   if (body.error === "invalid_grant") {
@@ -938,7 +938,7 @@ export class HashBinAccount {
     const response = await fetch(`${this.baseUrl}/oauth/token`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ grant_type: "refresh_token", refresh_token: this.tokens.refreshToken })
+      body: JSON.stringify({ grant_type: "refresh_token", client_id: this.clientId, refresh_token: this.tokens.refreshToken })
     });
     const body = await response.json().catch(() =&gt; ({}));
     if (body.error === "invalid_grant") {

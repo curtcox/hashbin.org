@@ -1,3 +1,4 @@
+import { originWarnings } from '../auth/shared-origins.js';
 import { handleBackupRequest } from '../utils/backup.js';
 
 const MAX_APP_NAME = 100;
@@ -96,6 +97,18 @@ export class ApplicationRegistry {
     if (backupResponse) return backupResponse;
 
     const url = new URL(request.url);
+    if (url.pathname === '/dpop/consume' && request.method === 'POST') {
+      const consume = async () => {
+        const data = await request.json();
+        const seen = (await this.state.storage.get('dpop-proofs') || []).filter(entry => entry.expires_at > Date.now());
+        if (seen.some(entry => entry.jti === data.jti)) return new Response(null, { status: 409 });
+        seen.push(data);
+        await this.state.storage.put('dpop-proofs', seen);
+        await this.state.storage.setAlarm?.(Date.now() + 120000);
+        return new Response(null, { status: 204 });
+      };
+      return this.state.blockConcurrencyWhile ? this.state.blockConcurrencyWhile(consume) : consume();
+    }
 
     if (url.pathname === '/apps' && request.method === 'POST') {
       return this.createApplication(await request.json());
@@ -124,6 +137,8 @@ export class ApplicationRegistry {
     return new Response('Not Found', { status: 404 });
   }
 
+  async alarm() { await this.state.storage.delete('dpop-proofs'); }
+
   async loadApplications() {
     const apps = (await this.state.storage.get('apps')) || [];
     // Apps are public PKCE clients; secrets from before that was settled are dropped
@@ -149,7 +164,12 @@ export class ApplicationRegistry {
     if (invalid) return invalid;
 
     const apps = await this.loadApplications();
+    const warnings = originWarnings(data.redirect_uris, apps);
+    if (warnings.length && data.shared_origin_acknowledged !== true) {
+      return Response.json({ error: 'shared_origin_acknowledgement_required', message: 'Other apps on these origins can read your app storage. Review the browser client safety guide and acknowledge this risk.', warnings, guide: '/docs/browser-client-safety' }, { status: 400 });
+    }
     const app = {
+      shared_origin_acknowledged: data.shared_origin_acknowledged === true,
       app_id: `app_${crypto.randomUUID()}`,
       app_name: data.app_name,
       owner_user_id: data.owner_user_id,
@@ -199,6 +219,13 @@ export class ApplicationRegistry {
     }
 
     const app = apps[index];
+    if (data.redirect_uris) {
+      const warnings = originWarnings(data.redirect_uris, apps, appId);
+      if (warnings.length && data.shared_origin_acknowledged !== true) {
+        return Response.json({ error: 'shared_origin_acknowledgement_required', message: 'Acknowledge the shared-origin storage risk before saving redirect URIs.', warnings, guide: '/docs/browser-client-safety' }, { status: 400 });
+      }
+      app.shared_origin_acknowledged = data.shared_origin_acknowledged === true;
+    }
     for (const field of ['app_name', 'redirect_uris', 'logo_url', 'website_url']) {
       if (data[field] !== undefined) app[field] = data[field];
     }
@@ -246,7 +273,7 @@ export class ApplicationRegistry {
       });
     }
 
-    return new Response(JSON.stringify(app), {
+    return new Response(JSON.stringify({ ...app, origin_warnings: originWarnings(app.redirect_uris, apps, appId) }), {
       headers: { 'content-type': 'application/json' }
     });
   }

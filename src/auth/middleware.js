@@ -7,6 +7,7 @@ import { verifyApiKey } from './download-tokens.js';
 import { verifyToken } from '@clerk/backend';
 import { hashApiKey, validateApiKeyFormat } from './utils.js';
 import { getOrCreateLocalProfile, validateLocalUserId } from './local-auth.js';
+import { verifyDPoP } from './dpop.js';
 import { verifyOAuthJwt } from './oauth.js';
 import { ALL_ADMIN_SCOPES, ALL_USER_SCOPES } from './scopes.js';
 
@@ -56,6 +57,7 @@ function extractAuth(request) {
     const [scheme, value] = parts;
     const normalizedScheme = scheme.toLowerCase();
 
+    if (normalizedScheme === 'dpop') return { type: 'dpop', value };
     if (normalizedScheme === 'bearer') {
       return { type: 'clerk', value };
     } else if (normalizedScheme === 'apikey') {
@@ -271,7 +273,7 @@ async function validateAdminKey(adminKey, env) {
   }
 }
 
-async function validateOAuthAccessToken(token, env) {
+async function validateOAuthAccessToken(token, env, request) {
   if (!env.OAUTH_SIGNING_KEY) {
     return {
       valid: false,
@@ -290,6 +292,10 @@ async function validateOAuthAccessToken(token, env) {
       };
     }
 
+    if (payload.cnf?.jkt) {
+      if (!/^DPoP /i.test(request.headers.get('authorization') || '')) throw new Error('DPoP authorization required');
+      await verifyDPoP(request, env, { expectedJkt: payload.cnf.jkt, accessToken: token });
+    } else if (/^DPoP /i.test(request.headers.get('authorization') || '')) throw new Error('Unbound access token');
     const userProfileId = env.USER_PROFILES.idFromName(payload.user_id);
     const userProfileStub = env.USER_PROFILES.get(userProfileId);
     const response = await userProfileStub.fetch(new Request('http://internal/profile', {
@@ -334,6 +340,7 @@ async function validateOAuthAccessToken(token, env) {
       };
     }
 
+    await userProfileStub.fetch(new Request(`http://internal/oauth/activity/${payload.grant_id}`, { method: 'POST' }));
     return {
       valid: true,
       userId: payload.user_id,
@@ -485,8 +492,8 @@ async function authenticateUncached(request, env) {
   }
 
   // Clerk JWT token
-  if (auth.type === 'clerk') {
-    if (!isLocalMode) {
+  if (auth.type === 'clerk' || auth.type === 'dpop') {
+    if (!isLocalMode && auth.type === 'clerk') {
       const validation = await validateClerkToken(auth.value, env);
       if (validation.valid) {
         // Fetch user profile from UserProfile DO
@@ -566,7 +573,7 @@ async function authenticateUncached(request, env) {
       }
     }
 
-    const oauthValidation = await validateOAuthAccessToken(auth.value, env);
+    const oauthValidation = await validateOAuthAccessToken(auth.value, env, request);
     if (!oauthValidation.valid) {
       return {
         authenticated: false,

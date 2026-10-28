@@ -72,7 +72,7 @@ export function contentDeletedResponse() {
  * POST /api/content
  * Upload content with payment from balance
  */
-export async function handleUploadContent(request, env) {
+export async function handleUploadContent(request, env, publishContext = null) {
   const authResult = await authenticate(request, env);
   
   if (!authResult.authenticated) {
@@ -187,8 +187,17 @@ export async function handleUploadContent(request, env) {
     // Check if this is inline content (≤64 bytes)
     const isInline = isInlineContent(hash_256t);
     
+    const rawMaxCost = url.searchParams.get('max_cost_cents');
+    const maxCost = rawMaxCost === null ? null : Number(rawMaxCost);
+    if (rawMaxCost !== null && (!/^\d+$/.test(rawMaxCost) || !Number.isSafeInteger(maxCost))) {
+      return Response.json({ error: 'invalid_max_cost', message: 'max_cost_cents must be a non-negative integer' }, { status: 400 });
+    }
+
     // Calculate cost (inline content is free)
     const cost_cents = isInline ? 0 : calculateRetentionCost(size_bytes, retention_months);
+    if (maxCost !== null && cost_cents > maxCost) {
+      return Response.json({ error: 'max_cost_exceeded', cost_cents, max_cost_cents: maxCost }, { status: 409 });
+    }
     if (isInline) {
       const profile = env.USER_PROFILES.get(env.USER_PROFILES.idFromName(authResult.user.userId));
       const limited = await profile.fetch(new Request('http://internal/inline-upload', { method: 'POST' }));
@@ -343,6 +352,8 @@ export async function handleUploadContent(request, env) {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             content_hash: hash_256t,
+            app_id: authResult.user.oauth?.appId || publishContext?.appId || null,
+            grant_id: authResult.user.oauth?.grantId || null,
             size_bytes: size_bytes,
             payment_id: transactionId
           })
@@ -456,6 +467,8 @@ export async function handleUploadContent(request, env) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           content_hash: hash_256t,
+          app_id: authResult.user.oauth?.appId || publishContext?.appId || null,
+          grant_id: authResult.user.oauth?.grantId || null,
           size_bytes: size_bytes,
           payment_id: transactionId
         })

@@ -32,6 +32,27 @@
   <main>
     <div class="container sdk-doc">
       <h1>Browser SDK</h1>
+      <p><a href="/docs/browser-client-safety">Choose a safe save flow</a>. <code>publish()</code> now uses HashBin-hosted approval without giving the app tokens. Token-based uploads use <code>save()</code>.</p>
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Save with per-save approval (recommended)</h2>
+        <pre><code>const client = hashbin.createClient({
+  clientId: "app_123",
+  redirectUri: "https://your-app.example/hashbin/callback"
+});
+
+// Call directly from a click handler, before awaiting other work.
+saveButton.onclick = async () =&gt; {
+  const result = await client.publish(documentBytes, { contentType: "text/plain" });
+  console.log(result.cid);
+};</code></pre>
+        <p>The user signs in, reviews the safe preview and exact price, then approves on HashBin. Popup mode supports up to 5 MiB; redirects support up to 512 KiB. If a popup is blocked, small documents fall back to redirect. Call <code>handlePublishCallback()</code> on the registered callback page to verify a redirect result. Pass <code>clientState</code> to preserve editor state through a redirect; it is returned with the verified CID. For <code>Cross-Origin-Opener-Policy: same-origin</code>, choose redirect mode or allow popups with <code>same-origin-allow-popups</code>.</p>
+      </section>
+      <section class="card" style="margin-bottom: 2rem;">
+        <h2>Pin a reviewed release</h2>
+        <p>The immutable <a href="/sdk/v0.2.0/hashbin.js">v0.2.0 SDK</a> is self-contained. Use this script tag to verify it with Subresource Integrity; it exposes <code>window.hashbin</code>. Pinning requires deliberate upgrades for future fixes. The unversioned URL below follows the latest release.</p>
+        <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.2.0/hashbin.js"
+  integrity="sha384-mB0YKaK9+BVa8ALdgsr2t2s8ZmFuY9DpcrvITMPb3+CZQMIQrPq+E5zBdLMYp1dX" crossorigin="anonymous"&gt;&lt;/script&gt;</code></pre>
+      </section>
       <section class="card" style="margin-bottom: 2rem;">
         <h2>Load the hosted SDK</h2>
         <pre><code>&lt;script type="module"&gt;
@@ -46,12 +67,14 @@
       </section>
 
       <section class="card" style="margin-bottom: 2rem;">
-        <h2>Start authorization</h2>
+        <h2>Opt into an allowance for silent saves</h2>
         <pre><code>await hashbin.authorize({
   scopes: ["content:write", "balance:read"],
-  mode: "redirect"
+  mode: "popup",
+  spendingLimit: 1,       // US dollars per month
+  maxUploadBytes: 1048576 // 1 MiB per upload
 });</code></pre>
-        <p>For popup flows, call <code>mode: "popup"</code> and let your callback page call <code>hashbin.handleCallback({ postMessageToOpener: true, closeWindow: true })</code>.</p>
+        <p>HashBin Publish offers an allowance setup link, then the user chooses caps and expiry on HashBin. Tokens are bound to a non-extractable browser key (DPoP). Access tokens last 15 minutes; refresh tokens have a seven-day idle timeout and a 90-day absolute lifetime. The default consent expiry is 30 days. If IndexedDB is unavailable, tokens and keys stay in memory and authorization requires popup mode. For popup flows, call <code>mode: "popup"</code> and let your callback page call <code>hashbin.handleCallback({ postMessageToOpener: true, closeWindow: true })</code>.</p>
       </section>
 
       <section class="card" style="margin-bottom: 2rem;">
@@ -72,14 +95,24 @@ await hashbin.handleCallback();</code></pre>
         <pre><code>const balance = await hashbin.getBalance();
 console.log(balance.balance_cents);
 
-const result = await hashbin.publish("hello world", {
+const result = await hashbin.save("hello world", {
+  maxCostCents: 0, // hello world is inline and free
   contentType: "text/plain"
 });
 
 console.log(result.cid, result.url);
 
 const contentUrl = hashbin.getContentUrl(result.cid, { download: true });
-const response = await hashbin.retrieve(result.cid);</code></pre>
+const response = await hashbin.retrieve(result.cid); // verifies bytes before returning
+const bytes = await response.arrayBuffer();
+console.log(await hashbin.verifyCID(result.cid, bytes));
+await hashbin.disconnect(); // revokes app access, then clears local tokens</code></pre>
+      </section>
+    <section class="card" style="margin-top:2rem"><h2>API and migration notes</h2>
+      <p><code>publish(content, { mode, contentType, clientState })</code> opens approval. <code>save(content, { contentType, maxCostCents })</code> uploads using an allowance. Both verify the returned CID. <code>retrieve(cid)</code> returns a Response only after fully verifying its bytes; streaming is unavailable. <code>verifyCID(cid, content)</code> returns a boolean and accepts strings, Blobs, ArrayBuffers and typed-array views.</p>
+      <p>Previously <code>publish()</code> uploaded with OAuth. Replace those calls with <code>save()</code> to keep silent-save behavior. To remove credentials from your client, use the new <code>publish()</code> flow and remove the authorization code. Old unbound grants continue within their expiry; new SDK authorization requests are DPoP-bound. All refresh requests must now include <code>client_id</code>. Existing rotated-token reuse revokes the grant, so clients outside the SDK must serialize refreshes.</p>
+      <p>For raw uploads, append <code>?max_cost_cents=INTEGER</code> to <code>POST /api/content</code>. A charge above that ceiling returns <code>409 max_cost_exceeded</code> before debit or storage. Negative, fractional, empty and unsafe values return 400. The SDK sends this ceiling from <code>maxCostCents</code>.</p>
+      <p>Custom DPoP implementations obtain a five-minute server nonce from <code>GET /oauth/dpop-nonce</code>, then send an ES256 proof in the <code>DPoP</code> header on token requests and resource requests. Use <code>Authorization: DPoP ACCESS_TOKEN</code> for resources, including <code>ath</code>; include <code>dpop_jkt</code> on authorization. Proofs require a unique <code>jti</code>, exact <code>htm</code>, a query-free <code>htu</code>, and <code>iat</code> within 60 seconds. Refresh and access tokens retain the same binding. The SDK handles this automatically.</p>
       </section>
     </div>
   </main>

@@ -2,7 +2,25 @@
 
 ## Status
 
-**Phase:** Proposed 2026-10-27. Nothing here is implemented. Row B13 in `STATUS.md`.
+**Phase:** HashBin implementation completed locally 2026-10-28; deployment and real-provider browser acceptance remain. Row B13 in `STATUS.md`. Sections B and C remain owner/client work outside this repository.
+
+### Implemented HashBin measures
+
+- **A1:** `/publish` and first-party session-only `/api/publish` review/approval. The signed five-minute approval binds the user, app, CID, type, retention and exact price; a serialized profile operation consumes it once before upload. The UI previews text without executing it, shows price/balance, denies framing, authenticates both popup origin and opener, and handles fragment redirects with state recovery across sign-in navigation. The SDK verifies the returned CID. Popup handoffs accept up to 5 MiB, redirect handoffs up to 512 KiB; blocked larger popups require enabling popups and retrying.
+- **A2/A2a:** the Publish entry page offers allowance setup through the existing HashBin consent page. SDK defaults are $1/month, 1 MiB per file and 30 days, with smaller caps and 1/7-day expiry options. Non-extractable P-256 keys live in IndexedDB; memory-only keys/tokens with popup authorization cover unavailable IndexedDB. ES256 DPoP binds access/refresh tokens, verifies method/URL/iat/ath/server nonce, and consumes replay IDs in a Durable Object per key. The dedicated 256t content worker enforces the same binding for funded OAuth downloads and binds to the main worker’s replay store. The five-minute nonce comes from `/oauth/dpop-nonce`; replay receipts expire and are deleted by alarm. Existing unbound grants remain subject to their grant expiry and the refresh-family lifetime. No silent iframe (A2b).
+- **A3:** SDK `verifyCID`, verified `retrieve()`, verified per-save `publish()` and allowance `save()`, including exact typed-array slices and inline content.
+- **A4:** refresh reuse revokes the whole grant, client/key matching precedes rotation, access tokens last 15 minutes, new refresh tokens have seven-day idle expiry and a 90-day family maximum. SDK refreshes use Web Locks and reread storage; calls within one client share renewal. Clients without Web Locks should use one active allowance tab or per-save approval.
+- **A5:** registration/update acknowledgment for known GitHub/GitLab shared hosts or origins already used by another registered app; consent and Publish show shared origins/app names. Removed the hard-coded origin and the environment-origin bypass: CORS is derived from active registrations only.
+- **A6:** `/api/content?max_cost_cents=INTEGER` rejects an excessive charge with 409 before debit/storage, including duplicate-content extensions. `save({ maxCostCents })` exposes it. Publish binds and rechecks the exact price and passes that ceiling to the existing upload path.
+- **A7:** account activity includes last use, monthly spend/cap and recent uploads per grant. Bounded in-app security notifications cover first use, refresh reuse revocation and 80% of the cap (once per spend window, including funded downloads). Account-wide OAuth revocation and SDK `disconnect()` revoke server-side; separately managed API keys remain under their existing controls.
+- **A8:** immutable self-contained `/sdk/v0.2.0/hashbin.js`, SHA-384 SRI manifest/docs and immutable cache headers; the release script refuses existing versions. `/sdk/hashbin.js` stays latest.
+- **A9:** published `frontend/docs/browser-client-safety.html` and linked it from registration, consent, Publish, SDK/API docs and the docs index.
+
+**SDK migration:** `publish()` now means hosted per-save approval. Previous token-based callers use `save()` to retain silent saves, or remove OAuth and adopt the new `publish()`. Raw refresh clients must include `client_id`; the bundled Expo/Flutter examples and their embedded documentation were updated. Other repositories are unchanged.
+
+**Validation:** 721 unit/security tests plus cross-origin Chromium and WebKit tests cover popup and redirect publishing (including handoff recovery after a reload), allowance authorization, DPoP resource use/refresh, server-side disconnect and clickjacking headers. Live Clerk/social sign-in with Safari ITP and Firefox tracking protection still requires production acceptance; local auth cannot establish that result. The installed Firefox test runtime failed to start (profile-folder error), so Firefox remains unverified. `npm test` passes all unit tests but stops at a pre-existing API-key grep check; the separate rate-limit grep script also predates the route-table format and fails on unchanged code. Upload-balance and git-SHA checks pass. The isolated main/content Worker acceptance suite passes 2,500 funded GET/HEAD/signed requests, exact cap enforcement, exhausted fallback and native accounting alarms. Replay-cache production cost and maximum fragment sizes beyond the conservative redirect limit remain operational questions.
+
+The analysis below preserves the original review and proposed owner/client follow-ups; descriptions of the original gaps are historical.
 
 This plan came from reviewing apptron's security model
 ([apptron `docs/security.md`](https://github.com/curtcox/apptron/blob/main/docs/security.md))
@@ -10,7 +28,7 @@ against Pages Online. Pages Online keeps user code in an opaque-origin sandbox, 
 code-execution escape does not apply there. But both apps, and every other HashBin client on
 `curtcox.github.io`, keep HashBin tokens where any script on that origin can read them.
 Pages Online fixed its own offline-cache poisoning and CID verification in pages `a98d857`;
-everything else is open.
+the remaining review findings are addressed or tracked above.
 
 The plan has two audiences:
 

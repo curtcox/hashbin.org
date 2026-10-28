@@ -26,7 +26,8 @@
     <section class="developers-hero">
       <div>
         <p class="developers-kicker">Developer Platform</p>
-        <h1>Publish to HashBin from your app</h1>
+        <p><a href="/docs/browser-client-safety">Browser client safety</a>: use hosted per-save approval to keep credentials out of your app, or opt into a limited allowance.</p>
+      <h1>Publish to HashBin from your app</h1>
         <p>
           Let your users store 256t content on HashBin.org directly from your web app.
           Users authorize your app via OAuth 2.0, and uploads are billed to their HashBin balance.
@@ -78,7 +79,7 @@
           <li><strong>Redirect</strong> users to <code>/oauth/authorize</code> with PKCE parameters.</li>
           <li>The user <strong>signs in</strong> (via their existing HashBin account) and <strong>approves</strong> your app.</li>
           <li>HashBin redirects back to your <code>redirect_uri</code> with an authorization <strong>code</strong>.</li>
-          <li>Exchange the code at <code>/oauth/token</code> for an <strong>access token</strong> (1 hr) and <strong>refresh token</strong> (30 days).</li>
+          <li>Exchange the code at <code>/oauth/token</code> for an <strong>access token</strong> (15 minutes) and <strong>refresh token</strong> (7 days idle, 90 days maximum).</li>
           <li>Use the access token to <strong>publish content</strong> via <code>POST /api/content</code>. Uploads use the user's default retention period, are billed to their balance, and return a content URL on <code>https://256t.us/{cid}</code>.</li>
         </ol>
       </div>
@@ -101,22 +102,19 @@
   const hb = new HashBinClient({
     clientId: 'YOUR_CLIENT_ID',
     redirectUri: 'https://your-username.github.io/your-repo/',
-    baseUrl: 'https://hashbin.org' // without this the SDK calls your own site
+    baseUrl: 'https://hashbin.org' // also the SDK default
   });
 
-  // Back from the HashBin approval page: trade the code for tokens.
-  if (new URLSearchParams(location.search).has('code')) {
-    await hb.handleCallback();
+  // Redirect fallback: verify the result and restore your saved app state.
+  if (location.hash.includes('hashbin_publish')) {
+    const result = await hb.handlePublishCallback();
+    console.log('Published:', result.cid);
     history.replaceState(null, '', location.pathname);
   }
 
   document.getElementById('publish').onclick = async () =&gt; {
-    if (!hb.getTokens()) {
-      await hb.authorize({ scopes: ['content:write'] }); // goes to hashbin.org
-      return;
-    }
     const result = await hb.publish('Hello, HashBin!', { contentType: 'text/plain' });
-    console.log('Published:', result.cid, result.url);
+    console.log('Published:', result.cid);
   };
 &lt;/script&gt;</pre></code></div>
         <p style="margin-top: 1rem;">
@@ -240,6 +238,8 @@
       <div class="developers-panel">
         <h2>Register an application</h2>
         <form id="app-registration-form" class="developers-form">
+          <p>Apps on one origin share storage. <a href="/docs/browser-client-safety">Read the browser client safety guide</a>.</p>
+          <label><input type="checkbox" id="shared-origin-ack"> I understand that other apps on a shared origin can read this app's tokens and stored data.</label>
           <label>
             <span>Application name</span>
             <input type="text" id="app-name" required placeholder="My App">

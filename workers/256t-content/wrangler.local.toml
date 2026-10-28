@@ -30,3 +30,9 @@ name = "INFRASTRUCTURE_COST"
 class_name = "InfrastructureCost"
 script_name = "hashbin-worker-local"
 
+
+# Shared DPoP replay receipts, keyed by the signing key's thumbprint.
+[[durable_objects.bindings]]
+name = "APPLICATION_REGISTRY"
+class_name = "ApplicationRegistry"
+script_name = "hashbin-worker-local"

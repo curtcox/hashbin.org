@@ -12,6 +12,15 @@ const retentionSelect = document.getElementById('default-retention-months');
 const retentionStatus = document.getElementById('retention-status');
 const authorizationsList = document.getElementById('authorizations-list');
 const refreshButton = document.getElementById('refresh-authorizations');
+document.getElementById('revoke-all-apps').addEventListener('click', async () => {
+  if (!window.confirm('Revoke access for every app? Each app will need approval again.')) return;
+  try {
+    const response = await authenticatedFetch('/api/account/authorizations', { method: 'DELETE' });
+    await handleApiError(response);
+    await loadAuthorizations();
+    showToast('All app access revoked', 'success');
+  } catch (error) { showToast(error.message, 'error'); }
+});
 
 function describeLimits(caveats = {}) {
   const limits = [];
@@ -52,6 +61,8 @@ function renderAuthorizations(authorizations) {
         <article class="account-authorization-card">
           <h3>${escapeHtml(authorization.app_name)}</h3>
           <p>${escapeHtml(describeLimits(authorization.caveats))}</p>
+          <p>Last used: ${escapeHtml(authorization.last_used_at || 'Never')}. Spent this month: $${((authorization.spend_used_cents || 0) / 100).toFixed(2)}.</p>
+          <p>Recent uploads: ${(authorization.uploads || []).map(upload => `<a href="/info/${encodeURIComponent(upload.content_hash)}">${escapeHtml(upload.content_hash)}</a>`).join(', ') || 'None'}</p>
           <p class="account-muted">Approved ${escapeHtml(new Date(authorization.created_at).toLocaleDateString())}</p>
           <div class="account-chip-row">
             ${(authorization.scopes || []).map((scope) => `<label class="account-chip"><input type="checkbox" class="grant-scope" value="${escapeHtml(scope)}" checked> ${escapeHtml(scope)}</label>`).join('')}
@@ -166,6 +177,12 @@ async function loadAuthorizations() {
     await handleApiError(response);
     const data = await response.json();
     renderAuthorizations(data.authorizations || []);
+    const labels = { grant_first_use: 'First use of app access', refresh_token_reuse: 'App access revoked after refresh token reuse', grant_spend_80_percent: 'App reached 80% of its monthly spending cap' };
+    document.getElementById('security-events').replaceChildren(...(data.security_events || []).slice(-10).reverse().map(event => {
+      const row = document.createElement('p');
+      row.textContent = `${labels[event.type] || event.type} — ${event.grant_id} — ${new Date(event.created_at).toLocaleString()}`;
+      return row;
+    }));
   } catch (error) {
     authorizationsList.innerHTML = `
       <div class="account-empty-state">${error.message || 'Unable to load authorized apps.'}</div>

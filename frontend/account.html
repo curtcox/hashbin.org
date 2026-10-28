@@ -105,9 +105,11 @@
                 <h2 class="card-title">Authorized publishing apps</h2>
                 <p class="account-panel-copy">These apps can publish immutable content with the scopes you approved.</p>
               </div>
+              <button id="revoke-all-apps" class="btn btn-secondary" type="button">Revoke all app access</button>
               <button id="refresh-authorizations" class="btn btn-secondary" type="button">Refresh</button>
             </div>
 
+            <div id="security-events" role="status"></div>
             <div id="authorizations-list" class="account-authorizations-loading">
               <div style="display: flex; align-items: center; gap: 1rem;">
                 <div class="spinner"></div>

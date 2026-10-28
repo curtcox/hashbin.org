@@ -901,3 +901,7 @@ build-reports/
 - **Coverage**: Lines ≥80%, Branches ≥70%
 - **Performance**: Average ≤1000ms, Max ≤5000ms
 - **Security**: All vulnerabilities reported, none blocking
+
+## Browser SDK releases
+
+Run `node scripts/release-browser-sdk.mjs vMAJOR.MINOR.PATCH` to freeze the hosted SDK and create its SHA-384 SRI manifest. The script refuses to overwrite an existing release. Commit the release directory, add an immutable cache rule in `frontend/_headers`, and publish the version URL and manifest integrity value in `frontend/docs/sdk.html`. Keep existing version files unchanged; `/sdk/hashbin.js` remains the latest SDK.

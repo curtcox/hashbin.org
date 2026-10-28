@@ -99,7 +99,7 @@ describe('OAuth narrowing', () => {
     [{ granted_scopes: [] }, 'invalid_scope'],
     [{ granted_spending_limit: '6' }, 'invalid_request'],
     [{ granted_spending_limit: null }, 'invalid_request'],
-    [{ expires_in_days: '7' }, 'invalid_request']
+    [{ expires_in_days: '2' }, 'invalid_request']
   ])('refuses consent that widens or drops a required limit: %j', async (consent, error) => {
     const response = await approve(consent);
     expect(response.status).toBe(400);
@@ -132,9 +132,9 @@ describe('OAuth narrowing', () => {
 
   it('refuses a wider refresh request without consuming the refresh token', async () => {
     const tokens = await (await exchange(codeFrom(await approve({ granted_scopes: ['balance:read'] })))).json();
-    const wider = await token({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, scope: 'content:write' });
+    const wider = await token({ grant_type: 'refresh_token', client_id: app.client_id, refresh_token: tokens.refresh_token, scope: 'content:write' });
     expect((await wider.json()).error).toBe('invalid_scope');
-    const refreshed = await (await token({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token, scope: 'balance:read' })).json();
+    const refreshed = await (await token({ grant_type: 'refresh_token', client_id: app.client_id, refresh_token: tokens.refresh_token, scope: 'balance:read' })).json();
     expect(refreshed.scope).toBe('balance:read');
   });
 
@@ -148,7 +148,7 @@ describe('OAuth narrowing', () => {
     expect((await widened.json()).error).toBe('SCOPE_WIDENING');
     const loosened = await handleUpdateAuthorization(session('PATCH', { caveats: { monthly_spend_limit_cents: 900 } }), env, first.grant_id);
     expect((await loosened.json()).error).toBe('CAVEAT_WIDENING');
-    const narrowed = await handleUpdateAuthorization(session('PATCH', { scopes: ['balance:read'], caveats: { monthly_spend_limit_cents: 100 } }), env, first.grant_id);
+    const narrowed = await handleUpdateAuthorization(session('PATCH', { scopes: ['balance:read'], caveats: { ...first.caveats, monthly_spend_limit_cents: 100 } }), env, first.grant_id);
     expect(await narrowed.json()).toMatchObject({ scopes: ['balance:read'], caveats: { monthly_spend_limit_cents: 100 } });
 
     expect((await handleRevokeAuthorization(session('DELETE'), env, first.grant_id)).status).toBe(200);
@@ -166,7 +166,7 @@ describe('OAuth narrowing', () => {
 
     const auth = await authenticate(new Request('https://hashbin.test', { headers: { authorization: `Bearer ${tokens.access_token}` } }), env);
     expect(auth.authenticated).toBe(false);
-    const refreshed = await token({ grant_type: 'refresh_token', refresh_token: tokens.refresh_token });
+    const refreshed = await token({ grant_type: 'refresh_token', client_id: app.client_id, refresh_token: tokens.refresh_token });
     expect((await refreshed.json()).error).toBe('invalid_grant');
   });
 });

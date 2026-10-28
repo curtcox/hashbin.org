@@ -135,15 +135,18 @@ import {
   handleGetOAuthAuthorizePage,
   handleOAuthAuthorize,
   handleOAuthToken,
+  handleDPoPNonce,
   handleOAuthRevoke,
   handleGetAccountSettings,
   handleUpdateAccountSettings,
   handleListAuthorizations,
+  handleRevokeAllAuthorizations,
   handleRevokeAuthorization,
   handleUpdateAuthorization
 } from './api/oauth.js';
 
 import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js';
+import { handlePublish, handlePublishApp } from './api/publish.js';
 import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
 import { ADMIN_SESSION, PUBLIC, SESSION, USER_SCOPES, checkAccess, isSessionAuth } from './auth/scopes.js';
 import { handleCreateAdminKey, handleListAdminKeys, handleRevokeAdminKey } from './api/admin-keys.js';
@@ -664,12 +667,16 @@ const API_ROUTES = [
   { method: 'GET', path: '/api/developers/apps', access: SESSION, handler: handleListDeveloperApps },
   { method: 'PATCH', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateDeveloperApp(request, env, m[1]) },
   { method: 'DELETE', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleDeleteDeveloperApp(request, env, m[1]) },
+  { method: 'GET', path: '/api/publish/app', access: PUBLIC, handler: handlePublishApp },
+  { method: 'POST', path: '/api/publish', access: SESSION, handler: handlePublish },
   { method: 'POST', path: '/oauth/authorize', access: SESSION, handler: handleOAuthAuthorize },
   { method: 'GET', path: '/oauth/authorize', access: PUBLIC, handler: handleGetOAuthAuthorizePage },
+  { method: 'GET', path: '/oauth/dpop-nonce', access: PUBLIC, handler: handleDPoPNonce },
   { method: 'POST', path: '/oauth/token', access: PUBLIC, handler: handleOAuthToken },
   { method: 'POST', path: '/oauth/revoke', access: PUBLIC, handler: handleOAuthRevoke },
   { method: 'GET', path: '/api/account/settings', access: SESSION, handler: handleGetAccountSettings },
   { method: 'PATCH', path: '/api/account/settings', access: SESSION, handler: handleUpdateAccountSettings },
+  { method: 'DELETE', path: '/api/account/authorizations', access: SESSION, handler: handleRevokeAllAuthorizations },
   { method: 'GET', path: '/api/account/authorizations', access: SESSION, handler: handleListAuthorizations },
   { method: 'DELETE', path: /^\/api\/account\/authorizations\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeAuthorization(request, env, m[1]) },
   { method: 'PATCH', path: /^\/api\/account\/authorizations\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateAuthorization(request, env, m[1]) },

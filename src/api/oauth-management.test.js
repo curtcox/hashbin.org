@@ -189,7 +189,7 @@ describe('OAuth management API', () => {
   });
 
   it('revokes a refresh token and prevents reuse', async () => {
-    const { tokens } = await issueTokens(env);
+    const { tokens, app } = await issueTokens(env);
 
     const revokeResponse = await handleOAuthRevoke(new Request('https://hashbin.test/oauth/revoke', {
       method: 'POST',
@@ -206,6 +206,7 @@ describe('OAuth management API', () => {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
         grant_type: 'refresh_token',
+        client_id: app.client_id,
         refresh_token: tokens.refresh_token
       })
     }), env);
