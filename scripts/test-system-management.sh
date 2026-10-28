@@ -48,7 +48,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=audit")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ]; then
   log_pass "First export request succeeds"
@@ -63,7 +63,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=audit")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "429" ]; then
   log_pass "Second export request is rate limited"
@@ -85,7 +85,7 @@ log_info "Checking health endpoint for alert creation capability"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
   "$BASE_URL/health")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ]; then
   log_pass "Health check endpoint operational"
@@ -102,7 +102,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/alerts")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ]; then
   log_pass "Alert listing endpoint works"
@@ -185,7 +185,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/audit-log")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ]; then
   if echo "$BODY" | grep -q "view_stats"; then

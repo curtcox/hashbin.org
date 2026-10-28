@@ -215,14 +215,14 @@ status=$(get_status "$response")
 assert_status "$status" "400" "U-033: Empty file rejected"
 
 # U-034: Insufficient balance rejected
-# A new local user starts with \$10; 1 MB for 1,000,000 months costs about \$29 (no minimum charge,
-# so many small uploads would never drain the balance)
+# Drain a new user's balance, then upload 32 MB for 120 months (about 11 cents)
 poor_user="poor_user_$$"
 poor_auth="Authorization: LocalDev $poor_user"
+drain_balance "$poor_auth"
 large_file=$(mktemp)
 TEMP_FILES+=("$large_file")
-head -c 1048576 /dev/urandom > "$large_file"
-response=$(http_post_file "/api/content?retention_months=1000000" "$large_file" "$poor_auth" "application/octet-stream")
+head -c 33554432 /dev/urandom > "$large_file"
+response=$(http_post_file "/api/content?retention_months=120" "$large_file" "$poor_auth" "application/octet-stream")
 status=$(get_status "$response")
 body=$(get_body "$response")
 if [ "$status" = "400" ] || [ "$status" = "402" ]; then

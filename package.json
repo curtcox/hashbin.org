@@ -45,6 +45,7 @@
     "test:api:balance": "bash scripts/api-tests/test-local-balance.sh",
     "test:api:upload": "bash scripts/api-tests/test-local-upload.sh",
     "test:api:download": "bash scripts/api-tests/test-local-download.sh",
+    "test:api:download-extended": "bash scripts/api-tests/test-local-download-extended.sh",
     "test:api:ratelimit": "bash scripts/api-tests/test-local-ratelimit-purchase.sh",
     "test:api:extension": "bash scripts/api-tests/test-local-extension.sh",
     "test:api:user": "bash scripts/api-tests/test-local-user.sh",

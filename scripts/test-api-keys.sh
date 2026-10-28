@@ -67,7 +67,7 @@ check() {
 }
 absent() { ! grep -rqE --exclude="*.test.js" "$1" "${@:2}"; }
 
-check "Keys are signed, routable hbk_ keys" grep -q "return \`hbk_" "$REPO_ROOT/src/auth/download-tokens.js"
+check "Keys are signed, routable hbk_ keys" grep -q "API_KEY_PATTERN = keyPattern('hbk')" "$REPO_ROOT/src/auth/download-tokens.js"
 check "Key creation requires scopes" grep -q "parseScopes(body.scopes, 'key')" "$REPO_ROOT/src/api/auth.js"
 check "Key updates can only narrow scopes" grep -q "SCOPE_WIDENING" "$REPO_ROOT/src/durable-objects/user-profile.js"
 check "Pre-scope keys are revoked when seen" grep -q "function retireUnscopedKeys" "$REPO_ROOT/src/durable-objects/user-profile.js"

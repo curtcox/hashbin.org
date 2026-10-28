@@ -29,7 +29,7 @@ test_cid=$(json_get "$body" "cid")
 # DE-001: Test /info/{cid} redirect route
 response=$(curl -sL -w "\n%{http_code}" "$BASE_URL/info/$test_cid")
 status=$(echo "$response" | tail -n1)
-html=$(echo "$response" | head -n -1)
+html=$(echo "$response" | sed '$d')
 
 if [ "$status" = "200" ] && echo "$html" | grep -q "Content Information"; then
   pass "DE-001: /info/{cid} route redirects to info.html"

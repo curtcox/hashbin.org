@@ -148,23 +148,24 @@ column of section 2. "Profit" is at today's $0.03.
   $350 a month. The responses say "cache for a year", but a Worker on its own domain runs before
   Cloudflare's cache, so every download reaches R2. Saving responses with the Cache API, or
   folding the two marker checks into the .meta read, would cut most of those reads. Neither has
-  been tested.
+  been tested. (Since done: 256t.us now uses the Cache API and fewer reads; STATUS S22.)
 - *The per-IP limit is cheap but local.* A request over 30 a minute costs one Worker request
   ($0.30 per million): one IP retrying 100 times a second for a month costs about $80. The count
   lives in each Worker instance's memory, so it isn't global, and a bot using many IPs just gets
   served (the viral rows).
 - *Today's checkout fee doesn't fully cover Stripe.* The code adds 2.9% + $0.30 to the credit,
   but Stripe takes 2.9% of the total including that fee: about 1.7¢ short on a $10 deposit. The
-  total that comes out even is (credit + $0.30) / (1 − 0.029). See the table below.
+  total that comes out even is (credit + $0.30) / (1 − 0.029). See the table below. (Since
+  fixed: checkout now charges that total.)
 - *Disputes are the biggest Stripe cost after the card fee itself.* Each one loses the deposit and
   $15; at the guessed 0.5% that's 1.25¢ of every dollar. International cards (+1.5%) and Stripe
   Tax (0.5% once registered) aren't passed to the customer either.
 - *API bandwidth is sold by the GB but costs by the request.* A download through the hashbin.org
   API costs about $2.40 per million however small the file (mostly the row recording when it was
   last served), so selling it at $0.02 a GB loses money on files under about 136 KB. Each purchase
-  does round up to at least 1¢.
-- *src/utils/cost-estimation.js is out of date.* It charges R2 egress at $0.015 a GB (R2 egress is
-  free) and Worker requests at $0.50 per million (now $0.30).
+  does round up to at least 1¢. (Since fixed: purchases have a $4-per-million-download floor.)
+- *Prices in code now have one source.* The stale src/utils/cost-estimation.js was removed;
+  src/utils/cost-policy.js holds every Cloudflare and Stripe rate.
 
 #+NAME: checkout
 | Credit bought | Charged today | Stripe takes | HashBin keeps | Short by | Total that comes out even |

@@ -46,7 +46,7 @@ log_info() {
 log_test "Admin authentication - missing token"
 RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/admin/stats")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "401" ]; then
   log_pass "Missing token returns 401"
@@ -61,7 +61,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey hba_invalid" \
   "$BASE_URL/api/admin/stats")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "401" ]; then
   log_pass "Invalid token returns 401"
@@ -76,7 +76,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ]; then
   log_pass "Valid token returns 200"
@@ -92,7 +92,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "timestamp"; then
   log_pass "Platform stats endpoint works"
@@ -108,7 +108,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats/financial")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "summary"; then
   log_pass "Financial stats endpoint works"
@@ -123,7 +123,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats/content")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "total_files"; then
   log_pass "Content stats endpoint works"
@@ -138,7 +138,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats/users")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "total_accounts"; then
   log_pass "User stats endpoint works"
@@ -153,7 +153,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/health")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "response_times"; then
   log_pass "Admin health endpoint works"
@@ -169,7 +169,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/alerts")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "alerts"; then
   log_pass "Alerts endpoint works"
@@ -184,7 +184,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/audit-log")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q "entries"; then
   log_pass "Audit log endpoint works"
@@ -213,7 +213,7 @@ RESPONSE=$(curl -s -w "\n%{http_code}" \
   -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=audit")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-BODY=$(echo "$RESPONSE" | head -n -1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ]; then
   log_pass "Export endpoint works"

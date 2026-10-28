@@ -80,7 +80,11 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
 - **Every API route declares its access** in `API_ROUTES` (`src/index.js`): `PUBLIC`, `SESSION`,
   `ADMIN_SESSION`, or the scope(s) a delegated credential needs (`src/auth/scopes.js`). The
   dispatcher enforces it, and a test fails for any route without a valid declaration. A new
-  scope needs an entry in `USER_SCOPES` or `ADMIN_SCOPES`.
+  scope needs an entry in `USER_SCOPES` or `ADMIN_SCOPES`. After changing `API_ROUTES`, run
+  `node scripts/docs/generate-api-route-index.mjs` to refresh the route index in `docs/API.md`.
+- **A new Durable Object** needs its class exported from `src/index.js`, a binding and a
+  migration in `wrangler.toml`, and the same binding in `wrangler.local.toml`
+  (`src/wrangler-bindings.test.js` checks the first and last).
 - **Errors** are JSON `{ error, ... }` with the right HTTP status.
 - **Frontend:** no framework, no bundler. Escape anything dynamic before it reaches
   `innerHTML` with `escapeHtml` from `/js/html.js`, or build nodes with `textContent`. Link
@@ -99,8 +103,11 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
 - `frontend/docs/textpad*.html` are generated from `scripts/docs/*.template.html`. After
   changing a template or a Textpad app, run `python3 scripts/docs/generate-textpad-docs.py`;
   `src/docs-textpad*.test.js` fails if they drift.
+- The route index in `docs/API.md` (between the `GENERATED ROUTE INDEX` markers) is generated
+  from `API_ROUTES` by `node scripts/docs/generate-api-route-index.mjs`;
+  `src/docs-api-routes.test.js` fails if it drifts.
 - `docs/video-series/narration/*.txt` is generated from `episodes/` by
-  `tools/extract_narration.py`.
+  `docs/video-series/tools/extract_narration.py`.
 - `build-reports/` and `test-results/` are local output and are gitignored.
 
 ## Plans and status
@@ -122,5 +129,8 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
 - Same bytes mean the same CID. Re-uploading existing content is charged as an extension.
 - Rate-limit counters in `src/auth/middleware.js` are per-isolate memory (best-effort).
   Download cost is bounded by the prepaid allowances in `docs/cost-safety.md`.
+- `/` and other pages are the static frontend; only `/api/*`, `/oauth/*` and `/health` reach
+  `API_ROUTES`. Unknown page paths redirect home, unknown API paths are JSON 404s.
+- Production sign-in offers Google and GitHub only (`todo/clerk_remaining.md` CL3).
 - `frontend/js/auth.js` initializes Clerk once, and `getSessionToken()` waits for it. Page
   scripts that call the API on load must go through it (STATUS L18).

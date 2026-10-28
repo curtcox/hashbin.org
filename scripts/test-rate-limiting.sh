@@ -228,7 +228,7 @@ else
   log_fail "Rate limit purchase route not found"
 fi
 
-if grep -q "/rate-limit.*GET" src/index.js; then
+if grep -q "method: 'GET'.*rate-limit" src/index.js; then
   log_pass "Rate limit status route found"
 else
   log_fail "Rate limit status route not found"

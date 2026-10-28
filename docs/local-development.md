@@ -11,10 +11,12 @@ This guide describes how to run HashBin.org entirely locally without external se
 
 ```bash
 npm install
+cp .dev.vars.example .dev.vars   # then replace the placeholder secrets with random values
 npm run dev:local
 ```
 
-The app runs at `http://localhost:8787`.
+The app runs at `http://localhost:8787`. `.dev.vars` sets the local signing secrets and
+`ADMIN_USER_ID` (see the comments in `.dev.vars.example`).
 
 ## Local Authentication
 

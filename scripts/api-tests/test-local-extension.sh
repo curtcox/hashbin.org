@@ -61,15 +61,16 @@ assert_status "$status" "404" "E-004: Cannot extend non-existent content"
 # Create a poor user
 poor_user="poor_ext_user_$$"
 poor_auth="Authorization: LocalDev $poor_user"
-# Upload 1 MB for one month (\$0.01); extending it by 1,000,000 months costs about \$29,
-# more than a new local user's \$10 balance
+# Upload 32 MB for one month, drain the rest of the balance, then extend by 119 months
+# (about 11 cents)
 poor_file=$(mktemp)
 TEMP_FILES+=("$poor_file")
-head -c 1048576 /dev/urandom > "$poor_file"
+head -c 33554432 /dev/urandom > "$poor_file"
 response=$(http_post_file "/api/content?retention_months=1" "$poor_file" "$poor_auth" "application/octet-stream")
 poor_cid=$(get_body "$response" | json_get "cid")
+drain_balance "$poor_auth"
 # Try to extend
-response=$(http_post "/api/content/$poor_cid/extend" '{"additional_months":1000000}' "$poor_auth")
+response=$(http_post "/api/content/$poor_cid/extend" '{"additional_months":119}' "$poor_auth")
 status=$(get_status "$response")
 body=$(get_body "$response")
 if [ "$status" = "400" ] || [ "$status" = "402" ]; then

@@ -44,12 +44,12 @@ echo "Base URL: $BASE_URL"
 echo "=========================================="
 echo ""
 
-# Test 1: Root endpoint
-echo "Test 1: Root endpoint"
+# Test 1: Home page (the Worker serves the static frontend at /)
+echo "Test 1: Home page"
 echo "--------------------"
 RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-BODY=$(echo "$RESPONSE" | head -n-1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 echo "HTTP Status: $HTTP_CODE"
 
@@ -59,8 +59,8 @@ if [ "$HTTP_CODE" != "200" ]; then
   exit 1
 fi
 
-if ! echo "$BODY" | grep -q "HashBin.org API"; then
-  echo "❌ FAILED: Response does not contain expected service name"
+if ! echo "$BODY" | grep -q "<title>.*HashBin"; then
+  echo "❌ FAILED: Home page does not have a HashBin title"
   echo "Response: $BODY"
   exit 1
 fi
@@ -73,7 +73,7 @@ echo "Test 2: Health endpoint"
 echo "--------------------"
 RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/health")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-BODY=$(echo "$RESPONSE" | head -n-1)
+BODY=$(echo "$RESPONSE" | sed '$d')
 
 echo "HTTP Status: $HTTP_CODE"
 echo "Response: $BODY" | head -c 200
@@ -187,16 +187,16 @@ fi
 echo "✅ PASSED"
 echo ""
 
-# Test 4: 404 handling
+# Test 4: 404 handling (unknown pages redirect home; unknown API routes are JSON 404s)
 echo "Test 4: 404 handling"
 echo "--------------------"
-RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/nonexistent")
+RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/api/nonexistent")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
 
 echo "HTTP Status: $HTTP_CODE"
 
 if [ "$HTTP_CODE" != "404" ]; then
-  echo "❌ FAILED: Expected HTTP 404 for nonexistent route, got $HTTP_CODE"
+  echo "❌ FAILED: Expected HTTP 404 for an unknown API route, got $HTTP_CODE"
   exit 1
 fi
 
@@ -211,10 +211,10 @@ echo "Environment: $ENV_NAME"
 echo "Base URL: $BASE_URL"
 echo ""
 echo "Endpoints tested:"
-echo "  - GET / (root)"
+echo "  - GET / (home page)"
 echo "  - GET /health (comprehensive)"
 echo "  - GET https://256t.us/health"
-echo "  - GET /nonexistent (404)"
+echo "  - GET /api/nonexistent (404)"
 echo ""
 echo "Services verified:"
 echo "  - Cloudflare Workers: $WORKER_STATUS"

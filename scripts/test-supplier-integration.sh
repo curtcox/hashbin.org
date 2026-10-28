@@ -57,11 +57,11 @@ else
 fi
 
 # I3: Unauthenticated registration fails
-response=$(curl -s -X POST "$BASE_URL/api/suppliers" \
+status=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/suppliers" \
   -H "Content-Type: application/json" \
   -d '{"name":"Test","supplier_type":"CID_GROUP","base_url":"https://example.com"}')
 
-if echo "$response" | grep -q "Unauthorized"; then
+if [ "$status" = "401" ]; then
   pass "I3: Unauthenticated registration fails"
 else
   fail "I3: Unauthenticated registration" "Expected 401 Unauthorized"

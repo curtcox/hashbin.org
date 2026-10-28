@@ -114,7 +114,7 @@ purge_cache() {
             --data "$data")
 
         HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-        BODY=$(echo "$RESPONSE" | head -n-1)
+        BODY=$(echo "$RESPONSE" | sed '$d')
 
         if [ "$HTTP_CODE" = "200" ]; then
             # Check if the API returned success

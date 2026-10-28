@@ -1,4 +1,15 @@
 # Copy to .dev.vars (ignored by git) for `npm run dev:local`.
-# Use a random local-only value, for example: openssl rand -hex 32
-# Never reuse the production key. Without it, hosted approval and DPoP return HTTP 500.
+# Use random local-only values, for example: openssl rand -hex 32
+# Never reuse production values.
+
+# Signs OAuth codes and tokens. Without it, hosted approval and DPoP return HTTP 500.
 OAUTH_SIGNING_KEY=replace-with-a-random-local-value
+
+# Signs API keys' download routes (shared with the 256t-content Worker). Without it,
+# creating an API key returns HTTP 503.
+DOWNLOAD_TOKEN_SECRET=replace-with-another-random-local-value
+
+# The local user who holds every admin scope. Sign in with this name (or send
+# `Authorization: LocalDev local_admin`) to use /admin pages; run the API tests with
+# ADMIN_USER=local_admin to include the admin checks.
+ADMIN_USER_ID=local_admin

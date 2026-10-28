@@ -138,18 +138,25 @@ for the same limits.
 
 ## HashBin code issues found along the way
 
-- `src/utils/cost-estimation.js` uses stale prices: Workers at $0.50/M requests (now $0.30) and
-  R2 egress at $0.015/GB (egress is free). `/api/admin/profitability` overstates costs.
-- Upload retention has no upper limit (donations cap at 1,200 months).
+Still open:
+
 - Checkout and Terms §3 describe the Stripe fee as a "card processing fee" (surcharge rules
-  above).
+  above). STATUS L20.
 - The dispute form has no NCII category, and every dispute auto-expires after 30 days.
-- Checkout adds 2.9% + $0.30 to the credit, but Stripe takes 2.9% of the whole charge: about
-  1.7¢ short per $10 deposit. The even total is (credit + $0.30) / 0.971.
-- The 256t.us Worker sends `immutable` cache headers but never uses the Cache API, so every
-  download does four R2 reads. Its 30-a-minute IP limit is per instance, not global.
-- API bandwidth sells at $0.02/GB but costs per request, so it loses money on files under
-  about 136 KB.
+  STATUS L19.
+- The 256t.us Worker's 30-a-minute IP limit is per instance, not global. Prepaid download
+  allowances (STATUS L22) bound the cost instead.
+
+Fixed since (2026-10):
+
+- Cloudflare and Stripe prices now come from one place, `src/utils/cost-policy.js`. The
+  stale `src/utils/cost-estimation.js` had no callers and was removed.
+- Uploads, extensions and donations all cap retention at 120 months.
+- Checkout charges ceil((credit + $0.30) / 0.971), so Stripe's 2.9% of the whole charge is
+  covered.
+- 256t.us caches downloads with the Cache API and needs fewer R2 reads per download (STATUS S22).
+- Bandwidth purchases have a floor of $4 per million downloads, so small files no longer
+  sell below cost (STATUS B9, L22).
 
 ## Where Sheets fell short for this job
 

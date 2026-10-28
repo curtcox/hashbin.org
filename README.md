@@ -16,7 +16,7 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 
 - **256t Content Addressing**: Permanent, verifiable content addressing using 256t specification
 - **Free Public Access**: All published content is freely accessible to everyone
-- **Multi-Provider OAuth**: Authenticate with Google, Apple, Microsoft, or GitHub (via Clerk)
+- **Social sign-in**: Google or GitHub through Clerk (Apple and Microsoft are supported by Clerk but not enabled)
 - **Browser Publishing**: Approve each save on HashBin without giving the client credentials, or opt into a capped DPoP allowance for silent saves
 - **Verified Browser SDK**: Verify retrieved bytes and returned CIDs; pin an immutable SDK release with SRI
 - **API Key Management**: Generate up to 25 scoped API keys for programmatic access
@@ -47,58 +47,26 @@ acceptance, including live-provider browser testing for the hosted save flow.
 ### Prerequisites
 
 - Node.js 22+ and npm (wrangler 4 requires it)
-- Cloudflare account (paid plan for Durable Objects and R2)
-- Clerk account (for OAuth authentication)
+- Nothing else for local development. Deploying needs a Cloudflare account (paid plan for
+  Durable Objects and R2), Clerk and Stripe.
 
 ### Local Development
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/curtcox/hashbin.org.git
-   cd hashbin.org
-   ```
+Local mode runs the whole stack with local sign-in and payments, no Clerk, Stripe or
+Cloudflare account:
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+```bash
+git clone https://github.com/curtcox/hashbin.org.git
+cd hashbin.org
+npm install
+cp .dev.vars.example .dev.vars   # then set a random local-only OAUTH_SIGNING_KEY
+npm run dev:local                # http://localhost:8787
+```
 
-3. **Start development server**
-   ```bash
-   npm run dev
-   ```
-
-4. **Run tests**
-   ```bash
-   # Run all tests
-   npm test
-   
-   # Run auth system tests (requires dev server running)
-   ./scripts/test-auth-system.sh
-   ```
-
-The development server runs at `http://localhost:8787`
-
-### Local-Only Development (No External Services)
-
-Use the fully local mode to run without Clerk or Stripe:
-
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-2. **Start local mode**
-   ```bash
-   cp .dev.vars.example .dev.vars   # then set a random local-only OAUTH_SIGNING_KEY
-   npm run dev:local
-   ```
-
-3. **Sign in locally**
-   - Click **Sign In** in the UI and enter a username, or
-   - Send requests with `Authorization: LocalDev <user_id>`.
-
-For full details, see [docs/local-development.md](docs/local-development.md).
+Click **Sign In** and enter any username, or send `Authorization: LocalDev <user_id>` with API
+requests. `npm run test:unit` needs no server. See
+[docs/local-development.md](docs/local-development.md) for details, and use `npm run dev`
+instead only when you want real Clerk and Stripe test keys in `.dev.vars`.
 
 ### Available Scripts
 
@@ -175,7 +143,7 @@ See [browser client safety and migration](docs/browser-client-safety.md), the
 ### Core Endpoints
 
 #### Public Endpoints (No Authentication)
-- `GET /` - Service information
+- `GET /` - Home page (the static frontend)
 - `GET /health` - Health check with component status
 - `GET /api/content/{hash}` - Content metadata
 - `GET https://256t.us/{hash}` - Download content (separate origin)

@@ -65,6 +65,7 @@ run_suite "Account Move Rehearsal" "$SCRIPT_DIR/api-tests/test-local-account-mov
 run_suite "Balance Tests" "$SCRIPT_DIR/api-tests/test-local-balance.sh"
 run_suite "Upload Tests" "$SCRIPT_DIR/api-tests/test-local-upload.sh"
 run_suite "Download Tests" "$SCRIPT_DIR/api-tests/test-local-download.sh"
+run_suite "Info Page & Contested Download Tests" "$SCRIPT_DIR/api-tests/test-local-download-extended.sh"
 run_suite "Rate Limit Purchase Tests" "$SCRIPT_DIR/api-tests/test-local-ratelimit-purchase.sh"
 run_suite "Content Extension Tests" "$SCRIPT_DIR/api-tests/test-local-extension.sh"
 run_suite "User Data Tests" "$SCRIPT_DIR/api-tests/test-local-user.sh"

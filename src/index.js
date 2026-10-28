@@ -846,30 +846,6 @@ async function withGitShaComment(response, env) {
 }
 
 /**
- * Root endpoint - Basic info
- */
-function handleRoot(env) {
-  const info = {
-    service: 'HashBin.org API',
-    version: '0.1.0',
-    environment: env.ENVIRONMENT || 'unknown',
-    status: 'operational',
-    phase: 'Phase 1 - Infrastructure Setup',
-    endpoints: {
-      health: '/health',
-      // More endpoints will be added in future phases
-    }
-  };
-
-  return new Response(JSON.stringify(info, null, 2), {
-    headers: {
-      'content-type': 'application/json',
-      'access-control-allow-origin': '*'
-    }
-  });
-}
-
-/**
  * Public configuration endpoint
  * Returns non-secret configuration needed by the frontend
  */

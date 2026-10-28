@@ -208,6 +208,115 @@ Content-Type: application/json
 
 ## Endpoints
 
+### Route index
+
+Every route in `API_ROUTES` (`src/index.js`) with the access it declares: public, the
+account's own session, or the scopes a key or app token needs (any one suffices). The
+sections after this one describe the main routes in detail.
+
+<!-- BEGIN GENERATED ROUTE INDEX: node scripts/docs/generate-api-route-index.mjs -->
+
+| Method | Path | Access |
+|--------|------|--------|
+| GET, PUT | `/api/downloads/budget` | account session |
+| PUT | `/api/{auth/apikeys\|oauth/grants}/{id}/download-budget` | account session |
+| GET, DELETE | `/api/downloads/sessions` | account session |
+| POST | `/api/downloads/session` | account session |
+| POST | `/api/downloads/sign` | `downloads:spend` |
+| GET, HEAD | `/health` | public |
+| GET | `/api/config` | public |
+| POST | `/api/auth/callback` | public |
+| GET | `/api/auth/session` | account session |
+| POST | `/api/auth/logout` | account session |
+| POST | `/api/auth/link` | account session |
+| POST | `/api/auth/apikeys` | account session |
+| GET | `/api/auth/apikeys` | account session |
+| DELETE | `/api/auth/apikeys/{id}` | account session |
+| PATCH | `/api/auth/apikeys/{id}` | account session |
+| DELETE | `/api/auth/account` | account session |
+| POST | `/api/developers/apps` | account session |
+| GET | `/api/developers/apps` | account session |
+| GET, PUT | `/api/developers/apps/{id}/run` | account session |
+| POST | `/api/admin/apps/{id}/run/{suspend\|restore}` | `admin:takedown` |
+| GET | `/api/developers/apps/{id}/safety` | account session |
+| POST | `/api/developers/apps/{id}/safety` | account session |
+| PATCH | `/api/developers/apps/{id}` | account session |
+| DELETE | `/api/developers/apps/{id}` | account session |
+| GET | `/api/publish/app` | public |
+| POST | `/api/publish` | account session |
+| POST | `/oauth/authorize` | account session |
+| GET | `/oauth/authorize` | public |
+| GET | `/oauth/dpop-nonce` | public |
+| POST | `/oauth/token` | public |
+| POST | `/oauth/revoke` | public |
+| GET | `/api/account/settings` | account session |
+| PATCH | `/api/account/settings` | account session |
+| DELETE | `/api/account/authorizations` | account session |
+| GET | `/api/account/authorizations` | account session |
+| DELETE | `/api/account/authorizations/{id}` | account session |
+| PATCH | `/api/account/authorizations/{id}` | account session |
+| GET | `/api/balance` | `balance:read` |
+| GET | `/api/balance/history` | `transactions:read` |
+| POST | `/api/balance/deposit` | account session |
+| POST | `/api/balance/dev-deposit` | account session |
+| POST | `/api/payments/calculate` | public |
+| POST | `/api/content` | `content:write` |
+| POST | `/api/content/rate-limit/purchase` | `ratelimit:purchase` |
+| GET | `/api/content/{id}/exists` | public |
+| GET | `/api/content/{id}/rate-limit` | public |
+| GET | `/api/content/{id}/disputes` | public |
+| GET | `/api/content/{id}/suppliers` | public |
+| GET | `/api/content/{id}` | public |
+| POST | `/api/content/{id}/extend` | `content:extend` |
+| DELETE | `/api/content/{id}` | `content:delete` or `admin:takedown` |
+| POST | `/api/donate/cid/{id}` | public |
+| GET | `/api/user/uploads` | `uploads:read` |
+| POST | `/api/disputes` | public |
+| GET | `/api/disputes` | public |
+| GET | `/api/disputes/{id}` | public |
+| POST | `/api/suppliers` | `suppliers:write` |
+| GET | `/api/suppliers` | `suppliers:read` |
+| GET | `/api/suppliers/{id}` | public |
+| DELETE | `/api/suppliers/{id}` | `suppliers:write` |
+| PATCH | `/api/suppliers/{id}` | `suppliers:write` |
+| POST | `/api/suppliers/{id}/scan` | `suppliers:write` |
+| POST | `/api/admin/keys` | admin session |
+| GET | `/api/admin/keys` | admin session |
+| DELETE | `/api/admin/keys/{id}` | admin session |
+| GET | `/api/admin/disputes` | `admin:disputes` |
+| PATCH | `/api/admin/disputes/{id}` | `admin:disputes` |
+| POST | `/api/admin/content/{id}/delete` | `admin:takedown` |
+| GET | `/api/admin/repeat-infringers` | `admin:disputes` |
+| GET | `/api/admin/actions` | `admin:disputes` |
+| GET | `/api/admin/stats` | `admin:stats` |
+| GET | `/api/admin/stats/financial` | `admin:stats` |
+| GET | `/api/admin/stats/content` | `admin:stats` |
+| GET | `/api/admin/stats/users` | `admin:stats` |
+| GET | `/api/admin/health` | `admin:stats` |
+| POST | `/api/admin/alerts/test` | `admin:stats` |
+| GET | `/api/admin/alerts` | `admin:stats` |
+| POST | `/api/admin/alerts/{id}/acknowledge` | `admin:stats` |
+| GET | `/api/admin/audit-log` | `admin:stats` |
+| GET | `/api/admin/export` | `admin:export` |
+| GET, POST | `/api/admin/cost-safety` | `admin:costs` |
+| POST | `/api/admin/cost-safety/run/refresh` | `admin:costs` |
+| GET | `/api/admin/cost-safety/history` | `admin:costs` |
+| GET | `/api/admin/costs` | `admin:costs` |
+| GET | `/api/admin/costs/by-service` | `admin:costs` |
+| POST | `/api/admin/costs/record` | `admin:costs` |
+| GET | `/api/admin/profitability` | `admin:costs` |
+| GET | `/api/admin/backups` | `admin:backups` |
+| POST | `/api/admin/backups/run` | `admin:backups` |
+| GET | `/api/admin/backups/file` | `admin:backups` |
+| GET | `/api/admin/backups/{id}/files` | `admin:backups` |
+| POST | `/api/admin/restore` | `admin:restore` |
+| POST | `/api/admin/accounts/move` | `admin:accounts` |
+| GET | `/api/public/deletions/stats` | public |
+| GET | `/api/public/deletions/{id}` | public |
+| GET | `/api/public/deletions` | public |
+
+<!-- END GENERATED ROUTE INDEX -->
+
 ### Public Endpoints
 
 These endpoints are accessible without authentication.

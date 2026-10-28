@@ -8,7 +8,7 @@ finished ones in [`../done/`](../done/).
 
 | Doc | What it covers |
 |-----|----------------|
-| [API.md](API.md) | REST API reference: content, auth, payments, disputes, OAuth |
+| [API.md](API.md) | REST API reference: a generated index of every route and its access, then content, auth, payments, OAuth details |
 | [browser-client-safety.md](browser-client-safety.md) | Browser save flows (hosted approval, DPoP allowances), token lifetimes, shared origins, SRI, migration |
 | [api-keys-setup.md](api-keys-setup.md) | Scoped `hbk_` API keys and their caveats |
 | [api-rate-limiting.md](api-rate-limiting.md) | Buying download allowance for content |

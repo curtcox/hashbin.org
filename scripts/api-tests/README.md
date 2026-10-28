@@ -46,9 +46,11 @@ bash scripts/run-all-api-tests.sh
 npm run test:api:health         # Health & Config (10 tests)
 npm run test:api:auth           # Authentication (31 tests)
 npm run test:api:funded         # Native two-Worker funded burst and accounting
+npm run test:api:scoped-keys    # Scoped API keys and caveats
 npm run test:api:balance        # Balance Management (10 tests)
 npm run test:api:upload         # Content Upload (35 tests)
 npm run test:api:download       # Content Download (17 tests)
+npm run test:api:download-extended # Info page and contested (451) downloads (6 tests)
 npm run test:api:ratelimit      # Rate Limit Purchase (10 tests)
 npm run test:api:extension      # Content Extension (6 tests)
 npm run test:api:user           # User Data (5 tests)
@@ -180,9 +182,13 @@ scripts/api-tests/
 ├── common.sh                        # Shared utilities
 ├── test-local-health.sh             # Health & Config tests
 ├── test-local-auth.sh               # Authentication tests
+├── test-local-scoped-keys.mjs       # Scoped key tests
+├── test-local-account-move.mjs      # Admin account-move rehearsal
+├── test-local-funded-downloads.mjs  # Two-Worker funded downloads (test:api:funded)
 ├── test-local-balance.sh            # Balance tests
 ├── test-local-upload.sh             # Upload tests
 ├── test-local-download.sh           # Download tests
+├── test-local-download-extended.sh  # Info page and 451 tests
 ├── test-local-ratelimit-purchase.sh # Rate limit tests
 ├── test-local-extension.sh          # Extension tests
 ├── test-local-user.sh               # User data tests
