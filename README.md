@@ -105,7 +105,7 @@ For full details, see [docs/local-development.md](docs/local-development.md).
 - `npm run dev` - Start local development server (needs Clerk/Stripe test keys in `.dev.vars`)
 - `npm run dev:local` - Start local development with local auth/payments
 - `npm run test:unit` - Unit tests (Vitest; no server needed)
-- `npm run lint` - ESLint for `src/`, `workers/` and `scripts/`
+- `npm run lint` - ESLint for `src/`, `workers/`, `scripts/` and `frontend/`
 - `npm test` - Unit tests plus the shell checks (some need `npm run dev:local` running)
 - `npm run status` - One-screen summary of `STATUS.md`
 - `npm run deploy` - Deploy the main Worker by hand (CI deploys every push to `main`)

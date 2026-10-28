@@ -33,7 +33,7 @@ jobs:
       - name: Run unit and cost safety tests
         run: npm run test:unit
 
-      - name: Lint Worker and script code
+      - name: Lint Worker, script and frontend code
         run: npm run lint
 
       - name: Install hosted-sandbox test browsers
