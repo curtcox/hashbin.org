@@ -35,6 +35,9 @@ saveButton.onclick = async () =&gt; {
 <li><strong>Links and restored state.</strong> Treat share links, fragments and stored drafts as untrusted input. Ask before a link replaces work kept in the browser.</li>
 <li><strong>Old tokens.</strong> After moving to <code>publish()</code>, call <code>disconnect()</code> once for any token the previous version stored, so copies elsewhere stop working.</li>
 </ul>
+<h2>Choose sandbox storage</h2>
+<p><code>createSandbox()</code> defaults to an opaque origin, with no persistent storage shared between runs. SDK v0.4.0 adds opt-in <a href="/docs/sdk#hosted-sandbox">hosted sandbox origins</a> for persistent IndexedDB, OPFS, Cache Storage and module workers. The run domain is configurable and must be deployed and enabled for the app.</p>
+<p>Keep nothing secret in hosted run storage and treat stored files as untrusted: all runs in an app share it, within the browser's top-level-site partition. Apps embedding from one shared origin can frame each other's sandboxes. Use separate embedding origins for app isolation and opaque mode for runs that must not share data.</p>
 <h2>Known pitfalls</h2>
 <ul>
 <li>Code from links run in a worker keeps your shared origin; use the sandbox: <a href="/docs/security/sn-2026-001">SN-2026-001</a>, <a href="/docs/security/sn-2026-002">SN-2026-002</a>.</li>

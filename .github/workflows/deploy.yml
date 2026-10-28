@@ -32,6 +32,12 @@ jobs:
       - name: Run unit and cost safety tests
         run: npm run test:unit
 
+      - name: Install hosted-sandbox test browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Verify hosted sandbox and developer controls
+        run: npm run test:hosted
+
       - name: Verify native funded downloads with isolated local Workers
         run: npm run test:funded:local
 
@@ -603,3 +609,26 @@ jobs:
 
 # Note: Smoke tests run automatically via workflow_run trigger
 # in .github/workflows/smoke-test.yml after this workflow completes
+
+  deploy-run-origin:
+    name: Deploy hosted run origin (hashbin.app)
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://hashbin.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - run: npm ci
+      - name: Deploy fixed frames and pinned runtime allowlist
+        run: npx wrangler deploy --config workers/run-origin/wrangler.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify apex and disabled-app responses
+        run: node scripts/verify-hosted-run-origin.mjs

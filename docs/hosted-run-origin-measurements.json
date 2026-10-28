@@ -1,0 +1,165 @@
+{
+  "measured_at": "2026-10-28T20:42:23.862Z",
+  "platform": "darwin arm64",
+  "privacy_settings": "Browser defaults; persistent profiles; no storage-access grant or privacy overrides",
+  "safari_seven_day_retention": "Not measured. Requires a separate manual Safari/ITP test.",
+  "results": [
+    {
+      "browser": "chromium",
+      "frame": "http://h5-run.localhost:58612",
+      "embedders": [
+        "http://127.0.0.1:58612",
+        "http://[::1]:58612"
+      ],
+      "version": "156.0.8078.4",
+      "frame_loaded": true,
+      "info": {
+        "ok": true,
+        "value": {
+          "origin": "http://h5-run.localhost:58612",
+          "secure": true
+        }
+      },
+      "write": {
+        "ok": true,
+        "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+      },
+      "worker_read": {
+        "ok": true,
+        "value": {
+          "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+        }
+      },
+      "reload_loaded": true,
+      "reload_read": {
+        "ok": true,
+        "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+      },
+      "module_worker": {
+        "ok": true,
+        "value": {
+          "origin": "http://h5-run.localhost:58612"
+        }
+      },
+      "service_worker": {
+        "ok": true,
+        "value": "service-worker-ok"
+      },
+      "other_site_loaded": true,
+      "other_site_read": {
+        "ok": true,
+        "value": null
+      },
+      "other_site_write": {
+        "ok": true,
+        "value": "embedder-b"
+      },
+      "return_loaded": true,
+      "return_read": {
+        "ok": true,
+        "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+      },
+      "denied_frame_loaded": false,
+      "csp_errors": [
+        "Framing 'http://h5-run.localhost:58612/' violates the following Content Security Policy directive: \"frame-ancestors 'none'\". The request has been blocked.\n"
+      ],
+      "restart_loaded": true,
+      "restart_read": {
+        "ok": true,
+        "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+      },
+      "restart_worker_read": {
+        "ok": true,
+        "value": {
+          "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+        }
+      },
+      "persistence_passed": true,
+      "partitioning_passed": true,
+      "frame_ancestors_passed": true
+    },
+    {
+      "browser": "webkit",
+      "frame": "http://localhost:58612",
+      "embedders": [
+        "http://127.0.0.1:58612",
+        "http://[::1]:58612"
+      ],
+      "version": "26.0",
+      "frame_loaded": true,
+      "info": {
+        "ok": true,
+        "value": {
+          "origin": "http://localhost:58612",
+          "secure": true
+        }
+      },
+      "write": {
+        "ok": true,
+        "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+      },
+      "worker_read": {
+        "ok": true,
+        "value": {
+          "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+        }
+      },
+      "reload_loaded": true,
+      "reload_read": {
+        "ok": true,
+        "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+      },
+      "module_worker": {
+        "ok": true,
+        "value": {
+          "origin": "http://localhost:58612"
+        }
+      },
+      "service_worker": {
+        "ok": true,
+        "value": "service-worker-ok"
+      },
+      "other_site_loaded": true,
+      "other_site_read": {
+        "ok": true,
+        "value": null
+      },
+      "other_site_write": {
+        "ok": true,
+        "value": "embedder-b"
+      },
+      "return_loaded": true,
+      "return_read": {
+        "ok": true,
+        "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+      },
+      "denied_frame_loaded": false,
+      "csp_errors": [
+        "Refused to load http://localhost:58612/frame?deny=1 because it does not appear in the frame-ancestors directive of the Content Security Policy."
+      ],
+      "restart_loaded": true,
+      "restart_read": {
+        "ok": true,
+        "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+      },
+      "restart_worker_read": {
+        "ok": true,
+        "value": {
+          "value": "b250b4b2-be48-49aa-aa4b-97a0a8c599a7"
+        }
+      },
+      "persistence_passed": true,
+      "partitioning_passed": true,
+      "frame_ancestors_passed": true
+    },
+    {
+      "browser": "firefox",
+      "frame": "http://h5-run.localhost:58612",
+      "embedders": [
+        "http://127.0.0.1:58612",
+        "http://[::1]:58612"
+      ],
+      "error": "Firefox exited before opening a page: Could not find profile folder. Persistence was not measured."
+    }
+  ]
+}

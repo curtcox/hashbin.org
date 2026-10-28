@@ -20,7 +20,9 @@
   (equivalent) verification code; adopting `hashbin-cache.js` there is optional cleanup.
 - **H4:** `src/app-safety.js` and `src/api/app-safety.js`: per-app check on the developer page
   (`GET`/`POST /api/developers/apps/:id/safety`) and nightly for the 20 least recently checked apps.
-- **H5/H6:** not started. Standalone plans, ready to implement once their decisions are signed off:
+- **H5:** implemented locally with configurable domain, run Worker, registry/developer controls, SDK v0.4.0,
+  H4/docs, and Chromium/WebKit measurements/tests. Domain/deployment, runtime pins, the external Python
+  Online pilot and remaining browser acceptance are pending. **H6:** not started. Standalone plans:
   [hosted_run_origin.md](hosted_run_origin.md) (H5) and [app_hosting.md](app_hosting.md) (H6).
 
 ## Goals

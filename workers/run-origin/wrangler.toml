@@ -1,0 +1,40 @@
+name = "hashbin-run-prod"
+main = "src/index.js"
+compatibility_date = "2026-10-28"
+workers_dev = false
+preview_urls = false
+
+# Wildcard zone routes (custom domains cannot cover app labels).
+routes = [
+  { pattern = "*.hashbin.app/*", zone_name = "hashbin.app" },
+  { pattern = "hashbin.app/*", zone_name = "hashbin.app" }
+]
+[vars]
+ENVIRONMENT = "production"
+RUN_DOMAIN = "hashbin.app"
+
+[[r2_buckets]]
+binding = "CONTENT_BUCKET"
+bucket_name = "hashbin-content-256t-prod"
+
+[[durable_objects.bindings]]
+name = "APPLICATION_REGISTRY"
+class_name = "ApplicationRegistry"
+script_name = "hashbin-worker-prod"
+
+[[durable_objects.bindings]]
+name = "INFRASTRUCTURE_COST"
+class_name = "InfrastructureCost"
+script_name = "hashbin-worker-prod"
+
+[[durable_objects.bindings]]
+name = "CONTENT_METADATA"
+class_name = "ContentMetadata"
+script_name = "hashbin-worker-prod"
+
+[[analytics_engine_datasets]]
+binding = "RUN_ANALYTICS"
+dataset = "hashbin_run"
+
+[limits]
+cpu_ms = 10

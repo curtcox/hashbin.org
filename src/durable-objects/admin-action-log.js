@@ -77,6 +77,8 @@ export class AdminActionLog {
 
     const validActionTypes = [
       'content_deleted',
+      'run_suspended',
+      'run_restored',
       'dispute_denied',
       'dispute_approved',
       'dispute_status_changed'

@@ -28,11 +28,11 @@
     <p>Use <code>publish()</code> for a save button: the user approves on HashBin and your app never holds a credential. Use an allowance with <code>authorize()</code> and <code>save()</code> for silent saves. <a href="/docs/browser-client-safety">Choose a safe flow</a> · <a href="/docs/security/">Security notes</a> · <a href="#migration">Upgrade an existing client</a> · <a href="/docs/api#browser-publishing">API contracts</a>.</p>
 
     <section class="card" id="load"><h2>1. Load and configure</h2>
-      <p>The immutable <a href="/sdk/v0.3.0/hashbin.js">v0.3.0 release</a> has no mutable module dependencies. This tag enforces Subresource Integrity and exposes <code>window.hashbin</code>:</p>
-      <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.3.0/hashbin.js"
-  integrity="sha384-OrIu52nODd4k+SsDRTZjfEQq7Nu4NO7x1AtXqngPk3r2Pm5eI2Afv7nu33exMJ+a"
+      <p>The immutable <a href="/sdk/v0.4.0/hashbin.js">v0.4.0 release</a> has no mutable module dependencies. This tag enforces Subresource Integrity and exposes <code>window.hashbin</code>:</p>
+      <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.4.0/hashbin.js"
+  integrity="sha384-zzmaXw5svWRp0YF//G5ytyeqEowixccM/hHVDth46FnGrIlPS7fPki5vbhv+bWCr"
   crossorigin="anonymous"&gt;&lt;/script&gt;</code></pre>
-      <p>Each release's <a href="/sdk/v0.3.0/integrity.json">integrity.json</a> lists SRI and SHA-256 hashes for its files. Offline-first apps can vendor the exact file instead and check it against those hashes in their tests; a vendored copy loads offline and is served by your own verified cache. v0.2.0 remains available unchanged.</p>
+      <p>Each release's <a href="/sdk/v0.4.0/integrity.json">integrity.json</a> lists SRI and SHA-256 hashes for its files. Offline-first apps can vendor the exact file instead and check it against those hashes in their tests; a vendored copy loads offline and is served by your own verified cache. v0.2.0 and v0.3.0 remain available unchanged.</p>
       <p>Use <code>window.hashbin.createClient()</code> from a following module script after the SDK loads. Pinning requires deliberate upgrades for fixes. For automatic updates, import the latest module instead:</p>
       <pre><code>import { createClient } from 'https://hashbin.org/sdk/hashbin.js';
 
@@ -153,6 +153,29 @@ const response = await cache.match(url);    // fetch: null if another app altere
         <li><code>disconnect()</code> revokes remote grant access. <code>clearTokens()</code> removes only local copies. The <a href="/account">account page</a> shows activity/spend and in-app security notifications, and can revoke all app access. Revoke-all does not revoke API keys.</li>
       </ul>
       <p>Raw OAuth clients without DPoP still receive bearer tokens. The bundled native and command-line examples use that flow; native secure storage does not add sender constraint automatically. See the <a href="/docs/api#browser-publishing">API reference</a> for custom proof fields, server nonces and recovery endpoints.</p>
+    </section>
+
+    <section class="card" id="hosted-sandbox"><h2>Hosted sandbox origin (v0.4.0)</h2>
+      <p>Opaque mode remains the default. Choose hosted mode when code needs IndexedDB, OPFS, Cache Storage or module workers. Enable <strong>Hosted sandbox origin</strong> for your app at <a href="/developers">Developers</a>, register each embedding page's origin in its redirect URIs, and use the dedicated run domain hashbin.app (the SDK default). Hosting must be deployed before this option is available.</p>
+      <pre><code>const sandbox = hashbin.createSandbox({
+  source: workerSource,
+  origin: 'hosted',
+  clientId: 'YOUR_APP_UUID_CLIENT_ID',
+  runDomain: 'hashbin.app',
+  workerType: 'module', // or 'classic' (the default)
+  timeout: 15000
+});
+sandbox.onmessage = ({ data }) =&gt; showOutput(data);
+sandbox.onerror = ({ code, message }) =&gt; {
+  // A blocked, disabled, suspended or unreachable frame yields sandbox_unavailable.
+  showError(message);
+};</code></pre>
+      <p>The frame is <code>https://a&lt;app-uuid-without-hyphens&gt;.&lt;run-domain&gt;/frame/v0.4.0</code>. Add that exact origin to your page's <code>frame-src</code>. Hosted mode requires no inline bootstrap hash or <code>blob:</code> on your embedding page. Inside the worker, <code>hashbinSandbox.origin</code> reports its hosted origin; opaque mode reports the string <code>null</code>. Module workers require hosted mode.</p>
+      <p>The SDK checks the frame's reported origin before sending worker code. It never silently falls back to opaque mode: persistent storage would change. If you choose to offer a fallback, catch <code>sandbox_unavailable</code> and deliberately create a new sandbox with <code>origin: 'opaque'</code>.</p>
+      <p><strong>Keep nothing secret in run storage.</strong> Every document and run in an app can read or change previous runs' data. Treat saved files as untrusted; use opaque mode for code that must not share state. Browsers partition this storage by the top-level site and may delete it. Persistence is not a backup. Safari's seven-day tracking-prevention retention still needs manual acceptance.</p>
+      <p><strong>Shared embedding origins:</strong> apps under one host such as <code>curtcox.github.io</code> can embed each other's registered run frames and access the same per-app run storage. Give apps distinct origins if they need isolation from one another.</p>
+      <p>The frame uses <code>allow-scripts allow-same-origin</code> safely because it is cross-origin to the embedding page. The SDK refuses a same-origin frame. Cross-origin isolation and <code>SharedArrayBuffer</code> still require an isolated embedder and explicit delegation; hosted mode does not add them.</p>
+      <p>Local development uses <code>runDomain: 'localhost:8790'</code> (HTTP loopback). Register your embedding <code>http://127.0.0.1:8787</code> redirect URI and enable <code>allow_local</code>. Production run origins require HTTPS. Runtime files come only from HashBin's pinned allowlist under <code>/r/name/version/path</code>; app files still use <code>proxy</code>.</p>
     </section>
 
     <section class="card" id="migration"><h2>Migrate from the previous SDK</h2>

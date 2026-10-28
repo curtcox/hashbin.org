@@ -2,17 +2,20 @@
 
 ## Status
 
-**Phase:** Planned 2026-10-28; nothing is built. This plan is ready to implement once the owner signs off the
-decisions below. Split out of [security_case_studies.md](security_case_studies.md) (Part 3, H5). It is tracked
+**Phase:** Implemented locally 2026-10-28 with a configurable domain; production rollout and the external
+Python Online pilot remain pending. The owner requested implementation, then selected `hashbin.app` as the production domain,
+leaving registration, deployment and the external pilot pending. D3–D5 use the defaults below; D1 now builds
+the implementation ahead of the pilot. Split out of [security_case_studies.md](security_case_studies.md) (Part 3, H5). It is tracked
 under row B14 in `STATUS.md`. The related plan is [app_hosting.md](app_hosting.md) (H6).
 
-- [ ] Owner: sign off decisions D1–D5
-- [ ] Phase 0: measure partitioning and persistence (local only, no purchase)
+- [x] Owner: implement with configurable domain and recommended label/access/cost defaults
+- [ ] Phase 0: all-browser acceptance (Chromium/WebKit measurements passed; Firefox and Safari 7-day retention pending)
 - [ ] Phase 1: domain, DNS and Public Suffix List request
-- [ ] Phase 2: run-origin Worker
-- [ ] Phase 3: registry, API and developer page
-- [ ] Phase 4: SDK v0.4.0 `createSandbox({ origin: 'hosted' })`
-- [ ] Phase 5: H4 check, docs and pilot in Python Online
+- [x] Phase 2: run-origin Worker and local/production configuration (not deployed)
+- [x] Phase 3: registry, API and developer page
+- [x] Phase 4: SDK v0.4.0 `createSandbox({ origin: 'hosted' })` artifacts, integrity and headers (not published)
+- [x] Phase 5: H4 check and docs
+- [ ] Phase 5: external Python Online pilot and runtime selection/pinning
 - [ ] Phase 6: offline service worker (optional)
 
 ## Why
@@ -52,6 +55,38 @@ consumer is a Python Online feature that keeps `/home/pyodide` across runs (Phas
 | D5 | Who may use it | Any active registered app whose owner turns it on in the developer page; admins can suspend | The run origin serves only HashBin-pinned files, so abuse is limited to load |
 
 ## Design
+
+### Implementation notes (2026-10-28)
+
+See [the operator guide](../docs/hosted-run-origin.md) for local commands, deployment order,
+runtime pinning/renewal and the remaining Python Online acceptance checklist.
+
+- `RUN_DOMAIN` is `hashbin.app` in both production configs, with wildcard/apex zone routes.
+  SDK callers default to `hashbin.app` and can override `runDomain` for tests. Local defaults use
+  `localhost:8790`; domain registration/DNS/TLS, deployment and runtime pins still need acceptance. The
+  [Python Online integration plan](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md)
+  tracks the consumer changes.
+- `workers/shared/` contains the CID and response header helpers shared with the content Worker.
+- The bootstrap first accepts a validated parent connection, reports its origin on the port, and only
+  then accepts worker source. This lets the SDK validate readiness **before** sending untrusted code.
+- Daily caps use an additional internal `POST /run/reserve` route. Registry reservations of up to 120
+  requests bound usage across isolates. `POST /run/usage` accepts a `lease_id` and cumulative `requests`
+  for that reservation, applying only the new delta so retries cannot double count. Day records are
+  separate storage values, retained for 35 days on subsequent usage. Lost isolates can strand quota
+  until midnight, but cannot refund it. A `waitUntil` flush after 25 seconds covers short sessions;
+  active request handling also flushes within 60 seconds. Display counts can lag or lose unflushed
+  usage after eviction. Per-IP counters remain per isolate.
+- Admin restore returns run status to `off`, allowing the owner to opt in again. Suspension and restore
+  require successful audit recording before the registry saves the change.
+- The hourly monitor uses `hashbin_run` request counts and a conservative CPU/R2/DO allowance for the
+  500-cent cap. Missing or stale (>2 hours) current-month run measurements stop production run traffic.
+  The brake is latched for its UTC month. Monitoring delay means this is not a strict dollar ceiling.
+- `runtimes.json` is empty until the pilot selects files. The pin tool requires upstream SHA-256 hashes,
+  checks every download before uploads, uses the publisher grant, verifies CID/maximum retention and
+  writes the manifest atomically. Configure the operator account's default retention to 120 months;
+  the existing OAuth API deliberately ignores caller overrides and applies grant caveats.
+- Validation: 777 unit tests passed; 14 hosted SDK/developer browser tests passed in Chromium/WebKit; Wrangler
+  production bundle dry runs cover the main, content and run Workers. SDK v0.3.0 files are unchanged.
 
 ### Domain, DNS and TLS (Phase 1)
 
@@ -323,6 +358,31 @@ embedder and frame on different sites, record:
    `ITPDebugMode` or by testing manually.
 
 Write the results into this file. If (1) fails in a major browser, stop: H5's purpose is persistence.
+
+### Phase 0 results (2026-10-28)
+
+Measured with `scripts/measure-hosted-run-origin.mjs` using persistent browser profiles and default
+storage/privacy behavior. The embedder sites were `http://127.0.0.1:<port>` and `http://[::1]:<port>`;
+the frame was `http://h5-run.localhost:<port>` in Chromium and `http://localhost:<port>` in WebKit,
+whose resolver does not reliably support `*.localhost`. Both are cross-site secure loopback contexts.
+Chromium's Playwright flag disabling storage partitioning was overridden to restore browser defaults.
+Profiles were closed and reopened at the **same path**, then removed after measurement.
+
+| Measurement | Chromium 156.0.8078.4 | Playwright WebKit 26.0 | Firefox |
+|---|---|---|---|
+| Frame + blob-worker IndexedDB, across new frames/reloads | Passed | Passed | Not measured |
+| IndexedDB across a clean browser restart | Passed | Passed | Not measured |
+| Distinct top-level sites get distinct storage; returning to the first preserves its value | Passed | Passed | Not measured |
+| Register, activate and message a service worker | Passed | Passed | Not measured |
+| Start a module worker | Passed | Passed | Not measured |
+| `frame-ancestors 'none'` blocks frame boot, with browser CSP evidence | Passed | Passed | Not measured |
+| Seven days without visiting the embedder (Safari/ITP) | N/A | Requires manual Safari acceptance | N/A |
+
+Firefox's installed build exited before opening the persistent profile with
+`Could not find profile folder`; this is an environment failure, not a measured storage failure.
+[Machine-readable evidence](../docs/hosted-run-origin-measurements.json) is committed. No major browser
+showed a persistence failure in the measured local scenarios. Production HTTPS/Safari retention and
+Firefox acceptance remain rollout gates; the local implementation and two-engine SDK tests can proceed.
 
 ## Rollout
 

@@ -13,5 +13,7 @@ export async function readCostSafety(env) {
   if (!safety || typeof safety.hard_stop !== 'boolean' || typeof safety.brake !== 'boolean') {
     throw new Error('Invalid cost safety response');
   }
-  return { hard_stop: safety.hard_stop, brake: env.COST_SAFETY_ALLOWANCE_ONLY === 'true' || safety.brake };
+  if (safety.run_brake !== undefined && typeof safety.run_brake !== 'boolean') throw new Error('Invalid run safety response');
+  return { hard_stop: safety.hard_stop, brake: env.COST_SAFETY_ALLOWANCE_ONLY === 'true' || safety.brake,
+    ...(safety.run_brake !== undefined ? { run_brake: safety.run_brake } : {}) };
 }

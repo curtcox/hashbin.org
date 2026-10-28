@@ -10,6 +10,8 @@ binding = "ASSETS"
 
 # Production environment variables
 [vars]
+# Dedicated H5 domain, separate from sessions and content downloads.
+RUN_DOMAIN = "hashbin.app"
 ENVIRONMENT = "production"
 LOG_LEVEL = "warn"
 CONTENT_DOMAIN = "256t.us"

@@ -145,6 +145,7 @@ import {
   handleUpdateAuthorization
 } from './api/oauth.js';
 import { handleDeveloperAppSafety, runAppSafetyChecks } from './api/app-safety.js';
+import { handleDeveloperRun, handleAdminRun } from './api/run-origin.js';
 
 import { applyRateLimit, authenticate, requireAuth } from './auth/middleware.js';
 import { handlePublish, handlePublishApp } from './api/publish.js';
@@ -666,6 +667,8 @@ const API_ROUTES = [
   { method: 'DELETE', path: '/api/auth/account', access: SESSION, handler: handleDeleteAccount },
   { method: 'POST', path: '/api/developers/apps', access: SESSION, handler: handleCreateDeveloperApp },
   { method: 'GET', path: '/api/developers/apps', access: SESSION, handler: handleListDeveloperApps },
+  { method: ['GET', 'PUT'], path: /^\/api\/developers\/apps\/([^/]+)\/run$/, access: SESSION, handler: (request, env, m) => handleDeveloperRun(request, env, m[1]) },
+  { method: 'POST', path: /^\/api\/admin\/apps\/([^/]+)\/run\/(suspend|restore)$/, access: 'admin:takedown', handler: (request, env, m) => handleAdminRun(request, env, m[1], m[2]) },
   { method: 'GET', path: /^\/api\/developers\/apps\/([^/]+)\/safety$/, access: SESSION, handler: (request, env, m) => handleDeveloperAppSafety(request, env, m[1]) },
   { method: 'POST', path: /^\/api\/developers\/apps\/([^/]+)\/safety$/, access: SESSION, handler: (request, env, m) => handleDeveloperAppSafety(request, env, m[1]) },
   { method: 'PATCH', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateDeveloperApp(request, env, m[1]) },

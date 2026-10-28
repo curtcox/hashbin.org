@@ -199,3 +199,22 @@ see [SDK release instructions](../scripts/README.md#browser-sdk-releases).
 For implementation history and remaining real-provider browser acceptance, see
 [the browser safety plan](../todo/browser_client_safety.md). Chromium and WebKit local-auth
 checks do not establish live Clerk/social sign-in behavior under Safari or Firefox tracking protection.
+
+## Hosted sandbox storage (SDK v0.4.0)
+
+Opaque mode remains the default. Use `createSandbox({ origin: 'hosted', clientId,
+runDomain, source })` only when persistent IndexedDB, OPFS, Cache Storage or module
+workers are needed. Configure the dedicated run domain, enable the app in Developers,
+and add its exact hosted origin to the embedding page's `frame-src`. See the
+[SDK guide](https://hashbin.org/docs/sdk#hosted-sandbox).
+
+All documents/runs in an app share that run origin's storage within each top-level-site
+partition. Keep nothing secret there, treat stored data as untrusted, and use opaque
+mode for code that should not share state. Apps on the same embedding origin can frame
+each other's run origins. Distinct embedding origins are needed for app isolation.
+Browsers may evict this storage; it is not a backup. Hosted mode does not automatically
+provide cross-origin isolation or SharedArrayBuffer.
+
+A disabled, suspended, blocked or unavailable hosted frame reports `sandbox_unavailable`;
+the SDK validates its origin and never silently switches storage modes. The previous
+v0.3.0 release and its opaque bootstrap remain immutable.

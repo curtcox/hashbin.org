@@ -1,8 +1,8 @@
+import { CID_PATTERN, decodeLengthPrefix, isInlineContent, extractInlineContent } from '../../shared/content.js';
+import { baseHeaders, textResponse } from '../../shared/headers.js';
 import { parseIdentity, confirmedFunding, takeFundedDownload, hardStopped, handshake } from './funding.js';
 import { exclusive } from './mutex.js';
 import { COST_POLICY, identifiedDownloadPriceUc, FUNDED_LEASE_COST_DOLLARS } from '../../../src/utils/cost-policy.js';
-const CID_PATTERN = /^([A-Za-z0-9_-]{8,94})(?:\.([a-zA-Z0-9]+))?$/;
-const INLINE_CONTENT_THRESHOLD = 64;
 const MAX_REQUESTS_PER_WINDOW = 30;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const ipWindows = new Map();
@@ -78,67 +78,11 @@ const MIME_TYPES = {
   webm: 'video/webm'
 };
 
-function baseHeaders(extra = {}) {
-  return {
-    'Content-Security-Policy': "default-src 'none'; sandbox",
-    'X-Content-Type-Options': 'nosniff',
-    'X-Frame-Options': 'DENY',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Expose-Headers': 'X-Budget, X-Cache, Retry-After',
-    'Cache-Control': 'public, max-age=3600',
-    ...extra
-  };
-}
-
-function textResponse(status, message, extraHeaders = {}) {
-  return new Response(message, {
-    status,
-    headers: baseHeaders({
-      'content-type': 'text/plain; charset=utf-8',
-      ...extraHeaders,
-      // A temporary failure must not become an immutable cached content response.
-      ...(status >= 400 ? { 'Cache-Control': 'no-store' } : {})
-    })
-  });
-}
-
 function getMimeType(extension, fallback = 'application/octet-stream') {
   if (!extension) {
     return fallback;
   }
   return MIME_TYPES[String(extension).replace(/^\./, '').toLowerCase()] || 'application/octet-stream';
-}
-
-function base64UrlDecode(str) {
-  const padding = (4 - (str.length % 4)) % 4;
-  const base64 = str.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat(padding);
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
-}
-
-function decodeLengthPrefix(prefix) {
-  const bytes = base64UrlDecode(prefix);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const high = view.getUint16(0, false);
-  const low = view.getUint32(2, false);
-  return high * 0x100000000 + low;
-}
-
-function isInlineContent(cid) {
-  return decodeLengthPrefix(cid.slice(0, 8)) <= INLINE_CONTENT_THRESHOLD;
-}
-
-function extractInlineContent(cid) {
-  const size = decodeLengthPrefix(cid.slice(0, 8));
-  const bytes = base64UrlDecode(cid.slice(8));
-  if (bytes.length !== size) {
-    throw new Error('Inline CID payload size mismatch');
-  }
-  return bytes;
 }
 
 function enforceRateLimit(request) {

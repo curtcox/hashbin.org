@@ -10,6 +10,7 @@ binding = "ASSETS"
 
 # Local development environment variables
 [vars]
+RUN_DOMAIN = "localhost:8790"
 ENVIRONMENT = "local"
 LOG_LEVEL = "debug"
 CONTENT_DOMAIN = "http://localhost:8787"

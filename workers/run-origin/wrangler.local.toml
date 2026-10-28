@@ -1,0 +1,32 @@
+name = "hashbin-run-local"
+main = "src/index.js"
+compatibility_date = "2026-10-28"
+
+[dev]
+port = 8790
+
+[vars]
+ENVIRONMENT = "local"
+RUN_DOMAIN = "localhost:8790"
+
+[[r2_buckets]]
+binding = "CONTENT_BUCKET"
+bucket_name = "hashbin-content-local"
+
+[[durable_objects.bindings]]
+name = "APPLICATION_REGISTRY"
+class_name = "ApplicationRegistry"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "INFRASTRUCTURE_COST"
+class_name = "InfrastructureCost"
+script_name = "hashbin-worker-local"
+
+[[durable_objects.bindings]]
+name = "CONTENT_METADATA"
+class_name = "ContentMetadata"
+script_name = "hashbin-worker-local"
+
+[limits]
+cpu_ms = 10

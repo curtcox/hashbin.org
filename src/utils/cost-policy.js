@@ -18,6 +18,7 @@ export const COST_POLICY = Object.freeze({
   fixedMonthlyCents: 701,
   projectionAlertCents: 2500,
   projectionBrakeCents: 5000,
+  runOriginMonthlyCapCents: 500,
   downloadsPerGBMonth: 2000,
   minimumDownloads: 5000,
   downloadDollarsPerMillion: 4,

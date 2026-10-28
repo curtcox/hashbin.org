@@ -44,6 +44,7 @@ function renderAppList(apps) {
             <button type="submit" class="btn btn-primary btn-sm">Save</button>
             <button type="button" class="btn btn-secondary btn-sm cancel-edit">Cancel</button>
           </form>
+          <section class="developers-run" aria-live="polite"><p>Hosted sandbox origin: loading…</p></section>
           <section class="developers-safety" aria-live="polite"><p class="developers-safety-state">Safety check: loading…</p></section>
           <div class="developers-app-actions">
             <button type="button" class="btn btn-secondary btn-sm check-safety">Check safety</button>
@@ -71,7 +72,41 @@ function renderAppList(apps) {
     card.querySelector('.delete-app').addEventListener('click', () => deleteApp(appId));
     card.querySelector('.check-safety').addEventListener('click', () => loadSafety(card, 'POST'));
     loadSafety(card, 'GET');
+    loadRun(card);
   }
+}
+
+async function loadRun(card) {
+  const section = card.querySelector('.developers-run');
+  const endpoint = `/api/developers/apps/${encodeURIComponent(card.dataset.appId)}/run`;
+  try {
+    const response = await authenticatedFetch(endpoint);
+    await checkAppResponse(response);
+    const run = await response.json();
+    section.innerHTML = `<h4>Hosted sandbox origin</h4>
+      <p>Status: <strong>${escapeHtml(run.status)}</strong>${run.suspended_reason ? ` — ${escapeHtml(run.suspended_reason)}` : ''}</p>
+      ${run.origin ? `<p><code>${escapeHtml(run.origin)}</code></p>` : '<p>The hosted run domain is not configured yet.</p>'}
+      <p>Requests today: ${Number(run.requests_today).toLocaleString()} / ${Number(run.daily_request_cap).toLocaleString()}. This month: ${Number(run.requests_month).toLocaleString()}. Counts can take a minute to update.</p>
+      <form class="run-settings">
+        <label><input type="checkbox" name="enabled" ${run.status === 'active' ? 'checked' : ''}> Enable hosted sandbox</label>
+        <label><input type="checkbox" name="local" ${run.allow_local ? 'checked' : ''}> Allow registered local development origins</label>
+        <button class="btn btn-secondary btn-sm" ${run.status === 'suspended' || !run.origin ? 'disabled' : ''}>Save hosted sandbox settings</button>
+      </form>
+      ${run.csp ? `<p>Add this to your page's CSP: <code>${escapeHtml(run.csp)}</code></p>` : ''}
+      <p>All runs in this app can read or change earlier runs' stored files. Keep nothing secret there and treat saved data as untrusted. <a href="/docs/sdk#hosted-sandbox">Hosted sandbox guide</a>.</p>
+      ${run.warnings?.length ? '<p><strong>Shared embedder origin:</strong> other apps on your registered origin can embed this sandbox and reach the same run storage. Use distinct origins for per-app isolation.</p>' : ''}`;
+    section.querySelector('.run-settings').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      form.querySelector('button').disabled = true;
+      try {
+        const response = await authenticatedFetch(endpoint, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: form.elements.enabled.checked ? 'active' : 'off', allow_local: form.elements.local.checked }) });
+        await checkAppResponse(response);
+        showToast('Hosted sandbox settings saved', 'success');
+        await loadRun(card);
+      } catch (error) { showToast(error.message || 'Could not save hosted sandbox settings', 'error'); form.querySelector('button').disabled = false; }
+    });
+  } catch (error) { section.innerHTML = `<p>${escapeHtml(error.message || 'Could not load hosted sandbox settings')}</p>`; }
 }
 
 const SAFETY_LABELS = { warn: 'Fix', info: 'Consider', ok: 'OK' };
@@ -83,7 +118,8 @@ async function loadSafety(card, method) {
   if (method === 'POST') { button.disabled = true; section.innerHTML = '<p class="developers-safety-state">Checking your published pages…</p>'; }
   try {
     const response = await authenticatedFetch(`/api/developers/apps/${encodeURIComponent(card.dataset.appId)}/safety`, { method });
-    const result = await checkAppResponse(response);
+    await checkAppResponse(response);
+    const result = await response.json();
     renderSafety(section, result);
   } catch (error) {
     section.innerHTML = `<p class="developers-safety-state">${escapeHtml(error.message || 'Safety check failed.')}</p>`;

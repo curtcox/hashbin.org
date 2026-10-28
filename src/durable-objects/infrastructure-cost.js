@@ -60,10 +60,28 @@ export class InfrastructureCost {
       }
       if (url.pathname === '/safety' && method === 'GET') {
         const latest = await this.state.storage.get('safety:latest');
+        const run = await this.state.storage.get(`run:snapshot:${getCurrentMonthPeriod()}`);
         return Response.json({ ...latest, brake: this.env.COST_SAFETY_ALLOWANCE_ONLY === 'true' || Boolean(await this.state.storage.get('safety:brake')),
+          run_brake: this.env.ENVIRONMENT !== 'local' && Boolean(this.env.RUN_DOMAIN) &&
+            (!run || run.brake || Date.now() - Date.parse(run.recorded_at) > 2 * 3600000),
           manual_brake: this.env.COST_SAFETY_ALLOWANCE_ONLY === 'true',
           hard_stop: this.env.COST_SAFETY_HARD_STOP === 'true',
           stale: !latest || Date.now() - new Date(latest.recorded_at).getTime() > 2 * 3600000 });
+      }
+      if (url.pathname === '/run/snapshot' && method === 'POST') {
+        const data = await request.json();
+        return await this.state.blockConcurrencyWhile(async () => {
+          const at = Date.parse(data.recorded_at);
+          if (!Number.isFinite(at) || at > Date.now() + 60000 || !Number.isFinite(data.cost_cents) || data.cost_cents < 0 || !Number.isSafeInteger(data.requests) || data.requests < 0) return Response.json({ error: 'Invalid run snapshot' }, { status: 400 });
+          const period = new Date(at).toISOString().slice(0, 7);
+          const key = `run:snapshot:${period}`;
+          const old = await this.state.storage.get(key);
+          if (old && Date.parse(old.recorded_at) >= at) return Response.json(old);
+          const cost = Math.max(data.cost_cents, old?.cost_cents || 0);
+          const report = { ...data, period, cost_cents: cost, requests: Math.max(data.requests, old?.requests || 0), brake: cost >= P.runOriginMonthlyCapCents || old?.brake === true };
+          await this.state.storage.put(key, report);
+          return Response.json(report);
+        });
       }
       if (url.pathname === '/history' && method === 'GET') {
         const limit = Math.min(1000, Math.max(1, Number(url.searchParams.get('limit')) || 168));

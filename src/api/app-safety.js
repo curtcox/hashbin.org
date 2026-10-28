@@ -14,7 +14,7 @@ export async function handleDeveloperAppSafety(request, env, appId) {
   const { app, apps, last } = await response.json();
   if (request.method === 'GET') return Response.json(last || { app_id: appId, pages: [], checked_at: null });
   if (last && Date.now() - Date.parse(last.checked_at) < 60000) return Response.json({ ...last, throttled: true });
-  const result = await checkApp(app, apps);
+  const result = await checkApp(app, apps, { runDomain: env.RUN_DOMAIN });
   await store(env, result);
   return Response.json(result);
 }
@@ -23,7 +23,7 @@ export async function handleDeveloperAppSafety(request, env, appId) {
 export async function runAppSafetyChecks(env, { limit = 20 } = {}) {
   const { apps, due } = await (await registry(env).fetch(new Request(`http://internal/safety/due?limit=${limit}`))).json();
   for (const app of due) {
-    try { await store(env, await checkApp(app, apps)); } catch (error) { console.error('App safety check failed:', app.app_id, error); }
+    try { await store(env, await checkApp(app, apps, { runDomain: env.RUN_DOMAIN })); } catch (error) { console.error('App safety check failed:', app.app_id, error); }
   }
   return due.length;
 }

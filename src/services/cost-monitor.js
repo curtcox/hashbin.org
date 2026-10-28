@@ -1,6 +1,7 @@
 import { DOWNLOAD_COST_DOLLARS } from '../utils/cost-policy.js';
 import { costPeriodBounds } from '../utils/cost-period.js';
 import { COST_USAGE_UNITS, priceCostUsage } from '../utils/cost-measurements.js';
+import { COST_POLICY as P } from '../utils/cost-policy.js';
 
 const API = 'https://api.cloudflare.com/client/v4';
 
@@ -103,7 +104,7 @@ export async function collectMonthMeasurement(env, now, period = now.toISOString
   await verifyAnalyticsSchema(env);
   const costs = { workers: 0, r2_operations: 0, r2_storage: 0, durable_objects: 0 };
   const usage = Object.fromEntries(Object.keys(COST_USAGE_UNITS).map(key => [key, 0]));
-  const scripts = (env.COST_SAFETY_WORKERS || 'hashbin-worker-prod,256t-content-prod').split(',').map(s => s.trim());
+  const scripts = (env.COST_SAFETY_WORKERS || 'hashbin-worker-prod,256t-content-prod,hashbin-run-prod').split(',').map(s => s.trim());
   // Daily windows fit dataset range limits and avoid grouping/storage truncation.
   for (let from = start.getTime(); from < through; from += 86400000) {
     const to = Math.min(from + 86400000, through);
@@ -232,6 +233,13 @@ async function refreshCompletedMonth(env, now) {
 
 export async function runCostMonitor(env, now = new Date()) {
   if (env.ENVIRONMENT === 'local') return;
+  if (env.RUN_DOMAIN) {
+    try { await runRunOriginCostMonitor(env, now); }
+    catch (error) {
+      try { await createCostAlert(env, 'run_analytics_unavailable', error.message, {}, 'critical'); }
+      catch (alertError) { console.error('Run cost alert unavailable', alertError.message); }
+    }
+  }
   try {
     if (!env.CLOUDFLARE_ANALYTICS_TOKEN || !env.CLOUDFLARE_ACCOUNT_ID) throw new Error('Configure CLOUDFLARE_ANALYTICS_TOKEN and CLOUDFLARE_ACCOUNT_ID');
     // Revisit the completed month for two days to capture the final UTC hour,
@@ -270,4 +278,31 @@ export async function runCostMonitor(env, now = new Date()) {
     await createCostAlert(env, 'cost_monitor_unavailable', error.message, {}, 'critical');
     return { error: error.message };
   }
+}
+
+export async function runRunOriginCostMonitor(env, now = new Date()) {
+  const start = `${now.toISOString().slice(0, 7)}-01 00:00:00`;
+  const end = now.toISOString().replace('T', ' ').slice(0, 19);
+  const response = await fetch(`${API}/accounts/${env.CLOUDFLARE_ACCOUNT_ID}/analytics_engine/sql`, {
+    method: 'POST', headers: { Authorization: `Bearer ${env.CLOUDFLARE_ANALYTICS_TOKEN}` },
+    body: `SELECT SUM(_sample_interval * double1) AS requests FROM hashbin_run WHERE timestamp >= '${start}' AND timestamp < '${end}' FORMAT JSON`,
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!response.ok) throw new Error(`Run analytics HTTP ${response.status}`);
+  const data = await response.json();
+  const raw = data.data?.[0]?.requests;
+  if (raw === undefined || (raw !== null && !['number', 'string'].includes(typeof raw)) || raw === '') throw new Error('Invalid run analytics');
+  const requests = raw === null ? 0 : Number(raw);
+  if (!Number.isSafeInteger(requests) || requests < 0) throw new Error('Invalid run request count');
+  // Conservative per-request allowance: full CPU limit, one R2 miss and DO
+  // coordination/storage. Actual run Worker costs also enter the platform budget.
+  const cost_cents = requests * (P.workerPerMillion + 10 * P.workerCpuPerMillionMs + P.r2ClassBPerMillion + 3 * P.doPerMillion + 4 * P.doRowsWrittenPerMillion) / 1e6 * 100;
+  const saved = await env.INFRASTRUCTURE_COST.get(env.INFRASTRUCTURE_COST.idFromName('global')).fetch(new Request('https://internal/run/snapshot', {
+    method: 'POST', body: JSON.stringify({ requests, cost_cents, recorded_at: now.toISOString() })
+  }));
+  if (!saved.ok) throw new Error('Run cost snapshot unavailable');
+  const report = await saved.json();
+  if (report.cost_cents >= P.runOriginMonthlyCapCents * 0.8) await createCostAlert(env, 'run_origin_budget',
+    report.brake ? 'Hosted run monthly cap reached; hosted sandboxes stopped' : 'Hosted run has used 80% of its monthly cap', report, report.brake ? 'critical' : 'warning');
+  return report;
 }

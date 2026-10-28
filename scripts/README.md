@@ -2,6 +2,16 @@
 
 This directory contains scripts for verifying deployments and testing the HashBin.org infrastructure.
 
+## Hosted sandbox origin (H5)
+
+- `npm run test:hosted:measure`: local persistent-profile browser measurements before rollout.
+- `npm run test:hosted`: the SDK and actual run Worker through a local HTTP fixture in Chromium/WebKit.
+- `node scripts/pin-runtime.mjs <name> <version> <https-prefix> <file...> --hashes <json> [--lock <pyodide-lock.json>]`:
+  verify upstream bytes and upload through the operator's publisher grant, then write the immutable runtime allowlist.
+
+The [operator guide](../docs/hosted-run-origin.md) covers executable overrides, required account retention,
+DNS/TLS/PSL setup, deployment order, quota controls, runtime renewal and the pending Python Online pilot.
+
 ## generate-oauth-signing-key.sh
 
 Generates a strong random value for `OAUTH_SIGNING_KEY`, used by OAuth token/code signing.

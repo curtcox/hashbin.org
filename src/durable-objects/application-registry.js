@@ -1,5 +1,6 @@
 import { originWarnings } from '../auth/shared-origins.js';
 import { handleBackupRequest } from '../utils/backup.js';
+import { DEFAULT_RUN, runEmbedders, runOrigin } from '../utils/run-origin.js';
 
 const MAX_APP_NAME = 100;
 const MAX_REDIRECT_URIS = 10;
@@ -82,7 +83,8 @@ function publicApp(app) {
     website_url: app.website_url || null,
     status: app.status,
     created_at: app.created_at,
-    updated_at: app.updated_at || null
+    updated_at: app.updated_at || null,
+    run: { ...DEFAULT_RUN, ...app.run }
   };
 }
 
@@ -97,6 +99,22 @@ export class ApplicationRegistry {
     if (backupResponse) return backupResponse;
 
     const url = new URL(request.url);
+    const byRun = url.pathname.match(/^\/run\/by-app\/([^/]+)$/);
+    if (byRun && request.method === 'GET') return this.getRun(byRun[1]);
+    const run = url.pathname.match(/^\/apps\/([^/]+)\/run(?:\/(suspend|restore))?$/);
+    if (run && request.method === 'GET' && !run[2]) return this.getOwnedRun(run[1], url.searchParams.get('owner_user_id'));
+    if (run && ['PUT', 'POST'].includes(request.method)) {
+      const data = await request.json();
+      return this.serializeRun(() => this.updateRun(run[1], data, run[2]));
+    }
+    if (url.pathname === '/run/usage' && request.method === 'POST') {
+      const data = await request.json();
+      return this.serializeRun(() => this.recordRunUsage(data));
+    }
+    if (url.pathname === '/run/reserve' && request.method === 'POST') {
+      const data = await request.json();
+      return this.serializeRun(() => this.reserveRun(data));
+    }
     if (url.pathname === '/dpop/consume' && request.method === 'POST') {
       const consume = async () => {
         const data = await request.json();
@@ -111,7 +129,8 @@ export class ApplicationRegistry {
     }
 
     if (url.pathname === '/apps' && request.method === 'POST') {
-      return this.createApplication(await request.json());
+      const data = await request.json();
+      return this.serializeRun(() => this.createApplication(data));
     }
 
     if (url.pathname === '/apps' && request.method === 'GET') {
@@ -128,11 +147,12 @@ export class ApplicationRegistry {
     }
 
     if (url.pathname.startsWith('/apps/') && request.method === 'PATCH') {
-      return this.updateApplication(url.pathname.split('/')[2], await request.json());
+      const data = await request.json();
+      return this.serializeRun(() => this.updateApplication(url.pathname.split('/')[2], data));
     }
 
     if (url.pathname.startsWith('/apps/') && request.method === 'DELETE') {
-      return this.deleteApplication(url.pathname.split('/')[2], url.searchParams.get('owner_user_id'));
+      return this.serializeRun(() => this.deleteApplication(url.pathname.split('/')[2], url.searchParams.get('owner_user_id')));
     }
 
     if (url.pathname === '/origins/check' && request.method === 'GET') {
@@ -182,6 +202,7 @@ export class ApplicationRegistry {
       logo_url: data.logo_url || null,
       website_url: data.website_url || null,
       status: 'active',
+      run: { ...DEFAULT_RUN },
       created_at: new Date().toISOString()
     };
 
@@ -248,6 +269,7 @@ export class ApplicationRegistry {
     if (error) return error;
 
     apps[index].status = 'deleted';
+    apps[index].run = { ...DEFAULT_RUN, ...apps[index].run, status: 'off' };
     apps[index].deleted_at = new Date().toISOString();
     await this.saveApplications(apps);
     return Response.json({ deleted: true, app_id: appId });
@@ -324,4 +346,121 @@ export class ApplicationRegistry {
       headers: { 'content-type': 'application/json' }
     });
   }
+
+  serializeRun(operation) {
+    return this.state.blockConcurrencyWhile ? this.state.blockConcurrencyWhile(operation) : operation();
+  }
+
+  async getRun(appId) {
+    const app = (await this.loadApplications()).find(app => app.app_id === appId && app.status === 'active');
+    if (!app) return Response.json({ status: 'off', embedders: [] }, { status: 404 });
+    return Response.json({ status: app.run?.status || 'off', embedders: runEmbedders(app), daily_request_cap: app.run?.daily_request_cap ?? DEFAULT_RUN.daily_request_cap });
+  }
+
+  async getOwnedRun(appId, ownerUserId) {
+    const { apps, index, error } = await this.findOwnedApplication(appId, ownerUserId);
+    if (error) return error;
+    const app = apps[index];
+    const today = new Date().toISOString().slice(0, 10);
+    const days = await this.state.storage.get(`run:days:${appId}`) || [];
+    const usage = Object.fromEntries(await Promise.all(days.map(async day => [day, await this.state.storage.get(`run:usage:${appId}:${day}`) || {}])));
+    const origin = runOrigin(appId, this.env.RUN_DOMAIN);
+    return Response.json({ ...DEFAULT_RUN, ...app.run, origin, embedders: runEmbedders(app),
+      requests_today: usage[today]?.requests || 0,
+      requests_month: Object.entries(usage).filter(([day]) => day.startsWith(today.slice(0, 7))).reduce((sum, [, value]) => sum + (value.requests || 0), 0),
+      csp: origin ? `frame-src ${origin}` : null,
+      warnings: originWarnings(app.redirect_uris, apps, appId) });
+  }
+
+  async updateRun(appId, data, action) {
+    let apps, index;
+    if (action) {
+      apps = await this.loadApplications();
+      index = apps.findIndex(app => app.app_id === appId && app.status === 'active');
+      if (index < 0) return Response.json({ error: 'not_found' }, { status: 404 });
+    } else {
+      const owned = await this.findOwnedApplication(appId, data?.owner_user_id);
+      if (owned.error) return owned.error;
+      ({ apps, index } = owned);
+      if (apps[index].status !== 'active') return Response.json({ error: 'Application is inactive' }, { status: 403 });
+      if (!data || !['active', 'off'].includes(data.status) || (data.allow_local !== undefined && typeof data.allow_local !== 'boolean')) {
+        return Response.json({ error: 'invalid_request', message: 'status must be active or off; allow_local must be boolean' }, { status: 400 });
+      }
+      if (apps[index].run?.status === 'suspended') return Response.json({ error: 'suspended', message: 'Only an administrator can restore this origin.' }, { status: 403 });
+      if (data.status === 'active' && !this.env.RUN_DOMAIN) return Response.json({ error: 'run_unavailable', message: 'The hosted run domain is not configured.' }, { status: 503 });
+    }
+    const app = apps[index];
+    const run = { ...DEFAULT_RUN, ...app.run };
+    if (action === 'suspend') {
+      if (typeof data?.reason !== 'string' || !data.reason.trim() || data.reason.length > 1000) return Response.json({ error: 'A reason (1–1000 characters) is required' }, { status: 400 });
+      Object.assign(run, { status: 'suspended', suspended_at: new Date().toISOString(), suspended_reason: data.reason.trim() });
+    } else if (action === 'restore') {
+      // Restore permission to opt in; do not enable a previously suspended app automatically.
+      Object.assign(run, { status: 'off', suspended_at: null, suspended_reason: null });
+    } else {
+      run.status = data.status;
+      if (data.allow_local !== undefined) run.allow_local = data.allow_local;
+      if (run.status === 'active') run.enabled_at ||= new Date().toISOString();
+    }
+    app.run = run;
+    app.updated_at = new Date().toISOString();
+    if (action) {
+      const log = this.env.ADMIN_ACTION_LOG.get(this.env.ADMIN_ACTION_LOG.idFromName('admin-action-log:global'));
+      const logged = await log.fetch(new Request('https://internal/log', { method: 'POST', body: JSON.stringify({
+        admin_user_id: data.actor, action_type: `run_${action === 'suspend' ? 'suspended' : 'restored'}`,
+        details: { app_id: appId, status: run.status, reason: data.reason || null }
+      }) }));
+      if (!logged.ok) return Response.json({ error: 'Audit log unavailable' }, { status: 503 });
+    }
+    await this.saveApplications(apps);
+    return Response.json(run);
+  }
+
+  async runUsage(appId, day) {
+    const today = new Date().toISOString().slice(0, 10);
+    const at = Date.parse(`${day}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day || '') || !Number.isFinite(at) || new Date(at).toISOString().slice(0, 10) !== day || day > today || at < Date.parse(`${today}T00:00:00Z`) - 34 * 86400000) return null;
+    const days = await this.state.storage.get(`run:days:${appId}`) || [];
+    const cutoff = new Date(Date.parse(`${today}T00:00:00Z`) - 34 * 86400000).toISOString().slice(0, 10);
+    for (const expired of days.filter(day => day < cutoff)) await this.state.storage.delete(`run:usage:${appId}:${expired}`);
+    const retained = days.filter(day => day >= cutoff);
+    if (!retained.includes(day)) retained.push(day);
+    await this.state.storage.put(`run:days:${appId}`, retained);
+    return await this.state.storage.get(`run:usage:${appId}:${day}`) || { requests: 0, reserved: 0, leases: {} };
+  }
+
+  async reserveRun({ app_id, day }) {
+    if (day !== new Date().toISOString().slice(0, 10)) return Response.json({ error: 'Invalid day' }, { status: 400 });
+    const config = await this.getRun(app_id);
+    if (!config.ok) return config;
+    const run = await config.json();
+    if (run.status !== 'active') return Response.json({ error: run.status }, { status: run.status === 'suspended' ? 403 : 404 });
+    const usage = await this.runUsage(app_id, day);
+    // Durable reservations bound the fleet's total, even if isolates disappear.
+    const count = Math.min(120, Math.max(0, run.daily_request_cap - usage.reserved));
+    const lease_id = crypto.randomUUID();
+    if (count) {
+      usage.reserved += count;
+      usage.leases[lease_id] = { reserved: count, requests: 0 };
+      await this.state.storage.put(`run:usage:${app_id}:${day}`, usage);
+    }
+    return Response.json({ count, lease_id });
+  }
+
+  async recordRunUsage({ app_id, day, requests, lease_id }) {
+    if (!(await this.loadApplications()).some(app => app.app_id === app_id)) return Response.json({ error: 'not_found' }, { status: 404 });
+    const usage = await this.runUsage(app_id, day);
+    const lease = usage && typeof lease_id === 'string' && Object.hasOwn(usage.leases, lease_id) && usage.leases[lease_id];
+    if (!lease || !Number.isSafeInteger(requests) || requests < 1 || requests > lease.reserved) return Response.json({ error: 'Invalid usage' }, { status: 400 });
+    // Report a cumulative count per reservation. Retries and out-of-order flushes
+    // cannot double count, and only ~167 lease records/day are needed at the cap.
+    const delta = Math.max(0, requests - lease.requests);
+    if (delta) {
+      usage.requests += delta;
+      lease.requests = requests;
+      await this.state.storage.put(`run:usage:${app_id}:${day}`, usage);
+    }
+    return Response.json({ requests: usage.requests });
+  }
+
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { analyzePage, contentSecurityPolicy, scriptUrls } from './app-safety.js';
+import { analyzePage, checkApp, contentSecurityPolicy, scriptUrls, isReleasedSdk } from './app-safety.js';
+import { readFileSync } from 'node:fs';
 
 const ids = findings => findings.map(item => item.id);
 
@@ -11,9 +12,29 @@ describe('registered-app safety check', () => {
 
   it('accepts a pinned current SDK, a strict policy, the sandbox and a verified cache', () => {
     const html = `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-x' blob:; object-src 'none'"><script src="app.js"></script>`;
-    const findings = analyzePage({ url: 'https://app.example/', html, scripts: { app: "import('../vendor/hashbin-sdk-v0.3.0.mjs'); sdk.createSandbox({})" }, serviceWorker: 'HashBinCache.verify' });
+    const findings = analyzePage({ url: 'https://app.example/', html, scripts: { app: "import('../vendor/hashbin-sdk-v0.4.0.mjs'); sdk.createSandbox({})" }, serviceWorker: 'HashBinCache.verify' });
     expect(findings.filter(item => item.level === 'warn')).toEqual([]);
     expect(ids(findings)).toEqual(expect.arrayContaining(['csp-present', 'sdk-current', 'sandbox', 'sw-verified']));
+  });
+
+  it('skips SDK bytes by released SHA-256, but scans an edited SDK regardless of filename', async () => {
+    const source = readFileSync(new URL('../frontend/sdk/v0.4.0/hashbin.js', import.meta.url), 'utf8');
+    expect(await isReleasedSdk(source)).toBe(true);
+    expect(await isReleasedSdk(`${source}\n// modified`)).toBe(false);
+    const app = { app_id: 'app_test', redirect_uris: ['https://app.example/'] };
+    const scan = script => checkApp(app, [], { fetch: async url => new Response(url.endsWith('renamed.js') ? script : '<script src="renamed.js"></script>') });
+    const trusted = await scan(source);
+    expect(ids(trusted.pages[0].findings)).not.toContain('sandbox-same-origin');
+    const edited = await scan(`${source}\n// modified`);
+    expect(ids(edited.pages[0].findings)).toContain('sandbox-same-origin');
+  });
+
+  it('reports hosted sandbox CSP and mismatched embedders', () => {
+    const appId = 'app_1932999d-125c-4cf6-bf56-806d6df1fa3a';
+    const app = { app_id: appId, run: { status: 'active' }, redirect_uris: ['https://registered.example/'] };
+    const findings = analyzePage({ appId, app, url: 'https://other.example/', html: '<script>createSandbox({origin:"hosted"})</script>', headers: { 'content-security-policy': "default-src 'none'; frame-src https://a1932999d125c4cf6bf56806d6df1fa3a.run.example" }, runDomain: 'run.example' });
+    expect(ids(findings)).toEqual(expect.arrayContaining(['sandbox-hosted', 'run-embedder-mismatch']));
+    expect(ids(findings)).not.toContain('sandbox');
   });
 
   it('reads policies and same-origin scripts', () => {

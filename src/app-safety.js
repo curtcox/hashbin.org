@@ -2,8 +2,16 @@
 // reports the problems documented in /docs/security/. Findings are advice for the developer; they
 // never block publishing.
 import { originWarnings, webOrigin } from './auth/shared-origins.js';
+import { runEmbedders, runOrigin } from './utils/run-origin.js';
+import sdk03 from '../frontend/sdk/v0.3.0/integrity.json' with { type: 'json' };
+import sdk04 from '../frontend/sdk/v0.4.0/integrity.json' with { type: 'json' };
 
-export const LATEST_SDK = 'v0.3.0';
+export const LATEST_SDK = 'v0.4.0';
+const SDK_HASHES = new Set([sdk03, sdk04].flatMap(release => Object.values(release.files).map(file => file.sha256)));
+export async function isReleasedSdk(source) {
+  const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
+  return SDK_HASHES.has([...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join(''));
+}
 const MAX_BYTES = 1024 * 1024;
 const MAX_SCRIPTS = 12;
 const NOTES = '/docs/security/';
@@ -37,7 +45,7 @@ export function scriptUrls(html, pageUrl) {
  * Analyse one page. `scripts` maps same-origin script URLs to their text, and `serviceWorker` is
  * the registered worker's text when one was found. `apps` is the registry, for shared origins.
  */
-export function analyzePage({ url, html, headers = {}, scripts = {}, serviceWorker = null, apps = [], appId = null }) {
+export function analyzePage({ url, html, headers = {}, scripts = {}, serviceWorker = null, apps = [], appId = null, app = apps.find(app => app.app_id === appId), runDomain = null }) {
   const findings = [];
   const code = [html, ...Object.values(scripts)].join('\n');
   const shared = originWarnings([url], apps, appId)[0];
@@ -68,7 +76,12 @@ export function analyzePage({ url, html, headers = {}, scripts = {}, serviceWork
   // Where untrusted code runs: same-origin workers and frames keep this origin's storage.
   if (/allow-scripts[^"'>]*allow-same-origin|allow-same-origin[^"'>]*allow-scripts/.test(code)) findings.push(finding('warn', 'sandbox-same-origin', 'An iframe combines allow-scripts with allow-same-origin, which lets its content remove the sandbox.', `${NOTES}sn-2026-001`));
   if (/new\s+(Shared)?Worker\s*\(/.test(code) && !/createSandbox\s*\(/.test(code)) findings.push(finding('info', 'worker-origin', 'The page starts workers with its own origin. If they run code from users or links, run it with createSandbox() instead.', `${NOTES}sn-2026-001`));
-  if (/createSandbox\s*\(/.test(code)) findings.push(finding('ok', 'sandbox', 'Code runs in the SDK sandbox (opaque origin).', '/docs/sdk#sandbox'));
+  const usesSandbox = /createSandbox\s*\(/.test(code);
+  const expected = appId && runDomain ? runOrigin(appId, runDomain) : null;
+  const hosted = usesSandbox && expected && (directive(policy || '', 'frame-src') || []).includes(expected);
+  if (hosted) findings.push(finding('ok', 'sandbox-hosted', 'The page allows the hosted sandbox origin and calls createSandbox(). Keep no secrets in shared run storage.', '/docs/sdk#hosted-sandbox'));
+  else if (usesSandbox) findings.push(finding('ok', 'sandbox', 'The page calls the SDK sandbox. Opaque mode is the default.', '/docs/sdk#sandbox'));
+  if (app?.run?.status === 'active' && !runEmbedders(app).includes(new URL(url).origin)) findings.push(finding('warn', 'run-embedder-mismatch', 'Hosted mode is enabled, but this page origin is not a registered embedder. Update the app redirect URIs or allow_local.', '/docs/sdk#hosted-sandbox'));
 
   if (serviceWorker !== null) {
     if (/HashBinCache|crypto\.subtle\.digest\(\s*['"]SHA-256/.test(serviceWorker)) findings.push(finding('ok', 'sw-verified', 'The service worker verifies cached bytes.', '/docs/sdk#offline-cache'));
@@ -93,7 +106,7 @@ async function readText(fetchImpl, url, accept) {
 }
 
 /** Fetch and analyse every published redirect URI of one app. */
-export async function checkApp(app, apps, { fetch: fetchImpl = fetch, now = new Date() } = {}) {
+export async function checkApp(app, apps, { fetch: fetchImpl = fetch, now = new Date(), runDomain = null } = {}) {
   const pages = [];
   const seen = new Set();
   for (const uri of app.redirect_uris || []) {
@@ -104,13 +117,18 @@ export async function checkApp(app, apps, { fetch: fetchImpl = fetch, now = new 
       const page = await readText(fetchImpl, url.href, 'text/html');
       const scripts = {};
       for (const scriptUrl of scriptUrls(page.text, url.href).slice(0, MAX_SCRIPTS)) {
-        try { scripts[scriptUrl] = (await readText(fetchImpl, scriptUrl, '*/*')).text; } catch { /* Missing scripts are not findings. */ }
+        try {
+          const source = (await readText(fetchImpl, scriptUrl, '*/*')).text;
+          // Hash the bytes, never the filename: a renamed SDK is still trusted,
+          // while an edited file named hashbin.js must still be scanned.
+          if (!await isReleasedSdk(source)) scripts[scriptUrl] = source;
+        } catch { /* Missing scripts are not findings. */ }
       }
       const code = [page.text, ...Object.values(scripts)].join('\n');
       const registration = /serviceWorker\s*\.\s*register\(\s*['"]([^'"]+)['"]/.exec(code)?.[1];
       let serviceWorker = null;
       if (registration) try { serviceWorker = (await readText(fetchImpl, new URL(registration, url).href, '*/*')).text; } catch { /* Reported as unverified only when readable. */ }
-      pages.push({ url: url.href, findings: analyzePage({ url: url.href, html: page.text, headers: page.headers, scripts, serviceWorker, apps, appId: app.app_id }) });
+      pages.push({ url: url.href, findings: analyzePage({ url: url.href, html: page.text, headers: page.headers, scripts, serviceWorker, apps, app, runDomain, appId: app.app_id }) });
     } catch (error) {
       pages.push({ url: url.href, error: `Could not read the page: ${error.message}` });
     }
