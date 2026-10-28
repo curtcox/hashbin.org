@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/css/components.css">
   <link rel="stylesheet" href="/css/auth.css">
   <style>
+    .textpad-doc { overflow-wrap: anywhere; }
     .textpad-doc pre {
       background: #0f172a;
       color: #e2e8f0;
@@ -115,6 +116,7 @@
 
       <section class="card">
         <h2>Signing in from an app</h2>
+        <p>This example implements raw OAuth with bearer tokens in native secure storage. It does not implement the browser SDK's DPoP key binding. New refresh tokens have a seven-day idle timeout and 90-day family maximum, and every refresh sends <code>client_id</code>. Reusing a rotated token revokes the whole grant. Browser clients should start with <a href="/docs/browser-client-safety">hosted per-save approval</a>; native clients must implement DPoP separately to gain sender constraint.</p>
         <p>
           A phone app signs in to HashBin with the same OAuth 2.0 and PKCE flow as a web page. Four
           things are different:
@@ -135,8 +137,8 @@
           </li>
           <li>
             <strong>Tokens are kept in secure storage</strong>, the iOS Keychain or the Android
-            Keystore, through <code>flutter_secure_storage</code>. A web page has to use
-            <code>localStorage</code>.
+            Keystore, through <code>flutter_secure_storage</code>. Browser allowances normally store tokens in
+            <code>localStorage</code> (or memory when key storage is unavailable); hosted per-save approval keeps credentials out of the web app entirely.
           </li>
           <li>
             <strong>Nothing has to survive a page change.</strong> The app keeps running while the
@@ -467,12 +469,12 @@ Future&lt;ConnectResult&gt; connect() async {
 
         <h3>8. Renewing access</h3>
         <p>
-          Access tokens last an hour. Every API call goes through <code>account.send()</code>, which
+          Access tokens last 15 minutes. Every API call goes through <code>account.send()</code>, which
           renews an expired token first. Refresh tokens work only once, so calls that need a new
           token at the same moment share a single renewal. A refused refresh token, or a 401 from
           the API, means the user has to approve Textpad again.
         </p>
-        <pre><code class="excerpt" data-file="lib/hashbin.dart">/// Access tokens last an hour. A refresh token gets a new one, and is
+        <pre><code class="excerpt" data-file="lib/hashbin.dart">/// Access tokens last 15 minutes. A refresh token gets a new one, and is
 /// itself replaced: each refresh token works only once. Calls that need a
 /// new token at the same moment share one refresh, because a second
 /// refresh with the same (by then used) token would fail.
@@ -939,7 +941,7 @@ class HashBinAccount {
         body: jsonEncode({'token': refreshToken, 'token_type_hint': 'refresh_token'}),
       );
     } catch (_) {
-      // Offline: the token still expires on its own within 30 days.
+      // Offline: a newly issued refresh token expires after seven idle days; remote revocation may still be needed.
     }
   }
 
@@ -947,7 +949,7 @@ class HashBinAccount {
   // Calling the API
   // ----------------------------------------------------------------------
 
-  /// Access tokens last an hour. A refresh token gets a new one, and is
+  /// Access tokens last 15 minutes. A refresh token gets a new one, and is
   /// itself replaced: each refresh token works only once. Calls that need a
   /// new token at the same moment share one refresh, because a second
   /// refresh with the same (by then used) token would fail.

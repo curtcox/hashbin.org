@@ -109,6 +109,7 @@
 
       <section class="card">
         <h2>Signing in from an app</h2>
+        <p>This example implements raw OAuth with bearer tokens in native secure storage. It does not implement the browser SDK's DPoP key binding. New refresh tokens have a seven-day idle timeout and 90-day family maximum, and every refresh sends <code>client_id</code>. Reusing a rotated token revokes the whole grant. Browser clients should start with <a href="/docs/browser-client-safety">hosted per-save approval</a>; native clients must implement DPoP separately to gain sender constraint.</p>
         <p>
           A phone app signs in to HashBin with the same OAuth 2.0 and PKCE flow as a web page. Four
           things are different:
@@ -130,8 +131,8 @@
           </li>
           <li>
             <strong>Tokens are kept in secure storage</strong>, the iOS Keychain or the Android
-            Keystore, through <code>expo-secure-store</code>. A web page has to use
-            <code>localStorage</code>.
+            Keystore, through <code>expo-secure-store</code>. Browser allowances normally store tokens in
+            <code>localStorage</code> (or memory when key storage is unavailable); hosted per-save approval keeps credentials out of the web app entirely.
           </li>
           <li>
             <strong>Nothing has to survive a page change.</strong> The app keeps running while the
@@ -230,12 +231,12 @@
 
         <h3>7. Renewing access</h3>
         <p>
-          Access tokens last an hour. Every API call goes through <code>account.fetch()</code>, which
+          Access tokens last 15 minutes. Every API call goes through <code>account.fetch()</code>, which
           renews an expired token first. Refresh tokens work only once, so calls that need a new
           token at the same moment share a single renewal. A refused refresh token, or a 401 from
           the API, means the user has to approve Textpad again.
         </p>
-@@EXCERPT file="hashbin.js" start="  // Access tokens last an hour." anchor="  async renewTokens() {" term="  }"@@
+@@EXCERPT file="hashbin.js" start="  // Access tokens last 15 minutes." anchor="  async renewTokens() {" term="  }"@@
 @@EXCERPT file="hashbin.js" start="  // fetch() for HashBin API paths" term="  }"@@
 
         <h3>8. Saving text</h3>

@@ -24,51 +24,51 @@ The HashBin.org frontend is served directly from the Cloudflare Worker using sta
 
 ### 2. Update Frontend Configuration
 
-The Clerk publishable key needs to be configured in each HTML file:
+The frontend reads Clerk's publishable key from `GET /api/config`. Configure it on the
+Worker rather than editing each HTML file. The auth loader selects local authentication
+when `/api/config` reports `authMode: "local"`.
 
-**For Development:**
-```javascript
-window.CLERK_PUBLISHABLE_KEY = 'pk_test_xxxxxxxxxxxxx';
-```
+### 3. Set backend secrets
 
-**For Production:**
-```javascript
-window.CLERK_PUBLISHABLE_KEY = 'pk_live_xxxxxxxxxxxxx';
-```
-
-Files to update:
-- `frontend/index.html`
-- `frontend/upload.html`
-- `frontend/dashboard.html`
-- `frontend/retrieve.html`
-- `frontend/deposit.html`
-
-### 3. Set Backend Secrets
-
-Add Clerk secret key to Cloudflare Workers:
+Configure secrets on the main production Worker:
 
 ```bash
-# Development
-npx wrangler secret put CLERK_SECRET_KEY --env development
-# Enter your Clerk secret key when prompted
-
-npx wrangler secret put CLERK_PUBLISHABLE_KEY --env development
-# Enter your Clerk publishable key when prompted
-
-# Production
-npx wrangler secret put CLERK_SECRET_KEY --env production
-npx wrangler secret put CLERK_PUBLISHABLE_KEY --env production
+npx wrangler secret put CLERK_SECRET_KEY
+npx wrangler secret put CLERK_PUBLISHABLE_KEY
+npx wrangler secret put OAUTH_SIGNING_KEY
 ```
 
-### 4. Deploy
+`OAUTH_SIGNING_KEY` signs authorization/access tokens, DPoP nonces and hosted Publish
+approvals. Keep it and `DOWNLOAD_TOKEN_SECRET` synchronized with the dedicated content
+Worker where required; never paste secret values into HTML or public docs.
 
-```bash
-# Development
-npm run deploy:dev
+### 4. Deploy and verify
 
-# Production  
-npm run deploy:prod
-```
+Push reviewed changes to `main`. `.github/workflows/deploy.yml` publishes the Worker and its
+`frontend/` assets together after its checks. It also deploys the dedicated content Worker
+and verifies the main site's health and Git SHA. The GitHub Pages build report is separate.
+For manual deployments, use the repository's documented production procedure in
+[deployment.md](deployment.md), including SHA injection and verification.
+
+### Browser safety assets and bindings
+
+- Publish `/publish`, `/js/publish.js`, the SDK, and the public browser safety/API/SDK guides
+  with the same code release. The page and its session-only `/api/publish` handlers cooperate.
+- Preserve `frontend/_headers`: `frame-ancestors 'none'`, `X-Frame-Options: DENY` and no-store
+  on Publish; CORS for SDK modules; immutable caching on frozen version paths.
+- The main `APPLICATION_REGISTRY` binding stores app origins and DPoP replay receipts. The
+  dedicated content Worker must bind to that same class in the main Worker, as shown in its
+  Wrangler configuration. It verifies bound tokens for funded OAuth downloads too.
+- App-origin CORS comes from active registrations; do not restore a shared-host exception or
+  an environment allow-list. Register each exact redirect URI and acknowledge shared origins.
+- Release new SDK versions with `node scripts/release-browser-sdk.mjs vMAJOR.MINOR.PATCH`,
+  add their immutable cache rule and publish their SRI hash. Never change a published version's
+  bytes to apply a fix; create a new version. Unversioned `/sdk/hashbin.js` stays latest.
+
+After deployment, verify `/health` reports the deployed commit, inspect `/publish` framing
+headers, and fetch both `/docs/browser-client-safety` and `/sdk/v0.2.0/integrity.json`.
+Local Chromium/WebKit tests cover the protocol, but live Clerk/social sign-in in Safari with
+tracking prevention and Firefox still needs acceptance. Do not describe that as covered by local auth.
 
 ## Static Assets Configuration
 
@@ -93,6 +93,9 @@ This tells the Worker to:
 - `/dashboard.html` → Dashboard (requires auth)
 - `/retrieve.html` → Retrieve page (public)
 - `/deposit.html` → Add funds (requires auth)
+- `/publish` → Hosted save review and allowance entry (sign-in required to approve)
+- `/docs/sdk`, `/docs/browser-client-safety`, `/docs/api` → Public integration guides
+- `/sdk/*` → Cross-origin browser SDK modules and frozen release manifests
 - `/css/*` → CSS files
 - `/js/*` → JavaScript modules
 - `/assets/*` → Images and icons
@@ -106,7 +109,7 @@ This tells the Worker to:
 The Worker routing (in `src/index.js`) works as follows:
 
 1. **Webhook endpoints** → Handled first (no rate limiting)
-2. **API paths** (`/api/*`, `/health`) → API route handler
+2. **API/OAuth paths** (`/api/*`, `/oauth/*`, `/health`) → API route handler
 3. **Static assets** → Served from `frontend/` directory
 4. **404** → If no asset or route found
 
@@ -132,7 +135,7 @@ The Worker routing (in `src/index.js`) works as follows:
 
 ### Development
 - Use `pk_test_` Clerk keys
-- Worker URL: `https://hashbin-worker-dev.<account-id>.workers.dev`
+- The repo has one production deployment; use local mode for isolated development
 - Local dev: `http://localhost:8787`
 
 ### Production
@@ -142,7 +145,7 @@ The Worker routing (in `src/index.js`) works as follows:
 
 ## CORS Configuration
 
-CORS is handled automatically by the Worker for API routes. Static assets don't require CORS headers since they're served from the same origin.
+API CORS allows active registered app origins only. The cross-origin SDK asset paths need `Access-Control-Allow-Origin: *` from `frontend/_headers`; other UI assets are normally served from the same origin. Do not remove the SDK rule when updating documentation or release caching.
 
 ## Troubleshooting
 

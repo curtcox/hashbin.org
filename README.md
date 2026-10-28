@@ -17,7 +17,9 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 - **256t Content Addressing**: Permanent, verifiable content addressing using 256t specification
 - **Free Public Access**: All published content is freely accessible to everyone
 - **Multi-Provider OAuth**: Authenticate with Google, Apple, Microsoft, or GitHub (via Clerk)
-- **API Key Management**: Generate up to 25 API keys for programmatic access
+- **Browser Publishing**: Approve each save on HashBin without giving the client credentials, or opt into a capped DPoP allowance for silent saves
+- **Verified Browser SDK**: Verify retrieved bytes and returned CIDs; pin an immutable SDK release with SRI
+- **API Key Management**: Generate up to 25 scoped API keys for programmatic access
 - **Transparent Operation**: Public records and open source codebase
 - **Pay-per-Retention**: Sustainable model with $0.03/GB/month storage cost
 
@@ -36,10 +38,9 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 **See [STATUS.md](STATUS.md)** — the single source of truth for what's done, what blocks launch, and what's next.
 Run `npm run status` for a one-screen summary.
 
-In short: the MVP feature set (upload/download, auth, API keys, payments, expiration, disputes backend,
-OAuth third-party publishing) is implemented and deployed. The site is **not yet accepting customers**;
-the remaining launch blockers are production credentials, legal pages, the content-reporting UI, and a few
-reliability items.
+Upload/download, account authentication, scoped keys, payments, retention, disputes and browser
+publishing are implemented. Check `STATUS.md` for launch readiness and outstanding operational
+acceptance, including live-provider browser testing for the hosted save flow.
 
 ## Quick Start
 
@@ -131,7 +132,7 @@ For full details, see [docs/local-development.md](docs/local-development.md).
 
 1. **ContentMetadata** - Content hash records and metadata
 2. **UserProfile** - User accounts, API keys, upload history
-3. **KeyRegistry** - Fast API key lookups (hash → user mapping)
+3. **ApplicationRegistry** - Public app registrations, registered-origin checks and per-key DPoP replay receipts
 4. **PaymentRecord** - Payment tracking and history
 5. **ContestRecord** - Content dispute tracking
 6. **MessageThread** - User-to-contester communication
@@ -140,16 +141,23 @@ For full details, see [docs/local-development.md](docs/local-development.md).
 
 ### Authentication
 
-HashBin.org supports two authentication methods:
+Browser clients should use **hosted per-save approval** with `publish()` unless they need silent saves.
+The app receives a verified CID and never holds a credential. For autosave, use the hosted SDK's
+`authorize()` and `save()` with a limited allowance.
 
-1. **Clerk OAuth Session** (for web applications)
-   - Use Clerk frontend SDK to obtain session token
-   - Include in `Authorization: Bearer <token>` header
+| Credential | Header | Access |
+| --- | --- | --- |
+| Account session | `Authorization: Bearer <clerk-jwt>` | Account management and first-party actions |
+| SDK app allowance | `Authorization: DPoP <access-token>` plus `DPoP: <proof>` | Approved scopes within the grant's caps and expiry |
+| API key | `Authorization: ApiKey hbk_…` or `X-API-Key: hbk_…` | Chosen scopes and caveats |
+| Raw unbound OAuth token | `Authorization: Bearer <access-token>` | Approved grant; no device binding |
 
-2. **API Keys** (for programmatic access)
-   - Create via `/api/auth/apikeys` endpoint (requires Clerk session)
-   - Include in `Authorization: ApiKey <key>` or `X-API-Key: <key>` header
-   - Format: `hb_live_<32-chars>`
+Access tokens last 15 minutes. New refresh tokens have a seven-day idle timeout and a 90-day
+family maximum; every refresh requires `client_id`. Reusing a rotated refresh token revokes
+the grant. The SDK verifies CIDs, serializes refreshes and supports `maxCostCents` on uploads.
+
+See [browser client safety and migration](docs/browser-client-safety.md), the
+[published SDK guide](https://hashbin.org/docs/sdk), and the [API reference](docs/API.md).
 
 ### Core Endpoints
 
@@ -177,10 +185,14 @@ See [docs/API.md](docs/API.md) for complete API reference documentation.
 
 ## Security
 
+- **Credential-free saves**: HashBin Publish binds a five-minute, single-use approval to the exact bytes and price
+- **Allowances**: Non-extractable browser keys constrain SDK tokens with DPoP; shared-origin scripts can still use the key while running
+- **Recovery**: Per-grant activity, in-app security notifications, server-side disconnect and revoke-all app access
+
 - **API Key Storage**: Keys are hashed with SHA-256 before storage
 - **Session Security**: Clerk handles JWT validation and CSRF protection
 - **Rate Limiting**: Per-user and per-key limits prevent abuse
-- **Key Expiration**: Maximum 5-year expiration on all API keys
+- **Key Expiration**: API keys default to 90 days and last at most one year
 - **Account Deletion**: Requires 2FA confirmation
 
 See [done/user_authorization.md#security-considerations](done/user_authorization.md#security-considerations) for details.
@@ -239,6 +251,7 @@ See [todo/manual_testing_guide.md](todo/manual_testing_guide.md) for comprehensi
 
 ## Documentation
 
+- **[Browser Client Safety](docs/browser-client-safety.md)** - Save flows, token lifetimes, shared origins, SRI and migration
 - **[API Reference](docs/API.md)** - Complete API endpoint documentation with examples ✨
 - **[Frontend Deployment](docs/frontend-deployment.md)** - Frontend setup and Clerk configuration ✨
 - **[Project Status](STATUS.md)** - Launch readiness and current work

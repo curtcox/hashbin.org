@@ -193,6 +193,13 @@
         </div>
       </section>
 
+      <section class="card faq-section" id="browser-apps">
+        <h2>Saving from another app</h2>
+        <div class="faq-item"><div class="faq-question">Can an app save without holding my HashBin credentials?</div><div class="faq-answer">Yes. SDK <code>publish()</code> opens HashBin Publish, where you review the document, retention and exact price and approve once. The app receives a verified CID and no credential. Popup saves support up to 5 MiB; redirect handoffs support up to 512 KiB. <a href="/docs/sdk">SDK guide</a>.</div></div>
+        <div class="faq-item"><div class="faq-question">How do silent saves work?</div><div class="faq-answer">Choose an allowance on HashBin for an app that needs autosave or background operations. The SDK suggests $1/month, a 1 MiB file limit and a 30-day grant; you can tighten them. New SDK tokens are bound to a browser key using DPoP. Access lasts 15 minutes; new refresh tokens have seven-day idle expiry and a 90-day family maximum, subject to earlier grant expiry. Code already running on the same origin can still use the key, so prefer a separate origin for allowance apps.</div></div>
+        <div class="faq-item"><div class="faq-question">How do I stop an app spending?</div><div class="faq-answer">Use Disconnect (server revocation in the SDK), revoke its grant on the <a href="/account">account page</a>, or choose Revoke all app access. Clearing browser storage alone does not invalidate remote token copies. The account page shows last use, monthly spend/cap, uploads and in-app security notices. Revoke-all app access does not revoke API keys. <a href="/docs/browser-client-safety">Browser client safety guide</a>.</div></div>
+      </section>
+
       <!-- Technical -->
       <section class="card faq-section">
         <h2>Technical</h2>

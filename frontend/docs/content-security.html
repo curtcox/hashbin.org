@@ -23,12 +23,18 @@
       </div>
       <div class="card" style="margin-bottom: 1.5rem;">
         <h2>Why this matters</h2>
-        <p>Because <code>256t.us</code> is a different browser origin, uploaded HTML, SVG, and JavaScript cannot read HashBin cookies, make authenticated API requests as the user, spoof the dashboard, or register service workers for the main application.</p>
+        <p>Because <code>256t.us</code> is a different browser origin, uploaded HTML, SVG, and JavaScript cannot read HashBin cookies, make authenticated API requests as the user, modify the real dashboard, or register service workers for the main application.</p>
         <p>This is the same same-origin isolation pattern used by GitHub, Google Drive, and Discord for untrusted user files.</p>
       </div>
       <div class="card" style="margin-bottom: 1.5rem;">
         <h2>What 256t.us is</h2>
         <p><code>256t.us</code> is run by the same operator as HashBin. It is a dedicated content sandbox that only serves raw uploaded files with strict response headers.</p>
+      </div>
+      <div class="card" style="margin-bottom:1.5rem;">
+        <h2>Protect the client origin too</h2>
+        <p>The separate content host protects HashBin's origin. It does not isolate two apps at different paths on your own origin, such as <code>owner.github.io/a/</code> and <code>/b/</code>. Use SDK <code>publish()</code> for hosted per-save approval without credentials in your client, or a capped DPoP allowance through <code>authorize()</code> and <code>save()</code> when silent saves are required. Same-origin scripts can still use an allowance's browser key while running.</p>
+        <p><code>retrieve()</code> verifies the complete response against its CID before returning it, and <code>publish()</code>/<code>save()</code> verify returned CIDs. Check custom fetches with <code>verifyCID(cid, bytes)</code> before displaying or caching the content. Pin the SDK with a versioned URL and SRI when deliberate upgrades are appropriate.</p>
+        <p><a href="/docs/browser-client-safety">Browser client safety and shared origins</a> · <a href="/docs/sdk">SDK examples and migration</a></p>
       </div>
       <div class="card">
         <h2>What this means for you</h2>

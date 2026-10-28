@@ -48,6 +48,8 @@
       overflow-x: auto;
       font-family: monospace;
       font-size: 0.875rem;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
       margin: 1rem 0;
     }
     .param-table {
@@ -65,6 +67,8 @@
       padding: 0.75rem;
       border-bottom: 1px solid var(--color-border);
     }
+    .param-table th, .param-table td, .endpoint-path, main :not(pre) > code { overflow-wrap: anywhere; }
+    @media (max-width: 600px) { .param-table th, .param-table td { padding: .5rem; } }
     .required-badge {
       background: #ef4444;
       color: white;
@@ -93,11 +97,40 @@
 Content: https://256t.us/{cid}</div>
         
         <h3 style="margin-top: 1.5rem;">Authentication</h3>
-        <p>Programs authenticate with an API key, sent in either header:</p>
+        <p>Programs can use a scoped API key in either header; browser save flows and DPoP allowances are described below:</p>
         <div class="code-block">Authorization: ApiKey hbk_...
 X-API-Key: hbk_...</div>
-        <p>Each key holds only the scopes you give it (for example <code>content:write</code> to publish, <code>balance:read</code> to read the balance) and can carry limits: a monthly spending limit, largest upload, longest retention, allowed content types, or specific CIDs. Anything else answers <code>403</code>. Keys, apps, settings and deposits always need your own sign-in. Create and narrow keys from your <a href="/api-keys.html">dashboard</a>; the full scope list is in <code>docs/API.md</code>.</p>
+        <p>Each key holds only the scopes you give it (for example <code>content:write</code> to publish, <code>balance:read</code> to read the balance) and can carry limits: a monthly spending limit, largest upload, longest retention, allowed content types, or specific CIDs. Anything else answers <code>403</code>. Keys, apps, settings and deposits always need your own sign-in. Create and narrow keys from your <a href="/api-keys.html">dashboard</a>; see the <a href="https://github.com/curtcox/hashbin.org/blob/main/docs/API.md#scopes">full scope reference</a>.</p>
         <p style="margin-top: 1rem;">For third-party browser integrations, use the hosted SDK at <code>https://hashbin.org/sdk/hashbin.js</code> (or an integrity-pinned release) and follow the <a href="/docs/sdk.html">SDK Guide</a> and <a href="/docs/browser-client-safety">browser client safety guide</a>. Raw files are served from <code>256t.us</code>; see <a href="/docs/content-security.html">content security</a>.</p>
+      </section>
+
+      <section class="card" id="browser-publishing" style="margin-bottom:2rem;">
+        <h2>Browser publishing and allowances</h2>
+        <p>Prefer SDK <code>publish()</code> for a save button: HashBin reviews each document and charge on its own page, then returns a verified CID without giving the app credentials. For autosave or other delegated operations, use <code>authorize()</code> and <code>save()</code>. See the <a href="/docs/sdk">complete SDK examples and migration steps</a>.</p>
+        <table class="param-table"><thead><tr><th>Route</th><th>Access and contract</th></tr></thead><tbody>
+          <tr><td><code>GET /api/publish/app</code></td><td>Public; validates <code>client_id</code> and exact <code>redirect_uri</code>, returning app name and shared-origin warnings.</td></tr>
+          <tr><td><code>POST /api/publish</code> (review)</td><td>Account session only. Query: <code>client_id</code>, <code>redirect_uri</code>, <code>retention_months</code>. Raw body with its content type. Returns CID, byte size, retention, exact cost, balance and a signed five-minute <code>approval</code>.</td></tr>
+          <tr><td><code>POST /api/publish</code> (approve)</td><td>Same account session, identical bytes/type, and <code>X-HashBin-Approval</code>. Consumes approval once and checks price before upload. The hosted page keeps the approval ticket; your client receives the result through the SDK.</td></tr>
+          <tr><td><code>GET /oauth/authorize</code></td><td>PKCE consent: <code>client_id</code>, registered <code>redirect_uri</code>, <code>response_type=code</code>, <code>scope</code>, <code>state</code>, <code>code_challenge</code>, <code>code_challenge_method=S256</code>. Optional <code>spending_limit</code> (USD/month), <code>max_retention_months</code>, <code>max_upload_bytes</code>, <code>dpop_jkt</code>.</td></tr>
+          <tr><td><code>POST /oauth/token</code> (code)</td><td>JSON: <code>grant_type=authorization_code</code>, <code>client_id</code>, <code>code</code>, <code>redirect_uri</code>, <code>code_verifier</code>. A bound code requires the matching DPoP proof.</td></tr>
+          <tr><td><code>POST /oauth/token</code> (refresh)</td><td>JSON: <code>grant_type=refresh_token</code>, required <code>client_id</code>, <code>refresh_token</code>; matching-key proof for a bound token. Optional <code>scope</code> requests fewer granted permissions.</td></tr>
+          <tr><td><code>GET /oauth/dpop-nonce</code></td><td>Returns <code>{nonce}</code>, valid for five minutes. No credential required; response is not cacheable.</td></tr>
+          <tr><td><code>POST /oauth/revoke</code></td><td>JSON: <code>{token, token_type_hint: "refresh_token"}</code> revokes the grant/family, including an already-rotated refresh token. Access-token revocation also identifies the grant. Invalid/already-revoked input returns 200 quietly.</td></tr>
+        </tbody></table>
+        <p>Hosted saves accept 1 byte to 5 MiB; fragment redirect handoffs accept up to 512 KiB. These limits are separate from the raw upload API's 90 MB ceiling. Publish rejects multipart reinterpretation and binds the user, app, bytes, type, retention and price. Errors include <code>400 approval_mismatch</code>, <code>400 approval_expired</code>, <code>409 approval_used</code> and <code>409 price_changed</code>; a failed approval requires a new review.</p>
+        <h3>Token lifetime and DPoP</h3>
+        <p>Authorization codes last 10 minutes and work once; access tokens last 15 minutes. New refresh tokens expire after seven idle days, and a family lasts at most 90 days despite rotation. An earlier grant expiry also applies. SDK consent defaults to 30 days and offers 1, 7, 30, 90 or 365 days, or no grant expiry. Rotated-token reuse revokes the entire grant.</p>
+        <div class="code-block">Authorization: DPoP ACCESS_TOKEN
+DPoP: SIGNED_PROOF_JWT</div>
+        <p>New SDK grants include <code>dpop_jkt</code> on authorization and receive <code>token_type: "DPoP"</code>. Proofs use ES256, <code>typ: "dpop+jwt"</code>, and a public P-256 JWK. Claims are exact <code>htm</code>, absolute query/fragment-free <code>htu</code>, integer <code>iat</code> within 60 seconds, unique 16–200-character <code>jti</code>, and the server nonce. Resource proofs also include <code>ath</code>, the Base64URL SHA-256 hash of the access token. The main API and dedicated content worker share replay checks. Token proof failures return <code>400 invalid_dpop_proof</code>; invalid resource credentials return 401.</p>
+        <p>Raw OAuth without DPoP still issues bearer tokens; existing tokens are not retroactively bound. SDK storage and refresh locking are described in the <a href="/docs/browser-client-safety">browser safety guide</a>.</p>
+        <h3>Registration and recovery</h3>
+        <p>Known GitHub/GitLab shared hosts, or origins used by another registered app, require <code>shared_origin_acknowledged: true</code> on app creation or redirect updates. Otherwise the API returns <code>400 shared_origin_acknowledgement_required</code> with affected origins, app names and a guide link. Active registrations determine CORS; paths do not isolate sibling apps.</p>
+        <table class="param-table"><thead><tr><th>Account-session route</th><th>Result</th></tr></thead><tbody>
+          <tr><td><code>GET /api/account/authorizations</code></td><td><code>authorizations</code> with limits, monthly spend, last use and recent uploads, plus bounded <code>security_events</code> for first use, refresh reuse revocation and reaching 80% of a monthly cap.</td></tr>
+          <tr><td><code>DELETE /api/account/authorizations/:id</code></td><td>A grant ID revokes that grant; an app ID revokes its grants.</td></tr>
+          <tr><td><code>DELETE /api/account/authorizations</code></td><td>Revokes every OAuth grant/refresh family. Separately managed API keys remain active.</td></tr>
+        </tbody></table>
       </section>
 
       <!-- Authentication Endpoints -->
@@ -220,9 +253,14 @@ X-API-Key: hbk_...</div>
                 <td>MIME type stored with the content (for raw bodies), or <code>multipart/form-data</code></td>
               </tr>
               <tr>
+                <td>max_cost_cents</td>
+                <td>query</td>
+                <td>Optional per-upload ceiling: non-negative safe integer in cents. Invalid values return <code>400 invalid_max_cost</code>; a higher charge returns <code>409 max_cost_exceeded</code> before debit/storage, including duplicate extensions. Separate from the grant's monthly cap; SDK <code>save(content, {maxCostCents})</code> sends it.</td>
+              </tr>
+              <tr>
                 <td>retention_months</td>
                 <td>query or form field</td>
-                <td>Whole months of retention, minimum 1 (default 1). OAuth clients always use the user's default retention.</td>
+                <td>Whole months of retention, minimum 1 (default 1). OAuth uploads use the user's default narrowed by the grant's retention cap.</td>
               </tr>
             </tbody>
           </table>

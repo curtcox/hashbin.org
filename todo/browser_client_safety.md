@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase:** HashBin implementation completed locally 2026-10-28; deployment and real-provider browser acceptance remain. Row B13 in `STATUS.md`. Sections B and C remain owner/client work outside this repository.
+**Phase:** HashBin measures deployed 2026-10-28 from `b36c126`; the production workflow and main-site health SHA were verified for that release. Real-provider browser acceptance remains. Row B13 in `STATUS.md`. Sections B and C remain owner/client work outside this repository.
 
 ### Implemented HashBin measures
 
@@ -11,7 +11,7 @@
 - **A3:** SDK `verifyCID`, verified `retrieve()`, verified per-save `publish()` and allowance `save()`, including exact typed-array slices and inline content.
 - **A4:** refresh reuse revokes the whole grant, client/key matching precedes rotation, access tokens last 15 minutes, new refresh tokens have seven-day idle expiry and a 90-day family maximum. SDK refreshes use Web Locks and reread storage; calls within one client share renewal. Clients without Web Locks should use one active allowance tab or per-save approval.
 - **A5:** registration/update acknowledgment for known GitHub/GitLab shared hosts or origins already used by another registered app; consent and Publish show shared origins/app names. Removed the hard-coded origin and the environment-origin bypass: CORS is derived from active registrations only.
-- **A6:** `/api/content?max_cost_cents=INTEGER` rejects an excessive charge with 409 before debit/storage, including duplicate-content extensions. `save({ maxCostCents })` exposes it. Publish binds and rechecks the exact price and passes that ceiling to the existing upload path.
+- **A6:** `/api/content?max_cost_cents=INTEGER` rejects an excessive charge with 409 before debit/storage, including duplicate-content extensions. `save(content, { maxCostCents })` exposes it. Publish binds and rechecks the exact price and passes that ceiling to the existing upload path.
 - **A7:** account activity includes last use, monthly spend/cap and recent uploads per grant. Bounded in-app security notifications cover first use, refresh reuse revocation and 80% of the cap (once per spend window, including funded downloads). Account-wide OAuth revocation and SDK `disconnect()` revoke server-side; separately managed API keys remain under their existing controls.
 - **A8:** immutable self-contained `/sdk/v0.2.0/hashbin.js`, SHA-384 SRI manifest/docs and immutable cache headers; the release script refuses existing versions. `/sdk/hashbin.js` stays latest.
 - **A9:** published `frontend/docs/browser-client-safety.html` and linked it from registration, consent, Publish, SDK/API docs and the docs index.

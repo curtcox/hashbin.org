@@ -174,7 +174,7 @@ class HashBinAccount {
         body: jsonEncode({'token': refreshToken, 'token_type_hint': 'refresh_token'}),
       );
     } catch (_) {
-      // Offline: the token still expires on its own within 30 days.
+      // Offline: a newly issued refresh token expires after seven idle days; remote revocation may still be needed.
     }
   }
 
@@ -182,7 +182,7 @@ class HashBinAccount {
   // Calling the API
   // ----------------------------------------------------------------------
 
-  /// Access tokens last an hour. A refresh token gets a new one, and is
+  /// Access tokens last 15 minutes. A refresh token gets a new one, and is
   /// itself replaced: each refresh token works only once. Calls that need a
   /// new token at the same moment share one refresh, because a second
   /// refresh with the same (by then used) token would fail.

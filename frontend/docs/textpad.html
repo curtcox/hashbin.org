@@ -101,11 +101,12 @@
 
       <section class="card">
         <h2>How saving is paid for</h2>
+        <p>This walkthrough keeps a persistent OAuth allowance to demonstrate account API calls. For a new save-button-only web app, prefer credential-free <code>publish()</code> from the <a href="/docs/sdk">SDK guide</a>. Silent SDK uploads use <code>save()</code>; this example calls <code>authorizedFetch()</code> directly, so it must supply its own CID checks and upload price ceiling when adopting those protections.</p>
         <ul>
           <li>Textpad is a <a href="/developers">registered HashBin app</a>. The first time a user saves, Textpad sends them to hashbin.org to sign in and approve it, using OAuth 2.0 with PKCE. Textpad never sees their password or an API key.</li>
           <li>Textpad asks for two permissions: <code>content:write</code> to publish, and <code>balance:read</code> to show the balance.</li>
           <li>Each save is charged to the user's balance at the normal <a href="/docs/pricing.html">price</a>, and kept for the <em>default retention period</em> set on their <a href="/account.html">account page</a> (one month unless they change it). Texts of 64 bytes or less are free.</li>
-          <li>The user stays connected: the SDK keeps a refresh token in the browser's <code>localStorage</code> and renews access as needed. <strong>Disconnect</strong> revokes it, and users can also revoke Textpad from their account page.</li>
+          <li>The user stays connected: new SDK grants bind tokens to a non-extractable P-256 key in IndexedDB. Tokens normally live in <code>localStorage</code>. Access lasts 15 minutes; new refresh tokens expire after seven idle days, with a 90-day family maximum and any earlier grant expiry. <strong>Disconnect</strong> revokes it, and users can also revoke Textpad from their account page.</li>
           <li>Content on HashBin can't be changed. Saving an edited text creates a new 256t string; the old text stays available under its old string until it expires.</li>
         </ul>
       </section>
@@ -559,10 +560,10 @@ if (draft) {
       <section class="card">
         <h2>Things to know</h2>
         <ul>
-          <li><strong>Tokens live in <code>localStorage</code>.</strong> Any script on the same origin can read them, so don't load scripts you don't trust on a page that uses the SDK. Textpad inserts every message with <code>textContent</code>, never <code>innerHTML</code>, so text from a 256t string can't inject markup.</li>
+          <li><strong>Allowance tokens normally live in <code>localStorage</code>.</strong> DPoP prevents using a copied token without the browser key, but another script on the same origin can use that key while running. Use a separate origin or <a href="/docs/browser-client-safety">per-save approval</a>. This example uses redirect sign-in and therefore requires persistent key and session storage; use popup authorization if the SDK falls back to a memory-only key. Textpad inserts every message with <code>textContent</code>, never <code>innerHTML</code>, so text from a 256t string can't inject markup.</li>
           <li><strong>Line endings.</strong> Browsers turn Windows <code>\r\n</code> line endings into <code>\n</code> inside a text box, so saving such a file after editing it stores <code>\n</code> endings.</li>
           <li><strong>Saving the same text again.</strong> Save stays disabled until the text changes. If edited text happens to match something already on HashBin (for example after undoing back to an earlier version), HashBin keeps the existing copy and extends how long it is kept, which is charged like a new save.</li>
-          <li><strong>Saves use the account's default retention.</strong> Apps cannot choose how long content is kept; users set their default on the account page.</li>
+          <li><strong>Saves use the account's default retention.</strong> OAuth uploads use the user’s default narrowed by the grant’s retention cap. Hosted per-save approval lets the user choose retention for that save.</li>
         </ul>
       </section>
 

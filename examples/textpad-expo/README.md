@@ -23,3 +23,15 @@ EXPO_PUBLIC_HASHBIN_URL=http://127.0.0.1:8787 \
 EXPO_PUBLIC_TEXTPAD_CLIENT_ID=<client ID> \
 npx expo run:ios
 ```
+
+## OAuth safety
+
+This example uses raw OAuth bearer tokens in native secure storage; it does not implement
+the hosted browser SDK's DPoP binding. Access tokens last 15 minutes; newly issued refresh
+tokens expire after seven idle days and the family lasts at most 90 days, subject to grant
+expiry. Refreshes send `client_id` and share one renewal in the running app. Reusing a rotated
+token revokes the whole grant. Disconnect attempts server revocation; if it cannot reach
+HashBin, revoke the app from the Account page to invalidate remote copies. For browser save
+buttons, prefer [credential-free hosted approval](https://hashbin.org/docs/browser-client-safety).
+Local OAuth testing also requires the throwaway signing key described in
+[local development](../../docs/local-development.md#local-oauth).

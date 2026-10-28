@@ -45,8 +45,9 @@ This credits the local balance immediately and records a transaction in history.
 
 ## Local OAuth
 
-`npm run dev:local` has no `OAUTH_SIGNING_KEY`, so `/oauth/authorize` answers
-`server_misconfigured`. To exercise OAuth publishing locally, start the server with a throwaway key:
+Plain `npm run dev:local` does not provide `OAUTH_SIGNING_KEY`. Hosted Publish approvals,
+DPoP nonces and OAuth exchanges need that signing material; `/oauth/authorize` reports
+`server_misconfigured` when it is absent. Start a local server with a throwaway key:
 
 ```bash
 npx wrangler dev --config wrangler.local.toml --local --var OAUTH_SIGNING_KEY:local-test-key
@@ -55,6 +56,20 @@ npx wrangler dev --config wrangler.local.toml --local --var OAUTH_SIGNING_KEY:lo
 Approve a request without the browser by posting the authorize URL's query parameters as JSON to
 `/oauth/authorize` with `Authorization: LocalDev <user_id>` and `Accept: application/json`; the
 response's `redirect_to` is the callback URL. See [publishing from the command line](publishing-from-the-command-line.md).
+
+### Browser save-flow checks
+
+Register an app on the local server with the exact callback URI, acknowledging shared-origin
+risk if another local app uses the same origin. Set the browser SDK's `baseUrl` and
+`contentBaseUrl` explicitly: its API default is `https://hashbin.org`, regardless of the
+client page's origin.
+
+With the keyed local server running, `npx playwright test frontend/tests/browser-client-safety.spec.js`
+checks hosted popup/redirect publishing, reload recovery, allowance consent, DPoP saves,
+disconnect, framing headers and SRI. `npm run test:funded:local` independently starts and
+cleans up an isolated main/content Worker pair with matching throwaway secrets and bindings.
+Never use production signing material in these commands. Local auth cannot validate real
+Clerk/social sign-in or a browser's tracking-prevention behavior.
 
 ## Helpful Endpoints
 

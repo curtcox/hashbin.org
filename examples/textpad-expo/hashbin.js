@@ -146,7 +146,7 @@ export class HashBinAccount {
   // Calling the API
   // --------------------------------------------------------------------
 
-  // Access tokens last an hour. A refresh token gets a new one, and is
+  // Access tokens last 15 minutes. A refresh token gets a new one, and is
   // itself replaced: each refresh token works only once. Calls that need a
   // new token at the same moment share one refresh, because a second
   // refresh with the same (by then used) token would fail.

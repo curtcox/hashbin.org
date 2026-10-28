@@ -1,193 +1,105 @@
-# HashBin.org Frontend
+# HashBin.org frontend
 
-This directory contains the frontend web interface for HashBin.org.
-
-## Overview
-
-The frontend is built using vanilla HTML, CSS, and JavaScript (ES6+ modules) with no build step required. It integrates with:
-
-- **Clerk JavaScript SDK** for OAuth authentication (Google, Apple, Microsoft, GitHub)
-- **Local auth module** for offline/local development
-- **HashBin.org API** (Cloudflare Workers backend) for balance, content operations, and user management
+The production UI, public documentation and hosted browser SDK are static assets in this
+directory. Cloudflare Workers Assets serves them together with the API on `hashbin.org`;
+raw uploaded content is isolated on `256t.us`. There is no frontend build step.
 
 ## Structure
 
-```
-frontend/
-├── index.html              # Landing page
-├── upload.html             # Content upload (protected)
-├── dashboard.html          # User dashboard (protected)
-├── retrieve.html           # Content retrieval (public)
-├── deposit.html            # Add funds (protected)
-├── css/
-│   ├── base.css           # CSS variables, reset, typography
-│   ├── layout.css         # Grid, flexbox, responsive layouts
-│   ├── components.css     # Buttons, forms, cards, alerts
-│   └── auth.css           # Authentication UI components
-└── js/
-    ├── app.js             # Main application entry point
-    ├── auth-loader.js     # Auth mode switcher (Clerk vs local)
-    ├── auth.js            # Clerk SDK integration
-    ├── local-auth.js      # Local auth implementation
-    ├── auth-gate.js       # Protected page middleware
-    └── utils.js           # Utility functions
-```
+| Path | Purpose |
+| --- | --- |
+| `publish.html`, `js/publish.js` | First-party per-save approval and allowance setup entry page |
+| `sdk/hashbin.js` | Latest self-contained browser SDK |
+| `sdk/v0.2.0/` | Immutable SDK release and SHA-384 integrity manifest |
+| `docs/browser-client-safety.html` | Choosing save flows, shared origins, storage and recovery |
+| `docs/sdk.html` | SDK usage, callbacks, SRI and migration |
+| `docs/api.html` | Public API reference |
+| `developers.html`, `js/developers.js` | App registration, redirect URIs and shared-origin acknowledgment |
+| `account.html`, `js/account.js` | Retention defaults, grants, spending/activity, revoke-all and download budgets |
+| `upload.html`, `retrieve.html`, `info.html` | Content upload, retrieval and metadata |
+| `dashboard/`, `api-keys*.html`, `transactions.html` | Uploads, suppliers, scoped API keys and account history |
+| `js/auth-loader.js`, `js/auth.js`, `js/local-auth.js` | Clerk/local authentication selection and session helpers |
+| `_headers` | SDK CORS/cache policy and hosted approval framing protections |
+| `tests/` | Playwright browser tests |
 
-## Configuration
+## Browser publishing
 
-### Clerk Publishable Key
+- **Default save button:** `client.publish(bytes, options)` opens HashBin Publish. The user
+  reviews the content, retention and exact price on HashBin and approves once. The app
+  receives a verified CID and no credential. Popup handoffs accept up to 5 MiB; redirect
+  handoffs accept up to 512 KiB and require `handlePublishCallback()` on return.
+- **Silent saves:** `authorize()` opens allowance setup; `save()` uploads using that grant.
+  Defaults suggest $1/month, 1 MiB per upload and a 30-day consent expiry. Access tokens
+  last 15 minutes. New refresh tokens have seven-day idle expiry and a 90-day family maximum.
+- **DPoP:** the hosted SDK binds new tokens to a non-extractable P-256 key in IndexedDB.
+  New bound tokens normally live in local storage; an unavailable key database falls back
+  to memory-only keys/tokens and popup authorization. Same-origin scripts can still use
+  the browser key while running. A separate origin per allowance app remains valuable.
+- **Verification and spending:** `retrieve()` verifies the full body before returning a
+  Response; `publish()` and `save()` check returned CIDs. `verifyCID()` covers custom fetches.
+  `save(content, {maxCostCents})` sets a per-upload charge ceiling. `disconnect()` revokes server-side;
+  `clearTokens()` only removes the local copy.
 
-The backend supplies the Clerk publishable key via `/api/config` when running in non-local mode.
-Set `CLERK_PUBLISHABLE_KEY` in your Worker environment (Wrangler or secrets) to enable Clerk.
+The previous OAuth-upload behavior of `publish()` moved to `save()`. Read the repository
+[browser safety and migration guide](../docs/browser-client-safety.md) before upgrading a client.
+Pinned SDK scripts need `integrity` and `crossorigin="anonymous"`; the published SDK guide
+contains the exact release hash. Never edit an existing published release directory.
 
-### Backend API
+## Configuration and local development
 
-The frontend expects the backend API to be accessible at the same origin. For development:
+The backend supplies Clerk's publishable key through `GET /api/config`. Set
+`CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` on the Worker; do not put secret keys into HTML.
+The auth loader selects local authentication when the API reports local mode.
 
-- Backend Worker: `http://localhost:8787` (via `wrangler dev`)
-- Frontend: Served via the same Worker or via a local server
-
-## Features
-
-### Implemented
-
-- ✅ **Authentication UI**
-  - Sign In button for unauthenticated users
-  - User info display (avatar, name, OAuth provider icon)
-  - Balance display in header
-  - Sign Out button
-  - Auth state management with Clerk SDK
-
-- ✅ **Protected Pages**
-  - Auth gate for upload, dashboard, and deposit pages
-  - Automatic redirect to landing page if not authenticated
-  - Session persistence across page refreshes
-
-- ✅ **Balance Display**
-  - Real-time balance fetching from `/api/balance`
-  - Formatted as dollars (e.g., "$12.50")
-  - Special handling for $0.00 balance with "Add funds" link
-  - Error handling with retry
-
-- ✅ **Responsive Design**
-  - Mobile-friendly navigation
-  - Responsive grid layouts
-  - Touch-friendly buttons and forms
-
-### Not Yet Implemented
-
-- ⏳ **Content Upload** (Phase 2)
-  - 256t hash generation
-  - File upload to R2
-  - Retention duration selection
-
-- ⏳ **Content Retrieval** (Phase 2)
-  - Hash-based content download
-  - Content verification
-
-- ⏳ **Payment Integration** (Phase 4)
-  - Stripe checkout for deposits
-  - Payment history display
-
-## Usage
-
-### Protected Pages
-
-Pages that require authentication use the auth gate:
-
-```html
-<script type="module">
-  import { requireAuth } from './js/auth-gate.js';
-  
-  // Protect this page
-  requireAuth();
-</script>
+```bash
+npm install
+npm run dev:local
 ```
 
-### Balance Display
+For hosted approval or OAuth tests, supply a throwaway signing key as well:
 
-To fetch and display balance:
-
-```javascript
-import { authenticatedFetch, formatBalance } from './js/utils.js';
-
-const response = await authenticatedFetch('/api/balance');
-const data = await response.json();
-const formatted = formatBalance(data.balance_cents);
+```bash
+npm run dev:local -- --var OAUTH_SIGNING_KEY:local-test-key
 ```
 
-### Auth State
+Open `http://localhost:8787`; local sign-in accepts a username. Registered redirects must
+match exactly. The browser SDK defaults to the production API, so local clients must set
+`baseUrl: 'http://localhost:8787'` and `contentBaseUrl` explicitly. See
+[local development](../docs/local-development.md).
 
-To check current auth state:
+## Documentation authoring
 
-```javascript
-import { getAuthState } from './js/auth-loader.js';
+Edit the public `.html` sources here and repository Markdown under `docs/`. The Textpad
+walkthroughs are generated: edit `scripts/docs/*-doc.template.html` and the corresponding
+example source/comments, then run `python3 scripts/docs/generate-textpad-docs.py`.
+The unit suite checks that embedded excerpts and complete sources still match the examples.
+Historical plans in `done/` retain their original context; `STATUS.md` tracks current acceptance.
 
-const authState = await getAuthState();
-if (authState.authenticated) {
-  console.log('User:', authState.user);
-}
+## Validation
+
+```bash
+npm run test:unit
+npx playwright test frontend/tests/browser-client-safety.spec.js
 ```
 
-## Development
+The Playwright configuration can start local mode, but the safety flows need an OAuth
+signing key, so start the keyed local server above first. The tests exercise two loopback
+origins, popup/redirect callbacks, reload recovery, DPoP saves/disconnect, framing headers
+and real SRI loading. Chromium and WebKit local-auth validation does not establish live
+Clerk/social sign-in behavior under Safari ITP or Firefox tracking protection.
 
-### Local Development
-
-1. Start the backend worker:
-   ```bash
-   npm run dev
-   ```
-
-2. Access the frontend at `http://localhost:8787`
-
-### Testing
-
-Manual testing checklist:
-- [ ] Sign in with Google/Apple/Microsoft
-- [ ] View balance in header
-- [ ] Navigate between pages
-- [ ] Sign out
-- [ ] Try accessing protected pages without auth
-- [ ] Verify session persists across page refresh
+Modern browsers need ES modules, WebCrypto, popup/postMessage support and session storage
+for redirects. IndexedDB provides persistent keys; Web Locks serializes refreshes across
+tabs. Without Web Locks, use one active allowance tab or per-save approval.
 
 ## Deployment
 
-The frontend is designed to be deployed via:
+The `Deploy to Cloudflare` GitHub Actions workflow on `main` publishes this directory as
+Worker Assets, deploys the API and dedicated content worker, and verifies the deployed Git SHA.
+The GitHub Pages build report is a separate site and is not the production documentation host.
+See [frontend deployment](../docs/frontend-deployment.md) for bindings and verification.
 
-1. **Cloudflare Pages** (recommended)
-   - Automatic deployment from `frontend/` directory
-   - Environment variables for Clerk key injection
-   - Connected to same domain as API
-
-2. **Cloudflare Workers Assets** (alternative)
-   - Serve static files from Worker
-   - Configured via `wrangler.toml`
-
-## Browser Support
-
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-
-ES6 modules and modern JavaScript features are used without transpilation.
-
-## Accessibility
-
-- Semantic HTML5 elements
-- ARIA labels on interactive elements
-- Keyboard navigation support
-- Screen reader friendly
-- Focus visible states
-
-## Security
-
-- Clerk publishable key is safe to expose (not a secret)
-- Session tokens sent via Authorization header only
-- No sensitive data in localStorage or sessionStorage
-- HTTPS enforced in production
-- CSRF protection via Clerk
-
-## Next Steps
-
-See `done/login.md` for the complete login implementation plan and `todo/frontend_ui.md` for future frontend features.
+Keep the `_headers` rules when deploying: Publish must reject framing and use `no-store`,
+the SDK must be importable across origins, and immutable version paths must keep their bytes
+and integrity hashes. The main and content Workers share OAuth signing material and the
+ApplicationRegistry replay-store binding for funded DPoP requests.

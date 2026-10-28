@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Register your app to publish content to HashBin.org via OAuth 2.0">
+  <meta name="description" content="Register your app for HashBin hosted publishing or limited DPoP allowances">
   <title>Developers - HashBin.org</title>
   <link rel="icon" href="/img/hashbin-logo.png">
 
@@ -36,8 +36,8 @@
       <div class="developers-hero-note">
         <strong>How it works</strong>
         <span>
-          Register your app, get a client ID, and redirect users through a standard
-          OAuth consent flow. Once authorized, your app can publish content on their behalf.
+          Register your app and use hosted per-save approval without handling credentials.
+          Opt into an allowance only when your app needs silent saves or delegated API access.
         </span>
       </div>
     </section>
@@ -49,8 +49,9 @@
         <div class="card">
           <h3>Security</h3>
           <p>
-            Redirect URI validation prevents authorization codes from being intercepted.
-            Only your registered origins receive tokens.
+            HashBin validates exact redirect URIs and PKCE transactions. Hosted saves return
+            no credential; allowance tokens are constrained by DPoP when you use the SDK.
+            Apps on one origin still share browser storage.
           </p>
         </div>
         <div class="card">
@@ -75,13 +76,13 @@
       <h2 style="margin-bottom: 1.5rem;">Integration overview</h2>
       <div class="card" style="max-width: 48rem;">
         <ol style="line-height: 1.8; padding-left: 1.25rem;">
-          <li><strong>Register your app</strong> below to get a <code>client_id</code>. That's the only credential your app needs, because it proves who it is with PKCE (<a href="#client-credentials">why no client secret?</a>).</li>
-          <li><strong>Redirect</strong> users to <code>/oauth/authorize</code> with PKCE parameters.</li>
-          <li>The user <strong>signs in</strong> (via their existing HashBin account) and <strong>approves</strong> your app.</li>
-          <li>HashBin redirects back to your <code>redirect_uri</code> with an authorization <strong>code</strong>.</li>
-          <li>Exchange the code at <code>/oauth/token</code> for an <strong>access token</strong> (15 minutes) and <strong>refresh token</strong> (7 days idle, 90 days maximum).</li>
-          <li>Use the access token to <strong>publish content</strong> via <code>POST /api/content</code>. Uploads use the user's default retention period, are billed to their balance, and return a content URL on <code>https://256t.us/{cid}</code>.</li>
+          <li><strong>Register</strong> your exact redirect URI and get a public <code>client_id</code>. Acknowledge shared-origin risk where required; the client ID is not a secret.</li>
+          <li><strong>Save on a click:</strong> call SDK <code>publish()</code>. HashBin shows the app, safe document preview, CID, retention, exact price and balance.</li>
+          <li>The user <strong>approves that save</strong> on HashBin. Your app receives a verified CID and never stores a HashBin credential.</li>
+          <li><strong>Need silent saves?</strong> Call <code>authorize()</code> to open allowance setup. The user reviews scopes, monthly cap, maximum file size and expiry on HashBin.</li>
+          <li>Use <code>save()</code> for allowance uploads and set <code>maxCostCents</code>. The SDK binds tokens to a non-extractable browser key, checks CIDs and serializes refreshes.</li>
         </ol>
+        <p>Popup saves support up to 5 MiB; fragment redirects up to 512 KiB. Allowance defaults suggest $1/month, 1 MiB per file and a 30-day consent expiry. Access tokens last 15 minutes; new refresh tokens expire after seven idle days with a 90-day family maximum. <a href="/docs/sdk">SDK setup, callbacks and migration</a>.</p>
       </div>
     </section>
 
@@ -91,8 +92,8 @@
       <div class="card" style="max-width: 48rem;">
         <p style="margin-bottom: 1rem;">
           If your app is hosted on GitHub Pages, register your Pages URL as the redirect URI.
-          The simplest setup is a single page that starts sign-in, receives the user back from
-          HashBin, and publishes. A minimal version using the hosted SDK:
+          Apps under one GitHub Pages host share storage, so prefer hosted approval. A single
+          page can open the save popup and handle a fragment callback if redirect fallback is needed. A minimal version using the hosted SDK:
         </p>
         <div class="developers-code"><code><pre>&lt;!-- https://your-username.github.io/your-repo/ (registered as the redirect URI) --&gt;
 &lt;button id="publish"&gt;Publish "Hello, HashBin!"&lt;/button&gt;
@@ -114,12 +115,13 @@
 
   document.getElementById('publish').onclick = async () =&gt; {
     const result = await hb.publish('Hello, HashBin!', { contentType: 'text/plain' });
-    console.log('Published:', result.cid);
+    if (!result.redirected) console.log('Published:', result.cid);
   };
 &lt;/script&gt;</pre></code></div>
         <p style="margin-top: 1rem;">
-          For a complete app that also handles sign-in errors, token renewal and drafts, see
-          <a href="/docs/textpad">Textpad</a>.
+          For a persistent-allowance example with account API calls and drafts, see
+          <a href="/docs/textpad">Textpad</a>. For a new save-button-only app, start with the
+          credential-free example above.
         </p>
         <p style="margin-top: 1rem;">
           See the <a href="/docs/sdk.html">SDK documentation</a> for the full API reference.
@@ -134,7 +136,8 @@
         <p style="margin-bottom: 0.75rem;">
           Textpad is a small text editor in one HTML file. It opens text from a <code>#256t=</code> link,
           lets the user edit it, and saves it to their HashBin account through OAuth. The walkthrough
-          explains every part of the code, so it makes a good starting point for your own app.
+          explains persistent-allowance API calls; for a save-button-only app, use the credential-free
+          <code>publish()</code> example above.
         </p>
         <p style="margin-bottom: 0.75rem;">
           <a href="/docs/textpad">Read the Textpad walkthrough</a> &middot;
@@ -226,8 +229,9 @@
         <p style="margin-top: 1rem; color: var(--color-text-light);">
           Ask only for what your app needs: the user sees each permission, can uncheck any of them, and sets a
           monthly spending limit (required for anything that spends), a retention cap and an expiry. Your app can
-          suggest a cap with the <code>spending_limit</code> (US dollars) and <code>max_retention_months</code>
-          parameters; the user can only lower them. A token request may pass <code>scope</code> to get a token with
+          suggest ceilings with <code>spending_limit</code> (US dollars/month),
+          <code>max_retention_months</code> and <code>max_upload_bytes</code>; the user can only tighten them.
+          Refresh requests require <code>client_id</code>; rotated-token reuse revokes the entire grant. A token request may pass <code>scope</code> to get a token with
           fewer of the granted scopes. Account management (keys, apps, settings, deposits) is never available to apps.
         </p>
       </div>

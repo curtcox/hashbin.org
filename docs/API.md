@@ -22,7 +22,8 @@ much). Each API route declares the scope it needs; anything undeclared is refuse
 |---|---|---|
 | Signed-in session (Clerk) | `Authorization: Bearer <clerk-jwt>` | Everything for the account. The `ADMIN_USER_ID` session also holds every admin scope. |
 | API key | `Authorization: ApiKey hbk_…` or `X-API-Key: hbk_…` | Only its scopes, within its caveats |
-| App access token (OAuth) | `Authorization: Bearer <access-token>` | Only the scopes and limits the user approved |
+| SDK app access token (OAuth + DPoP) | `Authorization: DPoP <access-token>` and `DPoP: <proof-jwt>` | Approved scopes/limits, constrained to the signing key |
+| Unbound app access token (raw OAuth) | `Authorization: Bearer <access-token>` | Approved scopes/limits, without device binding |
 | Admin key | `Authorization: ApiKey hba_…` | Only its admin scopes |
 
 Account management is **session-only**: API keys, admin keys, developer apps, account
@@ -81,12 +82,64 @@ are revoked.
 
 ### App tokens (OAuth)
 
-Authorization code with PKCE (S256). The consent page lets the user uncheck any requested
-scope and set a spending limit, retention cap and expiry; the app's `spending_limit`
-(US dollars) and `max_retention_months` parameters are ceilings. Each approval is its own
-grant. Codes are single-use; access tokens last an hour; refresh tokens rotate and last 30
-days. `POST /oauth/token` accepts `scope` to get an access token with fewer of the granted
-scopes. Apps are public clients: there is no client secret.
+For a browser save button, prefer SDK `publish()`: the user approves the exact bytes and
+price on HashBin, and the client receives only a verified CID. Use an OAuth allowance for
+background saves or other delegated API operations. See [browser client safety](browser-client-safety.md).
+
+OAuth uses authorization code + PKCE (S256), with no client secret. Each approval is a separate
+grant. Users can remove requested scopes and tighten `spending_limit` (US dollars/month),
+`max_retention_months` and `max_upload_bytes` (1–5242880 for this consent field). Spending scopes
+require a monthly cap. SDK defaults are $1/month and 1 MiB per file; consent defaults to a
+30-day grant and offers 1, 7, 30, 90 or 365 days, or no grant expiry.
+
+| Endpoint | Contract |
+| --- | --- |
+| `GET /oauth/authorize` | Consent page; `client_id`, exact registered `redirect_uri`, `response_type=code`, `scope`, `state`, `code_challenge`, `code_challenge_method=S256`; optional limits above and `dpop_jkt` |
+| `POST /oauth/authorize` | Account session only; JSON authorization fields plus optional `granted_scopes`, `granted_spending_limit`, `granted_max_retention_months`, `granted_max_upload_bytes`, `expires_in_days`; redirect to the registered URI, or `{redirect_to}` for `Accept: application/json` |
+| `POST /oauth/token` | JSON `grant_type=authorization_code`, `client_id`, `code`, `redirect_uri`, `code_verifier`; a DPoP-bound code requires the matching proof |
+| `POST /oauth/token` (refresh) | JSON `grant_type=refresh_token`, **`client_id`**, `refresh_token`; bound refresh tokens require a proof from the original key |
+| `GET /oauth/dpop-nonce` | `{nonce}`: a server-signed nonce valid for five minutes; no credential needed |
+| `POST /oauth/revoke` | JSON `{token, token_type_hint: "refresh_token"}` revokes the token's grant and refresh family, even for an already-rotated refresh token; access-token revocation also identifies the grant; invalid/already-revoked inputs return 200 quietly |
+
+Authorization codes expire after 10 minutes and work once. Access tokens last **15 minutes**.
+New refresh tokens expire after **seven idle days**; the original family's absolute lifetime
+is **90 days**, regardless of rotation. Grant expiry can end access sooner. A replayed rotated
+refresh token revokes the whole grant. Missing/mismatched `client_id`, revoked/expired grants,
+and key mismatches cannot mint replacement tokens. Token requests may pass `scope` to request
+fewer of the grant's permissions. Token and nonce responses are not cacheable.
+
+New hosted-SDK authorizations include `dpop_jkt` and receive `token_type: "DPoP"`, with `cnf.jkt`
+in the signed access token. Raw OAuth without DPoP still receives bearer tokens; existing tokens
+are not retroactively bound. Clients outside the SDK must implement DPoP and refresh locking
+separately. The bundled native and command-line examples currently use unbound OAuth.
+
+#### DPoP proof requirements
+
+Get a nonce from `/oauth/dpop-nonce`. Send a signed ES256 JWT in `DPoP` on exchange, refresh and
+every bound resource request. Its protected header uses `typ: "dpop+jwt"`, `alg: "ES256"` and a
+public EC P-256 `jwk` without private material. The authorization request's `dpop_jkt` is the
+SHA-256 JWK thumbprint; the same key must sign the exchange and future proofs.
+
+Claims: exact HTTP method `htm`; absolute `htu` containing origin/path without query or fragment;
+integer `iat` within 60 seconds; a unique `jti` (16–200 characters); and the server `nonce`.
+Resource requests also need `ath`, the Base64URL SHA-256 hash of the access token, and
+`Authorization: DPoP <access-token>`. The API and funded-content worker share replay receipts.
+A token-endpoint proof or code-binding failure returns `400 invalid_dpop_proof`; an invalid
+resource credential returns 401. Obtain a new nonce before the cached one expires.
+
+#### Shared-origin registration and account recovery
+
+Create/update developer apps with `shared_origin_acknowledged: true` when known GitHub/GitLab
+shared hosts or another active app use a redirect origin. Otherwise registration returns
+`400 shared_origin_acknowledgement_required`, including `warnings` (origins/app names) and a
+`guide` URL. CORS derives from active registrations only, and paths cannot isolate co-hosted apps.
+
+`GET /api/account/authorizations` returns `authorizations` with grant limits, current monthly
+spend, `last_used_at`, and recent `uploads`, plus bounded `security_events` for first use,
+refresh reuse revocation and reaching 80% of the monthly cap. These are in-app notifications.
+`DELETE /api/account/authorizations/:grantId` revokes one grant; an app ID revokes its grants.
+`DELETE /api/account/authorizations` revokes all OAuth grants and refresh tokens. Separately
+managed API keys remain active. These management routes require the account session.
 
 ### Admin keys
 
@@ -233,7 +286,7 @@ Returns comprehensive health check with component status.
 
 ### Authentication Endpoints
 
-These endpoints manage user sessions and API keys.
+These endpoints manage user sessions and API keys. App OAuth endpoints and recovery controls are described above.
 
 ---
 
@@ -498,6 +551,26 @@ Get transaction history for the current user's balance.
 
 ---
 
+## Hosted publishing endpoints
+
+Third-party clients should invoke these through SDK `publish()`; they do not receive a
+HashBin credential. The hosted page is `/publish?client_id=…&redirect_uri=…&state=…&mode=popup|redirect`.
+Popup data/results use correlated `postMessage` with exact source/origin checks. Redirect
+handoffs use fragments. Hosted saves accept **1 byte to 5 MiB**; SDK fragment handoffs are
+limited to **512 KiB**, independently of the raw upload API's 90 MB ceiling.
+
+| Endpoint | Access | Result |
+| --- | --- | --- |
+| `GET /api/publish/app?client_id=…&redirect_uri=…` | Public | Validates the active app/exact redirect, returns name and shared-origin warnings |
+| `POST /api/publish?client_id=…&redirect_uri=…&retention_months=…` | Account session | Raw bytes with their `Content-Type`; returns `cid`, `size_bytes`, `retention_months`, `cost_cents`, `balance_cents`, and a signed `approval` valid for five minutes |
+| `POST /api/publish` with `X-HashBin-Approval: <approval>` | Same account session | Identical raw bytes and type; consumes the bound approval once, rechecks app/price and uploads; returns the normal upload result |
+
+The review page renders content as text and denies framing. Clients never receive its approval
+ticket. A mismatch returns `400 approval_mismatch`, an expired/invalid ticket returns
+`400 approval_expired`, reuse returns `409 approval_used`, and a changed price returns
+`409 price_changed`. Multipart form uploads are not accepted on this endpoint: its approval
+must bind the exact bytes that are stored. Use a new review after any failed approval.
+
 ## Content Endpoints
 
 Uploads go to `hashbin.org`; content is served from the separate origin `https://256t.us/{cid}`.
@@ -508,7 +581,15 @@ Upload content (requires authentication; cost is deducted from balance). Body is
 (`Content-Type` is stored) or `multipart/form-data` with a `content` file field. Retention is
 `retention_months` (query or form field, default 1). Maximum upload size is **90 MB**; larger
 requests return `413 Payload Too Large` with `max_upload_bytes` in the body. The current limit is
-also published as `max_upload_bytes` in `GET /api/config`.
+also published as `max_upload_bytes` in `GET /api/config`. OAuth uploads use the account's
+retention default, narrowed by the grant's retention cap, rather than caller retention fields.
+
+Optional query parameter `max_cost_cents` sets a per-upload ceiling, including when duplicate
+content extends retention. It must be a non-negative safe integer written in decimal digits;
+empty, negative, fractional and unsafe values return `400 invalid_max_cost`. If the computed
+charge exceeds it, the server returns `409 max_cost_exceeded` with `cost_cents` and
+`max_cost_cents` before debit or storage. This does not replace the credential's monthly cap.
+SDK `save(content, {maxCostCents})` sends this parameter.
 
 ### GET /api/content/{cid}
 Content metadata (public). Includes `url` and `download_domain`.
@@ -676,13 +757,15 @@ signed links, and download sessions.
 
 - Header identity: `GET https://256t.us/a/<cid>[.ext]` with
   `Authorization: ApiKey hbk_...`, `X-API-Key: hbk_...`, or
-  `Authorization: Bearer <OAuth-access-token>` with `downloads:spend`.
+  `Authorization: DPoP <OAuth-access-token>` plus a valid `DPoP` proof with
+  `downloads:spend`. Unbound raw/legacy OAuth tokens use `Authorization: Bearer …`. Bound
+  tokens cannot use the bearer path. Proof `htu` names the actual content-host URL.
 - Signed link: `GET https://256t.us/s/<token>/<cid>[.ext]`. The signature binds the
   CID and spending identity. Use these for cross-site embeds.
 - Browser identity: navigate to the handshake URL. It sets the HttpOnly, Secure,
   SameSite=Lax, Path=/ `__Host-hb_dl` cookie for up to 30 days, then redirects to
   `/a/<cid>`. Cookies work on direct navigation; credentialed CORS is not enabled.
-- `OPTIONS` supports GET/HEAD and `Authorization, X-API-Key` with wildcard origin.
+- `OPTIONS` supports GET/HEAD and `Authorization, X-API-Key, DPoP` with wildcard origin.
 
 `X-Budget` is `file`, `funded`, `anon`, or `exhausted` and is exposed to CORS callers.
 Funded requests bypass the content Worker's per-IP and cost-brake limits. The strict

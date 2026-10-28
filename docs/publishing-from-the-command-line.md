@@ -10,11 +10,19 @@ all-powerful API key.
   it (`spending_limit_exceeded`) without charging.
 - **Token storage:** the refresh token is kept in the macOS Keychain under the service
   `hashbin-publish:<host>`, never in the repo or in process arguments. HashBin rotates it on every
-  use; it expires after 30 days without one.
+  use; newly issued refresh tokens expire after seven idle days, and a refresh family lasts at most
+  90 days. Access tokens last 15 minutes; grant expiry can end access sooner.
 - **Retention:** OAuth uploads use your account's default retention, set on the Account page,
   held to the grant's retention cap if it has one (`--max-retention 12`).
 - **Your choice:** the approval page lets you uncheck either scope, lower the limit, cap
-  retention and make the grant expire after 30, 90 or 365 days. Each approval is a separate grant.
+  retention and choose a grant expiry of 1, 7, 30, 90 or 365 days, or no grant expiry (refresh limits
+  still apply). Each approval is a separate grant.
+
+This script uses raw OAuth bearer tokens, not the hosted browser SDK's DPoP binding. The
+Keychain protects storage but does not make a copied token unusable elsewhere. Browser apps
+that only save on a click should prefer credential-free `publish()`; see
+[browser client safety](browser-client-safety.md). All refreshes require `client_id`; run one
+publisher at a time per grant because rotated-token reuse revokes the entire grant.
 
 ## Set up (once)
 
@@ -40,8 +48,10 @@ The content type comes from the file extension unless `--type` is given.
 
 - `node scripts/publish.mjs forget` revokes the stored refresh token and deletes it from the
   Keychain.
-- To cut off the whole grant, including tokens on other machines, revoke **Claude Code publisher**
-  under authorized apps on your Account page. You can also uncheck a scope or lower the limit there.
+- `forget` also revokes the grant and its refresh family server-side. If the revocation request
+  cannot reach HashBin, removing the Keychain entry alone cannot invalidate remote copies.
+- From the Account page, revoke **Claude Code publisher**, revoke all app access, or tighten its
+  scopes and monthly limit. Separately managed API keys are not affected by revoke-all app access.
 - If publishing reports `invalid_grant`, the token expired or was revoked; run `authorize` again.
 
 ## Configuration

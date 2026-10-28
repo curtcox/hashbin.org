@@ -259,7 +259,8 @@ search the scripts for the value.
 | 256t.us per-IP limit | 30 requests per minute per IP | `workers/256t-content/src/index.js` |
 | Alternate suppliers | Up to 20 per account; single-CID or group (e.g. a GitHub folder); every CID checked for size and hash on scan; public | `src/api/suppliers.js`, `src/utils/supplier-scanning.js` |
 | API keys | Up to 25; format `hb_` + 32 characters; expire within at most 5 years (default 1); headers `Authorization: ApiKey …` or `X-API-Key` | `src/auth/utils.js`, `src/durable-objects/user-profile.js` |
-| OAuth | Authorization code + PKCE (S256 only); code 10 min; access token 1 h; refresh token 30 days, rotated; scopes `content:write`, `content:read`, `balance:read`; optional monthly spending limit per app; publish only | `src/api/oauth.js` |
+| Browser saves | SDK `publish()` opens first-party, single-use per-save approval; client gets a verified CID and no credential. `save()` uses an explicitly approved allowance; published guidance and immutable SDK/SRI available | `docs/browser-client-safety.md`, `frontend/docs/sdk.html` |
+| OAuth | PKCE (S256), code 10 min, access 15 min, new refresh tokens 7 days idle / 90-day family max; reuse revokes the grant; refresh requires `client_id`; SDK DPoP binding, user-narrowed scopes, required monthly cap for spending | `src/api/oauth.js`, `src/auth/dpop.js` |
 | App-published retention | The user's default (1, 3, 6, or 12 months; 1 if unset) | account page, `src/api/content.js` |
 | Backups | Nightly metadata snapshots, 30 kept | STATUS L10 |
 
