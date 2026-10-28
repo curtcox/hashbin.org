@@ -35,6 +35,16 @@ saveButton.onclick = async () =&gt; {
 <li><strong>Links and restored state.</strong> Treat share links, fragments and stored drafts as untrusted input. Ask before a link replaces work kept in the browser.</li>
 <li><strong>Old tokens.</strong> After moving to <code>publish()</code>, call <code>disconnect()</code> once for any token the previous version stored, so copies elsewhere stop working.</li>
 </ul>
+<h2>Known pitfalls</h2>
+<ul>
+<li>Tokens in Web Storage are readable by every app on the origin: <a href="/docs/security/sn-2026-003">SN-2026-003</a>.</li>
+<li>A meta policy also binds <code>srcdoc</code> previews: <a href="/docs/security/sn-2026-004">SN-2026-004</a>.</li>
+<li>Cross-origin isolation severs the Publish popup; use redirect mode: <a href="/docs/security/sn-2026-005">SN-2026-005</a>.</li>
+<li>Keep your own copy of <code>clientState</code> until the SDK returns it on cancellation: <a href="/docs/security/sn-2026-006">SN-2026-006</a>.</li>
+<li>Redirect saves are limited to 512 KiB: <a href="/docs/security/sn-2026-007">SN-2026-007</a>.</li>
+<li>Sanitizers can trigger policy reports in tests: <a href="/docs/security/sn-2026-009">SN-2026-009</a>.</li>
+</ul>
+<p>See all <a href="/docs/security/">security notes</a>.</p>
 <h2>What each measure protects against</h2>
 <p>Threats: another app on the same origin is compromised; your own app has an XSS or compromised dependency; untrusted content your app runs escapes its sandbox; a server or CDN returns different bytes; a fake consent or price prompt tricks the user.</p>
 <div style="overflow-x:auto"><table>

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SN-2026-003: JavaScript-readable tokens on shared origins — HashBin</title><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css"><style>main{max-width:850px;margin:2rem auto;padding:1rem}li{margin:.5rem 0}td,th{padding:.5rem;text-align:left;border-bottom:1px solid #ccc;vertical-align:top}</style></head><body><main>
+<p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a></p>
+<h1>SN-2026-003: JavaScript-readable tokens on shared origins</h1>
+<p>Browser apps stored HashBin OAuth access and refresh tokens in <code>localStorage</code>. On a host such as <code>username.github.io</code>, every app shares one origin, so any script running in any of those apps could read the tokens and use them elsewhere until they expired. Fixed for every app by HashBin-side changes; the curtcox apps no longer hold tokens at all.</p>
+<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-26, review of a sibling app's security model</td></tr><tr><th>Fixed</th><td>2026-10-28: HashBin measures deployed from <code>b36c126</code>; client apps migrated the same day</td></tr><tr><th>Affected</th><td>SDK versions before v0.2.0 and any app storing tokens in Web Storage</td></tr><tr><th>Severity</th><td>High: stolen tokens gave offline access within the grant's spending cap</td></tr><tr><th>Status</th><td>Fixed</td></tr></table></div>
+<h2>What was wrong</h2>
+<p>Browsers isolate storage by origin (scheme, host and port), not by path. The hosted SDK kept tokens in <code>localStorage</code>, and the <code>Origin</code> header carries no path, so HashBin could not tell co-hosted apps apart. A bug or compromised dependency in any app on the origin exposed every other app's tokens.</p>
+<h2>How it was detected</h2>
+<p>A security review of one app asked what else could read its storage. The answer covered every HashBin client on the same GitHub Pages origin.</p>
+<h2>How it can be demonstrated</h2>
+<p>Not applicable now: no supported flow stores a bearer token in Web Storage. The browser tests in <code>frontend/tests/browser-client-safety.spec.js</code> check that a client completing a hosted save holds no tokens.</p>
+<h2>How it was fixed</h2>
+<ul><li><strong>HashBin-side:</strong> hosted per-save approval (<code>publish()</code>) so apps never hold a credential; DPoP-bound allowance tokens with non-extractable keys; refresh reuse revocation, client binding and shorter lifetimes; shared-origin warnings at registration and consent; versioned, integrity-pinned SDK.</li><li><strong>App-side:</strong> the six curtcox apps switched to <code>publish()</code> and revoke tokens left by their earlier flow on the next load.</li><li><strong>Rejected:</strong> a hidden HashBin iframe holding the credential. Partitioned third-party storage is unreliable across browsers, and co-hosted apps share one embedding origin.</li></ul>
+<h2>How to avoid it</h2>
+<p>Use <code>publish()</code> for saves. If you need silent saves, use the SDK's DPoP allowance with a small cap and expiry, and give that app its own origin.</p>
+<h2>Lessons</h2>
+<p>Credentials should be HashBin's to hold, not the client's. Registration now asks about shared origins.</p>
+</main></body></html>

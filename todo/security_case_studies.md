@@ -2,7 +2,18 @@
 
 ## Status
 
-**Phase:** planned 2026-10-28; nothing built or published yet. Row B14 in `STATUS.md`.
+**Phase:** step 1 partly done 2026-10-28. Row B14 in `STATUS.md`.
+
+- Done: `/docs/security/` index with the entry template, disclosure rule and private
+  reporting link. Backlog notes SN-2026-003 to SN-2026-009 are published. The index is
+  linked from the docs index, sitemap, developer page, SDK guide and browser client
+  safety guide (new "Known pitfalls" list). `src/docs-security-notes.test.js` checks
+  index/page consistency and that local links resolve. `.dev.vars.example` closes
+  SN-2026-008.
+- Not done: the SN-2026-001 (PythonOnline) and SN-2026-002 (ManimOnline) pages. They are
+  listed on the index as "analysis being written" without detail. Drafting their analysis
+  in this session was stopped by an automated safety filter, so the owner writes them or
+  they are drafted another way.
 Follows `browser_client_safety.md`, whose section C review raised the first two cases.
 
 ## Goals

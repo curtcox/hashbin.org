@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SN-2026-009: Sanitizers trigger Content-Security-Policy reports — HashBin</title><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css"><style>main{max-width:850px;margin:2rem auto;padding:1rem}li{margin:.5rem 0}td,th{padding:.5rem;text-align:left;border-bottom:1px solid #ccc;vertical-align:top}</style></head><body><main>
+<p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a></p>
+<h1>SN-2026-009: Sanitizers trigger Content-Security-Policy reports</h1>
+<p>When DOMPurify sanitizes markup containing inline event handlers, the browser can report <code>script-src-attr</code> violations from DOMPurify's internal document. Nothing runs, but tests that fail on any violation report fail.</p>
+<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-28, adding a policy check to the Sheets gallery tests</td></tr><tr><th>Affected</th><td>Apps that test their policy and sanitize untrusted markup</td></tr><tr><th>Severity</th><td>None: the handlers are refused and then removed</td></tr><tr><th>Status</th><td>Accepted</td></tr></table></div>
+<h2>What was wrong</h2>
+<p>The sanitizer parses untrusted markup in a document that shares the page's policy before it removes the handlers. The browser reports the handler it refused.</p>
+<h2>How it was detected</h2>
+<p>A gallery example that deliberately contains a handler produced one report. The report's source file pointed into the sanitizer, and a check confirmed the handler never ran.</p>
+<h2>How to avoid it</h2>
+<p>In policy tests, ignore <code>script-src-attr</code> reports whose source file is the sanitizer, and keep an assertion that the handler did not run.</p>
+</main></body></html>

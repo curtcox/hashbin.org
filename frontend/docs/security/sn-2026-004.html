@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SN-2026-004: A meta Content-Security-Policy also binds srcdoc previews — HashBin</title><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css"><style>main{max-width:850px;margin:2rem auto;padding:1rem}li{margin:.5rem 0}td,th{padding:.5rem;text-align:left;border-bottom:1px solid #ccc;vertical-align:top}</style></head><body><main>
+<p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a></p>
+<h1>SN-2026-004: A meta Content-Security-Policy also binds srcdoc previews</h1>
+<p>An editor that previews user HTML in a sandboxed <code>srcdoc</code> iframe cannot add a useful script policy to its own page. The preview inherits the page's policy, so restricting scripts on the editor also breaks users' own scripts in the preview. Pages Online has no Content-Security-Policy for this reason.</p>
+<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-28, while adding policies to the curtcox apps</td></tr><tr><th>Affected</th><td>Pages Online; any editor previewing user HTML through <code>srcdoc</code></td></tr><tr><th>Severity</th><td>Low: it removes one layer of defence against bugs in the editor itself</td></tr><tr><th>Status</th><td>Open</td></tr></table></div>
+<h2>What was wrong</h2>
+<p>Documents created from <code>srcdoc</code> share their creator's policy container. A policy that limits <code>script-src</code> to the site would apply to the preview, which must run inline scripts, data-URL scripts and scripts from any CDN the user chooses.</p>
+<h2>How it was detected</h2>
+<p>Designing the editor's policy: the preview's needs and the editor's policy could not both be met.</p>
+<h2>How it can be demonstrated</h2>
+<p>Add <code>&lt;meta http-equiv="Content-Security-Policy" content="script-src 'self'"&gt;</code> to an editor, preview a page with an inline script, and see it blocked.</p>
+<h2>How it can be fixed</h2>
+<ul><li><strong>HashBin-side (planned):</strong> a HashBin-hosted isolated origin that apps embed for previews and code execution.</li><li><strong>App-side:</strong> load the preview from a document on another origin with its own policy, or from a separate URL rather than <code>srcdoc</code>.</li></ul>
+<h2>How to avoid it</h2>
+<p>Plan where user content renders before choosing a policy. Previews that share a document lineage with the editor share its policy.</p>
+</main></body></html>

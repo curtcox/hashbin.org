@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SN-2026-006: A cancelled redirect save loses the app's saved state — HashBin</title><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css"><style>main{max-width:850px;margin:2rem auto;padding:1rem}li{margin:.5rem 0}td,th{padding:.5rem;text-align:left;border-bottom:1px solid #ccc;vertical-align:top}</style></head><body><main>
+<p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a></p>
+<h1>SN-2026-006: A cancelled redirect save loses the app's saved state</h1>
+<p>In redirect mode the SDK stores the document and optional <code>clientState</code> while the user visits HashBin. If the user cancels, <code>handlePublishCallback()</code> discards the stored state and only throws the error, so an app without its own draft storage loses the user's work.</p>
+<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-28, migrating ManimOnline, which keeps no local draft</td></tr><tr><th>Affected</th><td>SDK v0.2.0</td></tr><tr><th>Severity</th><td>Low: data loss, not exposure</td></tr><tr><th>Status</th><td>Mitigated in the curtcox apps; SDK fix planned</td></tr></table></div>
+<h2>What was wrong</h2>
+<p>The callback removes its transaction before checking for an error, and the error path returns nothing.</p>
+<h2>How it was detected</h2>
+<p>Tracing the cancel path while adding redirect support to an app without draft persistence.</p>
+<h2>How it can be demonstrated</h2>
+<p>Publish in redirect mode with <code>clientState</code>, choose Cancel on HashBin, and call <code>handlePublishCallback()</code>: it throws <code>access_denied</code> with no state.</p>
+<h2>How it was fixed</h2>
+<ul><li><strong>App-side:</strong> each app keeps its own session copy of the document before publishing and restores it on error.</li><li><strong>HashBin-side (planned):</strong> the SDK returns <code>clientState</code> with the error, so the app copies can be removed.</li></ul>
+<h2>How to avoid it</h2>
+<p>Until the SDK change ships, keep a session copy of anything you pass as <code>clientState</code>.</p>
+</main></body></html>

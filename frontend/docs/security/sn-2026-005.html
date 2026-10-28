@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SN-2026-005: Cross-origin isolation severs the Publish popup — HashBin</title><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css"><style>main{max-width:850px;margin:2rem auto;padding:1rem}li{margin:.5rem 0}td,th{padding:.5rem;text-align:left;border-bottom:1px solid #ccc;vertical-align:top}</style></head><body><main>
+<p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a></p>
+<h1>SN-2026-005: Cross-origin isolation severs the Publish popup</h1>
+<p>An app that serves <code>Cross-Origin-Opener-Policy: same-origin</code>, usually for <code>crossOriginIsolated</code> and SharedArrayBuffer, cannot receive the result from HashBin Publish's popup. The SDK sees the popup as closed and reports a failed save.</p>
+<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-28, migrating apptron to <code>publish()</code></td></tr><tr><th>Affected</th><td>SDK v0.2.0 popup mode in apps sending that header</td></tr><tr><th>Severity</th><td>Low: saves fail; nothing is exposed</td></tr><tr><th>Status</th><td>Mitigated in apptron; SDK fix planned</td></tr></table></div>
+<h2>What was wrong</h2>
+<p>That header places a cross-origin popup in a separate browsing context group. The opener loses its reference, so no result can come back over <code>postMessage</code>.</p>
+<h2>How it was detected</h2>
+<p>Reading the app's service worker during migration: it adds the header to every response.</p>
+<h2>How it can be demonstrated</h2>
+<p>Serve a page with the header, call <code>publish()</code> in popup mode, and observe the "Publish window closed" error.</p>
+<h2>How it was fixed</h2>
+<ul><li><strong>App-side:</strong> apptron uses <code>mode: 'redirect'</code> when <code>crossOriginIsolated</code> is true.</li><li><strong>HashBin-side (planned):</strong> the SDK detects a severed popup and falls back to redirect itself.</li></ul>
+<h2>How to avoid it</h2>
+<p>Use redirect mode in isolated apps, or <code>same-origin-allow-popups</code> if isolation is not required.</p>
+</main></body></html>

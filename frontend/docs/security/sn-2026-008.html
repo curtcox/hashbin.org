@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SN-2026-008: Local security tests failed without a signing key — HashBin</title><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css"><style>main{max-width:850px;margin:2rem auto;padding:1rem}li{margin:.5rem 0}td,th{padding:.5rem;text-align:left;border-bottom:1px solid #ccc;vertical-align:top}</style></head><body><main>
+<p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a></p>
+<h1>SN-2026-008: Local security tests failed without a signing key</h1>
+<p>The local Worker configuration had no <code>OAUTH_SIGNING_KEY</code>. Hosted approval and DPoP returned errors, so the cross-origin browser safety tests failed locally for a reason unrelated to the code under test.</p>
+<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-28, re-verifying the browser client safety measures</td></tr><tr><th>Fixed</th><td>2026-10-28: <code>.dev.vars.example</code> and local setup documentation</td></tr><tr><th>Affected</th><td>HashBin development only</td></tr><tr><th>Severity</th><td>None in production; risk of ignoring security test failures</td></tr><tr><th>Status</th><td>Fixed</td></tr></table></div>
+<h2>What was wrong</h2>
+<p><code>wrangler.local.toml</code> defines no signing key, and no example <code>.dev.vars</code> existed. A previous developer environment must have had one.</p>
+<h2>How it was detected</h2>
+<p>The tests failed with HTTP 500 from <code>/api/publish</code>; the worker code reads <code>env.OAUTH_SIGNING_KEY</code>.</p>
+<h2>How it was fixed</h2>
+<p>Copy <code>.dev.vars.example</code> to <code>.dev.vars</code> and set a random local-only key, or pass <code>--var OAUTH_SIGNING_KEY:…</code> to <code>wrangler dev</code>. Never reuse the production key.</p>
+<h2>Lessons</h2>
+<p>Security tests that fail for environment reasons get ignored. Local setup must make them pass by default.</p>
+</main></body></html>

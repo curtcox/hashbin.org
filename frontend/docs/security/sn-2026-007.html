@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SN-2026-007: Redirect saves are limited to 512 KiB — HashBin</title><link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css"><style>main{max-width:850px;margin:2rem auto;padding:1rem}li{margin:.5rem 0}td,th{padding:.5rem;text-align:left;border-bottom:1px solid #ccc;vertical-align:top}</style></head><body><main>
+<p><a href="/docs/security/">Security notes</a> · <a href="/docs/browser-client-safety">Browser client safety</a></p>
+<h1>SN-2026-007: Redirect saves are limited to 512 KiB</h1>
+<p>Redirect mode carries the document in the URL fragment, so the SDK limits it to 512 KiB. Apps that must use redirect mode, such as cross-origin isolated apps, cannot publish larger documents directly.</p>
+<div style="overflow-x:auto"><table><tr><th>Found</th><td>2026-10-28, migrating apptron, whose disk overlays can reach 5 MiB</td></tr><tr><th>Affected</th><td>Redirect-only apps</td></tr><tr><th>Severity</th><td>Low: a usability limit</td></tr><tr><th>Status</th><td>Open</td></tr></table></div>
+<h2>What was wrong</h2>
+<p>Fragment length is the only channel a redirect offers without a server-side handoff.</p>
+<h2>How it was detected</h2>
+<p>Comparing apptron's overlay size limit with the SDK's redirect limit.</p>
+<h2>How it can be demonstrated</h2>
+<p>Call <code>publish()</code> in redirect mode with more than 512 KiB: the SDK refuses.</p>
+<h2>How it can be fixed</h2>
+<ul><li><strong>App-side:</strong> apptron asks the user to download the file and upload it on hashbin.org.</li><li><strong>HashBin-side (planned):</strong> a larger handoff, such as a file chooser on the Publish page.</li></ul>
+</main></body></html>

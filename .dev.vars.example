@@ -1,0 +1,4 @@
+# Copy to .dev.vars (ignored by git) for `npm run dev:local`.
+# Use a random local-only value, for example: openssl rand -hex 32
+# Never reuse the production key. Without it, hosted approval and DPoP return HTTP 500.
+OAUTH_SIGNING_KEY=replace-with-a-random-local-value

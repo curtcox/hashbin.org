@@ -90,6 +90,7 @@ Use the fully local mode to run without Clerk or Stripe:
 
 2. **Start local mode**
    ```bash
+   cp .dev.vars.example .dev.vars   # then set a random local-only OAUTH_SIGNING_KEY
    npm run dev:local
    ```
 
