@@ -247,13 +247,14 @@ describe('Content Deletion API', () => {
       expect(data.success).toBe(true);
       expect(data.deleted.deleted_by).toBe('admin');
     });
-    it('should allow deletion with X-Admin-Token and no signed-in user', async () => {
-      mockEnv.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
+    it('should allow deletion with an admin key', async () => {
       const request = new Request('http://localhost/api/admin/content/test-cid/delete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'a'.repeat(64) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: 'DMCA notice' })
       });
+      request.user = { userId: 'admin-user-123', authMethod: 'admin_key', keyId: 'k1', scopes: ['admin:takedown'] };
+      request.auth = { authenticated: true, user: request.user };
 
       const response = await handleAdminDeleteContent(request, mockEnv, 'test-cid');
       expect(response.status).toBe(200);

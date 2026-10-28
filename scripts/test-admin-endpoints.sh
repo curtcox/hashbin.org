@@ -12,7 +12,8 @@ NC='\033[0m' # No Color
 
 # Test configuration
 BASE_URL="${BASE_URL:-http://localhost:8787}"
-ADMIN_TOKEN="${ADMIN_TOKEN:-test-admin-token-for-local-dev-only}"
+# An admin key (hba_...) with the admin scopes these checks need; issue one at /admin/keys.html
+ADMIN_KEY="${ADMIN_KEY:?Set ADMIN_KEY to an admin key}"
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
@@ -57,7 +58,7 @@ fi
 # Test 2: Admin authentication - invalid token
 log_test "Admin authentication - invalid token"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: invalid-token" \
+  -H "Authorization: ApiKey hba_invalid" \
   "$BASE_URL/api/admin/stats")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -72,7 +73,7 @@ fi
 # Test 3: Admin authentication - valid token
 log_test "Admin authentication - valid token"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -88,7 +89,7 @@ fi
 # Test 4: Get platform statistics
 log_test "GET /api/admin/stats"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -104,7 +105,7 @@ fi
 # Test 5: Get financial statistics
 log_test "GET /api/admin/stats/financial"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats/financial")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -119,7 +120,7 @@ fi
 # Test 6: Get content statistics
 log_test "GET /api/admin/stats/content"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats/content")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -134,7 +135,7 @@ fi
 # Test 7: Get user statistics
 log_test "GET /api/admin/stats/users"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/stats/users")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -149,7 +150,7 @@ fi
 # Test 8: Get admin health check
 log_test "GET /api/admin/health"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/health")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -165,7 +166,7 @@ fi
 # Test 9: Get alerts
 log_test "GET /api/admin/alerts"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/alerts")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -180,7 +181,7 @@ fi
 # Test 10: Get audit log
 log_test "GET /api/admin/audit-log"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/audit-log")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -196,7 +197,7 @@ fi
 # Test 11: Export data - invalid type
 log_test "GET /api/admin/export?type=invalid"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=invalid")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 
@@ -209,7 +210,7 @@ fi
 # Test 12: Export data - valid type
 log_test "GET /api/admin/export?type=audit"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=audit")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)

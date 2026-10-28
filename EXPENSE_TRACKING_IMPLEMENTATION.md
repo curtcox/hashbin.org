@@ -77,7 +77,7 @@ Four new admin endpoints for cost monitoring:
    - Query: `?period=all_time` or `?period=2026-01`
    - Returns revenue vs costs with margin percentage
 
-All endpoints require admin authentication via `ADMIN_SECRET_TOKEN`.
+All endpoints require `admin:costs` (the admin's session or an admin key).
 
 ## Usage Examples
 
@@ -85,7 +85,7 @@ All endpoints require admin authentication via `ADMIN_SECRET_TOKEN`.
 
 ```bash
 curl -X POST https://hashbin.org/api/admin/costs/record \
-  -H "Authorization: Bearer $ADMIN_SECRET_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   -H "Content-Type: application/json" \
   -d '{
     "service": "r2_storage",
@@ -100,15 +100,15 @@ curl -X POST https://hashbin.org/api/admin/costs/record \
 ```bash
 # Get cost summary
 curl https://hashbin.org/api/admin/costs?period=2026-01 \
-  -H "Authorization: Bearer $ADMIN_SECRET_TOKEN"
+  -H "Authorization: ApiKey $ADMIN_KEY"
 
 # Get cost breakdown by service
 curl https://hashbin.org/api/admin/costs/by-service?period=2026-01 \
-  -H "Authorization: Bearer $ADMIN_SECRET_TOKEN"
+  -H "Authorization: ApiKey $ADMIN_KEY"
 
 # Get profitability metrics
 curl https://hashbin.org/api/admin/profitability?period=2026-01 \
-  -H "Authorization: Bearer $ADMIN_SECRET_TOKEN"
+  -H "Authorization: ApiKey $ADMIN_KEY"
 ```
 
 ## Test Results
@@ -215,7 +215,7 @@ npm run test:infrastructure-cost
 
 # Test the admin endpoints (requires running server and admin token)
 curl https://hashbin.org/api/admin/costs \
-  -H "Authorization: Bearer $ADMIN_SECRET_TOKEN"
+  -H "Authorization: ApiKey $ADMIN_KEY"
 ```
 
 ## Documentation

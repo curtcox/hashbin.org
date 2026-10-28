@@ -4,16 +4,16 @@ import { fileURLToPath } from 'node:url';
 import { costPeriodBounds } from '../src/utils/cost-period.js';
 import { COST_USAGE_UNITS, priceCostUsage, validCostUsage } from '../src/utils/cost-measurements.js';
 
-// An hba_ admin key (with admin:costs) goes in Authorization; anything else is the legacy admin token.
-export function adminCredentialHeaders(credential) {
-  return credential.startsWith('hba_') ? { Authorization: `ApiKey ${credential}` } : { 'X-Admin-Token': credential };
+// An hba_ admin key with admin:costs
+export function adminCredentialHeaders(adminKey) {
+  return { Authorization: `ApiKey ${adminKey}` };
 }
 
 export async function exportCostHistory(baseUrl, token, request = fetch) {
   const base = new URL(baseUrl);
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(base.hostname);
   if (base.username || base.password || (base.protocol !== 'https:' && !(local && base.protocol === 'http:'))) throw new Error('Use HTTPS or a loopback HTTP endpoint');
-  if (!token) throw new Error('Set COST_SAFETY_ADMIN_KEY (an admin:costs admin key) or COST_SAFETY_ADMIN_TOKEN for a history export');
+  if (!token) throw new Error('Set COST_SAFETY_ADMIN_KEY (an admin key with admin:costs) for a history export');
   const snapshots = [], cursors = new Set();
   let before;
   for (let page = 0; page < 100; page++) {
@@ -82,7 +82,7 @@ async function main() {
   }
   if (Boolean(options['--base-url']) === Boolean(options['--input'])) throw new Error('Choose either --base-url for read-only export or --input for reconciliation');
   if (options['--base-url'] && (options['--invoice'] || options['--period'])) throw new Error('Reconcile exported data with a separate --input invocation');
-  const result = options['--base-url'] ? await exportCostHistory(options['--base-url'], process.env.COST_SAFETY_ADMIN_KEY || process.env.COST_SAFETY_ADMIN_TOKEN)
+  const result = options['--base-url'] ? await exportCostHistory(options['--base-url'], process.env.COST_SAFETY_ADMIN_KEY)
     : reconcileCostReports(JSON.parse(await readFile(options['--input'], 'utf8')),
       options['--invoice'] ? JSON.parse(await readFile(options['--invoice'], 'utf8')) : null, options['--period']);
   const output = JSON.stringify(result, null, 2) + '\n';

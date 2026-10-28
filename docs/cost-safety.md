@@ -126,8 +126,8 @@ are $0.25/M writes beyond 10M and $1/M reads beyond 1M. At 1% sampling writes ad
 $0.0025/M content requests before included usage; review when billing changes.
 
 `/admin/costs.html` shows MTD costs, kept revenue, projection, snapshot age,
-brake controls and top files. It warns after two hours without data. Its admin
-token stays only in page memory. APIs require `X-Admin-Token`:
+brake controls and top files. It warns after two hours without data. It acts as
+the signed-in admin. APIs require `admin:costs` (the admin's session or an admin key):
 
 - `GET /api/admin/cost-safety`
 - `POST /api/admin/cost-safety` with `{"brake":true}` or `{"brake":false}`
@@ -199,8 +199,8 @@ task can be completed before evidence exists.
 ## Export and invoice reconciliation
 
 The read-only export tool follows all history cursors without putting the admin
-token in command-line arguments. Set `COST_SAFETY_ADMIN_TOKEN` securely in the
-environment, then run:
+key in command-line arguments. Set `COST_SAFETY_ADMIN_KEY` (an admin key with
+`admin:costs`) securely in the environment, then run:
 
 ```bash
 mkdir -p cost-safety-exports

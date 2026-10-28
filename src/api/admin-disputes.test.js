@@ -206,12 +206,11 @@ describe('Admin Disputes API', () => {
       expect(data.dispute.resolved_by).toBe('admin');
     });
 
-    it('should accept X-Admin-Token, unindex the dispute, and clear the marker', async () => {
-      mockEnv.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
+    it('should unindex the dispute and clear the marker', async () => {
       mockEnv.CONTENT_BUCKET = { put: vi.fn(), delete: vi.fn() };
       const request = new Request('http://localhost/api/admin/disputes/test-cid', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'a'.repeat(64) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'closed_denied', resolution_reason: 'Not infringing' })
       });
 
@@ -223,7 +222,6 @@ describe('Admin Disputes API', () => {
 
     it('takes the content down when a dispute is upheld (closed_deleted)', async () => {
       const softDelete = vi.fn();
-      mockEnv.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
       mockEnv.CONTENT_BUCKET = { put: vi.fn(), delete: vi.fn() };
       mockEnv.CONTENT_METADATA = {
         idFromName: () => 'cid',
@@ -242,7 +240,7 @@ describe('Admin Disputes API', () => {
 
       const request = new Request('http://localhost/api/admin/disputes/test-cid', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'X-Admin-Token': 'a'.repeat(64) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'closed_deleted', resolution_reason: 'Infringes registered work' })
       });
 

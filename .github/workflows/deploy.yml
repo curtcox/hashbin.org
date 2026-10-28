@@ -262,14 +262,8 @@ jobs:
 
       - name: Configure admin secrets
         run: |
-          # Admin moderation (dispute resolution, takedowns) needs ADMIN_SECRET_TOKEN
-          # and/or ADMIN_USER_ID. Skip unset values so a manually set secret isn't overwritten.
-          if [ -n "$ADMIN_SECRET_TOKEN" ]; then
-            echo "$ADMIN_SECRET_TOKEN" | npx wrangler secret put ADMIN_SECRET_TOKEN
-            echo "✅ ADMIN_SECRET_TOKEN configured"
-          else
-            echo "⚠️ ADMIN_SECRET_TOKEN GitHub secret not set; admin API relies on any manually set value"
-          fi
+          # ADMIN_USER_ID's own sign-in holds every admin scope and issues admin keys.
+          # Skip an unset value so a manually set secret isn't overwritten.
           if [ -n "$ADMIN_USER_ID" ]; then
             echo "$ADMIN_USER_ID" | npx wrangler secret put ADMIN_USER_ID
             echo "✅ ADMIN_USER_ID configured"
@@ -279,7 +273,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          ADMIN_SECRET_TOKEN: ${{ secrets.ADMIN_SECRET_TOKEN }}
           ADMIN_USER_ID: ${{ secrets.ADMIN_USER_ID }}
 
       - name: Verify wrangler.toml for binding conflicts

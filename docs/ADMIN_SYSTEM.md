@@ -35,11 +35,6 @@ other admin keys, and stop working if `ADMIN_USER_ID` changes.
 | `admin:export` | `GET /api/admin/export` |
 | `admin:accounts` | `POST /api/admin/accounts/move` (see `todo/clerk_remaining.md` CL13) |
 
-### Legacy admin token
-
-`ADMIN_SECRET_TOKEN`, sent as `X-Admin-Token`, still holds every admin scope. It will be
-removed once `ADMIN_USER_ID` is configured and admin keys replace it; prefer them now.
-
 ### 3. Verify Durable Objects Migration
 
 Ensure the new Durable Objects are deployed:
@@ -64,9 +59,8 @@ npm run deploy
 
 ## API Endpoints
 
-Each admin endpoint needs its admin scope (table above): the admin's session, an admin key
-with that scope, or the legacy `X-Admin-Token` header. The examples below use the token
-header; replace it with `-H "Authorization: ApiKey $ADMIN_KEY"` to use an admin key.
+Each admin endpoint needs its admin scope (table above): the admin's own session, or an
+admin key with that scope. The examples use an admin key in `$ADMIN_KEY`.
 
 ### Platform Statistics
 
@@ -273,7 +267,7 @@ alerts of the same type within an hour aren't re-sent.
 
 ```bash
 # Send a test notification
-curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/alerts/test
+curl -X POST -H "Authorization: ApiKey $ADMIN_KEY" https://hashbin.org/api/admin/alerts/test
 ```
 
 ## Backups
@@ -287,36 +281,36 @@ with the legacy token, kept only in that tab's session storage), review open dis
 them under review, deny them (content restored), or uphold them (content taken down). The
 repeat-infringer list is on the same page. Everything below is the equivalent API.
 
-The dispute endpoints need `admin:disputes` (takedowns `admin:takedown`): the admin's session,
-an admin key, or the legacy `X-Admin-Token` header.
+The dispute endpoints need `admin:disputes` (takedowns `admin:takedown`): the admin's session
+or an admin key with that scope.
 
 ```bash
 # List open disputes, including reporter contact info
-curl -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/disputes
+curl -H "Authorization: ApiKey $ADMIN_KEY" https://hashbin.org/api/admin/disputes
 
 # Mark a dispute under review (content stays blocked with HTTP 451 on 256t.us)
-curl -X PATCH -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+curl -X PATCH -H "Authorization: ApiKey $ADMIN_KEY" -H "Content-Type: application/json" \
   -d '{"status":"under_review"}' https://hashbin.org/api/admin/disputes/{cid}
 
 # Deny a dispute (content becomes available again)
-curl -X PATCH -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+curl -X PATCH -H "Authorization: ApiKey $ADMIN_KEY" -H "Content-Type: application/json" \
   -d '{"status":"closed_denied","resolution_reason":"Not infringing"}' \
   https://hashbin.org/api/admin/disputes/{cid}
 
 # Uphold a dispute: same as taking the content down (below), with your reason on the dispute
-curl -X PATCH -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+curl -X PATCH -H "Authorization: ApiKey $ADMIN_KEY" -H "Content-Type: application/json" \
   -d '{"status":"closed_deleted","resolution_reason":"Infringes the reporter'"'"'s registered work"}' \
   https://hashbin.org/api/admin/disputes/{cid}
 
 # Take content down (closes any open dispute, writes a public deletion record)
-curl -X POST -H "X-Admin-Token: $ADMIN_TOKEN" -H "Content-Type: application/json" \
+curl -X POST -H "Authorization: ApiKey $ADMIN_KEY" -H "Content-Type: application/json" \
   -d '{"reason":"DMCA notice upheld"}' https://hashbin.org/api/admin/content/{cid}/delete
 
 # Review the moderation log
-curl -H "X-Admin-Token: $ADMIN_TOKEN" https://hashbin.org/api/admin/actions
+curl -H "Authorization: ApiKey $ADMIN_KEY" https://hashbin.org/api/admin/actions
 
 # Accounts with repeated upheld copyright removals (defaults: 3 in 365 days)
-curl -H "X-Admin-Token: $ADMIN_TOKEN" "https://hashbin.org/api/admin/repeat-infringers?min=3&days=365"
+curl -H "Authorization: ApiKey $ADMIN_KEY" "https://hashbin.org/api/admin/repeat-infringers?min=3&days=365"
 ```
 
 Removing content while a **copyright** dispute is open records a strike against the uploader.
@@ -329,33 +323,33 @@ those accounts per the DMCA policy (`frontend/dmca.html` §5).
 
 ```bash
 # Set your admin token
-ADMIN_TOKEN="your-64-char-hex-token-here"
+ADMIN_KEY="hba_..."   # an admin key with the scopes you need
 
 # Get platform statistics
-curl -H "X-Admin-Token: $ADMIN_TOKEN" \
+curl -H "Authorization: ApiKey $ADMIN_KEY" \
   https://hashbin.org/api/admin/stats
 
 # Get financial details
-curl -H "X-Admin-Token: $ADMIN_TOKEN" \
+curl -H "Authorization: ApiKey $ADMIN_KEY" \
   https://hashbin.org/api/admin/stats/financial
 
 # List active critical alerts
-curl -H "X-Admin-Token: $ADMIN_TOKEN" \
+curl -H "Authorization: ApiKey $ADMIN_KEY" \
   "https://hashbin.org/api/admin/alerts?severity=critical&status=active"
 
 # Acknowledge an alert
 curl -X POST \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   -H "Content-Type: application/json" \
   -d '{"acknowledged_by":"admin"}' \
   https://hashbin.org/api/admin/alerts/alert_abc123/acknowledge
 
 # View recent audit log
-curl -H "X-Admin-Token: $ADMIN_TOKEN" \
+curl -H "Authorization: ApiKey $ADMIN_KEY" \
   "https://hashbin.org/api/admin/audit-log?limit=50"
 
 # Export audit log as CSV
-curl -H "X-Admin-Token: $ADMIN_TOKEN" \
+curl -H "Authorization: ApiKey $ADMIN_KEY" \
   "https://hashbin.org/api/admin/export?type=audit" \
   > audit-export.csv
 ```
@@ -363,12 +357,12 @@ curl -H "X-Admin-Token: $ADMIN_TOKEN" \
 ### Using JavaScript
 
 ```javascript
-const ADMIN_TOKEN = 'your-64-char-hex-token-here';
+const ADMIN_KEY = 'hba_...'; // an admin key with admin:stats
 
 async function getStats() {
   const response = await fetch('https://hashbin.org/api/admin/stats', {
     headers: {
-      'X-Admin-Token': ADMIN_TOKEN
+      Authorization: `ApiKey ${ADMIN_KEY}`
     }
   });
   return await response.json();
@@ -379,7 +373,7 @@ async function listAlerts() {
     'https://hashbin.org/api/admin/alerts?status=active',
     {
       headers: {
-        'X-Admin-Token': ADMIN_TOKEN
+        Authorization: `ApiKey ${ADMIN_KEY}`
       }
     }
   );
@@ -392,8 +386,8 @@ async function listAlerts() {
 1. **Least privilege**: Give each script an admin key with only the scopes it needs and a short
    expiry. Revoke it at `/admin/keys.html` when it is no longer needed or may be exposed.
 
-2. **Legacy token**: Until it is removed, store `ADMIN_SECRET_TOKEN` securely and rotate it with
-   `wrangler secret put ADMIN_SECRET_TOKEN` if it may be compromised.
+2. **No shared secret**: Admin access is the `ADMIN_USER_ID` sign-in or an admin key; there is
+   no shared admin token (retired 2026-10-27).
 
 3. **Access Logging**: All admin actions are automatically logged in the audit log.
 
@@ -408,7 +402,7 @@ Run the admin endpoint tests:
 
 ```bash
 # Local testing (requires local dev server running)
-ADMIN_TOKEN="test-admin-token-for-local-dev-only" \
+ADMIN_KEY="hba_..." \
   BASE_URL="http://localhost:8787" \
   bash scripts/test-admin-endpoints.sh
 ```
@@ -421,9 +415,9 @@ A web-based admin dashboard UI is planned for future implementation. For now, us
 
 ### 401 Unauthorized
 
-- Verify the `X-Admin-Token` header is present
-- Ensure the token matches the `ADMIN_SECRET_TOKEN` secret in Cloudflare
-- Check that the secret was properly set: `wrangler secret list`
+- Send the admin key as `Authorization: ApiKey hba_...`, and check it is unexpired and unrevoked
+  at `/admin/keys.html` and holds the endpoint's scope
+- Check that `ADMIN_USER_ID` is set (`wrangler secret list`); admin keys stop working if it changes
 
 ### Empty Statistics
 

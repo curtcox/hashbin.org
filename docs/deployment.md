@@ -241,7 +241,6 @@ Also set, from GitHub secrets of the same name (the deploy workflow publishes th
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: payments (Stripe Tax must be activated; checkouts use automatic tax)
 - `ADMIN_USER_ID`: the admin's Clerk user ID; that sign-in holds every admin scope and issues
   scoped admin keys (`/admin/keys.html`)
-- `ADMIN_SECRET_TOKEN`: legacy shared admin token, until it is retired in favor of admin keys
 - `API_KEY_ENCRYPTION_KEY` is no longer used (keys are stored as hashes only); delete it with
   `wrangler secret delete API_KEY_ENCRYPTION_KEY`
 - `CLERK_WEBHOOK_SECRET`: Clerk webhook signing secret. Use authorized webhook management APIs

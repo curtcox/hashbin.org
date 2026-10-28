@@ -587,6 +587,12 @@ describe('API key scopes', () => {
     expect(result.authenticated).toBe(false);
   });
 
+  it('ignores the retired X-Admin-Token header', async () => {
+    const env = { ENVIRONMENT: 'test', ADMIN_SECRET_TOKEN: 'a'.repeat(64) };
+    const result = await authenticate(new Request('http://test.com', { headers: { 'X-Admin-Token': 'a'.repeat(64) } }), env);
+    expect(result.authenticated).toBe(false);
+  });
+
   it('gives sessions every user scope and only the admin session admin scopes', async () => {
     const env = { ENVIRONMENT: 'local', ADMIN_USER_ID: 'boss', USER_PROFILES: createMockDurableObject('USER_PROFILES', {
       getProfile: () => ({ user_id: 'boss', deleted_at: null }) }) };

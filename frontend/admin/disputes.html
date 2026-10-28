@@ -25,12 +25,8 @@
       <h1>Moderation</h1>
       <p><a href="/admin/costs.html">Cost safety</a> · <a href="/admin/keys.html">Admin keys</a></p>
 
-      <section class="card" id="token-card">
-        <p>Sign in as the admin, or enter the legacy admin token (the <code>ADMIN_SECRET_TOKEN</code> secret), kept only in this tab's session storage.</p>
-        <form id="token-form" class="admin-actions">
-          <input type="password" id="token-input" class="form-input" autocomplete="off" placeholder="64-character token" required>
-          <button class="btn btn-primary" type="submit">Continue</button>
-        </form>
+      <section class="card hidden" id="sign-in-card">
+        <p>Sign in to HashBin as the admin to moderate disputes.</p>
       </section>
 
       <div id="admin-content" class="hidden">
@@ -38,7 +34,6 @@
           <h2 style="margin: 0;">Open disputes <span id="dispute-count" class="form-text"></span></h2>
           <div>
             <button class="btn btn-secondary btn-sm" id="refresh">Refresh</button>
-            <button class="btn btn-secondary btn-sm" id="sign-out">Forget token</button>
           </div>
         </div>
         <div id="admin-error" class="alert alert-error hidden" role="alert"></div>

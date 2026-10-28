@@ -8,7 +8,6 @@ import { verifyToken } from '@clerk/backend';
 import { hashApiKey, validateApiKeyFormat } from './utils.js';
 import { getOrCreateLocalProfile, validateLocalUserId } from './local-auth.js';
 import { verifyOAuthJwt } from './oauth.js';
-import { validateAdminToken } from './admin.js';
 import { ALL_ADMIN_SCOPES, ALL_USER_SCOPES } from './scopes.js';
 
 // Error codes for authentication failures
@@ -414,19 +413,6 @@ export function authenticate(request, env) {
 async function authenticateUncached(request, env) {
   const auth = extractAuth(request);
   const isLocalMode = env.ENVIRONMENT === 'local';
-
-  // Platform admin token (X-Admin-Token) on a request carrying no other credential
-  const adminToken = request.headers.get('x-admin-token');
-  if (adminToken && auth.type === 'none') {
-    if (!validateAdminToken(adminToken, env)) {
-      return { authenticated: false, user: null, error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT };
-    }
-    return {
-      authenticated: true,
-      user: { userId: null, authMethod: 'admin_token', session: false, scopes: [...ALL_ADMIN_SCOPES], caveats: {} },
-      error: null
-    };
-  }
 
   // No authentication provided
   if (auth.type === 'none') {

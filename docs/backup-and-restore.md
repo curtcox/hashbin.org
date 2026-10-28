@@ -85,5 +85,4 @@ was at snapshot time, so anything written after the snapshot is lost for that ob
 
 Use `--base-url http://localhost:8787` to rehearse against local dev
 (`npx wrangler dev --config wrangler.local.toml --local --var ADMIN_USER_ID:local_admin`, then
-issue a key with `POST /api/admin/keys` using `Authorization: LocalDev local_admin`). Until it is
-removed, the legacy `ADMIN_TOKEN` (the `ADMIN_SECRET_TOKEN` secret) also works.
+issue a key with `POST /api/admin/keys` using `Authorization: LocalDev local_admin`).

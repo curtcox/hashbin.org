@@ -1,58 +1,30 @@
 /**
  * Admin moderation page (/admin/disputes.html)
- * Acts as the signed-in admin; the legacy admin token, if entered, lives only in sessionStorage.
+ * Acts as the signed-in admin (ADMIN_USER_ID).
  */
 
 import { escapeHtml } from '/js/html.js';
 import { adminHeaders } from '/js/admin-auth.js';
 import { claimTypeLabel, formatDisputeDate, isHttpsUrl, statusLabel } from '/js/disputes.js';
 
-const TOKEN_KEY = 'hashbin.adminToken';
 const listEl = document.getElementById('dispute-list');
 const errorEl = document.getElementById('admin-error');
-
-function getToken() {
-  try {
-    return sessionStorage.getItem(TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function setToken(token) {
-  try {
-    if (token) sessionStorage.setItem(TOKEN_KEY, token);
-    else sessionStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // Storage unavailable: the token lasts until reload
-  }
-  memoryToken = token;
-}
-
-let memoryToken = getToken();
 
 async function adminFetch(path, init = {}) {
   const response = await fetch(path, {
     ...init,
-    headers: { ...await adminHeaders(memoryToken), 'Content-Type': 'application/json', ...(init.headers || {}) }
+    headers: { ...await adminHeaders(), 'Content-Type': 'application/json', ...(init.headers || {}) }
   });
   if (response.status === 401 || response.status === 403) {
-    const hadToken = Boolean(memoryToken);
-    setToken(null);
-    showTokenForm(hadToken ? 'That token was rejected.' : 'Sign in as the admin, or enter the legacy admin token.');
+    showSignIn();
     throw new Error('unauthorized');
   }
   return response;
 }
 
-function showTokenForm(message) {
-  document.getElementById('token-card').classList.remove('hidden');
+function showSignIn() {
+  document.getElementById('sign-in-card').classList.remove('hidden');
   document.getElementById('admin-content').classList.add('hidden');
-  if (message) {
-    errorEl.textContent = message;
-    errorEl.classList.remove('hidden');
-    document.getElementById('token-card').prepend(errorEl);
-  }
 }
 
 function showError(message) {
@@ -151,21 +123,11 @@ async function load() {
 }
 
 function start() {
-  document.getElementById('token-card').classList.add('hidden');
+  document.getElementById('sign-in-card').classList.add('hidden');
   document.getElementById('admin-content').classList.remove('hidden');
-  document.getElementById('admin-content').prepend(errorEl);
   load();
 }
 
-document.getElementById('token-form').addEventListener('submit', event => {
-  event.preventDefault();
-  setToken(document.getElementById('token-input').value.trim());
-  start();
-});
 document.getElementById('refresh').addEventListener('click', load);
-document.getElementById('sign-out').addEventListener('click', () => {
-  setToken(null);
-  showTokenForm();
-});
 
 start();

@@ -12,7 +12,8 @@ NC='\033[0m' # No Color
 
 # Test configuration
 BASE_URL="${BASE_URL:-http://localhost:8787}"
-ADMIN_TOKEN="${ADMIN_TOKEN:-test-admin-token-for-local-dev-only}"
+# An admin key (hba_...) with the admin scopes these checks need; issue one at /admin/keys.html
+ADMIN_KEY="${ADMIN_KEY:?Set ADMIN_KEY to an admin key}"
 TOTAL_TESTS=0
 PASSED_TESTS=0
 FAILED_TESTS=0
@@ -44,7 +45,7 @@ log_info() {
 # Test 1: Export rate limiting - first request should succeed
 log_test "Export rate limiting - first request"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=audit")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -59,7 +60,7 @@ fi
 # Test 2: Export rate limiting - immediate second request should be rate limited
 log_test "Export rate limiting - immediate second request"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=audit")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -98,7 +99,7 @@ fi
 # Test 4: Alert listing and filtering
 log_test "Alert listing"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/alerts")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)
@@ -118,7 +119,7 @@ fi
 # Test 5: Alert filtering by severity
 log_test "Alert filtering by severity"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/alerts?severity=critical")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 
@@ -134,7 +135,7 @@ sleep 61
 
 log_test "Export transactions"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=transactions")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 
@@ -149,7 +150,7 @@ sleep 61
 
 log_test "Export users"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=users")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 
@@ -164,7 +165,7 @@ sleep 61
 
 log_test "Export content"
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/export?type=content")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 
@@ -177,11 +178,11 @@ fi
 # Test 7: Audit log captures admin actions
 log_test "Audit log captures admin actions"
 # Make a request that should be logged
-curl -s -H "X-Admin-Token: $ADMIN_TOKEN" "$BASE_URL/api/admin/stats" > /dev/null
+curl -s -H "Authorization: ApiKey $ADMIN_KEY" "$BASE_URL/api/admin/stats" > /dev/null
 
 # Check audit log
 RESPONSE=$(curl -s -w "\n%{http_code}" \
-  -H "X-Admin-Token: $ADMIN_TOKEN" \
+  -H "Authorization: ApiKey $ADMIN_KEY" \
   "$BASE_URL/api/admin/audit-log")
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 BODY=$(echo "$RESPONSE" | head -n -1)

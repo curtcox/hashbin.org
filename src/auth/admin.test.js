@@ -1,88 +1,16 @@
 /**
- * Unit tests for admin authentication
+ * Unit tests for admin identity in audit records
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateAdminToken } from '../../src/auth/admin.js';
+import { adminActorId } from './admin.js';
 
-describe('Admin Authentication', () => {
-  describe('validateAdminToken', () => {
-    it('returns true for valid token', () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234'
-      };
-      const token = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234';
-      
-      expect(validateAdminToken(token, env)).toBe(true);
-    });
-
-    it('returns false for invalid token', () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234'
-      };
-      const token = 'wrong_token';
-      
-      expect(validateAdminToken(token, env)).toBe(false);
-    });
-
-    it('returns false for empty token', () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234'
-      };
-      const token = '';
-      
-      expect(validateAdminToken(token, env)).toBe(false);
-    });
-
-    it('returns false for null token', () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234'
-      };
-      const token = null;
-      
-      expect(validateAdminToken(token, env)).toBe(false);
-    });
-
-    it('returns false when secret not configured', () => {
-      const env = {};
-      const token = 'any_token';
-      
-      expect(validateAdminToken(token, env)).toBe(false);
-    });
-
-    it('is case sensitive', () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'A1B2C3D4E5F6789012345678901234567890123456789012345678901234'
-      };
-      const token = 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234';
-      
-      expect(validateAdminToken(token, env)).toBe(false);
-    });
-
-    it('returns false for different length tokens', () => {
-      const env = {
-        ADMIN_SECRET_TOKEN: 'a1b2c3d4e5f6789012345678901234567890123456789012345678901234'
-      };
-      const token = 'a1b2c3d4';
-      
-      expect(validateAdminToken(token, env)).toBe(false);
-    });
-
-    it('uses constant-time comparison', () => {
-      // This test ensures the function doesn't short-circuit
-      // In a proper security audit, timing would be measured
-      const env = {
-        ADMIN_SECRET_TOKEN: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-      };
-      
-      // These should take approximately the same time
-      const token1 = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-      const token2 = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaabbbbbbbb';
-      
-      // Both should return false
-      expect(validateAdminToken(token1, env)).toBe(false);
-      expect(validateAdminToken(token2, env)).toBe(false);
-    });
+describe('adminActorId', () => {
+  it('names the signed-in admin', () => {
+    expect(adminActorId({ user: { userId: 'user_admin', authMethod: 'clerk' } })).toBe('user_admin');
   });
 
+  it('names the admin key used', () => {
+    expect(adminActorId({ user: { userId: 'user_admin', authMethod: 'admin_key', keyId: 'k1' } })).toBe('user_admin (admin key k1)');
+  });
 });

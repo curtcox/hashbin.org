@@ -93,8 +93,7 @@ scopes. Apps are public clients: there is no client secret.
 Format: `hba_<route>.<random>.<tag>`. Issued, listed and revoked only by the
 `ADMIN_USER_ID` session (`POST|GET /api/admin/keys`, `DELETE /api/admin/keys/{key_id}`, or
 `/admin/keys.html`), each with chosen admin scopes and an expiry of 1–90 days. They stop
-working if `ADMIN_USER_ID` changes. The legacy `X-Admin-Token` header still holds every
-admin scope until it is retired.
+working if `ADMIN_USER_ID` changes. There is no shared admin token.
 
 All key and download-token tags use separate keys derived from `DOWNLOAD_TOKEN_SECRET`, so
 one kind of credential can never verify as another.
@@ -609,7 +608,7 @@ limited to 60 per account per UTC hour. Accounts under 30 days old may deposit
 at most $20 per checkout. The total card charge is
 ceil((credit_cents + 30) / 0.971); the existing $1 minimum credit remains.
 
-Admin endpoints require X-Admin-Token:
+Admin endpoints require `admin:costs` (the admin's session or an admin key):
 
 - GET /api/admin/cost-safety: current monthly snapshot, projection, sampled top
   files, stale-data flag and effective brake state.
@@ -634,7 +633,7 @@ continue and produce a critical revenue-unavailable alert. An unknown revenue
 value must not be interpreted as zero.
 
 `npm run cost-safety:report` exports paginated history using
-`COST_SAFETY_ADMIN_TOKEN` and reconciles completed periods with normalized
+`COST_SAFETY_ADMIN_KEY` (an `admin:costs` admin key) and reconciles completed periods with normalized
 invoice amounts. See the [export runbook](cost-safety.md#export-and-invoice-reconciliation).
 
 The admin page is /admin/costs.html. See [operator setup and policy](cost-safety.md)

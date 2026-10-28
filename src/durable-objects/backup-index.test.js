@@ -145,10 +145,8 @@ describe('BackupIndex snapshot', () => {
 
   it('restores an object through the admin endpoint and re-indexes it', async () => {
     const { env, state, index } = setup();
-    env.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
     const request = new Request('https://hashbin.test/api/admin/restore', {
       method: 'POST',
-      headers: { 'X-Admin-Token': 'a'.repeat(64) },
       body: JSON.stringify({ binding: 'USER_PROFILES', name: 'u9', entries: { profile: { user_id: 'u9', balance_cents: 42 } } })
     });
 
@@ -161,10 +159,8 @@ describe('BackupIndex snapshot', () => {
 
   it('rejects restores to unknown bindings', async () => {
     const { env } = setup();
-    env.ADMIN_SECRET_TOKEN = 'a'.repeat(64);
     const request = new Request('https://hashbin.test/api/admin/restore', {
       method: 'POST',
-      headers: { 'X-Admin-Token': 'a'.repeat(64) },
       body: JSON.stringify({ binding: 'BACKUP_BUCKET', name: 'x', entries: {} })
     });
     expect((await handleRestoreObject(request, env)).status).toBe(400);

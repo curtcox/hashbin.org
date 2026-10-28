@@ -5,7 +5,7 @@
  *   ADMIN_KEY=hba_... node scripts/backup/restore-snapshot.mjs --run <run_id> [options]
  *
  * ADMIN_KEY is an admin key with admin:backups and admin:restore (issue one at
- * /admin/keys.html). ADMIN_TOKEN, the legacy shared admin token, also still works.
+ * /admin/keys.html).
  *
  * Options:
  *   --base-url <url>     API origin (default https://hashbin.org)
@@ -31,8 +31,8 @@ const onlyBinding = option('--binding');
 const onlyName = option('--name');
 const overwrite = flag('--overwrite');
 const dryRun = flag('--dry-run');
-const token = process.env.ADMIN_KEY || process.env.ADMIN_TOKEN;
-const credentialHeaders = token?.startsWith('hba_') ? { Authorization: `ApiKey ${token}` } : { 'X-Admin-Token': token };
+const token = process.env.ADMIN_KEY;
+const credentialHeaders = { Authorization: `ApiKey ${token}` };
 
 function fail(message) {
   console.error(message);

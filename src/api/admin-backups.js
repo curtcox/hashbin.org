@@ -1,7 +1,7 @@
 /**
  * Admin Backup API
  * Snapshot status, on-demand runs, snapshot file access, and restore.
- * All endpoints require X-Admin-Token. See docs/backup-and-restore.md.
+ * Access is declared in the route table (admin:backups, admin:restore). See docs/backup-and-restore.md.
  */
 
 import { INDEXED_BINDINGS, RESTORABLE_BINDINGS, RESTORE_PATH } from '../utils/backup.js';
