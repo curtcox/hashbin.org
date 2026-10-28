@@ -11,7 +11,7 @@ tracked under B14 in `STATUS.md`. Related plan: [app_hosting.md](app_hosting.md)
 
 - [x] Owner: configurable implementation, production domain `hashbin.app` and Python Online pilot
 - [ ] Phase 0: complete browser retention acceptance (local Chromium/WebKit restart/partitioning passed;
-      Python Online Chromium/Firefox CI passed; WebKit offline lifecycle checks are being stabilized; Safari seven-day and Firefox restart measurements remain)
+      Python Online Chromium/Firefox/WebKit CI passed; Safari seven-day and Firefox restart measurements remain)
 - [x] Phase 1: domain, proxied apex/wildcard DNS, Universal SSL, HTTPS and minimum TLS 1.2
 - [ ] Phase 1: PSL eligibility and submission (registration expires 2027-10-28; pilot scale is also a concern)
 - [x] Phase 2: deployed run-origin Worker, routes and CI deployment/verification
@@ -115,8 +115,8 @@ runtime pinning/renewal and the remaining Python Online acceptance checklist.
   Extend the term and establish qualifying public usage before preparing the PRIVATE entry, then add the
   `_psl` TXT reference to the actual PR. PSL remains a follow-up, not a storage-origin prerequisite.
 - Python Online's [plan](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md)
-  and implementation are pushed. Its Chromium and Firefox CI pass; WebKit functional checks pass with an intermittent offline
-  lifecycle error under investigation. The previous three-engine run passed, with
+  and implementation are pushed. Its [final Linux CI](https://github.com/curtcox/PythonOnline/actions/runs/40779949350) is green
+  in Chromium, Firefox and WebKit, with
   30 Node/package tests and 19 Python tests passing. Its real runtime is Pyodide 314.0.7 (CPython 3.14.2), initially using
   the existing verified embedding-page proxy. Direct `/r/` loading waits for approved runtime uploads.
 
@@ -440,3 +440,10 @@ Firefox acceptance remain rollout gates; the local implementation and two-engine
    - `STATUS.md` row B14.
 8. Phase 6 if offline use is wanted: `/sw.js` caches `/frame/*` and `/r/*` with `HashBinCache` CID checks.
    It runs only if Phase 0 (3) passed in the browsers that matter.
+
+Final acceptance: HashBin [CI and deployment](https://github.com/curtcox/hashbin.org/actions/runs/40778712524)
+passed at `4fd7e51`. Python Online CI passed at `233c0c8` in all three browser engines, including
+all gallery URLs and offline checks. The test fixture gives each simulated deploy a cache version
+derived from its actual bytes and waits for preloads before navigation/offline transitions; strict
+page-error/CSP assertions remain enabled. Live HTTPS acceptance passed without unexpected network
+or CSP errors. The latest real run-cost measurement reports 62 requests, below one cent.

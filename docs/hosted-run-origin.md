@@ -83,8 +83,8 @@ hashes may come from a separately obtained `pyodide-lock.json` (`--lock`).
 
 ```sh
 node scripts/publish.mjs authorize --limit 5 --max-retention 120
-node scripts/pin-runtime.mjs pyodide 0.27.7 https://UPSTREAM/pyodide/v0.27.7/full/ \
-  pyodide.js pyodide.asm.js pyodide.asm.wasm python_stdlib.zip \
+node scripts/pin-runtime.mjs pyodide 314.0.7 https://cdn.jsdelivr.net/pyodide/v314.0.7/full/ \
+  pyodide.mjs pyodide.asm.mjs pyodide.asm.wasm python_stdlib.zip pyodide-lock.json \
   --hashes /path/to/upstream-core-sha256.json --lock /path/to/pyodide-lock.json
 ```
 
@@ -167,3 +167,9 @@ The script is stored as literal text: serializing a function after bundling capt
 references that did not exist in the served script. A production-bundle regression test covers this.
 Frame HTML uses `Cache-Control: no-cache, no-transform` to prevent automatic beacon injection while
 retaining fresh registry policies. Published SDK v0.4.0 files are unchanged.
+
+Final acceptance evidence: [HashBin tests and deployment](https://github.com/curtcox/hashbin.org/actions/runs/40778712524)
+and [Python Online Chromium/Firefox/WebKit CI](https://github.com/curtcox/PythonOnline/actions/runs/40779949350)
+passed. These cover the committed implementation; subsequent acceptance-note changes do not alter
+shipped SDK/runtime assets. Direct runtime uploads, PSL eligibility and remaining browser retention
+measurements stay open in the plan.
