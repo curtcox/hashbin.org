@@ -65,6 +65,7 @@ async function loadPage(reset) {
     if (reset && disputes.length === 0) {
       listEl.innerHTML = '<p class="dispute-empty">There are no open disputes.</p>';
     } else {
+      // eslint-disable-next-line no-unsanitized/method -- renderDispute escapes every field
       listEl.insertAdjacentHTML('beforeend', disputes.map(renderDispute).join(''));
     }
 

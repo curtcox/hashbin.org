@@ -80,6 +80,7 @@ async function load() {
     reportLink.href = `/disputes/submit.html?cid=${encodeURIComponent(cid)}`;
     reportLink.classList.toggle('hidden', hasActive);
 
+    // eslint-disable-next-line no-unsanitized/property -- renderDispute escapes every field
     historyEl.innerHTML = disputes.length === 0
       ? '<p class="dispute-empty">No disputes have been filed for this content.</p>'
       : disputes.map(renderDispute).join('');

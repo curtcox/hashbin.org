@@ -25,6 +25,7 @@ function renderAppList(apps) {
     return;
   }
 
+  // eslint-disable-next-line no-unsanitized/property -- every API value below is escaped
   appsListEl.innerHTML = `
     <div class="developers-app-list">
       ${apps.map((app) => `
@@ -83,6 +84,7 @@ async function loadRun(card) {
     const response = await authenticatedFetch(endpoint);
     await checkAppResponse(response);
     const run = await response.json();
+    // eslint-disable-next-line no-unsanitized/property -- API values are escaped or passed through Number()
     section.innerHTML = `<h4>Hosted sandbox origin</h4>
       <p>Status: <strong>${escapeHtml(run.status)}</strong>${run.suspended_reason ? ` — ${escapeHtml(run.suspended_reason)}` : ''}</p>
       ${run.origin ? `<p><code>${escapeHtml(run.origin)}</code></p>` : '<p>The hosted run domain is not configured yet.</p>'}
@@ -129,6 +131,7 @@ async function loadSafety(card, method) {
 function renderSafety(section, result) {
   if (!result.checked_at) { section.innerHTML = '<p class="developers-safety-state">Safety check: not run yet. HashBin also checks registered apps nightly.</p>'; return; }
   const order = { warn: 0, info: 1, ok: 2 };
+  // eslint-disable-next-line no-unsanitized/property -- API values are escaped; labels are constants
   section.innerHTML = `
     <h4>Safety check <small>${escapeHtml(new Date(result.checked_at).toLocaleString())}${result.throttled ? ' (checked within the last minute)' : ''}</small></h4>
     ${result.pages.map(page => `

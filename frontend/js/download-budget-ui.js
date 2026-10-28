@@ -32,6 +32,7 @@ export function capsFields(prefix) {
 }
 export function mountCapForm(container, prefix, caps, save) {
   // Prefixes and this markup are constants owned by the caller.
+  // eslint-disable-next-line no-unsanitized/property -- see above
   container.innerHTML = `<form>${capsFields(prefix)}<button class="btn btn-primary" type="submit">Save download caps</button><p role="status" aria-live="polite"></p></form>`;
   fillDownloadCaps(prefix, caps);
   container.querySelector('form').addEventListener('submit', async event => {

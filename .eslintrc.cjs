@@ -17,6 +17,8 @@ module.exports = {
     'plugin:jsdoc/recommended',
   ],
   plugins: ['security', 'no-unsanitized', 'promise', 'node', 'jsdoc'],
+  // Worktrees live under .claude/worktrees/ inside the main checkout; don't merge its config too.
+  root: true,
   parserOptions: {
     ecmaVersion: 2022,
     sourceType: 'module',
@@ -59,6 +61,9 @@ module.exports = {
       rules: {
         'node/no-missing-import': 'off',
         'node/no-unsupported-features/es-syntax': 'off',
+        // Values passed through escapeHtml (frontend/js/html.js) are safe to interpolate.
+        'no-unsanitized/property': ['error', { escape: { methods: ['escapeHtml'] } }],
+        'no-unsanitized/method': ['error', { escape: { methods: ['escapeHtml'] } }],
       },
     },
     {
@@ -76,6 +81,15 @@ module.exports = {
       // The SDK validates that names contain no control characters.
       files: ['frontend/sdk/**/*.js'],
       rules: { 'no-control-regex': 'off' },
+    },
+    {
+      // hashbinSandbox.import() loads fetched code inside the sandbox worker on purpose (always a
+      // blob: URL). The file must stay byte-identical to the latest sdk/v*/ release, so it can't
+      // carry an inline disable comment; this skips only the import() check.
+      files: ['frontend/sdk/hashbin.js'],
+      rules: {
+        'no-unsanitized/method': ['error', { escape: { methods: ['escapeHtml'] } }, { import: { properties: [] } }],
+      },
     },
     {
       files: ['scripts/**/*.mjs', 'scripts/**/*.js'],

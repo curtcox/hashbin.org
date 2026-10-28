@@ -52,7 +52,7 @@ Node 22+. Run `npm install` first.
 |---------|-----------|-------|
 | `npm run test:unit` | Unit tests (Vitest, `**/*.test.js` beside the code). **Run before every commit.** | nothing |
 | `npx vitest run src/api/oauth.test.js` | One test file | nothing |
-| `npm run lint` | ESLint over `src/`, `workers/`, `scripts/`. Must report 0 errors. | nothing |
+| `npm run lint` | ESLint over `src/`, `workers/`, `scripts/`, `frontend/js/`, `frontend/sdk/`. Must report 0 errors. | nothing |
 | `npm run dev:local` | Full local stack at `http://localhost:8787` with no Clerk, Stripe or Cloudflare account | `.dev.vars` from `.dev.vars.example` |
 | `npm run test:e2e` | Playwright browser tests | starts `dev:local` if needed |
 | `npm run test:hosted` | Hosted sandbox tests (Chromium, WebKit) | `npx playwright install chromium webkit` |

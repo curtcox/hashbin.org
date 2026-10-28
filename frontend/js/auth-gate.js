@@ -6,6 +6,7 @@
 
 import { getAuthState, initializeAuth } from './auth-loader.js';
 import { redirectWithReturn, getReturnUrl } from './utils.js';
+import { escapeHtml } from './html.js';
 
 /**
  * Wait for Clerk to be fully initialized
@@ -113,7 +114,7 @@ export function showSessionExpired(message = 'Your session has expired. Please s
     main.innerHTML = `
       <div class="session-expired">
         <h2>Session Expired</h2>
-        <p>${message}</p>
+        <p>${escapeHtml(message)}</p>
         <a href="/" class="btn btn-primary">Sign In</a>
       </div>
     `;

@@ -13,7 +13,7 @@
     "deploy": "wrangler deploy",
     "verify": "scripts/verify-deployment.sh https://hashbin.org",
     "verify:workers-dev": "scripts/verify-deployment.sh production",
-    "lint": "eslint src workers scripts",
+    "lint": "eslint src workers scripts frontend/js frontend/sdk",
     "test": "npm run test:unit && bash scripts/test-grep-patterns.sh && bash scripts/test-user-balance.sh && bash scripts/test-auth-gate.sh && bash scripts/test-stripe-webhook.sh && bash scripts/test-api-keys.sh && bash scripts/test-upload-balance.sh && bash scripts/test-rate-limiting.sh && bash scripts/test-git-sha-injection.sh && bash scripts/test-transaction-history.sh && bash scripts/test-supplier-validation.sh && bash scripts/test-supplier-integration.sh",
     "status": "bash scripts/status.sh",
     "test:unit": "vitest run",

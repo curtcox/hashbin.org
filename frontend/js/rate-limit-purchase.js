@@ -6,6 +6,7 @@
 import { requireAuth } from './auth-gate.js';
 import { authenticatedFetch, handleApiError, formatBalance, contentUrl } from './utils.js';
 import { formatFileSize, validate256tCID } from './hash256t.js';
+import { escapeHtml } from './html.js';
 import {
   formatMTBR,
   getRateLimitBadge,
@@ -156,7 +157,7 @@ function displayRateLimitStatus(status) {
     <div class="info-row">
       <span class="info-label">Status</span>
       <span class="info-value">
-        <span class="badge ${badge.class}">${badge.icon} ${badge.text}</span>
+        <span class="badge ${escapeHtml(badge.class)}">${escapeHtml(badge.icon)} ${escapeHtml(badge.text)}</span>
       </span>
     </div>
   `;
@@ -165,7 +166,7 @@ function displayRateLimitStatus(status) {
     html += `
       <div class="info-row">
         <span class="info-label">Current Frequency</span>
-        <span class="info-value">${formatMTBR(status.effective_mtbr_ms)}</span>
+        <span class="info-value">${escapeHtml(formatMTBR(status.effective_mtbr_ms))}</span>
       </div>
     `;
   }
@@ -176,7 +177,7 @@ function displayRateLimitStatus(status) {
       html += `
         <div class="info-row">
           <span class="info-label">Next Available In</span>
-          <span class="info-value">${formatTimeUntil(status.next_available_at)}</span>
+          <span class="info-value">${escapeHtml(formatTimeUntil(status.next_available_at))}</span>
         </div>
       `;
     }
@@ -186,7 +187,7 @@ function displayRateLimitStatus(status) {
     html += `
       <div class="info-row">
         <span class="info-label">Active Purchases</span>
-        <span class="info-value">${status.active_rate_limits.length}</span>
+        <span class="info-value">${escapeHtml(status.active_rate_limits.length)}</span>
       </div>
     `;
   }

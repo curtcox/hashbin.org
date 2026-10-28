@@ -4,15 +4,7 @@
  */
 
 import { authenticatedFetch, formatBalance, handleApiError } from './utils.js';
-
-/**
- * Escape text for HTML insertion
- * @param {*} value Value to escape
- * @returns {string} Escaped string
- */
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-}
+import { escapeHtml } from './html.js';
 
 /**
  * Format transaction amount with direction indicator and color
@@ -174,22 +166,22 @@ export function buildTransactionDetails(transaction) {
   // Type-specific details
   if (transaction.type === 'upload_payment' || transaction.type === 'cid_extension' || transaction.type === 'donation_received') {
     if (transaction.retention_months) {
-      details.push(`<div><strong>Retention:</strong> ${formatRetentionMonths(transaction.retention_months)}</div>`);
+      details.push(`<div><strong>Retention:</strong> ${escapeHtml(formatRetentionMonths(transaction.retention_months))}</div>`);
     }
   }
   
   if (transaction.type === 'rate_limit_purchase') {
     if (transaction.min_time_between_requests_ms) {
-      details.push(`<div><strong>MTBR:</strong> ${formatMTBR(transaction.min_time_between_requests_ms)}</div>`);
+      details.push(`<div><strong>MTBR:</strong> ${escapeHtml(formatMTBR(transaction.min_time_between_requests_ms))}</div>`);
     }
     if (transaction.duration_seconds) {
-      details.push(`<div><strong>Duration:</strong> ${formatDateRange(transaction.created_at, transaction.duration_seconds)}</div>`);
+      details.push(`<div><strong>Duration:</strong> ${escapeHtml(formatDateRange(transaction.created_at, transaction.duration_seconds))}</div>`);
     }
     if (transaction.max_requests) {
-      details.push(`<div><strong>Max Requests:</strong> ${transaction.max_requests.toLocaleString()}</div>`);
+      details.push(`<div><strong>Max Requests:</strong> ${escapeHtml(transaction.max_requests.toLocaleString())}</div>`);
     }
     if (transaction.max_bytes) {
-      details.push(`<div><strong>Max Bandwidth:</strong> ${formatBytes(transaction.max_bytes)}</div>`);
+      details.push(`<div><strong>Max Bandwidth:</strong> ${escapeHtml(formatBytes(transaction.max_bytes))}</div>`);
     }
   }
   
@@ -204,7 +196,7 @@ export function buildTransactionDetails(transaction) {
 
   // Stripe reference (if present)
   if (transaction.type === 'deposit' && transaction.stripe_session_id) {
-    details.push(`<div><strong>Stripe:</strong> <span style="font-family: monospace; font-size: 0.875rem;">${transaction.stripe_session_id.slice(0, 20)}...</span></div>`);
+    details.push(`<div><strong>Stripe:</strong> <span style="font-family: monospace; font-size: 0.875rem;">${escapeHtml(transaction.stripe_session_id.slice(0, 20))}...</span></div>`);
   }
   
   // Failed transaction details
@@ -261,15 +253,16 @@ export function renderTransactionList(transactions, container) {
     
     return `
       <tr class="${rowClass}">
-        <td class="date-cell">${date}</td>
-        <td>${typeLabel} ${statusBadge}</td>
-        <td class="amount-cell"><span class="${amount.cssClass}">${amount.formatted}</span></td>
+        <td class="date-cell">${escapeHtml(date)}</td>
+        <td>${escapeHtml(typeLabel)} ${statusBadge}</td>
+        <td class="amount-cell"><span class="${amount.cssClass}">${escapeHtml(amount.formatted)}</span></td>
         <td class="details-cell">${details}</td>
-        <td class="balance-cell">${balance}</td>
+        <td class="balance-cell">${escapeHtml(balance)}</td>
       </tr>
     `;
   }).join('');
   
+  // eslint-disable-next-line no-unsanitized/property -- rows escape API values; details comes from buildTransactionDetails, which escapes its own
   container.innerHTML = `
     <table class="transaction-table">
       <thead>
@@ -308,6 +301,7 @@ export function renderPagination(total, limit, offset, onPageChange, container) 
   const hasPrev = currentPage > 1;
   const hasNext = currentPage < totalPages;
   
+  // eslint-disable-next-line no-unsanitized/property -- page numbers are computed with Math; total is escaped
   container.innerHTML = `
     <div class="pagination">
       <button 
@@ -318,7 +312,7 @@ export function renderPagination(total, limit, offset, onPageChange, container) 
         Previous
       </button>
       <span class="pagination-info">
-        Page ${currentPage} of ${totalPages} (${total} total)
+        Page ${currentPage} of ${totalPages} (${escapeHtml(total)} total)
       </span>
       <button 
         class="btn btn-secondary" 

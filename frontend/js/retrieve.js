@@ -5,6 +5,7 @@
 
 import { validate256tCID, isInlineContent, getContentSize, formatFileSize } from './hash256t.js';
 import { contentUrl } from './utils.js';
+import { escapeHtml } from './html.js';
 
 /**
  * Initialize retrieve page
@@ -63,7 +64,7 @@ async function showInlineContentInfo(cid, size) {
       <div style="margin-bottom: 1.5rem;">
         <div class="info-row">
           <span class="info-label">CID:</span>
-          <code class="info-value" style="word-break: break-all;">${cid}</code>
+          <code class="info-value" style="word-break: break-all;">${escapeHtml(cid)}</code>
         </div>
         
         <div class="info-row">
@@ -73,7 +74,7 @@ async function showInlineContentInfo(cid, size) {
         
         <div class="info-row">
           <span class="info-label">Size:</span>
-          <span class="info-value">${formatFileSize(size)}</span>
+          <span class="info-value">${escapeHtml(formatFileSize(size))}</span>
         </div>
         
         <div class="info-row">
@@ -83,11 +84,11 @@ async function showInlineContentInfo(cid, size) {
       </div>
 
       <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-        <a href="${downloadHref}" class="btn btn-primary" download>
+        <a href="${escapeHtml(downloadHref)}" class="btn btn-primary" download>
           Download Content
         </a>
         
-        <button class="btn btn-secondary show-ext-picker" data-cid="${cid}">
+        <button class="btn btn-secondary show-ext-picker" data-cid="${escapeHtml(cid)}">
           Download with Extension
         </button>
       </div>
@@ -135,6 +136,7 @@ async function fetchAndShowContentInfo(cid) {
     // Show content info
     const daysUntilExpiration = Math.ceil((expiresAt - new Date()) / (1000 * 60 * 60 * 24));
     
+    // eslint-disable-next-line no-unsanitized/property -- every value below is escaped or numeric
     resultDiv.innerHTML = `
       <div class="card">
         <h3 class="card-title">Content Information</h3>
@@ -142,35 +144,35 @@ async function fetchAndShowContentInfo(cid) {
         <div style="margin-bottom: 1.5rem;">
           <div class="info-row">
             <span class="info-label">CID:</span>
-            <code class="info-value" style="word-break: break-all;">${cid}</code>
+            <code class="info-value" style="word-break: break-all;">${escapeHtml(cid)}</code>
           </div>
           
           <div class="info-row">
             <span class="info-label">Size:</span>
-            <span class="info-value">${formatFileSize(data.size_bytes)}</span>
+            <span class="info-value">${escapeHtml(formatFileSize(data.size_bytes))}</span>
           </div>
           
           <div class="info-row">
             <span class="info-label">Expiration:</span>
             <span class="info-value">
-              ${expiresAt.toLocaleDateString()} (${daysUntilExpiration} days remaining)
+              ${escapeHtml(expiresAt.toLocaleDateString())} (${escapeHtml(daysUntilExpiration)} days remaining)
             </span>
           </div>
           
           ${data.download_count ? `
             <div class="info-row">
               <span class="info-label">Downloads:</span>
-              <span class="info-value">${data.download_count.toLocaleString()}</span>
+              <span class="info-value">${escapeHtml(data.download_count.toLocaleString())}</span>
             </div>
           ` : ''}
         </div>
 
         <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-          <a href="${downloadHref}" class="btn btn-primary" download>
+          <a href="${escapeHtml(downloadHref)}" class="btn btn-primary" download>
             Download Content
           </a>
           
-          <button class="btn btn-secondary show-ext-picker" data-cid="${cid}">
+          <button class="btn btn-secondary show-ext-picker" data-cid="${escapeHtml(cid)}">
             Download with Extension
           </button>
         </div>
@@ -208,12 +210,13 @@ async function showExtensionPicker(cid) {
   ];
 
   const extensionButtons = (await Promise.all(commonExtensions.map(async ({ ext, name }) => `
-    <a href="${await contentUrl(cid, ext)}" class="btn btn-secondary" download style="width: 100%;">
-      ${name} (.${ext})
+    <a href="${escapeHtml(await contentUrl(cid, ext))}" class="btn btn-secondary" download style="width: 100%;">
+      ${escapeHtml(name)} (.${escapeHtml(ext)})
     </a>
   `))).join('');
 
   const existingCard = resultDiv.querySelector('.card');
+  // eslint-disable-next-line no-unsanitized/method -- extensionButtons is built from escaped values
   existingCard.insertAdjacentHTML('afterend', `
     <div class="card extension-picker" style="margin-top: 1rem;">
       <h3 class="card-title">Download with Extension</h3>
@@ -234,7 +237,7 @@ async function showExtensionPicker(cid) {
             class="form-input" 
             placeholder="e.g., xml, csv"
             style="flex: 1;"
-            data-cid="${cid}"
+            data-cid="${escapeHtml(cid)}"
           >
           <button class="btn btn-primary custom-ext-btn">
             Download
@@ -289,7 +292,7 @@ function showExtensionError(inputElement, message) {
   const errorDiv = document.createElement('div');
   errorDiv.className = 'alert alert-error extension-error';
   errorDiv.style.marginTop = '0.5rem';
-  errorDiv.innerHTML = `<strong>Error:</strong> ${message}`;
+  errorDiv.innerHTML = `<strong>Error:</strong> ${escapeHtml(message)}`;
   
   inputElement.parentElement.parentElement.appendChild(errorDiv);
   
@@ -309,7 +312,7 @@ function showError(message) {
   resultDiv.classList.remove('hidden');
   resultDiv.innerHTML = `
     <div class="alert alert-error">
-      <strong>Error:</strong> ${message}
+      <strong>Error:</strong> ${escapeHtml(message)}
     </div>
   `;
 }

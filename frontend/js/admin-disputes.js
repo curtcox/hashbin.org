@@ -86,9 +86,10 @@ async function loadInfringers() {
   const el = document.getElementById('infringer-list');
   const response = await adminFetch('/api/admin/repeat-infringers');
   const { infringers = [] } = await response.json();
+  // eslint-disable-next-line no-unsanitized/property -- API values are escaped
   el.innerHTML = infringers.length === 0
     ? '<p class="dispute-empty">None.</p>'
-    : `<ul>${infringers.map(i => `<li><code>${escapeHtml(i.uploader_id)}</code>: ${i.strikes} upheld removals (${i.recent_strikes.map(s => escapeHtml(s.cid.slice(0, 12))).join(', ')}…)</li>`).join('')}</ul>`;
+    : `<ul>${infringers.map(i => `<li><code>${escapeHtml(i.uploader_id)}</code>: ${escapeHtml(i.strikes)} upheld removals (${i.recent_strikes.map(s => escapeHtml(s.cid.slice(0, 12))).join(', ')}…)</li>`).join('')}</ul>`;
 }
 
 async function load() {
@@ -100,6 +101,7 @@ async function load() {
     if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
     const disputes = data.disputes || [];
     document.getElementById('dispute-count').textContent = `(${data.total ?? disputes.length})`;
+    // eslint-disable-next-line no-unsanitized/property -- renderDispute escapes every field
     listEl.innerHTML = disputes.length === 0
       ? '<p class="dispute-empty">No open disputes.</p>'
       : disputes.map(renderDispute).join('');

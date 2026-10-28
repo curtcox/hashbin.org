@@ -14,6 +14,7 @@ import {
 
 import { renderNavHeader } from './nav-header.js';
 import { renderBanner } from './banner.js';
+import { escapeHtml } from './html.js';
 
 import { 
   authenticatedFetch, 
@@ -71,6 +72,7 @@ async function updateAuthUI() {
   if (!authSection) return;
 
   // Show loading state
+  // eslint-disable-next-line no-unsanitized/property -- constant markup
   authSection.innerHTML = createAuthLoadingHTML();
 
   // Get current auth state
@@ -80,6 +82,7 @@ async function updateAuthUI() {
   // Update UI based on auth state
   if (authState.authenticated) {
     const providerIcon = await getProviderIcon(authState.user.provider);
+    // eslint-disable-next-line no-unsanitized/property -- createAuthenticatedHTML escapes the profile fields
     authSection.innerHTML = createAuthenticatedHTML(authState.user, providerIcon);
     setupAuthenticatedHandlers();
     // Fetch and display balance
@@ -87,6 +90,7 @@ async function updateAuthUI() {
     // Show auth-only nav links
     showAuthOnlyNavigation();
   } else {
+    // eslint-disable-next-line no-unsanitized/property -- constant markup
     authSection.innerHTML = createUnauthenticatedHTML();
     setupUnauthenticatedHandlers();
     // Hide auth-only nav links
@@ -129,13 +133,13 @@ function createUnauthenticatedHTML() {
 function createAuthenticatedHTML(user, providerIcon) {
   // Only render provider icon if we have a non-empty src
   const providerIconHTML = providerIcon
-    ? `<img class="provider-icon" src="${providerIcon}" alt="${user.provider || ''}" title="Signed in with ${user.provider}">` 
+    ? `<img class="provider-icon" src="${escapeHtml(providerIcon)}" alt="${escapeHtml(user.provider)}" title="Signed in with ${escapeHtml(user.provider)}">` 
     : '';
 
   return `
     <div class="user-info">
-      <img class="avatar" src="${user.imageUrl}" alt="${user.fullName}">
-      <span class="user-name">${user.fullName}</span>
+      <img class="avatar" src="${escapeHtml(user.imageUrl)}" alt="${escapeHtml(user.fullName)}">
+      <span class="user-name">${escapeHtml(user.fullName)}</span>
       ${providerIconHTML}
     </div>
     <div class="balance" id="balance-display">
@@ -212,12 +216,12 @@ async function updateBalance() {
     
     if (balanceCents === 0) {
       balanceDisplay.innerHTML = `
-        <span class="balance-amount zero">${balanceFormatted}</span>
+        <span class="balance-amount zero">${escapeHtml(balanceFormatted)}</span>
         <a href="/deposit.html" class="deposit-link">Add funds</a>
       `;
     } else {
       balanceDisplay.innerHTML = `
-        <span class="balance-amount">${balanceFormatted}</span>
+        <span class="balance-amount">${escapeHtml(balanceFormatted)}</span>
       `;
     }
   } catch (error) {
@@ -237,7 +241,7 @@ function showAuthError(message) {
   const authSection = document.getElementById('auth-section');
   if (authSection) {
     authSection.innerHTML = `
-      <div class="auth-error">${message}</div>
+      <div class="auth-error">${escapeHtml(message)}</div>
     `;
   }
 }

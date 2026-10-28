@@ -55,6 +55,7 @@ function renderAuthorizations(authorizations) {
     return;
   }
 
+  // eslint-disable-next-line no-unsanitized/property -- every API value below is escaped or numeric
   authorizationsList.innerHTML = `
     <div class="account-authorizations-grid">
       ${authorizations.map((authorization) => `
@@ -185,7 +186,7 @@ async function loadAuthorizations() {
     }));
   } catch (error) {
     authorizationsList.innerHTML = `
-      <div class="account-empty-state">${error.message || 'Unable to load authorized apps.'}</div>
+      <div class="account-empty-state">${escapeHtml(error.message || 'Unable to load authorized apps.')}</div>
     `;
   }
 }
