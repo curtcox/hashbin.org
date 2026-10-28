@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase:** Parts 1 and 2 done and H1–H4 built 2026-10-28 (local; deploy pending). Row B14 in `STATUS.md`.
+**Phase:** Parts 1 and 2 done and H1–H4 built and deployed 2026-10-28 (fb34c27). Row B14 in `STATUS.md`.
 
 - **Record:** `/docs/security/` with SN-2026-001–009. SN-001/002 (the case studies), 005, 006 and 007 are
   `fixed`; 004 is open; 003 and 008 fixed; 009 accepted. `src/docs-security-notes.test.js` checks the index.
@@ -20,7 +20,8 @@
   (equivalent) verification code; adopting `hashbin-cache.js` there is optional cleanup.
 - **H4:** `src/app-safety.js` and `src/api/app-safety.js`: per-app check on the developer page
   (`GET`/`POST /api/developers/apps/:id/safety`) and nightly for the 20 least recently checked apps.
-- **H5/H6:** plans below; not started, pending cost and abuse review.
+- **H5/H6:** not started. Standalone plans, ready to implement once their decisions are signed off:
+  [hosted_run_origin.md](hosted_run_origin.md) (H5) and [app_hosting.md](app_hosting.md) (H6).
 
 ## Goals
 
@@ -114,7 +115,8 @@ Ordered by value per cost. Each item becomes, or closes, a security-notes entry.
 
 H1–H3 are SDK work. Release them as a new immutable SDK version, then migrate the six
 clients and delete their local copies. H4 is server and UI work. H5 and H6 need cost,
-abuse and moderation review before they are committed to, and their own plans.
+abuse and moderation review before they are committed to; see their own plans,
+[hosted_run_origin.md](hosted_run_origin.md) and [app_hosting.md](app_hosting.md).
 
 ## Backlog entries to open from the 2026-10-28 rollout
 
@@ -137,42 +139,15 @@ Retroactive entries, mostly short, to seed the record:
 4. H3 and H2 in the same SDK release. Then migrate the clients.
 5. H4. Then decide on H5/H6.
 
-## H5 plan: hosted isolated run origin
+## H5 and H6 plans
 
-Only needed for code that must run with a stable origin of its own (persistent storage for the sandboxed
-code, or APIs an opaque origin lacks). `createSandbox()` covers the current apps without it.
-
-1. **Domain.** Register a separate registrable domain (not a `hashbin.org` subdomain), listed on the Public
-   Suffix List so each `<app>.<domain>` is its own site for cookies and storage partitioning.
-2. **Serving.** A Worker serves only immutable files addressed by CID (pinned runtimes such as Pyodide, and the
-   SDK's frame document), with `Cross-Origin-Resource-Policy: cross-origin`, a strict CSP, no cookies and no
-   HashBin session.
-3. **SDK.** `createSandbox({ origin: 'hosted' })` frames `https://<app_id>.<domain>/frame/<cid>` instead of
-   `srcdoc`, so the sandbox has a stable per-app origin and its own service worker for offline use.
-4. **Abuse and cost.** Serve only CIDs on an allow-list (runtimes HashBin pins) plus content registered apps
-   publish; per-app request quotas; a kill switch per app; R2 egress estimate before launch.
-5. **Open:** storage partitioning when framed from `*.github.io` (Safari, Firefox) may make per-app storage
-   per-embedder anyway; measure before committing.
-
-## H6 plan: per-app hosting from CIDs
-
-1. **Model.** A registered app publishes a manifest CID (path → CID map). HashBin serves it at
-   `https://<app_id>.<apps-domain>/` (same PSL-listed domain family as H5, separate from H5's run origin).
-2. **Updates.** The developer page sets the current manifest CID; old manifests stay addressable for rollback.
-   Users see a stable origin, so drafts survive releases.
-3. **Safety.** Default CSP and `X-Content-Type-Options` headers; no HashBin cookies; the H4 check runs on every
-   manifest change.
-4. **Costs and moderation.** Hosted bytes count against the developer's balance like other content; abuse
-   reports and takedown use the existing dispute flow; rate limits per app.
-5. **Migration.** For github.io apps, ship a build that copies drafts to the new origin through a one-time
-   export link before switching (see the guide's migration advice).
-6. **Decision needed:** whether HashBin wants to be an app host at all. It removes section B of
-   `browser_client_safety.md` for every customer, but it adds moderation duties.
+Each has its own standalone plan, with decisions to sign off, design, tests and rollout:
+- H5: [hosted_run_origin.md](hosted_run_origin.md)
+- H6: [app_hosting.md](app_hosting.md)
 
 ## Open questions
 
 - Should demonstration material for curtcox apps publish immediately, since the owner is
   affected, or follow the 30-day rule like third parties?
-- Which registrable domain would host H5, and should H5 and H6 share it?
-- Does Firefox's or Safari's storage partitioning change the isolation matrix for H5's
-  iframes embedded on `*.github.io`?
+- Domains for H5 and H6, and storage partitioning: see decision D2 and Phase 0 in
+  [hosted_run_origin.md](hosted_run_origin.md), and D2 in [app_hosting.md](app_hosting.md).
