@@ -1,5 +1,6 @@
 import { handleDownloads } from './api/downloads.js';
 import { runCostMonitor } from './services/cost-monitor.js';
+import { disputeExpires } from './durable-objects/dispute-record.js';
 /**
  * HashBin.org - Main Worker Entry Point
  * Content distribution platform using 256t hash-based addressing
@@ -531,7 +532,10 @@ export default {
 
   /**
    * Process expired disputes
-   * Updates disputes that are past their expires_at date to closed_expired
+   * Closes disputes past their expires_at as closed_expired, and restores copyright content
+   * whose counter-notice wait has passed with no reported court action (closed_restored).
+   * Copyright and intimate-image reports have no expiry: their content stays blocked until
+   * an administrator decides.
    */
   async processExpiredDisputes(env) {
     try {
@@ -548,58 +552,67 @@ export default {
       
       const now = new Date();
       let expired = 0;
+      let restored = 0;
       
-      // Check each dispute for expiration. Intimate-image reports have no expiry: their
-      // content stays blocked until an administrator decides.
       for (const dispute of listData.disputes || []) {
-        if (!dispute.expires_at) continue;
-        const expiresAt = new Date(dispute.expires_at);
-        
-        if (expiresAt <= now) {
-          try {
-            // Update dispute status to closed_expired
-            const disputeRecordId = env.DISPUTE_RECORD.idFromName(`dispute:${dispute.cid}`);
-            const disputeRecordStub = env.DISPUTE_RECORD.get(disputeRecordId);
-            
-            const closeResponse = await disputeRecordStub.fetch(new Request('http://internal/dispute', {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                status: 'closed_expired',
-                resolution: 'expired',
-                resolution_reason: 'Dispute expired after 30 days without resolution',
-                resolved_by: 'system'
-              })
-            }));
-            if (!closeResponse.ok) {
-              throw new Error(`DisputeRecord returned ${closeResponse.status}`);
+        try {
+          const disputeRecordStub = env.DISPUTE_RECORD.get(env.DISPUTE_RECORD.idFromName(`dispute:${dispute.cid}`));
+          let close = null;
+
+          if (dispute.claim_type === 'copyright') {
+            // The counter-notice wait lives on the record, not the index
+            const recordResponse = await disputeRecordStub.fetch(new Request('http://internal/dispute'));
+            const record = recordResponse.ok ? await recordResponse.json() : null;
+            if (record?.restore_after && !record.court_action_at && new Date(record.restore_after) <= now) {
+              close = {
+                status: 'closed_restored',
+                resolution: 'restored',
+                resolution_reason: 'Restored after a counter-notice; no court action was reported during the waiting period'
+              };
             }
-
-            const availability = env.CONTENT_METADATA.get(env.CONTENT_METADATA.idFromName(dispute.cid));
-            const availabilityResponse = await availability.fetch(new Request('http://internal/availability', {
-              method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disputed: false })
-            }));
-            if (!availabilityResponse.ok) throw new Error('Failed to publish dispute expiry');
-            // An expired dispute no longer blocks the content: 256t.us serves 451 while this marker exists
-            await env.CONTENT_BUCKET.delete(`${dispute.cid}.disputed`);
-
-            // Remove from DisputeIndex
-            await indexStub.fetch(new Request('http://internal/remove', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                dispute_id: dispute.dispute_id
-              })
-            }));
-            
-            expired++;
-          } catch (error) {
-            console.error(`Error expiring dispute ${dispute.dispute_id}:`, error);
+          } else if (dispute.expires_at && disputeExpires(dispute.claim_type) && new Date(dispute.expires_at) <= now) {
+            close = {
+              status: 'closed_expired',
+              resolution: 'expired',
+              resolution_reason: 'Dispute expired after 30 days without resolution'
+            };
           }
+          if (!close) continue;
+
+          const closeResponse = await disputeRecordStub.fetch(new Request('http://internal/dispute', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...close, resolved_by: 'system' })
+          }));
+          if (!closeResponse.ok) {
+            throw new Error(`DisputeRecord returned ${closeResponse.status}`);
+          }
+
+          const availability = env.CONTENT_METADATA.get(env.CONTENT_METADATA.idFromName(dispute.cid));
+          const availabilityResponse = await availability.fetch(new Request('http://internal/availability', {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disputed: false })
+          }));
+          if (!availabilityResponse.ok) throw new Error('Failed to publish dispute closure');
+          // A closed dispute no longer blocks the content: 256t.us serves 451 while this marker exists
+          await env.CONTENT_BUCKET.delete(`${dispute.cid}.disputed`);
+
+          // Remove from DisputeIndex
+          await indexStub.fetch(new Request('http://internal/remove', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              dispute_id: dispute.dispute_id
+            })
+          }));
+
+          if (close.status === 'closed_restored') restored++;
+          else expired++;
+        } catch (error) {
+          console.error(`Error closing dispute ${dispute.dispute_id}:`, error);
         }
       }
       
-      console.log(`Expired disputes processed: ${expired} disputes closed`);
+      console.log(`Disputes processed: ${expired} expired, ${restored} restored after counter-notice`);
     } catch (error) {
       console.error('Error processing expired disputes:', error);
     }

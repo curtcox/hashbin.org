@@ -3,7 +3,7 @@ import worker from './index.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function makeEnv({ disputes, closeStatus = 200 }) {
+function makeEnv({ disputes, closeStatus = 200, records = {} }) {
   const removedFromIndex = [];
   const patched = [];
   const bucketDelete = vi.fn(async () => {});
@@ -26,6 +26,10 @@ function makeEnv({ disputes, closeStatus = 200 }) {
       idFromName: (name) => name,
       get: (name) => ({
         fetch: async (request) => {
+          if (request.method === 'GET') {
+            const record = records[name];
+            return record ? Response.json(record) : Response.json({ error: 'NO_ACTIVE_DISPUTE' }, { status: 404 });
+          }
           patched.push({ name, body: await request.json() });
           return Response.json({}, { status: closeStatus });
         }
@@ -60,6 +64,48 @@ describe('processExpiredDisputes', () => {
 
     expect(patched).toEqual([]);
     expect(bucketDelete).not.toHaveBeenCalled();
+  });
+
+  it('never expires a copyright report, even one indexed with an expiry', async () => {
+    const { env, patched, bucketDelete } = makeEnv({
+      disputes: [{ dispute_id: 'disp_c', cid: 'AAAAAABBcopy', claim_type: 'copyright', expires_at: new Date(Date.now() - DAY_MS).toISOString() }],
+      records: { 'dispute:AAAAAABBcopy': { claim_type: 'copyright', status: 'open' } }
+    });
+
+    await worker.processExpiredDisputes(env);
+
+    expect(patched).toEqual([]);
+    expect(bucketDelete).not.toHaveBeenCalled();
+  });
+
+  it('restores copyright content once the counter-notice wait has passed', async () => {
+    const { env, patched, bucketDelete, removedFromIndex } = makeEnv({
+      disputes: [{ dispute_id: 'disp_c', cid: 'AAAAAABBcopy', claim_type: 'copyright', expires_at: null }],
+      records: { 'dispute:AAAAAABBcopy': { claim_type: 'copyright', status: 'under_review', restore_after: new Date(Date.now() - 1000).toISOString() } }
+    });
+
+    await worker.processExpiredDisputes(env);
+
+    expect(patched).toEqual([{ name: 'dispute:AAAAAABBcopy', body: expect.objectContaining({ status: 'closed_restored', resolved_by: 'system' }) }]);
+    expect(bucketDelete).toHaveBeenCalledWith('AAAAAABBcopy.disputed');
+    expect(removedFromIndex).toEqual(['disp_c']);
+  });
+
+  it('keeps copyright content blocked before the wait ends or after a court action', async () => {
+    const { env, patched } = makeEnv({
+      disputes: [
+        { dispute_id: 'disp_wait', cid: 'AAAAAABBwait', claim_type: 'copyright', expires_at: null },
+        { dispute_id: 'disp_suit', cid: 'AAAAAABBsuit', claim_type: 'copyright', expires_at: null }
+      ],
+      records: {
+        'dispute:AAAAAABBwait': { claim_type: 'copyright', restore_after: new Date(Date.now() + DAY_MS).toISOString() },
+        'dispute:AAAAAABBsuit': { claim_type: 'copyright', restore_after: new Date(Date.now() - DAY_MS).toISOString(), court_action_at: new Date().toISOString() }
+      }
+    });
+
+    await worker.processExpiredDisputes(env);
+
+    expect(patched).toEqual([]);
   });
 
   it('leaves disputes that have not expired alone', async () => {

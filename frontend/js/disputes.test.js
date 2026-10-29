@@ -112,6 +112,9 @@ describe('intimate image reports', () => {
   it('show a decision deadline instead of an expiry', () => {
     expect(disputeDeadlineText({ claim_type: 'ncii', expires_at: null, removal_due_at: '2026-10-30T12:00:00Z' }))
       .toMatch(/^Decision due .*2026; does not expire$/);
-    expect(disputeDeadlineText({ claim_type: 'copyright', expires_at: '2026-11-27T12:00:00Z' })).toMatch(/^Expires .*2026$/);
+    expect(disputeDeadlineText({ claim_type: 'harassment', expires_at: '2026-11-27T12:00:00Z' })).toMatch(/^Expires .*2026$/);
+    expect(disputeDeadlineText({ claim_type: 'copyright', expires_at: null })).toBe('Does not expire');
+    expect(disputeDeadlineText({ claim_type: 'copyright', expires_at: null, restore_after: '2026-11-10T15:00:00Z' }))
+      .toMatch(/^Restores .*2026 unless a court action is reported$/);
   });
 });

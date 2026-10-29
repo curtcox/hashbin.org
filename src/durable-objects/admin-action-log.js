@@ -81,7 +81,9 @@ export class AdminActionLog {
       'run_restored',
       'dispute_denied',
       'dispute_approved',
-      'dispute_status_changed'
+      'dispute_status_changed',
+      'dispute_counter_notice',
+      'dispute_court_action'
     ];
 
     if (!data.action_type || !validActionTypes.includes(data.action_type)) {

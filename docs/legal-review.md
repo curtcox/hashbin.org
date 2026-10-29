@@ -31,8 +31,12 @@ These are written to match the current code. Change the code or the text if you 
    regulate stored-value balances; confirm this is acceptable.
 4. ~~Reporter contact visibility~~ **Decided 2026-10-07:** reporter contact details stay visible
    to every signed-in user (and admins), not to anonymous visitors. Privacy §3 says so.
-5. **DMCA notices auto-expire after 30 days** if not reviewed, and the content becomes available
-   again (DMCA §2). Confirm that's acceptable for formal copyright notices.
+5. ~~DMCA notices auto-expire after 30 days~~ **Decided 2026-10-28 (S19):** copyright reports
+   never expire. Content stays blocked until an admin decides, or until a recorded counter-notice
+   restores it 12 weekdays later (inside the 10–14 business-day window) unless the reporter
+   reports a court action. Upheld (deleted) content can't be restored or re-uploaded, which
+   DMCA §3 now says. Ask the lawyer whether deleting rather than only blocking upheld copyright
+   content loses § 512(g) protection, and whether that last sentence is acceptable.
 6. **Repeat-infringer threshold** `[NUMBER]` upheld removals in `[PERIOD]` (DMCA §5). Safe harbor
    requires a reasonably implemented policy. Strikes are tracked automatically and the cron alerts
    at the code defaults of **3 in 365 days** (`REPEAT_INFRINGER_*` in `src/api/admin-disputes.js`).

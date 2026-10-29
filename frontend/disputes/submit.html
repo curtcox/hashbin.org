@@ -64,8 +64,8 @@
       <p>
         Use this form to report content hosted on HashBin.org: copyright infringement, illegal
         content, privacy violations, harassment, or malware. While a report is open, the content
-        is blocked (HTTP 451) until an administrator reviews it. Reports that aren't resolved
-        expire after 30 days.
+        is blocked (HTTP 451) until an administrator reviews it. Most reports that aren't resolved
+        expire after 30 days; copyright and intimate image reports stay open until we decide them.
       </p>
       <div class="alert alert-info" role="note">
         <strong>Is it an intimate image of you shared without your consent?</strong>
@@ -165,6 +165,7 @@
           <strong>Report submitted.</strong>
           <p>Reference: <code id="success-id"></code></p>
           <p id="success-standard">The content is now blocked pending review. This report expires on <span id="success-expires"></span> if it isn't resolved.</p>
+          <p id="success-open" class="hidden">The content is now blocked pending review. Copyright reports don't expire: the content stays blocked until we decide, or until the uploader sends a valid counter-notice under our <a href="/dmca.html">DMCA Policy</a>.</p>
           <p id="success-ncii" class="hidden">The content is now blocked everywhere it is served. We will decide by <span id="success-due"></span> and remove it permanently if the report is valid. The report does not expire, and its details stay private. We'll contact you if we need more information.</p>
         </div>
         <p>

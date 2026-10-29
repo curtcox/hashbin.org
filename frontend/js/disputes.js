@@ -31,6 +31,7 @@ export const STATUS_LABELS = {
   closed_deleted: 'Content removed',
   closed_expired: 'Expired',
   closed_superseded: 'Replaced by a later report',
+  closed_restored: 'Restored after counter-notice',
   closed_withdrawn: 'Withdrawn'
 };
 
@@ -223,8 +224,9 @@ export function formatDisputeDate(dateString) {
 }
 
 /**
- * When an open dispute ends on its own: intimate image reports never expire
- * @param {Object} dispute - Dispute with expires_at and/or removal_due_at
+ * When an open dispute ends on its own. Intimate image and copyright reports never expire;
+ * a copyright report with a counter-notice restores the content on a set date.
+ * @param {Object} dispute - Dispute with expires_at, removal_due_at and/or restore_after
  * @returns {string} e.g. "Expires Oct 30, 2026" or "Decision due Oct 30, 2026; does not expire"
  */
 export function disputeDeadlineText(dispute) {
@@ -233,7 +235,11 @@ export function disputeDeadlineText(dispute) {
       ? `Decision due ${formatDisputeDate(dispute.removal_due_at)}; does not expire`
       : 'Does not expire';
   }
-  return `Expires ${formatDisputeDate(dispute?.expires_at)}`;
+  if (dispute?.restore_after) {
+    return `Restores ${formatDisputeDate(dispute.restore_after)} unless a court action is reported`;
+  }
+  if (!dispute?.expires_at) return 'Does not expire';
+  return `Expires ${formatDisputeDate(dispute.expires_at)}`;
 }
 
 /**

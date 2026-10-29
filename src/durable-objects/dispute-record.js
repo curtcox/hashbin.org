@@ -11,6 +11,39 @@ export const NCII_CLAIM_TYPE = 'ncii';
 export const NCII_REMOVAL_HOURS = 48;
 const NCII_SIGNATURE_MAX = 200;
 
+// Copyright reports stay open until decided: restoring noticed content without a counter-notice
+// risks the DMCA safe harbor (17 U.S.C. § 512(g)). After a counter-notice, content comes back
+// 10–14 business days later unless the reporter says they filed suit. 12 weekdays stays inside
+// that window with up to two holidays in it, and the nightly restore adds at most a day.
+const NON_EXPIRING_CLAIM_TYPES = [NCII_CLAIM_TYPE, 'copyright'];
+export const COUNTER_NOTICE_WAIT_WEEKDAYS = 12;
+
+/**
+ * Whether disputes of this kind close on their own after 30 days
+ * @param {string} claimType - Dispute claim type
+ * @returns {boolean} False for copyright and intimate image reports
+ */
+export function disputeExpires(claimType) {
+  return !NON_EXPIRING_CLAIM_TYPES.includes(claimType);
+}
+
+/**
+ * Add weekdays (Monday–Friday, UTC) to a date
+ * @param {Date} date - Start
+ * @param {number} days - Weekdays to add
+ * @returns {Date} The resulting date, same time of day
+ */
+export function addWeekdays(date, days) {
+  const result = new Date(date);
+  let added = 0;
+  while (added < days) {
+    result.setUTCDate(result.getUTCDate() + 1);
+    const day = result.getUTCDay();
+    if (day !== 0 && day !== 6) added++;
+  }
+  return result;
+}
+
 /**
  * DisputeRecord Durable Object
  * One instance per CID
@@ -255,7 +288,7 @@ export class DisputeRecord {
 
     // Create dispute
     const now = new Date().toISOString();
-    const expiresAt = isNcii ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+    const expiresAt = disputeExpires(data.claim_type) ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : null; // 30 days
     const removalDueAt = isNcii ? new Date(Date.now() + NCII_REMOVAL_HOURS * 60 * 60 * 1000).toISOString() : null;
     
     const dispute = {
@@ -362,7 +395,7 @@ export class DisputeRecord {
 
     // Update fields
     if (data.status) {
-      const validStatuses = ['open', 'under_review', 'closed_deleted', 'closed_denied', 'closed_expired', 'closed_superseded'];
+      const validStatuses = ['open', 'under_review', 'closed_deleted', 'closed_denied', 'closed_expired', 'closed_superseded', 'closed_restored'];
       if (!validStatuses.includes(data.status)) {
         return new Response(JSON.stringify({ error: 'INVALID_STATUS' }), {
           status: 400,
@@ -382,6 +415,33 @@ export class DisputeRecord {
 
     if (data.resolved_by) {
       activeDispute.resolved_by = data.resolved_by;
+    }
+
+    // A counter-notice schedules the content's return; a reported court action cancels it
+    if (data.counter_notice) {
+      if (activeDispute.claim_type !== 'copyright') {
+        return new Response(JSON.stringify({ error: 'COUNTER_NOTICE_COPYRIGHT_ONLY' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      const receivedAt = new Date(data.counter_notice.received_at || Date.now());
+      if (Number.isNaN(receivedAt.getTime()) || receivedAt > new Date()) {
+        return new Response(JSON.stringify({ error: 'INVALID_RECEIVED_AT' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      activeDispute.counter_notice_received_at = receivedAt.toISOString();
+      activeDispute.restore_after = activeDispute.court_action_at
+        ? null
+        : addWeekdays(receivedAt, COUNTER_NOTICE_WAIT_WEEKDAYS).toISOString();
+      activeDispute.status = 'under_review';
+    }
+
+    if (data.court_action) {
+      activeDispute.court_action_at = new Date().toISOString();
+      activeDispute.restore_after = null;
     }
 
     // If closing, set closed_at

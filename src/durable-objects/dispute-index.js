@@ -5,6 +5,7 @@
  */
 
 import { handleBackupRequest } from '../utils/backup.js';
+import { disputeExpires } from './dispute-record.js';
 
 // Dispute submissions allowed per IP per hour
 const MAX_SUBMISSIONS_PER_WINDOW = 10;
@@ -92,8 +93,9 @@ export class DisputeIndex {
   async addDispute(request) {
     const data = await request.json();
     
-    // Intimate-image reports never expire; they carry a removal deadline instead
-    const hasEnd = data.claim_type === 'ncii' ? !!data.removal_due_at : !!data.expires_at;
+    // Copyright and intimate-image reports never expire; the latter carry a removal deadline
+    const hasEnd = data.claim_type === 'ncii' ? !!data.removal_due_at
+      : (disputeExpires(data.claim_type) ? !!data.expires_at : true);
     if (!data.cid || !data.dispute_id || !data.claim_type || !data.created_at || !hasEnd) {
       return new Response(JSON.stringify({ error: 'MISSING_REQUIRED_FIELDS' }), {
         status: 400,

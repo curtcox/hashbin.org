@@ -153,7 +153,8 @@ async function handleSubmit(event) {
       ? new Date(dispute.removal_due_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
       : '';
     const ncii = payload.claim_type === NCII_CLAIM_TYPE;
-    document.getElementById('success-standard').classList.toggle('hidden', ncii);
+    document.getElementById('success-standard').classList.toggle('hidden', ncii || !dispute.expires_at);
+    document.getElementById('success-open').classList.toggle('hidden', ncii || !!dispute.expires_at);
     document.getElementById('success-ncii').classList.toggle('hidden', !ncii);
     document.getElementById('success-view').href = `/disputes/view.html?cid=${encodeURIComponent(payload.cid)}`;
     form.classList.add('hidden');

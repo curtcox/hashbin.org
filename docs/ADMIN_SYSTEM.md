@@ -313,6 +313,24 @@ curl -H "Authorization: ApiKey $ADMIN_KEY" https://hashbin.org/api/admin/actions
 curl -H "Authorization: ApiKey $ADMIN_KEY" "https://hashbin.org/api/admin/repeat-infringers?min=3&days=365"
 ```
 
+Copyright disputes never expire: the content stays blocked until you deny or uphold. When the
+designated agent receives a valid counter-notice (DMCA §3), forward it to the reporter and record
+it; the nightly job restores the content 12 weekdays after receipt (`closed_restored`) unless you
+record a reported court action first. Both buttons are on `/admin/disputes.html`, or:
+
+```bash
+# Counter-notice received (received_at defaults to now)
+curl -X PATCH -H "Authorization: ApiKey $ADMIN_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"counter_notice","received_at":"2026-10-23T12:00:00Z"}' \
+  https://hashbin.org/api/admin/disputes/{cid}
+
+# The reporter says they filed a court action: cancel the scheduled restore
+curl -X PATCH -H "Authorization: ApiKey $ADMIN_KEY" -H "Content-Type: application/json" \
+  -d '{"action":"court_action"}' https://hashbin.org/api/admin/disputes/{cid}
+```
+
+Upholding deletes the content for good, so a later counter-notice can't restore it.
+
 Removing content while a **copyright** dispute is open records a strike against the uploader.
 The nightly cron raises a `repeat_infringer` alert when any account reaches the threshold; close
 those accounts per the DMCA policy (`frontend/dmca.html` §5).

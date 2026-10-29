@@ -125,6 +125,7 @@ function createMockEnv(isAdmin = true) {
 /**
  * Import handlers
  */
+import { DisputeRecord } from '../durable-objects/dispute-record.js';
 import { 
   handleAdminListDisputes,
   handleAdminUpdateDispute,
@@ -294,6 +295,65 @@ describe('Admin Disputes API', () => {
 
       // Verify admin action was logged
       expect(logFetch).toHaveBeenCalled();
+    });
+  });
+
+  describe('counter-notices', () => {
+    async function envWithCopyrightDispute(claimType = 'copyright') {
+      const storage = new Map();
+      const record = new DisputeRecord({
+        storage: {
+          get: async key => storage.get(key),
+          put: async (key, value) => storage.set(key, value),
+          delete: async key => storage.delete(key)
+        }
+      }, {});
+      record.ensureBackupRegistration = async () => {};
+      await record.fetch(new Request('http://internal/dispute', {
+        method: 'POST',
+        body: JSON.stringify({ cid: 'test-cid', claim_type: claimType, evidence: 'x'.repeat(60), contact: { type: 'email', value: 'a@example.com' } })
+      }));
+      const logged = [];
+      const bucket = { put: vi.fn(), delete: vi.fn() };
+      return {
+        logged,
+        bucket,
+        env: {
+          ...createMockEnv(),
+          DISPUTE_RECORD: { idFromName: name => name, get: () => record },
+          ADMIN_ACTION_LOG: { idFromName: name => name, get: () => ({ fetch: async req => { logged.push(await req.json()); return Response.json({}); } }) },
+          CONTENT_BUCKET: bucket
+        }
+      };
+    }
+    const act = (env, body) => handleAdminUpdateDispute(new Request('http://localhost/api/admin/disputes/test-cid', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    }), env, 'test-cid');
+
+    it('records a counter-notice and the restore date, keeping the content blocked', async () => {
+      const { env, logged, bucket } = await envWithCopyrightDispute();
+      const response = await act(env, { action: 'counter_notice', received_at: '2026-10-23T15:00:00.000Z' });
+      expect(response.status).toBe(200);
+      const { dispute } = await response.json();
+      expect(dispute).toMatchObject({ status: 'under_review', restore_after: '2026-11-10T15:00:00.000Z' });
+      expect(logged).toEqual([expect.objectContaining({ action_type: 'dispute_counter_notice', target_cid: 'test-cid' })]);
+      expect(bucket.delete).not.toHaveBeenCalled();
+    });
+
+    it('records a court action, which cancels the restore', async () => {
+      const { env, logged } = await envWithCopyrightDispute();
+      await act(env, { action: 'counter_notice' });
+      const { dispute } = await (await act(env, { action: 'court_action' })).json();
+      expect(dispute.restore_after).toBeNull();
+      expect(logged.map(l => l.action_type)).toEqual(['dispute_counter_notice', 'dispute_court_action']);
+    });
+
+    it('refuses counter-notices on other kinds of dispute', async () => {
+      const { env, logged } = await envWithCopyrightDispute('harassment');
+      const response = await act(env, { action: 'counter_notice' });
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe('COUNTER_NOTICE_COPYRIGHT_ONLY');
+      expect(logged).toEqual([]);
     });
   });
 

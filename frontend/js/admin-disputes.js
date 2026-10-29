@@ -5,7 +5,7 @@
 
 import { escapeHtml } from '/js/html.js';
 import { adminHeaders } from '/js/admin-auth.js';
-import { NCII_CLAIM_TYPE, claimTypeLabel, formatDisputeDate, isHttpsUrl, statusLabel } from '/js/disputes.js';
+import { NCII_CLAIM_TYPE, claimTypeLabel, disputeDeadlineText, formatDisputeDate, isHttpsUrl, statusLabel } from '/js/disputes.js';
 
 const listEl = document.getElementById('dispute-list');
 const errorEl = document.getElementById('admin-error');
@@ -42,6 +42,12 @@ function byUrgency(a, b) {
 }
 
 function renderNcii(dispute) {
+  if (dispute.claim_type === 'copyright') {
+    const counter = dispute.counter_notice_received_at
+      ? `<dt>Counter-notice</dt><dd>Received ${escapeHtml(formatDisputeDate(dispute.counter_notice_received_at))}${dispute.court_action_at ? `; court action reported ${escapeHtml(formatDisputeDate(dispute.court_action_at))}` : ''}</dd>`
+      : '';
+    return `<dt>Ends</dt><dd>${escapeHtml(disputeDeadlineText(dispute))}</dd>${counter}`;
+  }
   if (dispute.claim_type !== NCII_CLAIM_TYPE) {
     return `<dt>Expires</dt><dd>${escapeHtml(formatDisputeDate(dispute.expires_at))}</dd>`;
   }
@@ -79,6 +85,8 @@ function renderDispute(dispute) {
       <form class="admin-actions" data-claim-type="${escapeHtml(dispute.claim_type)}">
         <input type="text" class="form-input resolution-reason" maxlength="500" placeholder="Resolution reason (shown publicly)">
         ${dispute.status === 'open' ? '<button type="button" class="btn btn-secondary btn-sm" data-action="under_review">Mark under review</button>' : ''}
+        ${dispute.claim_type === 'copyright' && !dispute.counter_notice_received_at ? '<button type="button" class="btn btn-secondary btn-sm" data-step="counter_notice">Counter-notice received</button>' : ''}
+        ${dispute.claim_type === 'copyright' && dispute.restore_after ? '<button type="button" class="btn btn-secondary btn-sm" data-step="court_action">Reporter filed suit</button>' : ''}
         <button type="button" class="btn btn-secondary btn-sm" data-action="closed_denied">Deny (restore content)</button>
         <button type="button" class="btn btn-secondary btn-sm btn-danger" data-action="closed_deleted">Uphold (take down)</button>
       </form>
@@ -101,6 +109,32 @@ async function resolve(cid, status, reason, claimType) {
     method: 'PATCH',
     body: JSON.stringify({ status, resolution_reason: reason || undefined })
   });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    showError(`Update failed: ${data.error || response.status}`);
+    return;
+  }
+  await load();
+}
+
+// Counter-notice steps on copyright disputes; the content stays blocked
+async function recordStep(cid, step) {
+  let body = { action: step };
+  if (step === 'counter_notice') {
+    const today = new Date().toISOString().slice(0, 10);
+    const received = window.prompt('Date the valid counter-notice was received (YYYY-MM-DD). Forward it to the reporter; the content returns after 12 weekdays unless they report a court action.', today);
+    if (!received) return;
+    const date = new Date(`${received}T12:00:00Z`);
+    if (Number.isNaN(date.getTime())) {
+      showError('Enter the date as YYYY-MM-DD.');
+      return;
+    }
+    body = { ...body, received_at: date.toISOString() };
+  } else if (!window.confirm('Record that the reporter filed a court action? The content then stays blocked until you decide.')) {
+    return;
+  }
+
+  const response = await adminFetch(`/api/admin/disputes/${encodeURIComponent(cid)}`, { method: 'PATCH', body: JSON.stringify(body) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     showError(`Update failed: ${data.error || response.status}`);
@@ -134,6 +168,10 @@ async function load() {
       : disputes.map(renderDispute).join('');
 
     for (const card of listEl.querySelectorAll('[data-cid]')) {
+      for (const button of card.querySelectorAll('[data-step]')) {
+        button.addEventListener('click', () => recordStep(card.dataset.cid, button.dataset.step)
+          .catch(error => error.message !== 'unauthorized' && showError(error.message)));
+      }
       for (const button of card.querySelectorAll('[data-action]')) {
         button.addEventListener('click', () => resolve(
           card.dataset.cid,

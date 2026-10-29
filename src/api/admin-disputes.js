@@ -98,6 +98,10 @@ export async function handleAdminUpdateDispute(request, env, cid) {
     // Parse request body
     const data = await request.json();
 
+    if (data.action === 'counter_notice' || data.action === 'court_action') {
+      return recordCounterNoticeStep(request, env, cid, data);
+    }
+
     // Validation
     const validStatuses = ['open', 'under_review', 'closed_deleted', 'closed_denied', 'closed_expired'];
     if (!data.status || !validStatuses.includes(data.status)) {
@@ -248,6 +252,46 @@ export async function handleAdminUpdateDispute(request, env, cid) {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+}
+
+/**
+ * Record a DMCA counter-notice (schedules the content's return) or a reported court action
+ * (cancels it) on an open copyright dispute. The content stays blocked either way.
+ * Body: { action: 'counter_notice', received_at?: ISO date } or { action: 'court_action' }
+ */
+async function recordCounterNoticeStep(request, env, cid, data) {
+  const disputeStub = env.DISPUTE_RECORD.get(env.DISPUTE_RECORD.idFromName(`dispute:${cid}`));
+  const update = data.action === 'counter_notice'
+    ? { counter_notice: { received_at: data.received_at || undefined } }
+    : { court_action: true };
+  const response = await disputeStub.fetch(new Request('http://internal/dispute', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(update)
+  }));
+  const body = await response.json();
+  if (!response.ok) {
+    const status = body.error === 'NO_ACTIVE_DISPUTE' ? 404 : response.status;
+    return Response.json(body.error === 'NO_ACTIVE_DISPUTE' ? { error: 'DISPUTE_NOT_FOUND' } : body, { status });
+  }
+
+  const adminLog = env.ADMIN_ACTION_LOG.get(env.ADMIN_ACTION_LOG.idFromName('admin-action-log:global'));
+  await adminLog.fetch(new Request('http://internal/log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      admin_user_id: adminActorId(request),
+      action_type: data.action === 'counter_notice' ? 'dispute_counter_notice' : 'dispute_court_action',
+      target_cid: cid,
+      target_dispute_id: body.dispute.dispute_id,
+      details: {
+        counter_notice_received_at: body.dispute.counter_notice_received_at || null,
+        restore_after: body.dispute.restore_after || null
+      }
+    })
+  }));
+
+  return Response.json({ success: true, dispute: body.dispute });
 }
 
 /**

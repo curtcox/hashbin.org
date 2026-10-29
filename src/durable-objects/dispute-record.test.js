@@ -29,7 +29,7 @@ function createMockEnv() {
 /**
  * Import DisputeRecord class
  */
-import { DisputeRecord, NCII_REMOVAL_HOURS } from './dispute-record.js';
+import { COUNTER_NOTICE_WAIT_WEEKDAYS, DisputeRecord, NCII_REMOVAL_HOURS, addWeekdays } from './dispute-record.js';
 
 describe('DisputeRecord Durable Object', () => {
   let disputeRecord;
@@ -510,5 +510,64 @@ describe('DisputeRecord Durable Object', () => {
       expect((await post({ ...copyrightReport, claim_type: 'harassment' })).status).toBe(429);
       expect((await post(nciiReport())).status).toBe(201);
     });
+  });
+
+  describe('Copyright reports and counter-notices', () => {
+    const copyright = {
+      cid: 'test-cid-123',
+      claim_type: 'copyright',
+      evidence: 'This is a detailed evidence description that is more than 50 characters long.',
+      contact: { type: 'email', value: 'owner@example.com' }
+    };
+    const create = (body) => disputeRecord.fetch(new Request('http://localhost/dispute', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    }));
+    const patch = (body) => disputeRecord.fetch(new Request('http://localhost/dispute', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    }));
+
+    it('never expire', async () => {
+      const { dispute } = await (await create(copyright)).json();
+      expect(dispute.expires_at).toBeNull();
+      expect(dispute.removal_due_at).toBeNull();
+    });
+
+    it('schedule the content to return 12 weekdays after a counter-notice', async () => {
+      await create(copyright);
+      const response = await patch({ counter_notice: { received_at: '2026-10-23T15:00:00.000Z' } }); // a Friday
+      expect(response.status).toBe(200);
+      const { dispute } = await response.json();
+      expect(dispute.status).toBe('under_review');
+      expect(dispute.counter_notice_received_at).toBe('2026-10-23T15:00:00.000Z');
+      expect(dispute.restore_after).toBe('2026-11-10T15:00:00.000Z');
+      expect(COUNTER_NOTICE_WAIT_WEEKDAYS).toBe(12);
+    });
+
+    it('cancel the return when a court action is reported, even if a counter-notice follows', async () => {
+      await create(copyright);
+      await patch({ counter_notice: {} });
+      let { dispute } = await (await patch({ court_action: true })).json();
+      expect(dispute.restore_after).toBeNull();
+      expect(dispute.court_action_at).toBeDefined();
+
+      ({ dispute } = await (await patch({ counter_notice: {} })).json());
+      expect(dispute.restore_after).toBeNull();
+    });
+
+    it('accept counter-notices only for copyright reports, received in the past', async () => {
+      await create({ ...copyright, claim_type: 'harassment' });
+      expect((await (await patch({ counter_notice: {} })).json()).error).toBe('COUNTER_NOTICE_COPYRIGHT_ONLY');
+
+      await patch({ status: 'closed_denied' });
+      mockState.storage.delete('dispute_history');
+      await create(copyright);
+      const future = new Date(Date.now() + 86400000).toISOString();
+      expect((await (await patch({ counter_notice: { received_at: future } })).json()).error).toBe('INVALID_RECEIVED_AT');
+    });
+  });
+
+  it('addWeekdays skips weekends', () => {
+    expect(addWeekdays(new Date('2026-10-30T12:00:00Z'), 1).toISOString()).toBe('2026-11-02T12:00:00.000Z');
+    expect(addWeekdays(new Date('2026-10-26T12:00:00Z'), 5).toISOString()).toBe('2026-11-02T12:00:00.000Z');
   });
 });

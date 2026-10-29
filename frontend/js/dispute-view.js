@@ -6,6 +6,7 @@
 import {
   NCII_CLAIM_TYPE,
   claimTypeLabel,
+  disputeDeadlineText,
   escapeHtml,
   formatDisputeDate,
   isActiveStatus,
@@ -39,9 +40,7 @@ function renderDispute(dispute) {
     : '';
   const closed = dispute.closed_at
     ? `<dt>Closed</dt><dd>${escapeHtml(formatDisputeDate(dispute.closed_at))}</dd>`
-    : dispute.claim_type === NCII_CLAIM_TYPE
-      ? `<dt>Decision due</dt><dd>${escapeHtml(formatDisputeDate(dispute.removal_due_at))} (does not expire)</dd>`
-      : `<dt>Expires</dt><dd>${escapeHtml(formatDisputeDate(dispute.expires_at))}</dd>`;
+    : `<dt>Ends</dt><dd>${escapeHtml(disputeDeadlineText(dispute))}</dd>`;
   // The API withholds intimate image reports' details from everyone but administrators
   const details = dispute.claim_type === NCII_CLAIM_TYPE
     ? '<p class="dispute-evidence">The details of intimate image reports are private. See <a href="/take-it-down.html">how these reports are handled</a>.</p>'
