@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Exactly how HashBin.org deposit amounts are calculated: credit, card payment cost, tax, and where each cent goes">
+  <title>How Deposit Amounts Are Calculated - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+
+  <style>
+    .deposit-doc { max-width: 760px; }
+    .deposit-doc h2 { margin-top: 2rem; }
+    .deposit-doc ol { list-style: decimal; padding-left: 1.5rem; }
+    .deposit-doc ul { list-style: disc; padding-left: 1.5rem; }
+    .deposit-doc li { margin-bottom: 0.4rem; }
+    .deposit-doc table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+    .deposit-doc th, .deposit-doc td { padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--color-border); text-align: right; }
+    .deposit-doc th:first-child, .deposit-doc td:first-child { text-align: left; }
+    .deposit-doc .table-scroll { overflow-x: auto; }
+    .deposit-doc code { white-space: nowrap; }
+    .calc-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    .calc-row input { max-width: 10rem; }
+    .calc-steps { margin-top: 1rem; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+
+  <main>
+    <div class="container deposit-doc">
+      <nav class="breadcrumbs" aria-label="Breadcrumb">
+        <a href="/">Home</a> <span>/</span>
+        <a href="/docs/index.html">Docs</a> <span>/</span>
+        <span>Deposit amounts</span>
+      </nav>
+
+      <h1>How deposit amounts are calculated</h1>
+
+      <p>
+        When you add money to your HashBin balance, you pay three things, and checkout lists each one
+        before you pay:
+      </p>
+      <ol>
+        <li><strong>Balance credit:</strong> the amount you chose. All of it is added to your balance.</li>
+        <li><strong>Card payment cost:</strong> what Stripe, our card processor, charges for the payment. HashBin keeps none of it, apart from rounding of at most one cent.</li>
+        <li><strong>Sales tax</strong>, if any applies where you are. Stripe calculates it and shows it at checkout. HashBin doesn't collect sales tax today, so it is $0.00.</li>
+      </ol>
+
+      <h2>Try an amount</h2>
+      <section class="card">
+        <div class="calc-row">
+          <label class="form-label" for="calc-amount" style="margin: 0;">Balance credit: $</label>
+          <input id="calc-amount" class="form-input" type="number" min="1" step="0.01" value="10.00" inputmode="decimal">
+        </div>
+        <div id="calc-output" class="calc-steps" aria-live="polite"></div>
+      </section>
+
+      <h2>The card payment cost, step by step</h2>
+      <p>
+        Stripe charges <strong>2.9% of the whole payment plus $0.30</strong> for a standard US card.
+        Because the 2.9% also applies to the amount added to cover it, the total can't simply be the
+        credit plus 2.9% plus $0.30. Instead:
+      </p>
+      <ol>
+        <li>Add $0.30 to your credit.</li>
+        <li>Divide by 0.971 (that is, 1 − 0.029), so that 2.9% of the result plus $0.30 leaves exactly your credit.</li>
+        <li>Round up to the next cent. That is what your card is charged, before any tax.</li>
+      </ol>
+      <p>
+        <code>total = ceiling((credit + $0.30) ÷ 0.971)</code>, and the card payment cost is
+        <code>total − credit</code>.
+      </p>
+      <p>
+        For a $10.00 credit: ($10.00 + $0.30) ÷ 0.971 = $10.6076…, rounded up to <strong>$10.61</strong>.
+        Stripe takes 2.9% × $10.61 + $0.30 = $0.6077, which it rounds to $0.61, and HashBin receives
+        $10.00, all of which goes to your balance.
+      </p>
+
+      <h2>Examples</h2>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr><th>Balance credit</th><th>Card payment cost</th><th>You pay</th><th>Cost as % of credit</th></tr>
+          </thead>
+          <tbody id="example-rows"></tbody>
+        </table>
+      </div>
+      <p>
+        The fixed $0.30 matters most on small deposits: it is why a $1.00 credit costs $1.34. Larger
+        deposits lose a smaller share to card costs.
+      </p>
+
+      <h2>Why we add it instead of building it into prices</h2>
+      <p>
+        Storage is priced close to what it costs us, so a card fee hidden inside it would have to be
+        paid by everyone, including people who deposit once and store for years. Passing the card
+        cost through, itemized and at cost, keeps storage prices low and shows you exactly where the
+        money goes.
+      </p>
+
+      <h2>Details</h2>
+      <ul>
+        <li><strong>Other cards:</strong> Stripe charges more for some cards, such as international cards or payments needing currency conversion. We always add only the standard US rate above; HashBin pays any difference.</li>
+        <li><strong>Rounding:</strong> rounding the total up to a whole cent can leave HashBin with up to one cent more than Stripe's fee. The calculator above shows when that happens.</li>
+        <li><strong>New accounts</strong> can add at most $20.00 per checkout during their first 30 days. The minimum deposit is $1.00.</li>
+        <li><strong>Your records:</strong> Stripe emails a receipt listing each line. Your <a href="/transactions.html">transaction history</a> shows the credit, card payment cost, any tax and the total charged for every deposit.</li>
+        <li><strong>Using your balance:</strong> storage costs $0.03 per GB per month; see <a href="/docs/pricing.html">pricing</a>. Deposits are final and balances can't be withdrawn (<a href="/terms.html">Terms</a> §3).</li>
+        <li><strong>The code:</strong> the server computes the total in <code>grossUp</code> in <a href="https://github.com/curtcox/hashbin.org/blob/main/src/utils/cost-policy.js" rel="noopener">src/utils/cost-policy.js</a>; this page uses the same formula, and a test checks they agree.</li>
+      </ul>
+    </div>
+  </main>
+
+  <footer style="margin-top: 4rem; padding: 2rem 0; border-top: 1px solid var(--color-border); text-align: center; color: var(--color-text-light);">
+    <p>&copy; 2026 HashBin.org. All rights reserved.</p>
+    <p style="margin-top: 0.5rem;">
+      <a href="/">Home</a> |
+      <a href="/docs/index.html">Docs</a> |
+      <a href="/docs/pricing.html">Pricing</a> |
+      <a href="/terms.html">Terms</a>
+    </p>
+  </footer>
+
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/deposit-explainer.js"></script>
+</body>
+</html>

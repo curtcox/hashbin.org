@@ -140,8 +140,10 @@ for the same limits.
 
 Still open:
 
-- Checkout and Terms §3 describe the Stripe fee as a "card processing fee" (surcharge rules
-  above). STATUS L20.
+- Deposits still pass the Stripe fee through (surcharge rules above). Decided 2026-10-28 to
+  keep it, itemized as a "card payment cost" at checkout, in Terms §3 and the deposit page,
+  with `/docs/deposits.html` explaining every amount. The surcharge-rule question remains
+  for the lawyer. STATUS L20.
 - The 256t.us Worker's 30-a-minute IP limit is per instance, not global. Prepaid download
   allowances (STATUS L22) bound the cost instead.
 

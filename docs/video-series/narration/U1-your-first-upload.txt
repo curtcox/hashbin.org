@@ -8,9 +8,9 @@ Remember, you only need an account to publish. The people you share links with w
 
 <break time="1.5s" />
 
-Publishing is paid from a prepaid balance, so next, add some funds. The minimum is one dollar. The payment goes through Stripe, and the card processing fee is added on top and shown before you pay: two point nine percent plus thirty cents.
+Publishing is paid from a prepaid balance, so next, add some funds. The minimum is one dollar. The payment goes through Stripe, and the card payment cost is added on top and itemized before you pay: Stripe's two point nine percent of the payment plus thirty cents.
 
-That fixed thirty cents is why small deposits look expensive. A one-dollar credit costs a dollar thirty-three. A ten-dollar credit costs ten fifty-nine. Either way, your balance gets the full credit amount.
+That fixed thirty cents is why small deposits look expensive. A one-dollar credit costs a dollar thirty-four. A ten-dollar credit costs ten sixty-one. Either way, your balance gets the full credit amount, and a link on the page shows the arithmetic.
 
 Payments are final, and a balance can't be withdrawn. But it doesn't expire, either. It just sits there until you publish something. And as we'll see, a dollar of storage goes a long way.
 

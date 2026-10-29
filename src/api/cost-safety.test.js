@@ -30,7 +30,8 @@ describe('cost safety at API boundaries', () => {
     expect((await handleCreateDeposit(post({ amount_cents: 2001 }), env)).status).toBe(400);
     expect(checkout).not.toHaveBeenCalled();
     expect((await handleCreateDeposit(post({ amount_cents: 2000 }), env)).status).toBe(200);
-    expect(checkout.mock.calls[0][0].line_items[0].price_data.unit_amount).toBe(2091);
+    const items = checkout.mock.calls[0][0].line_items.map(item => [item.price_data.product_data.name, item.price_data.unit_amount]);
+    expect(items).toEqual([['HashBin balance credit', 2000], ['Card payment cost', 91]]);
     env.USER_PROFILES = binding(async () => Response.json({ created_at: '2025-01-01T00:00:00Z' }));
     expect((await handleCreateDeposit(post({ amount_cents: 5000 }), env)).status).toBe(200);
   });

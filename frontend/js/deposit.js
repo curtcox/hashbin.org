@@ -4,12 +4,11 @@
  */
 
 import { authenticatedFetch, showToast, handleApiError } from './utils.js';
+import { depositBreakdown, formatCents } from './deposit-math.js';
 
 // Constants
 const MINIMUM_DEPOSIT_DOLLARS = 1.00;
 const LOCAL_MINIMUM_DEPOSIT_DOLLARS = 0.01;
-const STRIPE_FEE_PERCENTAGE = 0.029;
-const STRIPE_FEE_FIXED_CENTS = 30;
 
 // DOM elements
 let amountInput;
@@ -159,12 +158,12 @@ function handleAmountChange() {
   if (!isLocalMode) {
     // Calculate fees
     const amountCents = Math.round(amountDollars * 100);
-    const fees = calculateFees(amountCents);
+    const fees = depositBreakdown(amountCents);
     
     // Update breakdown display
-    creditAmountSpan.textContent = formatDollars(fees.creditCents);
-    feeAmountSpan.textContent = formatDollars(fees.feeCents);
-    totalAmountSpan.textContent = formatDollars(fees.totalChargeCents);
+    creditAmountSpan.textContent = formatCents(fees.creditCents);
+    feeAmountSpan.textContent = formatCents(fees.cardCostCents);
+    totalAmountSpan.textContent = formatCents(fees.totalChargeCents);
     
     // Show breakdown
     feeBreakdown.classList.remove('hidden');
@@ -172,32 +171,6 @@ function handleAmountChange() {
   
   // Enable submit button
   submitBtn.disabled = false;
-}
-
-/**
- * Calculate fees for a desired credit amount
- * User pays fees on top of the credit they want
- * 
- * NOTE: This calculation is duplicated in the backend (src/utils/pricing.js)
- * for API validation. Frontend duplication provides instant feedback without
- * requiring an API call. If fee structure changes, update both locations.
- */
-function calculateFees(creditCents) {
-  const totalChargeCents = Math.ceil((creditCents + STRIPE_FEE_FIXED_CENTS) / (1 - STRIPE_FEE_PERCENTAGE));
-  const feeCents = totalChargeCents - creditCents;
-  
-  return {
-    creditCents,
-    feeCents,
-    totalChargeCents
-  };
-}
-
-/**
- * Format cents as dollars
- */
-function formatDollars(cents) {
-  return `$${(cents / 100).toFixed(2)}`;
 }
 
 /**
@@ -241,7 +214,7 @@ async function handleFormSubmit(event) {
 
     if (isLocalMode) {
       successMessage.classList.remove('hidden');
-      showToast(`Added ${formatDollars(data.amount_cents)} to your balance.`, 'success');
+      showToast(`Added ${formatCents(data.amount_cents)} to your balance.`, 'success');
       submitBtn.textContent = 'Add Funds';
       submitBtn.disabled = false;
       submitBtn.classList.remove('loading');

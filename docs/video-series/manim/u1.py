@@ -110,9 +110,10 @@ class U1_AddFunds(Ep):
         minimum = T("minimum $1.00", 20, GREY_B).next_to(amount.box, RIGHT, buff=0.2)
 
         def lines(credit):
-            fee = round(credit * 0.029 + 0.30 + 1e-9, 2)
-            rows = VGroup(T(f"Credit  ${credit:.2f}", 26), T(f"Processing fee  ${fee:.2f}", 26, ORANGE),
-                          T(f"Total charge  ${credit + fee:.2f}", 26, WHITE, weight=BOLD)).arrange(DOWN, aligned_edge=LEFT, buff=0.25)
+            # Same gross-up as src/utils/cost-policy.js grossUp: Stripe's 2.9% applies to the whole total
+            total = math.ceil((round(credit * 100) + 30) / 0.971) / 100
+            rows = VGroup(T(f"Added to balance  ${credit:.2f}", 26), T(f"Card payment cost  ${total - credit:.2f}", 26, ORANGE),
+                          T(f"You pay  ${total:.2f}", 26, WHITE, weight=BOLD)).arrange(DOWN, aligned_edge=LEFT, buff=0.25)
             return rows.next_to(amount, DOWN, buff=0.45).align_to(amount, LEFT)
 
         typed = M("1.00", 22).move_to(amount.box).align_to(amount.box, LEFT).shift(RIGHT * 0.15)
@@ -121,13 +122,13 @@ class U1_AddFunds(Ep):
         stripe = T("payment by card (Stripe)", 20, GREY_B).next_to(form.rect, DOWN, buff=0.2)
         self.at("goes through Stripe", FadeIn(stripe), rt=0.5)
         rows = lines(1.00)
-        self.at("card processing fee is added on top", FadeIn(rows), rt=0.8)
-        formula = VGroup(RoundedRectangle(corner_radius=0.12, width=4.2, height=0.9, color=ORANGE),
-                         T("fee = 2.9% × credit + 30¢", 26, ORANGE)).move_to(RIGHT * 3.6 + DOWN * 0.6)
+        self.at("card payment cost is added on top", FadeIn(rows), rt=0.8)
+        formula = VGroup(RoundedRectangle(corner_radius=0.12, width=4.8, height=0.9, color=ORANGE),
+                         T("total = ⌈(credit + 30¢) ÷ 0.971⌉", 26, ORANGE)).move_to(RIGHT * 3.6 + DOWN * 0.6)
         formula[1].move_to(formula[0])
         self.at("two point nine percent", FadeIn(formula, shift=LEFT * 0.3), Indicate(rows[1], color=ORANGE), rt=1.0)
 
-        self.at("That fixed thirty cents", Indicate(formula[1][-3:], color=YELLOW, scale_factor=1.4), rt=0.8)
+        self.at("That fixed thirty cents", Indicate(formula[1], color=YELLOW, scale_factor=1.2), rt=0.8)
         self.at("A one-dollar credit costs", Indicate(rows[2], color=WHITE), rt=0.8)
         typed10 = M("10.00", 22).move_to(typed, aligned_edge=LEFT)
         self.at("A ten-dollar credit", Transform(typed, typed10), Transform(rows, lines(10.00)), rt=0.8)

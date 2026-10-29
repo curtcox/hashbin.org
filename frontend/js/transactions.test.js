@@ -22,3 +22,17 @@ describe('content deletion transactions', () => {
     expect(html).toContain('href="/info.html?cid=AAAAAAAAcid"');
   });
 });
+
+describe('deposit details', () => {
+  it('itemize the card payment cost and tax, and link to the explanation', () => {
+    const html = buildTransactionDetails({ type: 'deposit', amount_cents: 1000, stripe_fee_cents: 61, tax_cents: 100 });
+    expect(html).toContain('Card payment cost:</strong> $0.61');
+    expect(html).toContain('sales tax:</strong> $1.00');
+    expect(html).toContain('charged:</strong> $11.61');
+    expect(html).toContain('href="/docs/deposits.html"');
+  });
+
+  it('leave out the breakdown for deposits recorded without one', () => {
+    expect(buildTransactionDetails({ type: 'deposit', amount_cents: 1000, stripe_fee_cents: null })).not.toContain('Card payment cost');
+  });
+});

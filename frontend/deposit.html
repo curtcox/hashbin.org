@@ -94,7 +94,7 @@
 
             <form id="deposit-form">
               <div class="form-group">
-                <label for="amount">Credit Amount (USD)</label>
+                <label for="amount">Amount to add to your balance (USD)</label>
                 <div class="input-group">
                   <span class="input-prefix">$</span>
                   <input 
@@ -114,18 +114,24 @@
               <!-- Fee Breakdown Display -->
               <div id="fee-breakdown" class="fee-breakdown hidden">
                 <div class="fee-line">
-                  <span>Credit Amount:</span>
-              <span id="credit-amount">$0.00</span>
-            </div>
-            <div class="fee-line">
-              <span>Processing Fee:</span>
-              <span id="fee-amount">$0.00</span>
-            </div>
-            <div class="fee-line fee-total">
-              <strong>Total Charge:</strong>
-              <strong id="total-amount">$0.00</strong>
-            </div>
-          </div>
+                  <span>Added to your balance:</span>
+                  <span id="credit-amount">$0.00</span>
+                </div>
+                <div class="fee-line">
+                  <span>Card payment cost (Stripe's fee):</span>
+                  <span id="fee-amount">$0.00</span>
+                </div>
+                <div class="fee-line fee-total">
+                  <strong>You pay:</strong>
+                  <strong id="total-amount">$0.00</strong>
+                </div>
+                <p class="form-text" style="margin-top: 0.75rem;">
+                  Stripe, our card processor, charges 2.9% of each payment plus $0.30. We add that
+                  cost, rounded up to the cent, so the full amount you chose reaches your balance;
+                  HashBin keeps none of it. Stripe shows any sales tax before you pay.
+                  <a href="/docs/deposits.html" target="_blank">How these amounts are calculated</a>
+                </p>
+              </div>
 
           <button type="submit" id="submit-btn" class="btn btn-primary" disabled>
             Add Funds via Stripe

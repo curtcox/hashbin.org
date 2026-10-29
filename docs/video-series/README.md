@@ -249,11 +249,11 @@ search the scripts for the value.
 | 256t string | 8-character length prefix (6-byte big-endian length) + 86 characters (SHA-512 or inline content), base64url, at most 94 characters | `frontend/js/hash256t.js` |
 | Largest size a 256t string can describe | 2⁴⁸ − 1 bytes (prefix `________`), about 256 tebibytes | 6-byte length prefix |
 | Upload limit | 90 MB per file | `src/utils/upload-limits.js` |
-| Deposits | $1.00 minimum; card fee 2.9% + 30¢, added on top ($1.00 credit costs $1.33; $10.00 costs $10.59) | `src/utils/pricing.js` |
+| Deposits | $1.00 minimum; the card payment cost (Stripe's 2.9% of the total + 30¢) is itemized and added on top: total = ⌈(credit + 30¢) ÷ 0.971⌉ ($1.00 credit costs $1.34; $10.00 costs $10.61); explained at `/docs/deposits.html` | `src/utils/cost-policy.js` |
 | Refunds | None; balances can't be withdrawn | Terms, deposit page |
 | Re-uploading existing content | Adds the chosen months to its expiration and charges for them; deleted content returns 410 and can't be re-uploaded | `src/api/content.js` |
 | Donations | Anyone, by card, no account; $1.00 minimum; buys whole months; capped at 100 years per donation | `src/utils/pricing.js` |
-| Disputes | Content blocked with 451 while open; expire after 30 days unresolved; new dispute on the same content blocked for 30 days after one closes; 10 reports per IP per hour; outcomes: under review, denied, upheld (taken down) | `src/durable-objects/dispute-record.js`, STATUS S10 |
+| Disputes | Content blocked with 451 while open; most expire after 30 days unresolved, copyright and intimate image reports never do; new dispute on the same content blocked for 30 days after one closes; 10 reports per IP per hour; outcomes: under review, denied, upheld (taken down) | `src/durable-objects/dispute-record.js`, STATUS S10 |
 | Repeat infringers | One strike per upheld copyright removal; operator alert at 3 strikes in 365 days | STATUS S14 |
 | Download allowance | Minimum time between requests (MTBR) per content; new uploads: one request per 30 days for their first 30 days; after that, none unless purchased; lowest active MTBR wins; minimum 100 ms; $0.02 per GiB of maximum possible transfer | `src/durable-objects/content-metadata.js`, `src/utils/rate-limit-pricing.js` |
 | 256t.us per-IP limit | 30 requests per minute per IP | `workers/256t-content/src/index.js` |

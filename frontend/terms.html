@@ -49,7 +49,7 @@
 
       <h2>3. Balance, pricing, and payments</h2>
       <ul>
-        <li>You add funds to a prepaid balance through Stripe. The card processing fee is shown and added at checkout; your balance is credited with the amount you chose. The total is rounded up from (credit + $0.30) / 0.971. Accounts under 30 days old may deposit at most $20 per checkout.</li>
+        <li>You add funds to a prepaid balance through Stripe, our card processor. Your balance is credited with the full amount you choose. Stripe charges us 2.9% of each payment plus $0.30, so we add that card payment cost, calculated as (credit + $0.30) / 0.971 rounded up to the cent, minus the credit. Checkout itemizes the credit, the card payment cost and any sales tax before you pay. <a href="/docs/deposits.html">How deposit amounts are calculated</a> shows the arithmetic in full. Accounts under 30 days old may deposit at most $20 per checkout.</li>
         <li>Prepaid retention is limited to 10 years from the date of purchase, including extensions and donations.</li>
         <li>Paid files include a finite lifetime download allowance based on their payments and storage costs. When that allowance runs out, downloads pause unless more downloads have been prepaid. Bandwidth purchases cost the greater of $0.02 per GB or $4 per million requests. During a cost safety brake, only the included allowance is served.</li>
         <li>Free inline uploads are limited to 60 per account per hour. Downloads are also subject to request limits.</li>

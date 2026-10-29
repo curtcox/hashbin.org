@@ -6,7 +6,7 @@ Act too slowly, and real harm stays online. Act too quickly, and anyone can take
 
 Anyone can report a file, with or without an account. There's a "Report this content" link on every content page, which opens a form.
 
-You choose a reason: copyright infringement, illegal content, a privacy violation, harassment, malware, or something else. You explain the problem in at least fifty characters, and you can add up to ten supporting links. For copyright, that means identifying the original work, how this file infringes it, and whether you hold the rights.
+You choose a reason: copyright infringement, illegal content, a privacy violation, harassment, malware, an intimate image shared without consent, or something else. You explain the problem in at least fifty characters, and you can add up to ten supporting links. For copyright, that means identifying the original work, how this file infringes it, and whether you hold the rights.
 
 Then you leave a way to reach you, and confirm that the report is made in good faith.
 
@@ -18,6 +18,8 @@ At the same moment, the report becomes public. It's listed on the disputes page 
 
 Publishing the report is what keeps this honest. If someone files a baseless report to silence something, the baseless report is on the record for everyone to read.
 
+There's one exception. A report of an intimate image shared without consent stays private: the public sees only the file and the reason, and an administrator decides it within forty-eight hours.
+
 <break time="1.5s" />
 
 Then an administrator reviews the report. There are three ways it can end.
@@ -28,7 +30,9 @@ If it does hold up, it's upheld, and the file is removed, the same way as any ot
 
 And if nobody resolves the report within thirty days, it expires, and the file becomes available again. A report can block a file for a while, but not forever by being ignored.
 
-Once a dispute closes, the same file can't be reported again for thirty days. That stops anyone from keeping a file blocked by filing the same report over and over.
+Copyright reports and intimate image reports are different: they never expire, so the file stays blocked until an administrator decides. A copyright report can also end with a counter-notice from the uploader. Then the file comes back about two and a half weeks later, unless the person who reported it goes to court.
+
+Once a dispute closes, the same file can't be reported again for thirty days. That stops anyone from keeping a file blocked by filing the same report over and over. An intimate image report is never made to wait.
 
 <break time="1.5s" />
 
@@ -44,6 +48,6 @@ What's not in the records is anyone's identity. The question the records answer 
 
 <break time="1.5s" />
 
-Anyone can report a file. It's blocked right away, the report is public, and a person reviews it: denied, upheld, or expired after thirty days. Limits keep reports from being used as a weapon, strikes keep repeat infringers in check, and every removal lands in the public record.
+Anyone can report a file. It's blocked right away, the report is public, and a person reviews it: denied, upheld, or, for most reports, expired after thirty days. Limits keep reports from being used as a weapon, strikes keep repeat infringers in check, and every removal lands in the public record.
 
 Next, a different kind of limit: not on whether a file can be read, but on how often.

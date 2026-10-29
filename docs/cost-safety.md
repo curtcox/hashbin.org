@@ -31,8 +31,10 @@ Donation quotes fit the remaining term; if another purchase fills the cap after
 Stripe checkout, the rejected payment is refunded with an idempotent key.
 Inline uploads are limited to 60/account/UTC hour. Accounts under 30 days old
 (or with unknown age) may deposit at most $20 per checkout. The $1 minimum stays;
-the corrected total is `ceil((credit_cents + 30) / 0.971)`. The card-fee legal
-question remains open in STATUS L20; corrected arithmetic does not resolve it.
+the corrected total is `ceil((credit_cents + 30) / 0.971)`. Checkout itemizes the
+credit and the card payment cost, and `/docs/deposits.html` explains them. Whether
+card-network surcharge rules apply to the pass-through remains open in STATUS L20;
+clear wording does not settle it.
 
 ## Caching and availability
 

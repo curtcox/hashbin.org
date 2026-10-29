@@ -53,18 +53,18 @@ marked *optional screen capture* can use a real recording of hashbin.org instead
 
 **Visual**
 - Stop 2 lights up. A mock "Add Funds" form: "Credit amount: $" with an input.
-- Type `1.00`. Three lines below animate: "Credit $1.00", "Processing fee $0.33", "Total charge $1.33". The fee
-  line glows briefly.
-- Retype `10.00`: the numbers count to "Credit $10.00 · Fee $0.59 · Total $10.59".
-- Pull out a small formula card: `fee = 2.9\% \times \text{credit} + 30¢` (rounded to the cent).
+- Type `1.00`. Three lines below animate: "Added to balance $1.00", "Card payment cost $0.34", "You pay $1.34". The
+  card payment cost line glows briefly.
+- Retype `10.00`: the numbers count to "Added to balance $10.00 · Card payment cost $0.61 · You pay $10.61".
+- Pull out a small formula card: `total = ⌈(credit + 30¢) ÷ 0.971⌉` (rounded up to the cent).
 - The `BALANCE` bar in the corner fills to $10.00 in GOLD.
 - Small print fades in under the form: "Payments are final. Balances can't be withdrawn."
 
 **Narration**
 
-> Publishing is paid from a prepaid balance, so next, add some funds. The minimum is one dollar. The payment goes through Stripe, and the card processing fee is added on top and shown before you pay: two point nine percent plus thirty cents.
+> Publishing is paid from a prepaid balance, so next, add some funds. The minimum is one dollar. The payment goes through Stripe, and the card payment cost is added on top and itemized before you pay: Stripe's two point nine percent of the payment plus thirty cents.
 >
-> That fixed thirty cents is why small deposits look expensive. A one-dollar credit costs a dollar thirty-three. A ten-dollar credit costs ten fifty-nine. Either way, your balance gets the full credit amount.
+> That fixed thirty cents is why small deposits look expensive. A one-dollar credit costs a dollar thirty-four. A ten-dollar credit costs ten sixty-one. Either way, your balance gets the full credit amount, and a link on the page shows the arithmetic.
 >
 > Payments are final, and a balance can't be withdrawn. But it doesn't expire, either. It just sits there until you publish something. And as we'll see, a dollar of storage goes a long way.
 

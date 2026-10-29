@@ -114,7 +114,8 @@ export async function handleCreateDeposit(request, env) {
       ? 'https://hashbin.org'
       : new URL(request.url).origin;
 
-    // Create Stripe Checkout session
+    // Create Stripe Checkout session. The receipt itemizes the credit and the card payment
+    // cost added to cover Stripe's fee (L20); /docs/deposits.html explains the arithmetic.
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [
@@ -122,10 +123,21 @@ export async function handleCreateDeposit(request, env) {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: 'HashBin.org Account Deposit',
-              description: `Deposit ${formatCents(amount_cents)} to your HashBin account`
+              name: 'HashBin balance credit',
+              description: `${formatCents(amount_cents)} added to your HashBin balance`
             },
-            unit_amount: feeBreakdown.totalChargeCents
+            unit_amount: feeBreakdown.creditCents
+          },
+          quantity: 1
+        },
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: 'Card payment cost',
+              description: 'Covers Stripe\'s fee of 2.9% of this payment plus $0.30, rounded up to the cent. HashBin keeps none of it. Details: hashbin.org/docs/deposits.html'
+            },
+            unit_amount: feeBreakdown.feeCents
           },
           quantity: 1
         }
@@ -338,11 +350,9 @@ async function handleCheckoutSessionCompleted(session, env) {
       const paymentRecordId = env.PAYMENT_RECORDS.idFromName(userId);
       const paymentRecordStub = env.PAYMENT_RECORDS.get(paymentRecordId);
 
-      // Calculate Stripe fee from the total charged amount
-      // The session metadata contains the credit amount the user receives
-      // We need to calculate the fee based on the actual charge
-      const totalCharged = session.amount_total; // in cents
-      const stripeFee = totalCharged - amount_cents; // fee = total - credit
+      // The card payment cost is what was charged beyond the credit and any sales tax
+      const taxCents = session.total_details?.amount_tax || 0;
+      const cardCostCents = session.amount_total - taxCents - amount_cents;
 
       await paymentRecordStub.fetch(
         new Request('http://internal/transaction', {
@@ -357,7 +367,8 @@ async function handleCheckoutSessionCompleted(session, env) {
             balance_after_cents: depositData.balance_after_cents,
             stripe_session_id: session.id,
             stripe_payment_intent: session.payment_intent,
-            stripe_fee_cents: stripeFee
+            stripe_fee_cents: cardCostCents,
+            tax_cents: taxCents
           })
         })
       );

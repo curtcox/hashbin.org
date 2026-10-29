@@ -47,7 +47,7 @@
 
 > Anyone can report a file, with or without an account. There's a "Report this content" link on every content page, which opens a form.
 >
-> You choose a reason: copyright infringement, illegal content, a privacy violation, harassment, malware, or something else. You explain the problem in at least fifty characters, and you can add up to ten supporting links. For copyright, that means identifying the original work, how this file infringes it, and whether you hold the rights.
+> You choose a reason: copyright infringement, illegal content, a privacy violation, harassment, malware, an intimate image shared without consent, or something else. You explain the problem in at least fifty characters, and you can add up to ten supporting links. For copyright, that means identifying the original work, how this file infringes it, and whether you hold the rights.
 >
 > Then you leave a way to reach you, and confirm that the report is made in good faith.
 
@@ -73,6 +73,8 @@
 > At the same moment, the report becomes public. It's listed on the disputes page with the reason, the explanation, and the links. Your contact details aren't shown to the public, but signed-in HashBin users can see them, so the person who uploaded the file can get in touch with you.
 >
 > Publishing the report is what keeps this honest. If someone files a baseless report to silence something, the baseless report is on the record for everyone to read.
+>
+> There's one exception. A report of an intimate image shared without consent stays private: the public sees only the file and the reason, and an administrator decides it within forty-eight hours.
 
 ---
 
@@ -87,7 +89,9 @@
   1. "Denied": the RED band lifts; `STATUS CHIP` 451 → 200 GREEN.
   2. "Upheld": the file is removed; `STATUS CHIP` 451 → 404; a public record row "removed by admin" with a short public
      reason.
-  3. "Expired after 30 days": a clock hits 30; the band lifts; 451 → 200.
+  3. "Expired after 30 days": a clock hits 30; the band lifts; 451 → 200. A small note: "not copyright or intimate
+     image reports".
+  4. "Counter-notice" (copyright only): a calendar counts 12 weekdays; the band lifts; 451 → 200.
 - Under "Upheld", a small branch: "copyright → strike against the uploader".
 - Under "Denied" and "Expired", a small lock icon labeled "no new report on this file for 30 days".
 
@@ -101,7 +105,9 @@
 >
 > And if nobody resolves the report within thirty days, it expires, and the file becomes available again. A report can block a file for a while, but not forever by being ignored.
 >
-> Once a dispute closes, the same file can't be reported again for thirty days. That stops anyone from keeping a file blocked by filing the same report over and over.
+> Copyright reports and intimate image reports are different: they never expire, so the file stays blocked until an administrator decides. A copyright report can also end with a counter-notice from the uploader. Then the file comes back about two and a half weeks later, unless the person who reported it goes to court.
+>
+> Once a dispute closes, the same file can't be reported again for thirty days. That stops anyone from keeping a file blocked by filing the same report over and over. An intimate image report is never made to wait.
 
 **⚠ Before recording:** browsers that already fetched a file may keep showing their cached copy (README, Before recording #4). Expired disputes unblock content once the STATUS S15 fix is deployed.
 
@@ -160,6 +166,6 @@
 
 **Narration**
 
-> Anyone can report a file. It's blocked right away, the report is public, and a person reviews it: denied, upheld, or expired after thirty days. Limits keep reports from being used as a weapon, strikes keep repeat infringers in check, and every removal lands in the public record.
+> Anyone can report a file. It's blocked right away, the report is public, and a person reviews it: denied, upheld, or, for most reports, expired after thirty days. Limits keep reports from being used as a weapon, strikes keep repeat infringers in check, and every removal lands in the public record.
 >
 > Next, a different kind of limit: not on whether a file can be read, but on how often.

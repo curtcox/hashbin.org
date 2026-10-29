@@ -194,6 +194,13 @@ export function buildTransactionDetails(transaction) {
     }
   }
 
+  // What the card was charged beyond the credit (L20): itemized, with the full explanation a click away
+  if (transaction.type === 'deposit' && Number.isInteger(transaction.stripe_fee_cents)) {
+    const cents = (value) => `$${(value / 100).toFixed(2)}`;
+    const charged = transaction.amount_cents + transaction.stripe_fee_cents + (transaction.tax_cents || 0);
+    details.push(`<div><strong>Card payment cost:</strong> ${escapeHtml(cents(transaction.stripe_fee_cents))}${transaction.tax_cents ? `; <strong>sales tax:</strong> ${escapeHtml(cents(transaction.tax_cents))}` : ''}; <strong>charged:</strong> ${escapeHtml(cents(charged))} (<a href="/docs/deposits.html">how this is calculated</a>)</div>`);
+  }
+
   // Stripe reference (if present)
   if (transaction.type === 'deposit' && transaction.stripe_session_id) {
     details.push(`<div><strong>Stripe:</strong> <span style="font-family: monospace; font-size: 0.875rem;">${escapeHtml(transaction.stripe_session_id.slice(0, 20))}...</span></div>`);

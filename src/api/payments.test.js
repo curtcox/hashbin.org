@@ -315,6 +315,30 @@ describe('Payments API - P0 Security Tests', () => {
       expect(balance2.balance_cents).toBe(10000); // Not doubled!
     });
 
+    it('records the card payment cost apart from any sales tax', async () => {
+      const event = createCheckoutSessionCompletedEvent({
+        id: 'evt_tax_1',
+        data: {
+          object: {
+            id: 'cs_tax_1',
+            client_reference_id: 'user_tax',
+            metadata: { user_id: 'user_tax', type: 'deposit', amount_cents: '1000' },
+            amount_total: 1161,
+            total_details: { amount_tax: 100 }
+          }
+        }
+      });
+      const response = await handleStripeWebhook(new Request('http://test.com/webhooks/stripe', {
+        method: 'POST',
+        headers: { 'stripe-signature': 'valid_signature', 'content-type': 'application/json' },
+        body: JSON.stringify(event)
+      }), mockEnv);
+      expect(response.status).toBe(200);
+
+      const deposit = mockEnv.PAYMENT_RECORDS.transactions.find(t => t.stripe_session_id === 'cs_tax_1');
+      expect(deposit).toMatchObject({ amount_cents: 1000, stripe_fee_cents: 61, tax_cents: 100 });
+    });
+
     it('should handle replay attacks gracefully', async () => {
       const event = createCheckoutSessionCompletedEvent({
         id: 'evt_replay_attack',
@@ -444,6 +468,7 @@ function createMockPaymentRecords() {
   const transactions = [];
   
   return {
+    transactions,
     idFromName: (userId) => ({ toString: () => userId }),
     get: () => ({
       fetch: async (request) => {
