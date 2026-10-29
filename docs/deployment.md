@@ -198,16 +198,20 @@ Update your domain's nameservers at your domain registrar:
 ### 3.6: Configure Worker Secrets
 
 The deploy workflow's "Verify required secrets" step fails unless these GitHub secrets exist,
-and then pushes them to the Worker:
+before any Cloudflare writes (only runtime secrets are pushed to the Worker):
 
-- `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`
+- `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ZONE_ID`
+- `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` (production live keys)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: payments (Stripe Tax must be activated;
   checkouts use automatic tax)
 - `OAUTH_SIGNING_KEY`, `DOWNLOAD_TOKEN_SECRET`: also pushed to the 256t.us Worker, which must
   share both values. `DOWNLOAD_TOKEN_SECRET` signs API keys, admin keys and download tokens, so
   changing it invalidates all of them.
 
-Also set, from GitHub secrets of the same name (the deploy workflow publishes them when present):
+The preflight also requires `ADMIN_USER_ID`, `CLERK_WEBHOOK_SECRET` and
+`CLOUDFLARE_ANALYTICS_TOKEN`. Set them as GitHub secrets; the workflow publishes them to the
+main Worker. `ALERT_WEBHOOK_URL` remains optional, but live alert delivery is a launch
+acceptance item. Details:
 
 - `ADMIN_USER_ID`: the admin's Clerk user ID; that sign-in holds every admin scope and issues
   scoped admin keys (`/admin/keys.html`)
@@ -296,7 +300,7 @@ git push origin main
 ```
 
 In the **Actions** tab, the "Deploy to Cloudflare" workflow:
-1. Runs the unit, hosted-sandbox and funded-download tests
+1. Runs the runtime audit, unit/lint, local API, browser, hosted-sandbox and funded-download tests
 2. Creates the R2 buckets if needed and pushes Worker secrets from GitHub secrets
 3. Deploys the three Workers listed above
 4. Verifies the workers.dev URL, the custom domain, and the git SHA embedded in the health
@@ -369,6 +373,10 @@ If custom domain doesn't work:
 ## Verification and Testing
 
 ### Automated Verification
+
+`npm run verify:production` enforces the strict [production checklist](../todo/deployment_checklist.md)
+against all three origins. Set `EXPECTED_GIT_SHA` to the full deployed commit for an exact
+match. Deploy CI runs it after deploying; scheduled smoke tests run it every six hours.
 
 The GitHub Actions workflow automatically verifies deployments by testing:
 - Root endpoint (`/`)
@@ -510,11 +518,15 @@ This opens a browser window to authorize Wrangler.
 
 ### Deploy
 
-There is one environment (production). Pushing to `main` deploys through CI; to deploy by hand:
+There is one environment (production). Push to `main` only when authorized by the owner,
+or rerun the workflow on its current commit:
 
 ```bash
-npm run deploy
+gh workflow run deploy.yml --repo curtcox/hashbin.org --ref main
 ```
+
+Do not use `npm run deploy` for production: it deploys only the main Worker and skips
+secret provisioning, SHA injection, the other two Workers and verification.
 
 ### Local Development
 

@@ -8,6 +8,8 @@ comment says what it needs.
 
 | Script | What it does |
 |--------|--------------|
+| `verify-production.mjs` | `npm run verify:production`: strict post-deploy checks for all three origins, page/health commits, credential/signature refusals and public endpoints. Set `EXPECTED_GIT_SHA` to require a full commit. Used by deploy and scheduled smoke CI ([checklist](../todo/deployment_checklist.md)). |
+| `check-deployment-secrets.mjs` | Validates required CI secrets and live key modes before Cloudflare writes; reports names only. |
 | `verify-deployment.sh` | Checks a deployment: home page, `/health` (config, Durable Objects, R2), the 256t.us content domain and API 404s. `npm run verify` checks `https://hashbin.org`; `npm run verify:workers-dev -- <subdomain>` checks `hashbin-worker-prod.<subdomain>.workers.dev`. |
 | `verify-hosted-run-origin.mjs` | Checks the live `hashbin.app` sandbox origin's headers (run by the deploy workflow). |
 | `generate-oauth-signing-key.sh` | Prints a random `OAUTH_SIGNING_KEY` and how to add it as a GitHub secret. Rotating it invalidates OAuth tokens and codes. |

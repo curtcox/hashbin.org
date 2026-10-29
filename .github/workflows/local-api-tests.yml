@@ -1,13 +1,13 @@
 name: Local API Tests
 
 on:
-  pull_request:
-    branches: [main]
+  workflow_call:
+  workflow_dispatch:
 
 jobs:
   api-tests:
     name: Run Local API Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -21,9 +21,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Run Unit Tests
-        run: npm run test:unit
 
       - name: Start local server
         run: |
@@ -43,16 +40,13 @@ jobs:
           echo "Server failed to start"
           echo "⚠️ Checking server logs:"
           # Try to get any error output from wrangler
-          ps aux | grep wrangler || echo "No wrangler process found"
+          pgrep -af wrangler || echo "No wrangler process found"
           exit 1
 
       - name: Run API Tests
         run: bash scripts/run-all-api-tests.sh
         env:
           ADMIN_USER: local_admin
-
-      - name: Verify native funded downloads with isolated local Workers
-        run: npm run test:funded:local
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
@@ -73,5 +67,5 @@ jobs:
         if: always()
         run: |
           if [ -f /tmp/server.pid ]; then
-            kill $(cat /tmp/server.pid) 2>/dev/null || true
+            kill "$(cat /tmp/server.pid)" 2>/dev/null || true
           fi

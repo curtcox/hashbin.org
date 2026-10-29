@@ -1,7 +1,7 @@
 # Production deployment checklist
 
 Checks to run around every production deploy, and the one-time setup still open before
-launch. Last checked against the code on 2026-10-28 (`431b09f`).
+launch. Repository automation implemented 2026-10-28; production acceptance remains open below.
 
 Production is the only environment, and every push to `main` deploys it, so push only when
 the owner has asked for it. [`STATUS.md`](../STATUS.md) wins over this file. The details
@@ -16,6 +16,39 @@ live elsewhere:
 | Reading `/health` | [`docs/health.md`](../docs/health.md) |
 | Brakes, hard stop and cost alerts | [`docs/cost-safety.md`](../docs/cost-safety.md) |
 | Restoring data | [`docs/backup-and-restore.md`](../docs/backup-and-restore.md) |
+
+## Implemented automation
+
+`npm run verify:production` runs the credential-free post-deploy checks against all three
+production origins. Set `EXPECTED_GIT_SHA` to the full deployed commit to require an exact
+match; without it, scheduled checks compare the five HTML pages to the current health SHA.
+The HTML checks use canonical paths (`/upload`, `/dashboard`, `/api-keys`, `/info`).
+The command fails on degraded health, a non-production environment, missing or down health
+components, mismatched page commits, content-origin failure, incorrect auth/webhook refusals,
+a broken public price calculation, API 404 failure, or unsafe hosted-origin responses.
+Requests have a 15-second timeout and refuse redirects. It never logs credentials.
+
+CI runs the runtime dependency audit, unit/lint, hosted-sandbox, funded-download, local API
+and browser suites before deployment. `scripts/check-deployment-secrets.mjs` rejects missing
+required secrets and test-mode Clerk/Stripe keys before the first Cloudflare write. A failed
+content Worker deploy now fails the workflow. Main/content verification runs after cache
+purging; full verification runs after deploying the hosted origin and in the Smoke Test
+workflow after successful deploys and every six hours. `--skip-run-origin` is reserved for
+the intermediate CI step before that origin deploys.
+
+Local evidence (2026-10-28): the runtime audit found a moderate `qs` advisory in Stripe's
+transitive dependencies. The lockfile now resolves `qs` 6.17.1 and `npm audit --omit=dev`
+reports zero vulnerabilities. Verification passed: 830 unit tests (including 43 new
+verifier/preflight tests), 14 local API suites, 39 frontend browser tests, 16 hosted sandbox
+checks, 2,500 funded requests within the one-cent cap, lint with zero errors, and Actionlint
+for the three changed workflows. Playwright ran with the pinned Chromium/WebKit binaries
+and Node 22. The credential-free verifier also passed against the existing production
+sites; these changes have not been deployed. Owner acceptance below is still open.
+
+The recurring checklist below remains a runbook. Automation does not complete the provider,
+browser, backup, alert-delivery, financial or legal acceptance items under **Open launch
+setup**. Record those results in their linked plans and STATUS rows; keep this plan open
+until the owner work has evidence.
 
 ## What a deploy changes
 
@@ -62,9 +95,8 @@ Workers and the cache purge.
 
 ## After every deploy
 
-- [ ] The run is green, including **Deploy hosted run origin (hashbin.app)**. The content
-  Worker step is `continue-on-error`, so a green run can hide a failed `256t.us` deploy.
-  Look for its warning in the run log.
+- [ ] The run is green, including the content Worker deploy and **Deploy hosted run origin
+  (hashbin.app)**. Both now fail the workflow on a deployment or verification error.
 - [ ] Main site health:
 
   ```bash
@@ -72,8 +104,8 @@ Workers and the cache purge.
   ```
 
   `status` is `healthy`, `environment` is `production` and `gitSha` is the deployed
-  commit. CI passes a `degraded` deploy with a warning, but production shouldn't stay
-  degraded: each check's `message` says why.
+  commit. CI rejects a `degraded` deploy; each check's `message` says why.
+- [ ] `npm run verify:production` passes (also run automatically by CI and smoke tests).
 - [ ] `curl -fsS https://256t.us/health` returns 200.
 - [ ] `node scripts/verify-hosted-run-origin.mjs` passes.
 - [ ] The Smoke Test workflow, which runs after each successful deploy and every 6 hours,
@@ -123,13 +155,13 @@ Check names (not values) with `gh secret list --repo curtcox/hashbin.org`,
 | Secret | Where | Needed |
 |--------|-------|--------|
 | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | CI; the account ID is also used by the main Worker's cost monitor | Required |
-| `CLOUDFLARE_ZONE_ID` | CI route check and cache purge | Required, though CI doesn't check for it |
+| `CLOUDFLARE_ZONE_ID` | CI route check and cache purge | Required; checked before any Cloudflare write |
 | `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` | Main Worker | Required (`sk_live_`/`pk_live_`) |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Main Worker | Required (live mode) |
 | `OAUTH_SIGNING_KEY`, `DOWNLOAD_TOKEN_SECRET` | Main and content Workers, same values | Required |
-| `ADMIN_USER_ID` | Main Worker | Without it nobody can sign in as admin or issue `hba_` keys |
-| `CLERK_WEBHOOK_SECRET` | Main Worker | Without it Clerk webhooks get 503 |
-| `CLOUDFLARE_ANALYTICS_TOKEN` | Main Worker | Read-only; the hourly cost monitor needs it |
+| `ADMIN_USER_ID` | Main Worker | Required; admin sign-in and issuing `hba_` keys |
+| `CLERK_WEBHOOK_SECRET` | Main Worker | Required; profile sync/deletion and webhook refusal verification |
+| `CLOUDFLARE_ANALYTICS_TOKEN` | Main Worker | Required, read-only; the hourly cost monitor needs it |
 | `ALERT_WEBHOOK_URL` | Main Worker | Without it alerts appear only at `/api/admin/alerts` |
 | `CLOUDFLARE_WORKERS_SUBDOMAIN` | CI | Optional extra workers.dev check |
 

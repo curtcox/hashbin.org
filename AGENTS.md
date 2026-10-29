@@ -59,11 +59,12 @@ Node 22+. Run `npm install` first.
 | `npm run test:funded:local` | Funded-download acceptance in two isolated local Workers | nothing |
 | `npm run test:api` | Local API suites in `scripts/api-tests/` | `dev:local` running |
 | `npm test` | Unit tests plus legacy grep-based shell checks | `dev:local` running for the supplier checks |
+| `npm run verify:production` | Strict production post-deploy checks for all three origins | deployed site; optional `EXPECTED_GIT_SHA` |
 | `npm run status` | Open STATUS items | nothing |
 
-Deployment CI (`.github/workflows/deploy.yml`) gates on the unit, hosted-sandbox and
-funded-download checks. Every push to `main` deploys production, the only environment, so
-don't push to `main` unless the owner asked you to.
+Deployment CI (`.github/workflows/deploy.yml`) gates on the runtime audit, lint, unit, local
+API, browser, hosted-sandbox and funded-download checks. Every push to `main` deploys
+production, the only environment, so don't push to `main` unless the owner asked you to.
 
 In local mode, authenticate API calls with `Authorization: LocalDev <user_id>`. New local
 users start with $10.00, and `POST /api/balance/dev-deposit` adds more

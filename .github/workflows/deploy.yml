@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev
+
       - name: Run tests with reporter
         run: bash scripts/test-reporter.sh
 
@@ -45,10 +48,14 @@ jobs:
       - name: Verify native funded downloads with isolated local Workers
         run: npm run test:funded:local
 
+  api-tests:
+    name: Verify API and frontend
+    uses: ./.github/workflows/local-api-tests.yml
+
   deploy:
     name: Deploy to Production
     if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-    needs: test
+    needs: [test, api-tests]
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -66,6 +73,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify required secrets
+        run: node scripts/check-deployment-secrets.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          CLERK_WEBHOOK_SECRET: ${{ secrets.CLERK_WEBHOOK_SECRET }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          OAUTH_SIGNING_KEY: ${{ secrets.OAUTH_SIGNING_KEY }}
+          DOWNLOAD_TOKEN_SECRET: ${{ secrets.DOWNLOAD_TOKEN_SECRET }}
+          ADMIN_USER_ID: ${{ secrets.ADMIN_USER_ID }}
+          CLOUDFLARE_ANALYTICS_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_TOKEN }}
+
       - name: Inject git SHA into frontend HTML files
         run: |
           GIT_SHA=$(git rev-parse HEAD)
@@ -78,7 +101,7 @@ jobs:
           echo ""
           echo "=== Verifying SHA injection in all HTML files ==="
           FAILED=false
-          for file in $(find frontend -name "*.html" -type f); do
+          while IFS= read -r -d '' file; do
             if grep -q "<!-- git-sha: $GIT_SHA -->" "$file"; then
               echo "✅ $file"
             else
@@ -87,7 +110,7 @@ jobs:
               head -3 "$file"
               FAILED=true
             fi
-          done
+          done < <(find frontend -name "*.html" -type f -print0)
 
           if [ "$FAILED" = true ]; then
             echo ""
@@ -141,58 +164,6 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
-      - name: Verify required secrets
-        run: |
-          echo "Verifying required secrets are configured..."
-          
-          # Check for required secrets
-          MISSING_SECRETS=""
-          
-          if [ -z "$CLERK_SECRET_KEY" ]; then
-            MISSING_SECRETS="$MISSING_SECRETS CLERK_SECRET_KEY"
-          fi
-          
-          if [ -z "$CLERK_PUBLISHABLE_KEY" ]; then
-            MISSING_SECRETS="$MISSING_SECRETS CLERK_PUBLISHABLE_KEY"
-          fi
-          
-          if [ -z "$STRIPE_SECRET_KEY" ]; then
-            MISSING_SECRETS="$MISSING_SECRETS STRIPE_SECRET_KEY"
-          fi
-          
-          if [ -z "$STRIPE_WEBHOOK_SECRET" ]; then
-            MISSING_SECRETS="$MISSING_SECRETS STRIPE_WEBHOOK_SECRET"
-          fi
-
-          if [ -z "$DOWNLOAD_TOKEN_SECRET" ]; then
-            MISSING_SECRETS="$MISSING_SECRETS DOWNLOAD_TOKEN_SECRET"
-          fi
-
-          if [ -z "$OAUTH_SIGNING_KEY" ]; then
-            MISSING_SECRETS="$MISSING_SECRETS OAUTH_SIGNING_KEY"
-          fi
-          
-          if [ -n "$MISSING_SECRETS" ]; then
-            echo "❌ ERROR: The following required secrets are missing:$MISSING_SECRETS"
-            echo ""
-            echo "Please configure these secrets in your GitHub repository settings:"
-            echo "Settings > Secrets and variables > Actions > New repository secret"
-            echo ""
-            echo "For more information, see docs/api-keys-setup.md"
-            exit 1
-          fi
-          
-          echo "✅ All required secrets are configured"
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
-          CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
-          OAUTH_SIGNING_KEY: ${{ secrets.OAUTH_SIGNING_KEY }}
-          DOWNLOAD_TOKEN_SECRET: ${{ secrets.DOWNLOAD_TOKEN_SECRET }}
-
       - name: Configure Clerk secrets
         run: |
           echo "Configuring Clerk secrets..."
@@ -233,7 +204,7 @@ jobs:
 
       - name: Configure Clerk webhook secret
         run: |
-          # Optional: enables POST /api/webhooks/clerk (profile sync and deletion)
+          # Required preflight enables profile sync and deletion.
           if [ -n "$CLERK_WEBHOOK_SECRET" ]; then
             echo "$CLERK_WEBHOOK_SECRET" | npx wrangler secret put CLERK_WEBHOOK_SECRET
             echo "✅ CLERK_WEBHOOK_SECRET configured"
@@ -273,7 +244,7 @@ jobs:
       - name: Configure admin secrets
         run: |
           # ADMIN_USER_ID's own sign-in holds every admin scope and issues admin keys.
-          # Skip an unset value so a manually set secret isn't overwritten.
+          # Preflight requires this value; retain the guard against empty writes.
           if [ -n "$ADMIN_USER_ID" ]; then
             echo "$ADMIN_USER_ID" | npx wrangler secret put ADMIN_USER_ID
             echo "✅ ADMIN_USER_ID configured"
@@ -337,7 +308,7 @@ jobs:
           WORKERS_DEV_URL=$(echo "$DEPLOY_OUTPUT" | grep -o 'https://[^[:space:]]*workers.dev' | head -1)
           echo ""
           echo "Extracted workers.dev URL: $WORKERS_DEV_URL"
-          echo "WORKERS_DEV_URL=$WORKERS_DEV_URL" >> $GITHUB_ENV
+          echo "WORKERS_DEV_URL=$WORKERS_DEV_URL" >> "$GITHUB_ENV"
 
           echo ""
           echo "=== Verifying bundled output contains git SHA ==="
@@ -362,14 +333,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy dedicated content worker (256t.us)
-        # Separate step so a content-worker problem (e.g. the API token lacking
-        # permission to attach the 256t.us custom domain) can't block the main site.
-        continue-on-error: true
-        run: |
-          if ! npx wrangler deploy --config workers/256t-content/wrangler.toml; then
-            echo "::warning::Content worker deploy failed; 256t.us downloads may be stale or unavailable (STATUS.md L4)"
-            exit 1
-          fi
+        run: npx wrangler deploy --config workers/256t-content/wrangler.toml
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -391,7 +355,7 @@ jobs:
           echo "Fetching /health from $WORKERS_DEV_URL..."
           RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" "${WORKERS_DEV_URL}/health")
           HTTP_CODE=$(echo "$RESPONSE" | grep -o 'HTTP_CODE:[0-9]*' | cut -d: -f2)
-          BODY=$(echo "$RESPONSE" | sed 's/HTTP_CODE:[0-9]*$//')
+          BODY=${RESPONSE%HTTP_CODE:*}
 
           echo "HTTP Code: $HTTP_CODE"
           echo "Response Body: $BODY"
@@ -459,115 +423,10 @@ jobs:
       - name: Wait for deployment propagation
         run: sleep 10
 
-      - name: Verify deployment - Custom domain
-        run: |
-          GIT_SHA=$(git rev-parse HEAD)
-          echo "Expected git SHA: $GIT_SHA"
-          echo "Testing custom domain hashbin.org..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin.org/health)
-          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-          BODY=$(echo "$RESPONSE" | head -n-1)
-
-          echo "HTTP Status Code: $HTTP_CODE"
-          echo "Response Body: $BODY"
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Health endpoint returned HTTP $HTTP_CODE (expected 200)"
-            exit 1
-          fi
-
-          # "degraded" means the code deployed but an integration isn't production-ready
-          # (e.g. Clerk/Stripe test keys). That's a launch blocker, not a failed deploy:
-          # the scheduled smoke test enforces it. Only "unhealthy" fails here.
-          OVERALL=$(echo "$BODY" | jq -r '.status')
-          if [ "$OVERALL" = "degraded" ]; then
-            echo "::warning::Health is degraded: $(echo "$BODY" | jq -r '[.checks | to_entries[] | select(.value.status != "operational") | "\(.key): \(.value.message)"] | join("; ")')"
-          elif [ "$OVERALL" != "healthy" ]; then
-            echo "❌ Health check failed - status is '$OVERALL'"
-            exit 1
-          fi
-
-          # Verify git SHA
-          DEPLOYED_SHA=$(echo "$BODY" | grep -o '"gitSha"[[:space:]]*:[[:space:]]*"[^"]*"' | sed 's/.*"\([^"]*\)".*/\1/')
-          echo "Deployed git SHA: $DEPLOYED_SHA"
-          
-          if [ "$DEPLOYED_SHA" != "$GIT_SHA" ]; then
-            echo "❌ Git SHA mismatch: expected $GIT_SHA, got $DEPLOYED_SHA"
-            exit 1
-          fi
-          
-          echo "✅ Git SHA verified: $GIT_SHA"
-
-          if ! echo "$BODY" | grep -q '"environment"[[:space:]]*:[[:space:]]*"production"'; then
-            echo "⚠️  Environment field shows unexpected value (non-critical)"
-          fi
-
-          echo ""
-          echo "Testing dedicated content domain health..."
-          CONTENT_HEALTH=$(curl -s -m 15 -w "\n%{http_code}" https://256t.us/health || true)
-          CONTENT_STATUS=$(echo "$CONTENT_HEALTH" | tail -n1)
-          CONTENT_BODY=$(echo "$CONTENT_HEALTH" | head -n-1)
-
-          echo "Content HTTP Status Code: $CONTENT_STATUS"
-          echo "Content Response Body: $CONTENT_BODY"
-
-          if [ "$CONTENT_STATUS" != "200" ]; then
-            # Not fatal until 256t.us is live (STATUS.md L4); the main site is unaffected
-            echo "::warning::Content domain https://256t.us/health returned HTTP $CONTENT_STATUS"
-          fi
-
-          echo "✅ Custom domain verified"
-
-      - name: Verify git SHA in HTML files
-        run: |
-          GIT_SHA=$(git rev-parse HEAD)
-          echo "Verifying git SHA in HTML files..."
-          echo "Expected SHA: $GIT_SHA"
-
-          PAGES=(
-            "/"
-            "/upload.html"
-            "/dashboard.html"
-            "/api-keys.html"
-            "/info.html"
-          )
-
-          MAX_RETRIES=3
-          RETRY_DELAY=5
-
-          for PAGE in "${PAGES[@]}"; do
-            echo ""
-            echo "Checking $PAGE..."
-            SUCCESS=false
-
-            for ((i=1; i<=MAX_RETRIES; i++)); do
-              # Use cache-busting headers
-              HTML_RESPONSE=$(curl -sL -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://hashbin.org$PAGE?_=$(date +%s)")
-
-              if echo "$HTML_RESPONSE" | grep -q "<!-- git-sha: $GIT_SHA -->"; then
-                echo "✅ Git SHA found in HTML: $GIT_SHA ($PAGE)"
-                SUCCESS=true
-                break
-              else
-                echo "Attempt $i/$MAX_RETRIES: SHA not found, waiting ${RETRY_DELAY}s..."
-                if [ $i -lt $MAX_RETRIES ]; then
-                  sleep $RETRY_DELAY
-                fi
-              fi
-            done
-
-            if [ "$SUCCESS" = false ]; then
-              echo "❌ Git SHA not found in HTML for $PAGE after $MAX_RETRIES attempts"
-              echo "Expected: <!-- git-sha: $GIT_SHA -->"
-              # Show what SHA is actually in the file
-              FOUND_SHA=$(echo "$HTML_RESPONSE" | grep -o '<!-- git-sha: [^>]*-->' | head -1)
-              echo "Found: $FOUND_SHA"
-              exit 1
-            fi
-          done
-
-          echo ""
-          echo "✅ All HTML files verified"
+      - name: Verify production checklist (main and content)
+        run: npm run verify:production -- --skip-run-origin
+        env:
+          EXPECTED_GIT_SHA: ${{ github.sha }}
 
       - name: Verify deployment - Workers.dev URL
         continue-on-error: true
@@ -579,7 +438,7 @@ jobs:
             exit 0
           fi
           echo "Testing worker on workers.dev..."
-          RESPONSE=$(curl -s -w "\n%{http_code}" https://hashbin-worker-prod.${WORKERS_SUBDOMAIN}.workers.dev/health)
+          RESPONSE=$(curl -s -w "\n%{http_code}" "https://hashbin-worker-prod.${WORKERS_SUBDOMAIN}.workers.dev/health")
           HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
           BODY=$(echo "$RESPONSE" | head -n-1)
 
@@ -634,5 +493,7 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Verify apex and disabled-app responses
-        run: node scripts/verify-hosted-run-origin.mjs
+      - name: Verify complete production checklist
+        run: npm run verify:production
+        env:
+          EXPECTED_GIT_SHA: ${{ github.sha }}

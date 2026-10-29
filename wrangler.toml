@@ -23,17 +23,18 @@ routes = [
 ]
 workers_dev = true
 
-# Note: Add these secrets using: wrangler secret put <SECRET_NAME>
+# Provision these secrets from GitHub through deploy.yml (see todo/deployment_checklist.md).
 # CLERK_SECRET_KEY (required)
 # CLERK_PUBLISHABLE_KEY (required)
 # STRIPE_SECRET_KEY (required for payments)
 # STRIPE_WEBHOOK_SECRET (required for Stripe webhooks)
-# ADMIN_USER_ID (Clerk user ID of the admin: holds every admin scope when signed in, and alone issues hba_ admin keys)
+# ADMIN_USER_ID (required; Clerk user ID of the admin: holds every admin scope when signed in, and alone issues hba_ admin keys)
 # OAUTH_SIGNING_KEY (required for OAuth authorize/token/revoke flow; same value on the 256t.us Worker)
 # DOWNLOAD_TOKEN_SECRET (required: signs API keys, admin keys and download tokens; same value on the 256t.us Worker)
-# CLERK_WEBHOOK_SECRET (optional - enables POST /api/webhooks/clerk)
+# CLERK_WEBHOOK_SECRET (required for production profile sync/deletion)
 # CLOUDFLARE_ANALYTICS_TOKEN (read-only Account Analytics token, required for cost monitoring)
 # CLOUDFLARE_ACCOUNT_ID (account ID, also needed at runtime by cost monitoring)
+# GIT_SHA (automatically set by CI to the full deployed commit)
 # COST_SAFETY_ALLOWANCE_ONLY=true (optional variable on this Worker; manual brake)
 # COST_SAFETY_ALERT_CENTS / COST_SAFETY_BRAKE_CENTS (optional; defaults 2500 / 5000)
 # ALERT_WEBHOOK_URL (optional - operator alert notifications, e.g. a Slack/Discord webhook)

@@ -27,6 +27,7 @@ The public site has user-facing versions of several of these under `frontend/doc
 
 | Doc | What it covers |
 |-----|----------------|
+| [Production checklist](../todo/deployment_checklist.md) | Repeatable deploy/rollback checks, automated gates and remaining owner acceptance |
 | [deployment.md](deployment.md) | Deploying a fork: Cloudflare, GitHub secrets, custom domains |
 | [frontend-deployment.md](frontend-deployment.md) | How the static frontend ships with the Worker; Clerk setup |
 | [payments-setup.md](payments-setup.md) | Stripe keys, webhook and secrets |
