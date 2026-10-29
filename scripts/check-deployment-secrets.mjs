@@ -11,11 +11,12 @@ export function checkDeploymentSecrets(env) {
     'DOWNLOAD_TOKEN_SECRET', 'ADMIN_USER_ID', 'CLOUDFLARE_ANALYTICS_TOKEN',
   ];
   const problems = required.filter(name => !env[name]?.trim()).map(name => `Missing ${name}`);
-  for (const [name, prefix] of [
-    ['CLERK_SECRET_KEY', 'sk_live_'], ['CLERK_PUBLISHABLE_KEY', 'pk_live_'],
-    ['STRIPE_SECRET_KEY', 'sk_live_'],
+  // Stripe live keys may be standard (sk_live_) or restricted (rk_live_), as /health accepts
+  for (const [name, prefixes] of [
+    ['CLERK_SECRET_KEY', ['sk_live_']], ['CLERK_PUBLISHABLE_KEY', ['pk_live_']],
+    ['STRIPE_SECRET_KEY', ['sk_live_', 'rk_live_']],
   ]) {
-    if (env[name]?.trim() && !env[name].startsWith(prefix)) problems.push(`${name} must be a production live key`);
+    if (env[name]?.trim() && !prefixes.some(prefix => env[name].startsWith(prefix))) problems.push(`${name} must be a production live key`);
   }
   return problems;
 }

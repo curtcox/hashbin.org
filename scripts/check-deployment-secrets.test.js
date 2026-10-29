@@ -25,6 +25,12 @@ describe('deployment secret preflight', () => {
     expect(JSON.stringify(problems)).not.toContain('private-value');
   });
 
+  it('accepts a restricted Stripe live key and rejects a restricted test key', () => {
+    expect(checkDeploymentSecrets({ ...secrets(), STRIPE_SECRET_KEY: 'rk_live_private-value' })).toEqual([]);
+    expect(checkDeploymentSecrets({ ...secrets(), STRIPE_SECRET_KEY: 'rk_test_private-value' }))
+      .toEqual(['STRIPE_SECRET_KEY must be a production live key']);
+  });
+
   it('reports all missing names without throwing on an empty environment', () => {
     expect(checkDeploymentSecrets({})).toHaveLength(12);
   });
