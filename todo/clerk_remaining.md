@@ -3,8 +3,8 @@
 ## Status
 
 **Phase:** production instance live since 2026-10-28 (UTC); account moved and the shared
-admin token retired. Left: GitHub and account-linking browser checks (CL10) and two secret
-deletions (see Record). Backend implementation is in [done/clerk.md](../done/clerk.md).
+admin token retired. Left: Restricted sign-up mode (CL16), GitHub and account-linking
+browser checks (CL10) and two secret deletions (see Record). Backend implementation is in [done/clerk.md](../done/clerk.md).
 
 ## Record (2026-10-27/28)
 
@@ -194,9 +194,23 @@ What is keyed by the user ID, and what happens to it:
   gh run list --workflow smoke-test.yml --limit 5
   ```
 
+## 5. Admit only invited users (STATUS L23)
+
+- [ ] **CL16 — Restricted sign-up.** Decided 2026-10-28: until the beta banner comes down,
+  only people the owner invites can create accounts. In the Clerk Dashboard for the
+  production instance, open **Configure → Restrictions** and set the sign-up mode to
+  **Restricted**. Invite each person from **Users → Invitations**, or with the Backend API
+  (`POST /v1/invitations` with their email and a `redirect_url` of `https://hashbin.org/`).
+  Existing accounts keep signing in. Acceptance: in a private window, signing in with a
+  Google or GitHub account that has no HashBin account and no invitation is refused, and
+  an invited address can sign up and reach `/dashboard`. Record the date and both results
+  here. Switch the mode back to **Public** as part of removing the banner (L12).
+  [Sign-up modes](https://clerk.com/docs/guides/secure/restricting-access),
+  [invitations](https://clerk.com/docs/reference/backend-api/tag/invitations/post/invitations).
+
 ## Completion criteria and manual exceptions
 
-Complete CL1–CL15 with evidence before marking production readiness done. For
+Complete CL1–CL16 with evidence before marking production readiness done. For
 any browser configuration fallback, record the exact setting, missing documented
 API/entitlement, manual action and verification. Missing credentials are an API
 access prerequisite, not a blanket browser-configuration requirement. Product

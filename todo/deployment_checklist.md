@@ -175,7 +175,8 @@ Owner (`ops`) work. Each item's evidence goes in the linked plan.
 
 - [ ] **Retired secrets:** delete `ADMIN_SECRET_TOKEN` and `API_KEY_ENCRYPTION_KEY`
   (`gh secret delete NAME`, `npx wrangler secret delete NAME`).
-- [ ] **Clerk:** CL9 (`user.updated` and `user.deleted` deliveries) and CL10 (GitHub
+- [ ] **Clerk:** CL16 (Restricted sign-up mode before anyone else signs up), CL9
+  (`user.updated` and `user.deleted` deliveries) and CL10 (GitHub
   sign-in, account linking, logout, mobile layout). Then rerun L11's sign-in step on the
   live keys.
 - [ ] **Cloudflare:** CF1–CF10, which cover the analytics token, alert delivery
