@@ -264,7 +264,8 @@ jobs:
           # sed pattern: /^\[vars\]/,/^\[/ matches from [vars] to next section
           # {/^\[vars\]/p; /^\[/!p;} prints [vars] line and all lines not starting with [
           # This extracts only [vars] section content, excluding next section header
-          if sed -n '/^\[vars\]/,/^\[/{/^\[vars\]/p; /^\[/!p;}' wrangler.toml | grep -q 'GIT_SHA'; then
+          # Match only a GIT_SHA key; the secrets comment block in [vars] names it too
+          if sed -n '/^\[vars\]/,/^\[/{/^\[vars\]/p; /^\[/!p;}' wrangler.toml | grep -qE '^[[:space:]]*GIT_SHA[[:space:]]*='; then
             echo "❌ ERROR: GIT_SHA is defined in wrangler.toml [vars] section"
             echo "This will conflict with the GIT_SHA secret configuration."
             echo "Please remove GIT_SHA from the [vars] section in wrangler.toml"
