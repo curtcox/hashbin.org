@@ -47,8 +47,9 @@ gh secret list --repo curtcox/hashbin.org
 ```
 
 Required names and exact use are in `.github/workflows/deploy.yml`. They include
-Cloudflare deployment IDs/token, Clerk and Stripe credentials, API-key encryption
-and shared download/OAuth signing keys. Follow the provider plans for webhook,
+Cloudflare deployment IDs/token, Clerk and Stripe credentials and the shared
+download/OAuth signing keys; the table in [the deployment checklist](deployment_checklist.md#secrets)
+summarizes them. Follow the provider plans for webhook,
 analytics and alert secrets; verify optional settings needed for launch rather
 than assuming the workflow's minimum list establishes production readiness.
 Use `gh variable set` for supported non-secret configuration where the workflow

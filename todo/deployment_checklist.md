@@ -1,368 +1,175 @@
-# Production Deployment Checklist for User Authorization
+# Production deployment checklist
 
-This checklist ensures the user authorization system is properly configured and deployed to production.
+Checks to run around every production deploy, and the one-time setup still open before
+launch. Last checked against the code on 2026-10-28 (`431b09f`).
 
-Use documented APIs/SDKs and CLI tools before browser configuration. The current
-[Clerk plan](clerk_remaining.md), [Cloudflare plan](cost_safety_cloudflare.md) and
-[Stripe plan](cost_safety_stripe.md) define access checks and task-specific API
-routes. Record the exact missing API/entitlement before using a dashboard
-fallback; browser acceptance of real login/payment journeys remains required.
-[Deployment setup](deployment_setup.md) provides the CLI release path.
+Production is the only environment, and every push to `main` deploys it, so push only when
+the owner has asked for it. [`STATUS.md`](../STATUS.md) wins over this file. The details
+live elsewhere:
 
-## Prerequisites
+| For | See |
+|-----|-----|
+| Every step CI runs, and the secrets it reads | [`.github/workflows/deploy.yml`](../.github/workflows/deploy.yml) |
+| Deploying and inspecting through `gh`, Wrangler and provider APIs | [`deployment_setup.md`](deployment_setup.md) |
+| Setting up a new account and domain from scratch | [`docs/deployment.md`](../docs/deployment.md) |
+| Open setup work for each provider | [Clerk](clerk_remaining.md) (CL), [Cloudflare](cost_safety_cloudflare.md) (CF), [Stripe](cost_safety_stripe.md) (ST) |
+| Reading `/health` | [`docs/health.md`](../docs/health.md) |
+| Brakes, hard stop and cost alerts | [`docs/cost-safety.md`](../docs/cost-safety.md) |
+| Restoring data | [`docs/backup-and-restore.md`](../docs/backup-and-restore.md) |
 
-- [ ] Cloudflare Workers Paid plan ($5/month) - Required for Durable Objects and R2
-- [ ] Clerk account created at https://clerk.com
-- [ ] Domain name configured (hashbin.org)
-- [ ] GitHub Actions secrets configured (see deployment_setup.md)
+## What a deploy changes
 
----
+| Worker | Config | Serves | Deployed by |
+|--------|--------|--------|-------------|
+| `hashbin-worker-prod` | `wrangler.toml` | `hashbin.org` and `www`: API, frontend, all Durable Objects, hourly cron | `deploy` job |
+| `256t-content-prod` | `workers/256t-content/wrangler.toml` | `256t.us` downloads | `deploy` job, after the main Worker |
+| `hashbin-run-prod` | `workers/run-origin/wrangler.toml` | `hashbin.app` hosted apps | `deploy-run-origin` job |
 
-## Clerk Application Setup
+The content and run Workers bind Durable Objects that live in the main Worker, so the main
+Worker deploys first. All three read the `hashbin-content-256t-prod` R2 bucket; the main
+Worker also writes nightly snapshots to `hashbin-backups-prod`. CI creates both buckets if
+they're missing.
 
-Follow [CL1–CL11](clerk_remaining.md) as the authoritative production checklist:
+## Before every deploy
 
-- [ ] Check Platform API entitlement and identify the application/production instance.
-- [ ] Configure instance, social providers, linking and domain using the available
-  Platform config schema/APIs; use supported Backend API settings where applicable.
-- [ ] Provision the webhook through authorized management APIs where available;
-  otherwise record the specific embedded webhook UI exception.
-- [ ] Store all three Clerk secrets with `gh secret set` and deploy through CI.
-- [ ] Verify API state and signed webhook delivery, then run browser login tests.
+- [ ] `npm run test:unit` passes and `npm run lint` reports 0 errors.
+- [ ] Download, sandbox or SDK changes: `npm run test:funded:local` and
+  `npm run test:hosted` pass. CI runs both, and a failure blocks the deploy.
+- [ ] Page or API changes: `npm run test:e2e` and `npm run test:api` pass against
+  `npm run dev:local`.
+- [ ] A new Durable Object has its export, binding and migration
+  ([AGENTS.md](../AGENTS.md#conventions)). Migrations can't be rolled back, and a
+  `deleted_classes` migration destroys that class's data.
+- [ ] A new secret is set in GitHub, written by a `deploy.yml` step (on both Workers if
+  shared) and listed in the comment block in `wrangler.toml`, all before the merge.
+- [ ] The STATUS rows the change affects are updated in the same commit.
 
-Dashboard configuration is limited to CL1–CL6 settings unavailable through the
-account's documented APIs. The Clerk plan distinguishes the private-beta
-Platform API, instance Backend API and managed Svix access.
+## Deploy
 
----
-
-## Cloudflare Configuration
-
-### 1. Verify Wrangler Installation
-
-```bash
-npm ci
-npx wrangler --version
-```
-
-### 2. Authenticate with Cloudflare
-
-Use a scoped `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` from the
-approved secret source. Prefer token APIs for scoped token provisioning when a
-bootstrap credential exists. `npx wrangler login` is a browser bootstrap fallback
-only when API access cannot yet be established; it is not the default CI path.
-
-### 3. Verify Repository Configuration
-
-Read the current `wrangler.toml` and content Worker configuration; the current
-production deployment uses the top-level config. Inspect deployed settings via
-Wrangler/Workers API and preserve GitHub as the configuration source of truth.
-Do not introduce an obsolete `--env production` target from older recipes.
-
-### 4. Provision Secrets Through GitHub and CI
-
-Use `gh secret set` with secure stdin for `CLERK_SECRET_KEY`,
-`CLERK_PUBLISHABLE_KEY` and `CLERK_WEBHOOK_SECRET`. Verify names with
-`gh secret list`, deploy via the existing Actions workflow, and verify deployed
-names with `npx wrangler secret list`. Do not expose values in output or perform
-routine manual Worker-secret writes that drift from GitHub (Decision 21).
-See [deployment setup](deployment_setup.md) for release commands.
-
-### 5. Verify Durable Objects Bindings
-
-Read all binding names and namespace targets from the current main/content
-Worker configs and compare with deployed Workers API metadata. Verify shared
-ContentMetadata, UserProfile and safety namespaces resolve to the intended main
-Worker; use the config rather than historical binding-name lists.
-
-### 6. Verify R2 Bucket Bindings
-
-- [ ] Create production R2 buckets (if not already created):
-  - `hashbin-content-256t-prod`
-  - `hashbin-backups-prod`
-- [ ] Verify bindings in `wrangler.toml`
-
----
-
-## Deployment
-
-### 1. Run Local Tests
+Push to `main`, or rerun the workflow on the current `main`:
 
 ```bash
-# Install dependencies
-npm install
-
-# Run automated tests
-npm test
-
-# Run authentication tests
-./scripts/test-auth-system.sh
+gh workflow run deploy.yml --repo curtcox/hashbin.org --ref main
 ```
-
-Expected result: All tests pass
-
-### 2. Deploy to Production
 
 ```bash
-# Deploy (there is only the production environment)
-npm run deploy
+gh run list --repo curtcox/hashbin.org --workflow deploy.yml --limit 3
 ```
 
-Expected output:
-```
-✨ Built successfully
-✨ Successfully uploaded worker
-✨ Deployed hashbin-worker-prod
-  https://hashbin.org/*
-```
-
-### 3. Verify Deployment
-
-```bash
-# Run deployment verification
-npm run verify
-```
-
-Check:
-- [ ] Health endpoint returns `"status": "healthy"`
-- [ ] Environment is `"production"`
-- [ ] All Durable Objects are `"operational"`
-- [ ] R2 buckets are `"operational"`
-
-### 4. Test Authentication Flow
-
-Manual testing steps:
-
-1. **Test OAuth Login**
-   - [ ] Visit https://hashbin.org
-   - [ ] Click "Sign In"
-   - [ ] Test Google OAuth login
-   - [ ] Test GitHub OAuth login
-   - [ ] Verify user profile created
-
-2. **Test Account Linking**
-   - [ ] Log in with Google
-   - [ ] Link Microsoft account
-   - [ ] Verify both providers listed in profile
-   - [ ] Log out and log in with Microsoft
-   - [ ] Verify same account accessed
-
-3. **Test API Key Management**
-   - [ ] Log in with Clerk session
-   - [ ] Create new API key via `/api/auth/apikeys`
-   - [ ] Save API key securely
-   - [ ] List API keys via `/api/auth/apikeys`
-   - [ ] Make authenticated request with API key
-   - [ ] Revoke API key
-   - [ ] Verify revoked key no longer works
-
-4. **Test Webhook Processing**
-   - [ ] Trigger `user.created` by signing up new user
-   - [ ] Check Worker logs for webhook processing
-   - [ ] Verify UserProfile Durable Object created
-   - [ ] Link new OAuth provider
-   - [ ] Check logs for `user.updated` webhook
-   - [ ] Delete designated test user via Clerk Backend API/SDK
-   - [ ] Check logs for `user.deleted` webhook
-
-### 5. Monitor Initial Traffic
-
-- [ ] Monitor Cloudflare Workers analytics
-- [ ] Check Worker logs for errors
-- [ ] Verify webhook delivery through authorized Svix API; record an embedded-UI fallback only if management API access is unavailable
-- [ ] Monitor Durable Objects usage
-- [ ] Check R2 storage metrics
-
----
-
-## Post-Deployment Verification
-
-### Authentication Tests
-
-Run these curl commands to verify endpoints:
-
-```bash
-# Test anonymous access
-curl https://hashbin.org/
-curl https://hashbin.org/health
-
-# Test authenticated endpoint (should return 401)
-curl -X GET https://hashbin.org/api/auth/session
-# Expected: {"error":"AUTH_MISSING","message":"Authentication required"}
-
-# Test invalid auth format (should return 401)
-curl -X GET https://hashbin.org/api/auth/session \
-  -H "Authorization: Invalid"
-# Expected: {"error":"AUTH_INVALID_FORMAT","message":"Invalid authentication format"}
-
-# Test with valid API key (create via Clerk first)
-curl -X GET https://hashbin.org/api/auth/session \
-  -H "Authorization: ApiKey hb_live_YOUR_KEY_HERE"
-# Expected: {"user_id":"...", "auth_method":"apikey", ...}
-```
-
-### Webhook Tests
-
-Test webhook endpoint (should reject without valid signature):
-
-```bash
-curl -X POST https://hashbin.org/api/webhooks/clerk \
-  -H "Content-Type: application/json" \
-  -d '{"type":"user.created","data":{"id":"test"}}'
-# Expected: {"error":"Invalid webhook signature"} with 401 status
-```
-
-### Health Check
-
-```bash
-curl https://hashbin.org/health | jq
-```
-
-Expected response:
-- `"status": "healthy"` or `"degraded"` (acceptable)
-- `"environment": "production"`
-- All Durable Objects show `"available": true, "accessible": true`
-- All R2 buckets show `"available": true, "accessible": true`
-
----
-
-## Rollback Plan
-
-If deployment fails or critical issues are found:
-
-1. **Immediate Rollback**
-   ```bash
-   # Revert to previous deployment
-   git checkout <previous-commit>
-   npm run deploy
-   ```
-
-2. **Disable Webhooks**
-   - Disable the specific endpoint through authorized webhook management API; use the embedded UI only if that API is unavailable
-   - This prevents user creation/update/deletion from affecting Worker
-
-3. **Investigate Issues**
-   - Check Cloudflare Worker logs
-   - Inspect Clerk API errors and authorized webhook delivery API/logs; use the recorded UI fallback only for unavailable delivery details
-   - Check Durable Objects state
-   - Review R2 bucket access
-
-4. **Fix and Redeploy**
-   - Fix identified issues
-   - Test in development environment
-   - Run all automated tests
-   - Deploy to production again
-
----
-
-## Security Checklist
-
-- [ ] CLERK_SECRET_KEY stored as Cloudflare secret (not in code)
-- [ ] CLERK_WEBHOOK_SECRET stored as Cloudflare secret
-- [ ] API keys hashed with SHA-256 before storage
-- [ ] Webhook signature verification enabled
-- [ ] Rate limiting enabled and configured
-- [ ] HTTPS enforced (Cloudflare handles this)
-- [ ] CORS headers properly configured
-- [ ] Error messages don't leak sensitive information
-- [ ] Logs don't contain API keys or secrets
-
----
-
-## Monitoring Setup
-
-### Cloudflare Alerts
-
-Discover supported alert types/eligibility and configure policies with the Cloudflare Alerting API (CF6), then verify delivery:
-
-- [ ] Worker error rate > 5%
-- [ ] Worker CPU time > 80% of limit
-- [ ] Durable Objects storage > 80% of limit
-- [ ] R2 requests > expected baseline
-
-### Clerk Monitoring
-
-Prefer documented Clerk usage/configuration APIs and authorized webhook delivery APIs. Record a dashboard fallback only for metrics unavailable through those APIs:
-
-- [ ] Daily active users
-- [ ] OAuth provider success rates
-- [ ] Webhook delivery success rate
-- [ ] Account linking frequency
-
-### Custom Monitoring
-
-Consider adding:
-- [ ] Uptime monitoring (e.g., UptimeRobot)
-- [ ] Error tracking (e.g., Sentry)
-- [ ] Analytics (Cloudflare Workers Analytics)
-
----
-
-## Known Issues and Workarounds
-
-### Issue: Clerk Webhook Delays
-
-**Symptom:** User profile not immediately available after OAuth login
-
-**Workaround:** 
-- Middleware creates profile on first authenticated request if webhook hasn't processed yet
-- No action needed from users
-
-### Issue: Environment Variable Not Set
-
-**Symptom:** Health check shows `"environment": "unknown"`
-
-**Fix:**
-```bash
-# Verify production environment variables
-wrangler secret list --env production
-
-# Redeploy if needed
-npm run deploy
-```
-
-### Issue: Durable Objects Not Connected
-
-**Symptom:** Health check shows `"accessible": false` for Durable Objects
-
-**Fix:**
-- This is expected in local development
-- In production, if this occurs, check Cloudflare Dashboard for migrations
-- Ensure all migrations in `wrangler.toml` are complete
-
----
-
-## Support and Documentation
-
-- **Clerk Documentation:** https://clerk.com/docs
-- **Cloudflare Workers Docs:** https://developers.cloudflare.com/workers/
-- **Wrangler CLI Docs:** https://developers.cloudflare.com/workers/wrangler/
-- **Project Documentation:** `/docs` directory
-- **Test Scripts:** `/scripts` directory
-
----
-
-## Completion Sign-Off
-
-Once all items are checked and verified:
-
-- [ ] All prerequisites met
-- [ ] Clerk configured and tested
-- [ ] Cloudflare secrets set
-- [ ] Deployment successful
-- [ ] Post-deployment tests pass
-- [ ] Monitoring configured
-- [ ] Security checklist complete
-
-**Deployed by:** _______________  
-**Date:** _______________  
-**Production URL:** https://hashbin.org  
-**Worker Name:** hashbin-worker-prod  
-
----
-
-## Revision History
-
-| Version | Date | Author | Changes |
-|---------|------|--------|---------|
-| 1.0 | 2026-01-14 | Copilot | Initial production deployment checklist |
+Don't deploy production with `npm run deploy`. It deploys only the main Worker. It skips
+the secrets, the git SHA injection that `/health` and the pages report, the other two
+Workers and the cache purge.
+
+## After every deploy
+
+- [ ] The run is green, including **Deploy hosted run origin (hashbin.app)**. The content
+  Worker step is `continue-on-error`, so a green run can hide a failed `256t.us` deploy.
+  Look for its warning in the run log.
+- [ ] Main site health:
+
+  ```bash
+  curl -fsS https://hashbin.org/health | jq '{status, environment, gitSha, checks: (.checks | map_values(.status))}'
+  ```
+
+  `status` is `healthy`, `environment` is `production` and `gitSha` is the deployed
+  commit. CI passes a `degraded` deploy with a warning, but production shouldn't stay
+  degraded: each check's `message` says why.
+- [ ] `curl -fsS https://256t.us/health` returns 200.
+- [ ] `node scripts/verify-hosted-run-origin.mjs` passes.
+- [ ] The Smoke Test workflow, which runs after each successful deploy and every 6 hours,
+  passed:
+
+  ```bash
+  gh run list --repo curtcox/hashbin.org --workflow smoke-test.yml --limit 3
+  ```
+
+- [ ] Requests without credentials are refused:
+
+  | Request | Expected |
+  |---------|----------|
+  | `GET /api/auth/session` with no `Authorization` | 401 `{"error":"AUTH_MISSING", ...}` |
+  | `GET /api/auth/session` with `Authorization: Invalid` | 401 `{"error":"AUTH_INVALID_FORMAT", ...}` |
+  | Unsigned `POST /api/webhooks/clerk` | 401 `{"error":"Invalid signature"}`; 503 means `CLERK_WEBHOOK_SECRET` is missing |
+  | `POST /api/payments/webhook` without `stripe-signature` | 400 `{"error":"Missing signature"}` |
+
+- [ ] No new errors in `npx wrangler tail hashbin-worker-prod` or
+  `npx wrangler tail 256t-content-prod` for a few minutes. No Worker sets
+  `[observability]`, so live tailing is the only log.
+- [ ] Changes to backups or the cron: `POST /api/admin/backups/run` reports `failed: 0`.
+
+## Rollback
+
+- **Normal path:** `git revert` the bad commit and push it to `main`. CI then redeploys
+  all three Workers with their secrets.
+- **Faster, one Worker:** `npx wrangler deployments list`, then `npx wrangler rollback`
+  (add `--config workers/256t-content/wrangler.toml` or `--config workers/run-origin/wrangler.toml`
+  for the others). Revert in git as well, or the next push redeploys the bad code.
+  Wrangler can't roll back across a Durable Object migration; fix forward instead.
+- **Stop downloads now:** `COST_SAFETY_HARD_STOP=true` on the main Worker returns 503 for
+  all `256t.us` content within 60 seconds. The allowance-only brake is
+  `COST_SAFETY_ALLOWANCE_ONLY=true`. See [`docs/cost-safety.md`](../docs/cost-safety.md).
+- **Clerk webhook damaging profiles:** disable the endpoint in Clerk until a fix is out.
+- A rollback restores code and bindings, not R2 or Durable Object data. For data, use
+  [`docs/backup-and-restore.md`](../docs/backup-and-restore.md).
+
+## Secrets
+
+GitHub is the source of truth (Decision 21). Set a value with
+`gh secret set NAME --repo curtcox/hashbin.org` (it prompts, so the value stays out of
+shell history), then deploy. Setting Worker secrets by hand makes them drift from GitHub.
+Check names (not values) with `gh secret list --repo curtcox/hashbin.org`,
+`npx wrangler secret list` and `npx wrangler secret list --config workers/256t-content/wrangler.toml`.
+
+| Secret | Where | Needed |
+|--------|-------|--------|
+| `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID` | CI; the account ID is also used by the main Worker's cost monitor | Required |
+| `CLOUDFLARE_ZONE_ID` | CI route check and cache purge | Required, though CI doesn't check for it |
+| `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` | Main Worker | Required (`sk_live_`/`pk_live_`) |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Main Worker | Required (live mode) |
+| `OAUTH_SIGNING_KEY`, `DOWNLOAD_TOKEN_SECRET` | Main and content Workers, same values | Required |
+| `ADMIN_USER_ID` | Main Worker | Without it nobody can sign in as admin or issue `hba_` keys |
+| `CLERK_WEBHOOK_SECRET` | Main Worker | Without it Clerk webhooks get 503 |
+| `CLOUDFLARE_ANALYTICS_TOKEN` | Main Worker | Read-only; the hourly cost monitor needs it |
+| `ALERT_WEBHOOK_URL` | Main Worker | Without it alerts appear only at `/api/admin/alerts` |
+| `CLOUDFLARE_WORKERS_SUBDOMAIN` | CI | Optional extra workers.dev check |
+
+CI also writes `GIT_SHA`. `ADMIN_SECRET_TOKEN` and `API_KEY_ENCRYPTION_KEY` are retired:
+delete them from GitHub and the Worker. Non-secret settings (`ENVIRONMENT`, `LOG_LEVEL`,
+`CONTENT_DOMAIN`, `RUN_DOMAIN`) are `[vars]` in each `wrangler.toml`.
+
+## Open launch setup
+
+Owner (`ops`) work. Each item's evidence goes in the linked plan.
+
+- [ ] **Retired secrets:** delete `ADMIN_SECRET_TOKEN` and `API_KEY_ENCRYPTION_KEY`
+  (`gh secret delete NAME`, `npx wrangler secret delete NAME`).
+- [ ] **Clerk:** CL9 (`user.updated` and `user.deleted` deliveries) and CL10 (GitHub
+  sign-in, account linking, logout, mobile layout). Then rerun L11's sign-in step on the
+  live keys.
+- [ ] **Cloudflare:** CF1–CF10, which cover the analytics token, alert delivery
+  (`POST /api/admin/alerts/test`), the `256t.us` WAF rule, billing notifications and live
+  cache and funded-path acceptance (S20, S21, S22, L22).
+- [ ] **Stripe:** ST1–ST5 (dispute notifications, Radar, webhook and checkout acceptance,
+  financial evidence) and the Missouri tax registration noted under L2.
+- [ ] **Backups:** confirm a production `POST /api/admin/backups/run` reported
+  `failed: 0` (L10).
+- [ ] **Third-party publishing:** production OAuth smoke test (S7).
+- [ ] **Dependencies:** `npm audit --omit=dev` is clean (L14).
+- [ ] **Legal and launch:** L5–L7 and L19–L21 in STATUS. Remove the beta banner (L12) last.
+
+Done and verified in STATUS: Workers Paid plan and all three domains (L4, B14), production
+Clerk with Google and GitHub (CL1–CL8, CL11–CL15), Stripe live mode with the
+`/api/payments/webhook` endpoint (L2, L3), and the end-to-end run on development Clerk keys
+(L11).
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+|---------|--------------|
+| `checks.clerk` or `checks.stripe` degraded | Test keys in production; check `details.usingTestKeysInProduction` |
+| `"environment": "unknown"` | `ENVIRONMENT` missing from `[vars]` in `wrangler.toml` (a variable, not a secret) |
+| A Durable Object shows `"accessible": false` | Missing binding or migration. `/health` probes only `CONTENT_METADATA`, `USER_PROFILES`, `PAYMENT_RECORDS`, `CONTEST_RECORDS` and `MESSAGE_THREADS` |
+| `256t.us` serves old behavior | The content Worker step failed; rerun the workflow |
+| Pages show an old `git-sha` comment | Cache; run the Purge Cloudflare Cache workflow |
+| New user has no profile | The Clerk webhook is late. `GET /api/auth/session` and `GET /api/balance` create the profile on first use |
+| Admin API returns 403 (`not_admin` or `insufficient_scope`) | `ADMIN_USER_ID` isn't the signed-in production user ID |
