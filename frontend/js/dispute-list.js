@@ -4,6 +4,7 @@
 
 import {
   claimTypeLabel,
+  disputeDeadlineText,
   escapeHtml,
   formatDisputeDate,
   statusLabel,
@@ -32,7 +33,7 @@ function renderDispute(dispute) {
         <div class="dispute-meta">
           <span>${escapeHtml(claimTypeLabel(dispute.claim_type))}</span>
           <span>Filed ${escapeHtml(formatDisputeDate(dispute.created_at))}</span>
-          <span>Expires ${escapeHtml(formatDisputeDate(dispute.expires_at))}</span>
+          <span>${escapeHtml(disputeDeadlineText(dispute))}</span>
         </div>
       </div>
       <div>

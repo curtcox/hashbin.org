@@ -37,8 +37,15 @@ These are written to match the current code. Change the code or the text if you 
    requires a reasonably implemented policy. Strikes are tracked automatically and the cron alerts
    at the code defaults of **3 in 365 days** (`REPEAT_INFRINGER_*` in `src/api/admin-disputes.js`).
    Keep the page and the constants in sync. Closing the account is still a manual admin step.
-7. **CSAM reporting** (Terms §5, Privacy §3): U.S. providers must report apparent CSAM to NCMEC
-   (18 U.S.C. § 2258A). Set up a NCMEC CyberTipline account and an internal procedure.
+7. **CSAM reporting** (Terms §5, Privacy §3, `take-it-down.html` §5): U.S. providers must
+   report apparent CSAM to NCMEC (18 U.S.C. § 2258A). Set up a NCMEC CyberTipline account and an internal procedure.
+8. **Intimate image removal process** (`frontend/take-it-down.html`, Terms §6, Privacy §3):
+   written for the TAKE IT DOWN Act (removal duty in force since 2026-05-19).
+   Valid reports block the content immediately and are decided within 48 hours; reports are
+   private and never expire. Confirm the page's plain-language wording, that the form's
+   required fields (signature, good-faith statement, contact, CID) match a valid request, and
+   whether to offer an email address as an alternative to the form. The page has no DRAFT
+   notice because it describes how the site already works.
 
 ## Ops steps outside the repo
 

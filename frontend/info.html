@@ -220,6 +220,8 @@
           </a>
           <p style="margin-top: 1.5rem;">
             <a id="report-link" class="link" href="/disputes/submit.html">Report this content</a>
+            <span id="ncii-report-item"> ·
+              <a id="ncii-report-link" class="link" href="/disputes/submit.html?reason=ncii">Report an intimate image shared without consent</a></span>
           </p>
         </div>
       </div>
@@ -321,12 +323,16 @@
       const disputeUrl = `/disputes/view.html?cid=${encodeURIComponent(cid)}`;
       const reportLink = document.getElementById('report-link');
       reportLink.href = `/disputes/submit.html?cid=${encodeURIComponent(cid)}`;
+      document.getElementById('ncii-report-link').href = `/disputes/submit.html?cid=${encodeURIComponent(cid)}&reason=ncii`;
 
       try {
         const response = await fetch(`/api/content/${encodeURIComponent(cid)}/disputes`);
         if (!response.ok) return;
         const data = await response.json();
-        const active = (data.disputes || []).some(d => d.status === 'open' || d.status === 'under_review');
+        const openDisputes = (data.disputes || []).filter(d => d.status === 'open' || d.status === 'under_review');
+        const active = openDisputes.length > 0;
+        // An intimate image report replaces any other open dispute, so offer it unless one is open
+        document.getElementById('ncii-report-item').classList.toggle('hidden', openDisputes.some(d => d.claim_type === 'ncii'));
         if (active) {
           document.getElementById('dispute-banner-link').href = disputeUrl;
           document.getElementById('dispute-banner').classList.remove('hidden');

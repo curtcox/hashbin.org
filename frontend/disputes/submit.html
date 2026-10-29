@@ -39,6 +39,14 @@
     .cid-input {
       font-family: 'Courier New', monospace;
     }
+    #ncii-fields {
+      border: 1px solid var(--color-border, #e5e7eb);
+      border-radius: 8px;
+      padding: 1rem;
+    }
+    #ncii-fields .radio-group {
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 <body>
@@ -59,8 +67,15 @@
         is blocked (HTTP 451) until an administrator reviews it. Reports that aren't resolved
         expire after 30 days.
       </p>
+      <div class="alert alert-info" role="note">
+        <strong>Is it an intimate image of you shared without your consent?</strong>
+        Choose "Intimate image shared without consent" below. The content is blocked as soon as
+        you submit, we decide within 48 hours, and your report stays private.
+        <a href="/take-it-down.html">How this works</a>.
+      </div>
       <p class="form-text">
-        Everything you submit except your contact details is public.
+        Everything you submit except your contact details is public, except in intimate image
+        reports, where only the content ID and reason are public.
         See <a href="/docs/faq.html">the FAQ</a> for how disputes are handled. Copyright owners: see the
         <a href="/dmca.html">DMCA Policy</a> for what a notice must include.
       </p>
@@ -84,12 +99,32 @@
             <option value="privacy">Privacy violation</option>
             <option value="harassment">Harassment</option>
             <option value="malware">Malware</option>
+            <option value="ncii">Intimate image shared without consent</option>
             <option value="other">Other</option>
           </select>
         </div>
 
+        <fieldset id="ncii-fields" class="form-group hidden">
+          <legend class="form-label">Intimate image report</legend>
+          <p class="form-text">
+            Only administrators see this report's details. The uploader and the public see only
+            that the content was reported and blocked.
+          </p>
+          <div class="radio-group">
+            <label><input type="radio" name="reporter_role" value="self"> I am the person shown</label>
+            <label><input type="radio" name="reporter_role" value="on_behalf"> I am authorized to act for them</label>
+          </div>
+          <label>
+            <input type="checkbox" id="ncii_statement">
+            I believe in good faith that this image or video shows the person identified above in an
+            intimate way and was published without their consent.
+          </label>
+          <label class="form-label" for="signature" style="margin-top: 1rem;">Signature: type your full name</label>
+          <input type="text" id="signature" class="form-input" maxlength="200" autocomplete="name">
+        </fieldset>
+
         <div class="form-group">
-          <label class="form-label" for="evidence">Explanation and evidence</label>
+          <label class="form-label" for="evidence">Explanation and evidence<span id="evidence-optional" class="hidden"> (optional)</span></label>
           <textarea id="evidence" name="evidence" class="form-textarea form-input" rows="8"
                     minlength="50" maxlength="10000" required></textarea>
           <div class="char-count" id="evidence-count">0 / 10,000 (minimum 50)</div>
@@ -129,7 +164,8 @@
         <div class="alert alert-success" role="status">
           <strong>Report submitted.</strong>
           <p>Reference: <code id="success-id"></code></p>
-          <p>The content is now blocked pending review. This report expires on <span id="success-expires"></span> if it isn't resolved.</p>
+          <p id="success-standard">The content is now blocked pending review. This report expires on <span id="success-expires"></span> if it isn't resolved.</p>
+          <p id="success-ncii" class="hidden">The content is now blocked everywhere it is served. We will decide by <span id="success-due"></span> and remove it permanently if the report is valid. The report does not expire, and its details stay private. We'll contact you if we need more information.</p>
         </div>
         <p>
           <a id="success-view" class="btn btn-primary" href="#">View dispute</a>
@@ -145,6 +181,7 @@
       <a href="/disputes/index.html">Disputes</a> |
       <a href="/terms.html">Terms</a> |
       <a href="/dmca.html">DMCA</a> |
+      <a href="/take-it-down.html">Intimate Images</a> |
       <a href="/sitemap.html">Site Map</a>
     </p>
   </footer>

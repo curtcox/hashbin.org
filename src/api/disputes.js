@@ -4,6 +4,11 @@
  */
 
 import { hashIP } from '../utils/ip-hash.js';
+import { NCII_CLAIM_TYPE } from '../durable-objects/dispute-record.js';
+
+// Intimate-image reports are seen only by administrators: the explanation, links and
+// statement can identify the person shown, and the uploader must not learn who reported
+const NCII_PRIVATE_FIELDS = ['evidence', 'evidence_urls', 'ncii_statement', 'submitter_contact'];
 
 /**
  * POST /api/disputes
@@ -66,9 +71,13 @@ export async function handleCreateDispute(request, env) {
     const disputeId = env.DISPUTE_RECORD.idFromName(`dispute:${data.cid}`);
     const disputeStub = env.DISPUTE_RECORD.get(disputeId);
 
-    // Check if can create new dispute (re-dispute cooldown)
-    const canDisputeResponse = await disputeStub.fetch(new Request('http://internal/can-dispute'));
-    const canDisputeData = await canDisputeResponse.json();
+    const isNcii = data.claim_type === NCII_CLAIM_TYPE;
+
+    // Check if can create new dispute (re-dispute cooldown). An intimate-image report skips
+    // this: it is never delayed and replaces another open dispute (see DisputeRecord).
+    const canDisputeData = isNcii
+      ? { can_dispute: true }
+      : await (await disputeStub.fetch(new Request('http://internal/can-dispute'))).json();
 
     if (!canDisputeData.can_dispute) {
       if (canDisputeData.reason === 'DISPUTE_EXISTS') {
@@ -97,6 +106,7 @@ export async function handleCreateDispute(request, env) {
         evidence: data.evidence,
         evidence_urls: data.evidence_urls || [],
         contact: data.contact,
+        ncii: data.ncii,
         submitter_ip_hash: ipHash
       })
     });
@@ -117,6 +127,14 @@ export async function handleCreateDispute(request, env) {
     const indexId = env.DISPUTE_INDEX.idFromName('dispute-index:global');
     const indexStub = env.DISPUTE_INDEX.get(indexId);
 
+    if (disputeData.superseded_dispute_id) {
+      await indexStub.fetch(new Request('http://internal/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dispute_id: disputeData.superseded_dispute_id })
+      }));
+    }
+
     await indexStub.fetch(new Request('http://internal/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -125,7 +143,8 @@ export async function handleCreateDispute(request, env) {
         dispute_id: disputeData.dispute.dispute_id,
         claim_type: data.claim_type,
         created_at: disputeData.dispute.created_at,
-        expires_at: disputeData.dispute.expires_at
+        expires_at: disputeData.dispute.expires_at,
+        removal_due_at: disputeData.dispute.removal_due_at
       })
     }));
 
@@ -149,6 +168,8 @@ export async function handleCreateDispute(request, env) {
       console.error('Error writing dispute marker:', markerError);
     }
 
+    if (isNcii) await alertNciiReport(env, data.cid, disputeData.dispute);
+
     return new Response(JSON.stringify(disputeData), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }
@@ -160,6 +181,33 @@ export async function handleCreateDispute(request, env) {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
+  }
+}
+
+/**
+ * Tell the operator about a new intimate-image report: it needs a decision within 48 hours.
+ * The alert names only the CID, so the webhook destination never sees the report itself.
+ * Never throws; the report already stands and the hourly deadline check repeats the alert.
+ * @param {Object} env - Environment bindings
+ * @param {string} cid - Reported content
+ * @param {Object} dispute - The created dispute ({ dispute_id, removal_due_at })
+ */
+async function alertNciiReport(env, cid, dispute) {
+  try {
+    const alertStore = env.ALERT_STORE.get(env.ALERT_STORE.idFromName('global'));
+    await alertStore.fetch(new Request('https://dummy/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'ncii_report',
+        severity: 'critical',
+        title: 'Intimate image report: decide within 48 hours',
+        message: `Content ${cid} is blocked. Uphold or deny it at /admin/disputes.html before ${dispute.removal_due_at}.`,
+        metadata: { cid, dispute_id: dispute.dispute_id, removal_due_at: dispute.removal_due_at }
+      })
+    }));
+  } catch (error) {
+    console.error('Error raising intimate image report alert:', error);
   }
 }
 
@@ -258,6 +306,10 @@ export async function handleGetContentDisputes(request, env, cid, userId = null)
     const disputes = historyData.disputes.map(dispute => {
       const filtered = { ...dispute };
       delete filtered.submitter_ip_hash;
+
+      if (dispute.claim_type === NCII_CLAIM_TYPE) {
+        for (const field of NCII_PRIVATE_FIELDS) delete filtered[field];
+      }
 
       // Only show contact info to authenticated users
       if (!userId) {

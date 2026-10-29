@@ -317,6 +317,32 @@ Removing content while a **copyright** dispute is open records a strike against 
 The nightly cron raises a `repeat_infringer` alert when any account reaches the threshold; close
 those accounts per the DMCA policy (`frontend/dmca.html` §5).
 
+### Intimate image reports (TAKE IT DOWN Act)
+
+Reports with reason `ncii` (intimate image shared without consent) follow the process published
+at `/take-it-down.html`. They differ from other disputes:
+
+- **Deadline.** Each has a `removal_due_at` 48 hours after filing and never expires. Content is
+  blocked (451) from the moment of the report, and stays blocked until you decide.
+- **Alerts.** Filing raises a critical `ncii_report` alert. The hourly cron raises a critical
+  `ncii_deadline` alert while any report is within 24 hours of its deadline or past it. Both name
+  only the CID, so `ALERT_WEBHOOK_URL` needs to be set for them to reach you.
+- **Deciding.** `/admin/disputes.html` lists these first, earliest deadline first, with the
+  reporter's signature and whether they act for the person shown. Uphold (`closed_deleted`) a
+  valid request: the law requires removal and doesn't ask you to decide whether consent was
+  given. Deny only an invalid request, such as content that isn't an intimate image;
+  denying makes the content public again. Never repeat the report's details in the public
+  resolution reason.
+- **Copies.** Identical files share a CID, so upholding removes every identical copy, and the
+  same bytes can't be uploaded again (410). Edited or re-encoded copies have their own CIDs and
+  need their own reports.
+- **Privacy.** The public dispute API omits the explanation, links, statement and contact for
+  these reports; only `GET /api/admin/disputes` returns them.
+- **Other disputes.** An intimate image report replaces another open dispute on the same CID
+  (that one closes as `closed_superseded`) and skips the 30-day re-report cooldown.
+- **Minors.** An image of anyone under 18 is CSAM: uphold it and report it to NCMEC
+  (`docs/legal-review.md` item 7).
+
 ## Usage Examples
 
 ### Using curl

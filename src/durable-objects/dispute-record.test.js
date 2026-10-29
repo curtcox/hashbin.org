@@ -29,7 +29,7 @@ function createMockEnv() {
 /**
  * Import DisputeRecord class
  */
-import { DisputeRecord } from './dispute-record.js';
+import { DisputeRecord, NCII_REMOVAL_HOURS } from './dispute-record.js';
 
 describe('DisputeRecord Durable Object', () => {
   let disputeRecord;
@@ -428,6 +428,87 @@ describe('DisputeRecord Durable Object', () => {
       const data = await response.json();
       expect(data.disputes).toHaveLength(1);
       expect(data.total).toBe(1);
+    });
+  });
+
+  describe('Intimate image reports (TAKE IT DOWN Act)', () => {
+    const post = (body) => disputeRecord.fetch(new Request('http://localhost/dispute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }));
+    const nciiReport = (overrides = {}) => ({
+      cid: 'test-cid-123',
+      claim_type: 'ncii',
+      contact: { type: 'email', value: 'person@example.com' },
+      ncii: { signature: 'Pat Example', on_behalf: false, good_faith: true },
+      ...overrides
+    });
+    const copyrightReport = {
+      cid: 'test-cid-123',
+      claim_type: 'copyright',
+      evidence: 'This is a detailed evidence description that is more than 50 characters long.',
+      contact: { type: 'email', value: 'owner@example.com' }
+    };
+
+    it('never expires, is due in 48 hours and needs no explanation', async () => {
+      const before = Date.now();
+      const response = await post(nciiReport());
+      expect(response.status).toBe(201);
+
+      const { dispute } = await response.json();
+      expect(dispute.expires_at).toBeNull();
+      const due = new Date(dispute.removal_due_at).getTime();
+      expect(due - before).toBeGreaterThanOrEqual(NCII_REMOVAL_HOURS * 3600 * 1000);
+      expect(due - Date.now()).toBeLessThanOrEqual(NCII_REMOVAL_HOURS * 3600 * 1000);
+
+      const stored = await mockState.storage.get('active_dispute');
+      expect(stored.evidence).toBe('');
+      expect(stored.ncii_statement).toEqual({ signature: 'Pat Example', on_behalf: false, good_faith: true });
+    });
+
+    it('requires a signature and the good-faith statement', async () => {
+      let response = await post(nciiReport({ ncii: { signature: ' ', good_faith: true } }));
+      expect((await response.json()).error).toBe('SIGNATURE_REQUIRED');
+
+      response = await post(nciiReport({ ncii: { signature: 'Pat Example' } }));
+      expect((await response.json()).error).toBe('NCII_STATEMENT_REQUIRED');
+      expect(await mockState.storage.get('active_dispute')).toBeUndefined();
+    });
+
+    it('replaces another open dispute instead of waiting behind it', async () => {
+      const first = await (await post(copyrightReport)).json();
+
+      const response = await post(nciiReport());
+      expect(response.status).toBe(201);
+      const data = await response.json();
+      expect(data.superseded_dispute_id).toBe(first.dispute.dispute_id);
+
+      const history = (await mockState.storage.get('dispute_history'));
+      expect(history.map(d => [d.claim_type, d.status])).toEqual([
+        ['copyright', 'closed_superseded'],
+        ['ncii', 'open']
+      ]);
+      expect((await mockState.storage.get('active_dispute')).claim_type).toBe('ncii');
+    });
+
+    it('does not duplicate an open intimate image report', async () => {
+      await post(nciiReport());
+      const response = await post(nciiReport());
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toBe('DISPUTE_EXISTS');
+    });
+
+    it('skips the 30-day cooldown after a closed dispute', async () => {
+      await post(copyrightReport);
+      await disputeRecord.fetch(new Request('http://localhost/dispute', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'closed_denied', resolution: 'denied', resolved_by: 'admin' })
+      }));
+
+      expect((await post({ ...copyrightReport, claim_type: 'harassment' })).status).toBe(429);
+      expect((await post(nciiReport())).status).toBe(201);
     });
   });
 });

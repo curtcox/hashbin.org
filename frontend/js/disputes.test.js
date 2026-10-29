@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   describeDisputeError,
+  disputeDeadlineText,
   escapeHtml,
   isActiveStatus,
   truncateCid,
@@ -78,5 +79,39 @@ describe('display helpers', () => {
   it('truncates long CIDs', () => {
     expect(truncateCid('A'.repeat(8) + 'B'.repeat(70) + 'C'.repeat(8))).toBe('AAAAAAAA…CCCCCCCC');
     expect(truncateCid('short')).toBe('short');
+  });
+});
+
+describe('intimate image reports', () => {
+  const ncii = {
+    ...valid,
+    claimType: 'ncii',
+    evidence: '',
+    evidenceUrls: [],
+    reporterRole: 'self',
+    nciiStatement: true,
+    signature: '  Pat Example '
+  };
+
+  it('need no explanation and send the signed statement', () => {
+    const { errors, payload } = validateDisputeForm(ncii);
+    expect(errors).toEqual([]);
+    expect(payload).toMatchObject({
+      claim_type: 'ncii',
+      evidence: '',
+      ncii: { signature: 'Pat Example', on_behalf: false, good_faith: true }
+    });
+  });
+
+  it('require the role, statement and signature', () => {
+    const { errors, payload } = validateDisputeForm({ ...ncii, reporterRole: '', nciiStatement: false, signature: ' ' });
+    expect(payload).toBeNull();
+    expect(errors).toHaveLength(3);
+  });
+
+  it('show a decision deadline instead of an expiry', () => {
+    expect(disputeDeadlineText({ claim_type: 'ncii', expires_at: null, removal_due_at: '2026-10-30T12:00:00Z' }))
+      .toMatch(/^Decision due .*2026; does not expire$/);
+    expect(disputeDeadlineText({ claim_type: 'copyright', expires_at: '2026-11-27T12:00:00Z' })).toMatch(/^Expires .*2026$/);
   });
 });

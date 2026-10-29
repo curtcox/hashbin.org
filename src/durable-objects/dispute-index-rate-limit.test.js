@@ -34,3 +34,17 @@ describe('DisputeIndex submission rate limit', () => {
     expect((await submit(index, 'ip-b')).allowed).toBe(true);
   });
 });
+
+describe('DisputeIndex intimate image reports', () => {
+  const add = (index, body) => index.fetch(new Request('http://internal/add', { method: 'POST', body: JSON.stringify(body) }));
+  const base = { cid: 'AAAAAAAAabc', dispute_id: 'disp_1', claim_type: 'ncii', created_at: '2026-10-28T00:00:00.000Z' };
+
+  it('indexes them by removal deadline instead of expiry', async () => {
+    const index = new DisputeIndex({ storage: createStorage() }, {});
+    expect((await add(index, base)).status).toBe(400);
+    expect((await add(index, { ...base, removal_due_at: '2026-10-30T00:00:00.000Z' })).status).toBe(200);
+
+    const listed = await (await index.fetch(new Request('http://internal/list?claim_type=ncii'))).json();
+    expect(listed.disputes).toEqual([{ ...base, expires_at: null, removal_due_at: '2026-10-30T00:00:00.000Z' }]);
+  });
+});

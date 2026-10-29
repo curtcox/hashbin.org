@@ -3,9 +3,11 @@
  */
 
 import {
+  CLAIM_TYPE_LABELS,
   EVIDENCE_MAX,
   EVIDENCE_MIN,
   MAX_EVIDENCE_URLS,
+  NCII_CLAIM_TYPE,
   describeDisputeError,
   formatDisputeDate,
   validateDisputeForm
@@ -19,10 +21,25 @@ const urlList = document.getElementById('url-list');
 const addUrlButton = document.getElementById('add-url');
 const contactInput = document.getElementById('contact_value');
 const submitButton = document.getElementById('submit-button');
+const claimSelect = document.getElementById('claim_type');
+const nciiFields = document.getElementById('ncii-fields');
 
 const params = new URLSearchParams(window.location.search);
 if (params.get('cid')) {
   document.getElementById('cid').value = params.get('cid');
+}
+if (CLAIM_TYPE_LABELS[params.get('reason')]) {
+  claimSelect.value = params.get('reason');
+}
+
+function isNcii() {
+  return claimSelect.value === NCII_CLAIM_TYPE;
+}
+
+function updateClaimFields() {
+  nciiFields.classList.toggle('hidden', !isNcii());
+  document.getElementById('evidence-optional').classList.toggle('hidden', !isNcii());
+  updateEvidenceCount();
 }
 
 function showErrors(messages) {
@@ -49,8 +66,9 @@ function clearErrors() {
 
 function updateEvidenceCount() {
   const length = evidenceInput.value.trim().length;
-  evidenceCount.textContent = `${length.toLocaleString('en-US')} / ${EVIDENCE_MAX.toLocaleString('en-US')} (minimum ${EVIDENCE_MIN})`;
-  evidenceCount.classList.toggle('invalid', length > 0 && (length < EVIDENCE_MIN || length > EVIDENCE_MAX));
+  const min = isNcii() ? 0 : EVIDENCE_MIN;
+  evidenceCount.textContent = `${length.toLocaleString('en-US')} / ${EVIDENCE_MAX.toLocaleString('en-US')}${min ? ` (minimum ${min})` : ''}`;
+  evidenceCount.classList.toggle('invalid', length > 0 && (length < min || length > EVIDENCE_MAX));
 }
 
 function addUrlRow() {
@@ -96,12 +114,15 @@ async function handleSubmit(event) {
 
   const { errors, payload } = validateDisputeForm({
     cid: document.getElementById('cid').value,
-    claimType: document.getElementById('claim_type').value,
+    claimType: claimSelect.value,
     evidence: evidenceInput.value,
     evidenceUrls: [...urlList.querySelectorAll('.evidence-url')].map(input => input.value),
     contactType: selectedContactType(),
     contactValue: contactInput.value,
-    goodFaith: document.getElementById('good_faith').checked
+    goodFaith: document.getElementById('good_faith').checked,
+    reporterRole: form.querySelector('input[name="reporter_role"]:checked')?.value,
+    nciiStatement: document.getElementById('ncii_statement').checked,
+    signature: document.getElementById('signature').value
   });
 
   if (errors.length > 0) {
@@ -128,6 +149,12 @@ async function handleSubmit(event) {
     const dispute = body.dispute || {};
     document.getElementById('success-id').textContent = dispute.dispute_id || '';
     document.getElementById('success-expires').textContent = formatDisputeDate(dispute.expires_at);
+    document.getElementById('success-due').textContent = dispute.removal_due_at
+      ? new Date(dispute.removal_due_at).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })
+      : '';
+    const ncii = payload.claim_type === NCII_CLAIM_TYPE;
+    document.getElementById('success-standard').classList.toggle('hidden', ncii);
+    document.getElementById('success-ncii').classList.toggle('hidden', !ncii);
     document.getElementById('success-view').href = `/disputes/view.html?cid=${encodeURIComponent(payload.cid)}`;
     form.classList.add('hidden');
     document.getElementById('success').classList.remove('hidden');
@@ -142,9 +169,10 @@ async function handleSubmit(event) {
 }
 
 evidenceInput.addEventListener('input', updateEvidenceCount);
+claimSelect.addEventListener('change', updateClaimFields);
 addUrlButton.addEventListener('click', addUrlRow);
 form.querySelectorAll('input[name="contact_type"]').forEach(radio => {
   radio.addEventListener('change', updateContactPlaceholder);
 });
 form.addEventListener('submit', handleSubmit);
-updateEvidenceCount();
+updateClaimFields();

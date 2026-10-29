@@ -16,8 +16,13 @@ export const CLAIM_TYPE_LABELS = {
   privacy: 'Privacy violation',
   harassment: 'Harassment',
   malware: 'Malware',
+  ncii: 'Intimate image shared without consent',
   other: 'Other'
 };
+
+// Reports under the TAKE IT DOWN Act: private, never expire, decided within 48 hours
+export const NCII_CLAIM_TYPE = 'ncii';
+export const NCII_SIGNATURE_MAX = 200;
 
 export const STATUS_LABELS = {
   open: 'Open',
@@ -25,6 +30,7 @@ export const STATUS_LABELS = {
   closed_denied: 'Denied',
   closed_deleted: 'Content removed',
   closed_expired: 'Expired',
+  closed_superseded: 'Replaced by a later report',
   closed_withdrawn: 'Withdrawn'
 };
 
@@ -89,6 +95,9 @@ export function isHttpsUrl(url) {
  * @param {string} input.contactType - 'email' or 'url'
  * @param {string} input.contactValue - Email address or URL
  * @param {boolean} input.goodFaith - Good-faith acknowledgment
+ * @param {string} [input.signature] - Intimate image reports: the reporter's typed full name
+ * @param {string} [input.reporterRole] - Intimate image reports: 'self' or 'on_behalf'
+ * @param {boolean} [input.nciiStatement] - Intimate image reports: good-faith belief of no consent
  * @returns {{errors: string[], payload: Object|null}} Validation errors, or the request body
  */
 export function validateDisputeForm(input) {
@@ -97,6 +106,8 @@ export function validateDisputeForm(input) {
   const evidence = (input.evidence || '').trim();
   const evidenceUrls = (input.evidenceUrls || []).map(u => u.trim()).filter(Boolean);
   const contactValue = (input.contactValue || '').trim();
+  const isNcii = input.claimType === NCII_CLAIM_TYPE;
+  const signature = (input.signature || '').trim();
 
   if (!CID_PATTERN.test(cid)) {
     errors.push('Enter a valid content ID (8–94 letters, digits, "-" or "_").');
@@ -104,7 +115,8 @@ export function validateDisputeForm(input) {
   if (!CLAIM_TYPE_LABELS[input.claimType]) {
     errors.push('Choose a reason for the report.');
   }
-  if (evidence.length < EVIDENCE_MIN) {
+  // An intimate image report needs no explanation: the CID, statement and signature suffice
+  if (evidence.length < EVIDENCE_MIN && !isNcii) {
     errors.push(`The explanation must be at least ${EVIDENCE_MIN} characters.`);
   } else if (evidence.length > EVIDENCE_MAX) {
     errors.push(`The explanation must be at most ${EVIDENCE_MAX.toLocaleString('en-US')} characters.`);
@@ -125,6 +137,17 @@ export function validateDisputeForm(input) {
   if (!input.goodFaith) {
     errors.push('Confirm that the report is made in good faith.');
   }
+  if (isNcii) {
+    if (input.reporterRole !== 'self' && input.reporterRole !== 'on_behalf') {
+      errors.push('Say whether you are the person shown or acting for them.');
+    }
+    if (!input.nciiStatement) {
+      errors.push('Confirm that the image was shared without consent.');
+    }
+    if (signature.length < 2 || signature.length > NCII_SIGNATURE_MAX) {
+      errors.push('Type your full name as your signature.');
+    }
+  }
 
   if (errors.length > 0) {
     return { errors, payload: null };
@@ -137,7 +160,8 @@ export function validateDisputeForm(input) {
       claim_type: input.claimType,
       evidence,
       evidence_urls: evidenceUrls,
-      contact: { type: input.contactType, value: contactValue }
+      contact: { type: input.contactType, value: contactValue },
+      ...(isNcii ? { ncii: { signature, on_behalf: input.reporterRole === 'on_behalf', good_faith: true } } : {})
     }
   };
 }
@@ -156,6 +180,10 @@ export function describeDisputeError(status, body = {}) {
       return 'That content has already been deleted.';
     case 'DISPUTE_EXISTS':
       return 'This content already has an open dispute. It is blocked while that dispute is reviewed.';
+    case 'SIGNATURE_REQUIRED':
+      return 'Type your full name as your signature.';
+    case 'NCII_STATEMENT_REQUIRED':
+      return 'Confirm that the image was shared without consent.';
     case 'REDISPUTE_TOO_SOON':
       return body.days_remaining
         ? `A dispute for this content was closed recently. You can file a new one in ${Math.ceil(body.days_remaining)} day(s).`
@@ -192,6 +220,20 @@ export function formatDisputeDate(dateString) {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+/**
+ * When an open dispute ends on its own: intimate image reports never expire
+ * @param {Object} dispute - Dispute with expires_at and/or removal_due_at
+ * @returns {string} e.g. "Expires Oct 30, 2026" or "Decision due Oct 30, 2026; does not expire"
+ */
+export function disputeDeadlineText(dispute) {
+  if (dispute?.claim_type === NCII_CLAIM_TYPE || (!dispute?.expires_at && dispute?.removal_due_at)) {
+    return dispute.removal_due_at
+      ? `Decision due ${formatDisputeDate(dispute.removal_due_at)}; does not expire`
+      : 'Does not expire';
+  }
+  return `Expires ${formatDisputeDate(dispute?.expires_at)}`;
 }
 
 /**

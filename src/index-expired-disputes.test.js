@@ -51,6 +51,17 @@ describe('processExpiredDisputes', () => {
     expect(removedFromIndex).toEqual(['disp_old']);
   });
 
+  it('never expires an intimate image report', async () => {
+    const { env, patched, bucketDelete } = makeEnv({
+      disputes: [{ dispute_id: 'disp_ncii', cid: 'AAAAAABBncii', claim_type: 'ncii', expires_at: null, removal_due_at: new Date(Date.now() - DAY_MS).toISOString() }]
+    });
+
+    await worker.processExpiredDisputes(env);
+
+    expect(patched).toEqual([]);
+    expect(bucketDelete).not.toHaveBeenCalled();
+  });
+
   it('leaves disputes that have not expired alone', async () => {
     const { env, patched, bucketDelete } = makeEnv({
       disputes: [{ dispute_id: 'disp_new', cid: 'AAAAAABBnew', expires_at: new Date(Date.now() + DAY_MS).toISOString() }]
@@ -73,5 +84,55 @@ describe('processExpiredDisputes', () => {
 
     expect(bucketDelete).not.toHaveBeenCalled();
     expect(removedFromIndex).toEqual([]);
+  });
+});
+
+describe('checkNciiDeadlines', () => {
+  const HOUR_MS = 60 * 60 * 1000;
+
+  function deadlineEnv(disputes) {
+    const alerts = [];
+    const queries = [];
+    return {
+      alerts,
+      queries,
+      env: {
+        DISPUTE_INDEX: {
+          idFromName: name => name,
+          get: () => ({ fetch: async request => { queries.push(new URL(request.url).search); return Response.json({ disputes }); } })
+        },
+        ALERT_STORE: {
+          idFromName: name => name,
+          get: () => ({ fetch: async request => { alerts.push(await request.json()); return Response.json({}); } })
+        }
+      }
+    };
+  }
+
+  it('stays quiet while every report has more than a day left', async () => {
+    const now = new Date();
+    const { env, alerts, queries } = deadlineEnv([
+      { dispute_id: 'disp_a', cid: 'AAAAAAAAa', claim_type: 'ncii', removal_due_at: new Date(now.getTime() + 30 * HOUR_MS).toISOString() }
+    ]);
+
+    await worker.checkNciiDeadlines(env, now);
+
+    expect(queries[0]).toContain('claim_type=ncii');
+    expect(alerts).toEqual([]);
+  });
+
+  it('alerts with the earliest report once one is within a day of its deadline', async () => {
+    const now = new Date();
+    const { env, alerts } = deadlineEnv([
+      { dispute_id: 'disp_late', cid: 'AAAAAAAAlate', claim_type: 'ncii', removal_due_at: new Date(now.getTime() + 20 * HOUR_MS).toISOString() },
+      { dispute_id: 'disp_over', cid: 'AAAAAAAAover', claim_type: 'ncii', removal_due_at: new Date(now.getTime() - HOUR_MS).toISOString() }
+    ]);
+
+    await worker.checkNciiDeadlines(env, now);
+
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ type: 'ncii_deadline', severity: 'critical', title: expect.stringContaining('past its 48-hour deadline') });
+    expect(alerts[0].message).toContain('AAAAAAAAover');
+    expect(alerts[0].metadata.disputes.map(d => d.dispute_id)).toEqual(['disp_over', 'disp_late']);
   });
 });

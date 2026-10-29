@@ -288,7 +288,7 @@ export default {
   async scheduled(event, env, _ctx) {
     const now = new Date(event.scheduledTime || Date.now());
     // Isolate failures so a maintenance error cannot skip monitoring.
-    for (const job of [() => runCostMonitor(env, now), () => this.runAnomalyDetection(env)]) {
+    for (const job of [() => runCostMonitor(env, now), () => this.runAnomalyDetection(env), () => this.checkNciiDeadlines(env, now)]) {
       try { await job(); } catch (error) { console.error('Hourly safety job failed:', error); }
     }
     if (now.getUTCHours() !== 2) return;
@@ -503,6 +503,33 @@ export default {
   },
 
   /**
+   * Alert while intimate-image reports wait for a decision past half their 48-hour window.
+   * Their content is blocked from the moment of the report; the decision removes it for good.
+   */
+  async checkNciiDeadlines(env, now = new Date()) {
+    const index = env.DISPUTE_INDEX.get(env.DISPUTE_INDEX.idFromName('dispute-index:global'));
+    const list = await (await index.fetch(new Request('http://internal/list?claim_type=ncii&limit=100'))).json();
+    const waiting = (list.disputes || [])
+      .filter(d => d.removal_due_at && new Date(d.removal_due_at) - now < 24 * 60 * 60 * 1000)
+      .sort((a, b) => new Date(a.removal_due_at) - new Date(b.removal_due_at));
+    if (waiting.length === 0) return;
+
+    const overdue = new Date(waiting[0].removal_due_at) <= now;
+    const alertStore = env.ALERT_STORE.get(env.ALERT_STORE.idFromName('global'));
+    await alertStore.fetch(new Request('https://dummy/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'ncii_deadline',
+        severity: 'critical',
+        title: overdue ? 'Intimate image report past its 48-hour deadline' : 'Intimate image report due within 24 hours',
+        message: `${waiting.length} report(s) need a decision at /admin/disputes.html; the earliest ${overdue ? 'was' : 'is'} due by ${waiting[0].removal_due_at} (content ${waiting[0].cid}).`,
+        metadata: { disputes: waiting.map(d => ({ cid: d.cid, dispute_id: d.dispute_id, removal_due_at: d.removal_due_at })) }
+      })
+    }));
+  },
+
+  /**
    * Process expired disputes
    * Updates disputes that are past their expires_at date to closed_expired
    */
@@ -522,8 +549,10 @@ export default {
       const now = new Date();
       let expired = 0;
       
-      // Check each dispute for expiration
+      // Check each dispute for expiration. Intimate-image reports have no expiry: their
+      // content stays blocked until an administrator decides.
       for (const dispute of listData.disputes || []) {
+        if (!dispute.expires_at) continue;
         const expiresAt = new Date(dispute.expires_at);
         
         if (expiresAt <= now) {

@@ -117,7 +117,7 @@ for the same limits.
 |------|---------|-----|
 | DMCA | Register the agent ($6, renew every 3 years; set a reminder). Enforce the repeat-infringer policy. | Without these steps, the safe harbor can be lost. In the risk table, a lapsed agent is the largest expected cost. |
 | DMCA disputes | **Don't auto-restore content 30 days after a copyright notice.** Restore only after a valid counter-notice and the statutory 10–14 business-day wait. | Putting noticed content back without a counter-notice puts safe harbor for that work at risk. Today all disputes expire after 30 days (S15; legal-review item 5). **Worth asking a lawyer.** |
-| TAKE IT DOWN Act (in force since May 19, 2026) | Add a "non-consensual intimate image" report type, remove within **48 hours**, never auto-expire, and remove identical copies. Publish a plain-language notice of the process. | It applies to public sites hosting user content, and the FTC enforces it. The report form has only "copyright" and "illegal" today. Identical copies are easy: same bytes, same CID. |
+| TAKE IT DOWN Act (in force since May 19, 2026) | Add a "non-consensual intimate image" report type, remove within **48 hours**, never auto-expire, and remove identical copies. Publish a plain-language notice of the process. | It applies to public sites hosting user content, and the FTC enforces it. Identical copies are easy: same bytes, same CID. **Built (STATUS L19)**: `/take-it-down.html`; needs the lawyer's read with the other pages. |
 | CSAM | Register with NCMEC's CyberTipline, write the internal procedure, and preserve reported material for 1 year (REPORT Act). | Fines for knowing failure to report reach $600k+. |
 | Terms | Fill placeholders with the LLC. Keep the liability cap. Add a discontinuation clause: notice period, a download window, and what happens to prepaid retention and balances. Drop "card processing fee" wording. | Prepaid retention is an open-ended promise until the Terms say what happens if HashBin stops. **Worth a lawyer's flat-fee review** (~$760) before launch if the budget allows. |
 | Balances | Keep them closed-loop: not transferable, not cashable (as now). Don't build B5 (peer-to-peer transfer). | Transferable stored value starts to look like money transmission. Missouri may treat old credit balances as unclaimed property after about 5 years; keep records. |
@@ -142,8 +142,7 @@ Still open:
 
 - Checkout and Terms §3 describe the Stripe fee as a "card processing fee" (surcharge rules
   above). STATUS L20.
-- The dispute form has no NCII category, and every dispute auto-expires after 30 days.
-  STATUS L19.
+- Every dispute except an intimate image report auto-expires after 30 days (S19).
 - The 256t.us Worker's 30-a-minute IP limit is per instance, not global. Prepaid download
   allowances (STATUS L22) bound the cost instead.
 
@@ -157,6 +156,9 @@ Fixed since (2026-10):
 - 256t.us caches downloads with the Cache API and needs fewer R2 reads per download (STATUS S22).
 - Bandwidth purchases have a floor of $4 per million downloads, so small files no longer
   sell below cost (STATUS B9, L22).
+- The report form has an intimate image category: the content is blocked at once, the report
+  stays private and never expires, the admin is alerted to decide within 48 hours, and
+  `/take-it-down.html` explains the process (STATUS L19).
 
 ## Where Sheets fell short for this job
 

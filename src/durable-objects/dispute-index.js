@@ -92,7 +92,9 @@ export class DisputeIndex {
   async addDispute(request) {
     const data = await request.json();
     
-    if (!data.cid || !data.dispute_id || !data.claim_type || !data.created_at || !data.expires_at) {
+    // Intimate-image reports never expire; they carry a removal deadline instead
+    const hasEnd = data.claim_type === 'ncii' ? !!data.removal_due_at : !!data.expires_at;
+    if (!data.cid || !data.dispute_id || !data.claim_type || !data.created_at || !hasEnd) {
       return new Response(JSON.stringify({ error: 'MISSING_REQUIRED_FIELDS' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -116,7 +118,8 @@ export class DisputeIndex {
       dispute_id: data.dispute_id,
       claim_type: data.claim_type,
       created_at: data.created_at,
-      expires_at: data.expires_at
+      expires_at: data.expires_at || null,
+      removal_due_at: data.removal_due_at || null
     });
 
     await this.state.storage.put('open_disputes', disputes);

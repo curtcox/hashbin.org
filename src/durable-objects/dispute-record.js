@@ -5,6 +5,12 @@
 
 import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
 
+// Reports of intimate images published without consent (TAKE IT DOWN Act, 47 U.S.C. § 223a).
+// They block the content at once, never expire, and must be decided within 48 hours.
+export const NCII_CLAIM_TYPE = 'ncii';
+export const NCII_REMOVAL_HOURS = 48;
+const NCII_SIGNATURE_MAX = 200;
+
 /**
  * DisputeRecord Durable Object
  * One instance per CID
@@ -100,15 +106,37 @@ export class DisputeRecord {
       });
     }
 
-    const validClaimTypes = ['copyright', 'illegal', 'privacy', 'harassment', 'malware', 'other'];
+    const validClaimTypes = ['copyright', 'illegal', 'privacy', 'harassment', 'malware', 'other', NCII_CLAIM_TYPE];
     if (!data.claim_type || !validClaimTypes.includes(data.claim_type)) {
       return new Response(JSON.stringify({ error: 'INVALID_CLAIM_TYPE' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       });
     }
+    const isNcii = data.claim_type === NCII_CLAIM_TYPE;
 
-    if (!data.evidence || data.evidence.length < 50) {
+    // The law's valid request is a signature, the content, a good-faith statement and contact
+    // details; an explanation is optional, so a short one must not invalidate the report
+    let nciiStatement = null;
+    if (isNcii) {
+      const signature = typeof data.ncii?.signature === 'string' ? data.ncii.signature.trim() : '';
+      if (signature.length < 2 || signature.length > NCII_SIGNATURE_MAX) {
+        return new Response(JSON.stringify({ error: 'SIGNATURE_REQUIRED' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      if (data.ncii.good_faith !== true) {
+        return new Response(JSON.stringify({ error: 'NCII_STATEMENT_REQUIRED' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      nciiStatement = { signature, on_behalf: data.ncii.on_behalf === true, good_faith: true };
+    }
+
+    if (isNcii && data.evidence == null) data.evidence = '';
+    if (typeof data.evidence !== 'string' || (!isNcii && data.evidence.length < 50)) {
       return new Response(JSON.stringify({ error: 'EVIDENCE_TOO_SHORT' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -180,18 +208,35 @@ export class DisputeRecord {
       });
     }
 
-    // Check for existing open dispute
+    // Check for existing open dispute. An intimate-image report can't wait behind another kind
+    // of dispute, so it replaces that one; the content stays blocked throughout.
     const activeDispute = await this.state.storage.get('active_dispute');
+    const history = await this.state.storage.get('dispute_history') || [];
+    let supersededDisputeId = null;
     if (activeDispute) {
-      return new Response(JSON.stringify({ error: 'DISPUTE_EXISTS' }), {
-        status: 409,
-        headers: { 'Content-Type': 'application/json' }
+      if (!isNcii || activeDispute.claim_type === NCII_CLAIM_TYPE) {
+        return new Response(JSON.stringify({ error: 'DISPUTE_EXISTS' }), {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      const closedAt = new Date().toISOString();
+      Object.assign(activeDispute, {
+        status: 'closed_superseded',
+        resolution: 'superseded',
+        resolution_reason: 'Replaced by a report of an intimate image shared without consent',
+        resolved_by: 'system',
+        closed_at: closedAt,
+        updated_at: closedAt
       });
+      const index = history.findIndex(d => d.dispute_id === activeDispute.dispute_id);
+      if (index >= 0) history[index] = activeDispute;
+      await this.state.storage.delete('active_dispute');
+      supersededDisputeId = activeDispute.dispute_id;
     }
 
-    // Check re-dispute rate limit (30 days)
-    const history = await this.state.storage.get('dispute_history') || [];
-    const lastClosedDispute = history
+    // Check re-dispute rate limit (30 days); it never delays an intimate-image report
+    const lastClosedDispute = isNcii ? null : history
       .filter(d => d.closed_at)
       .sort((a, b) => new Date(b.closed_at) - new Date(a.closed_at))[0];
 
@@ -210,7 +255,8 @@ export class DisputeRecord {
 
     // Create dispute
     const now = new Date().toISOString();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+    const expiresAt = isNcii ? null : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+    const removalDueAt = isNcii ? new Date(Date.now() + NCII_REMOVAL_HOURS * 60 * 60 * 1000).toISOString() : null;
     
     const dispute = {
       dispute_id: `disp_${crypto.randomUUID()}`,
@@ -220,6 +266,7 @@ export class DisputeRecord {
       updated_at: now,
       closed_at: null,
       expires_at: expiresAt,
+      removal_due_at: removalDueAt,
       
       // Submitter info
       submitter_contact: {
@@ -233,6 +280,7 @@ export class DisputeRecord {
       claim_type: data.claim_type,
       evidence: data.evidence,
       evidence_urls: data.evidence_urls || [],
+      ncii_statement: nciiStatement,
       
       // Resolution
       resolution: null,
@@ -254,8 +302,10 @@ export class DisputeRecord {
         cid: dispute.cid,
         status: dispute.status,
         created_at: dispute.created_at,
-        expires_at: dispute.expires_at
-      }
+        expires_at: dispute.expires_at,
+        removal_due_at: dispute.removal_due_at
+      },
+      superseded_dispute_id: supersededDisputeId
     }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }
@@ -312,7 +362,7 @@ export class DisputeRecord {
 
     // Update fields
     if (data.status) {
-      const validStatuses = ['open', 'under_review', 'closed_deleted', 'closed_denied', 'closed_expired'];
+      const validStatuses = ['open', 'under_review', 'closed_deleted', 'closed_denied', 'closed_expired', 'closed_superseded'];
       if (!validStatuses.includes(data.status)) {
         return new Response(JSON.stringify({ error: 'INVALID_STATUS' }), {
           status: 400,
