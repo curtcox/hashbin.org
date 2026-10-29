@@ -98,8 +98,9 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
 
 - `frontend/sdk/vX.Y.Z/` is a published SDK release, pinned by apps through SRI. Never edit it.
   Change `frontend/sdk/hashbin.js` (and `hashbin-cache.js`), then cut a new version with
-  `node scripts/release-browser-sdk.mjs vX.Y.Z` and add it to `src/app-safety.js` and the tests in
-  `src/browser-sdk-release.test.js`.
+  `node scripts/release-browser-sdk.mjs vX.Y.Z`, then add the version to `src/app-safety.js`,
+  `src/browser-sdk-release.test.js`, an immutable cache rule in `frontend/_headers` and
+  `frontend/docs/sdk.html`.
 - `frontend/docs/textpad*.html` are generated from `scripts/docs/*.template.html`. After
   changing a template or a Textpad app, run `python3 scripts/docs/generate-textpad-docs.py`;
   `src/docs-textpad*.test.js` fails if they drift.

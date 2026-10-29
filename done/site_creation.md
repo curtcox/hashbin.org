@@ -803,7 +803,7 @@ After completing Phase 1, proceed to:
    - Create upload and download endpoints
    - Integrate with R2 storage
 
-2. **Phase 3: Authentication & Authorization** (`todo/user_authorization.md`)
+2. **Phase 3: Authentication & Authorization** (`done/user_authorization.md`)
    - Integrate Clerk for OAuth
    - Implement session management
    - Create API key system

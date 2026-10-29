@@ -220,7 +220,7 @@ In public deletion records, hash the uploader_id to prevent linking uploads to s
 
 ## References
 
-- Implementation plan: `todo/content_lifecycle_remaining.md`
+- Implementation plan: `done/content_lifecycle_implementation.md`
 - Master Plan: `todo/master_plan.md` (Phase 5)
 - User Stories: `todo/user_stories.md` (Content Lifecycle section)
 - Current Implementation: `src/durable-objects/content-metadata.js`

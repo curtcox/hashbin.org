@@ -302,7 +302,7 @@ The manual testing guide (`todo/manual_testing_guide.md`) provides complete test
 - `scripts/test-auth-system.sh` - Automated test suite (NEW)
 
 ### Documentation
-- `todo/user_authorization.md` - Updated with completion status
+- `done/user_authorization.md` - Updated with completion status
 - `todo/deployment_checklist.md` - Complete deployment guide (NEW)
 - `todo/manual_testing_guide.md` - Manual testing procedures (NEW)
 
@@ -310,7 +310,7 @@ The manual testing guide (`todo/manual_testing_guide.md`) provides complete test
 
 ## Success Criteria Met
 
-From `todo/user_authorization.md`:
+From `done/user_authorization.md`:
 
 1. ✅ Users can authenticate via any supported OAuth provider (implementation complete)
 2. ✅ Users can link multiple OAuth providers to one account (webhook handler supports external_accounts)
@@ -370,7 +370,7 @@ git log --name-only --oneline -5
 
 ## References
 
-- **Main Documentation:** `todo/user_authorization.md`
+- **Main Documentation:** `done/user_authorization.md`
 - **Deployment Guide:** `todo/deployment_checklist.md`
 - **Testing Guide:** `todo/manual_testing_guide.md`
 - **Test Script:** `scripts/test-auth-system.sh`
@@ -384,7 +384,7 @@ git log --name-only --oneline -5
 ## Contact
 
 For questions about this implementation:
-- Review `todo/user_authorization.md` for detailed specification
+- Review `done/user_authorization.md` for detailed specification
 - Run `./scripts/test-auth-system.sh` to verify functionality
 - Follow `todo/deployment_checklist.md` for production deployment
 - Use `todo/manual_testing_guide.md` for manual verification

@@ -12,10 +12,10 @@ documented API or required entitlement is unavailable.
 
 - Clerk application configured with OAuth providers
 - Production deployment completed (see deployment_checklist.md)
-- Test accounts for each OAuth provider:
+- Test accounts for each enabled OAuth provider. Production enables Google and GitHub only
+  (`clerk_remaining.md` CL3), so mark the Apple and Microsoft tests SKIP until they are
+  configured:
   - Google account
-  - Apple ID
-  - Microsoft account
   - GitHub account
 
 ---

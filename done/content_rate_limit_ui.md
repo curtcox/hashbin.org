@@ -2,7 +2,7 @@
 
 ## Implementation Status: ✅ COMPLETE (2026-01-17)
 
-This document describes the UI for allowing users to view rate limit status and purchase bandwidth (MTBR rate limiting) for specific content. The backend API is already complete (see `todo/content_rate_limit.md`), and this plan focuses on the frontend implementation.
+This document describes the UI for allowing users to view rate limit status and purchase bandwidth (MTBR rate limiting) for specific content. The backend API is already complete (see `done/content_rate_limit.md`), and this plan focuses on the frontend implementation.
 
 ## User Stories Addressed
 

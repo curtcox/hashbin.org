@@ -6,7 +6,7 @@ This document summarizes the user authorization implementation completed for Has
 
 ### Overview
 
-The user authorization system has been fully implemented according to the plan in `todo/user_authorization.md`. The system supports both OAuth authentication via Clerk and programmatic access via API keys.
+The user authorization system has been fully implemented according to the plan in `done/user_authorization.md`. The system supports both OAuth authentication via Clerk and programmatic access via API keys.
 
 ### What Was Built
 
@@ -125,7 +125,7 @@ All endpoints integrated into main worker (`src/index.js`):
 - `src/durable-objects/user-profile.js` - Full implementation
 - `wrangler.toml` - Added KeyRegistry binding and Clerk config
 - `package.json` - Added @clerk/backend dependency
-- `todo/user_authorization.md` - Marked phases complete
+- `done/user_authorization.md` - Marked phases complete
 
 ### Architecture Decisions
 
@@ -266,7 +266,7 @@ npm run verify:prod
 
 ### Phase 3.6: Escalation System (Deferred to Phase 6)
 
-The escalation system for contests and DMCA is documented in `todo/user_authorization.md` but deferred:
+The escalation system for contests and DMCA is documented in `done/user_authorization.md` but deferred:
 - Tier 1: Automated rules (no AI)
 - Tier 2: AI review (OpenRouter)
 - Tier 3: Owner notification (webhook)
@@ -402,7 +402,7 @@ All Phase 3.1-3.5 success criteria have been met:
 ## 📞 Support
 
 For questions or issues with the authorization system:
-1. Check `todo/user_authorization.md` for design decisions
+1. Check `done/user_authorization.md` for design decisions
 2. Review this summary for implementation details
 3. Refer to inline code comments for specific functionality
 4. Test locally with `npm run dev`

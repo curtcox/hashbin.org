@@ -87,7 +87,7 @@ Features planned but not critical for MVP:
 - API reference with curl examples
 - Security considerations documented
 - Troubleshooting guide included
-- Implementation status in `todo/system_management.md`
+- Implementation status in `done/system_management.md`
 
 ## Deployment Readiness
 

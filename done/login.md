@@ -652,7 +652,7 @@ When Clerk service is unavailable:
 |------------|------|--------|
 | Deposit funds | `done/add_to_balance.md` | Planned (next phase) |
 | Upload content | `todo/master_plan.md` Phase 2 | Planned |
-| Dashboard UI | `todo/frontend_ui.md` | Planned |
+| Dashboard UI | `done/frontend_ui.md` | Planned |
 
 ---
 

@@ -348,7 +348,7 @@ Not required for core functionality. API endpoints provide transparency.
 ### Documentation
 
 - `done/content_lifecycle.md` - Planning document
-- `todo/content_lifecycle_remaining.md` - Implementation plan (to be moved)
+- `done/content_lifecycle_implementation.md` - Implementation plan
 - `todo/master_plan.md` - Master roadmap
 
 ---

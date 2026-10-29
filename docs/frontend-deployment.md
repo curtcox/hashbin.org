@@ -11,7 +11,8 @@ The HashBin.org frontend is served directly from the Cloudflare Worker using sta
 1. **Create a Clerk Application**
    - Go to [clerk.com](https://clerk.com) and create an account
    - Create a new application
-   - Enable OAuth providers: Google, Apple, Microsoft, GitHub
+   - Enable OAuth providers. Production enables Google and GitHub only; Apple and Microsoft
+     are not configured (`todo/clerk_remaining.md` CL3)
 
 2. **Get Clerk Keys**
    - Navigate to **API Keys** in Clerk Dashboard

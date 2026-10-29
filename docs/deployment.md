@@ -197,15 +197,18 @@ Update your domain's nameservers at your domain registrar:
 
 ### 3.6: Configure Worker Secrets
 
-At minimum, production must include these Worker secrets:
+The deploy workflow's "Verify required secrets" step fails unless these GitHub secrets exist,
+and then pushes them to the Worker:
 
-- `CLERK_SECRET_KEY`
-- `CLERK_PUBLISHABLE_KEY`
-- `OAUTH_SIGNING_KEY`
+- `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: payments (Stripe Tax must be activated;
+  checkouts use automatic tax)
+- `OAUTH_SIGNING_KEY`, `DOWNLOAD_TOKEN_SECRET`: also pushed to the 256t.us Worker, which must
+  share both values. `DOWNLOAD_TOKEN_SECRET` signs API keys, admin keys and download tokens, so
+  changing it invalidates all of them.
 
 Also set, from GitHub secrets of the same name (the deploy workflow publishes them when present):
 
-- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`: payments (Stripe Tax must be activated; checkouts use automatic tax)
 - `ADMIN_USER_ID`: the admin's Clerk user ID; that sign-in holds every admin scope and issues
   scoped admin keys (`/admin/keys.html`)
 - `API_KEY_ENCRYPTION_KEY` is no longer used (keys are stored as hashes only); delete it with
@@ -217,6 +220,8 @@ Also set, from GitHub secrets of the same name (the deploy workflow publishes th
   Deleting a user in Clerk then deletes their HashBin profile and disables their API keys.
 - `ALERT_WEBHOOK_URL`: where operator alerts are pushed (a Slack or Discord incoming webhook works
   directly). Test with `POST /api/admin/alerts/test`.
+- `CLOUDFLARE_ANALYTICS_TOKEN`: a read-only Account Analytics token for cost monitoring
+  ([cost safety](cost-safety.md))
 
 Generate the OAuth signing key value:
 
@@ -225,6 +230,7 @@ Generate the OAuth signing key value:
 ```
 
 Copy the generated value and store it as a GitHub repository secret named `OAUTH_SIGNING_KEY`.
+Generate a different random value for `DOWNLOAD_TOKEN_SECRET` (for example `openssl rand -base64 48`).
 The deployment pipeline will automatically publish it to Cloudflare Worker secrets.
 
 If you need to set secrets manually with Wrangler:
@@ -233,9 +239,12 @@ If you need to set secrets manually with Wrangler:
 wrangler secret put CLERK_SECRET_KEY
 wrangler secret put CLERK_PUBLISHABLE_KEY
 wrangler secret put OAUTH_SIGNING_KEY
+wrangler secret put DOWNLOAD_TOKEN_SECRET
+wrangler secret put OAUTH_SIGNING_KEY --config workers/256t-content/wrangler.toml
+wrangler secret put DOWNLOAD_TOKEN_SECRET --config workers/256t-content/wrangler.toml
 ```
 
-For `OAUTH_SIGNING_KEY`, use a high-entropy random value (for example, 32+ bytes).
+For `OAUTH_SIGNING_KEY` and `DOWNLOAD_TOKEN_SECRET`, use a high-entropy random value (for example, 32+ bytes).
 Do not commit this value to source control.
 
 ## Step 4: Configure GitHub Secrets
@@ -247,7 +256,7 @@ GitHub Secrets store sensitive credentials securely.
 3. In left sidebar, click **Secrets and variables** → **Actions**
 4. Click **New repository secret**
 
-Add these two secrets:
+Add the Cloudflare secrets below, plus the ones listed in Step 3.6:
 
 ### Secret 1: CLOUDFLARE_ACCOUNT_ID
 

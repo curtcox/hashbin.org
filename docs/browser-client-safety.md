@@ -181,7 +181,7 @@ apps may vendor the exact files and check them against it.
 It exposes `window.hashbin`; use it from a subsequent module script after the SDK loads.
 A plain JavaScript `import` of a version URL pins the version but does not by itself enforce
 SRI. `/sdk/hashbin.js` remains latest. Pinned clients must upgrade deliberately for fixes;
-see [SDK release instructions](../scripts/README.md#browser-sdk-releases).
+see [SDK release instructions](../scripts/README.md#operator-and-release-tools).
 
 ## Migrate existing clients
 

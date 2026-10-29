@@ -196,7 +196,8 @@ Quick summary:
 1. Configure OAuth providers in Clerk Dashboard
 2. Generate an OAuth signing key: `./scripts/generate-oauth-signing-key.sh`
 3. Add the GitHub secrets checked by the workflow's "Verify required secrets" step
-   (including `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `OAUTH_SIGNING_KEY`, Stripe keys)
+   (including `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `OAUTH_SIGNING_KEY`,
+   `DOWNLOAD_TOKEN_SECRET`, Stripe keys)
 4. Push to `main` (or `npm run deploy` by hand)
 5. Verify: `npm run verify`
 

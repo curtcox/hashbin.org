@@ -172,7 +172,7 @@ User Request → Validate CID → Check If-None-Match (304?)
 
 ## References
 
-- See `todo/download_remaining.md` for remaining work (contested content, info page, performance testing)
+- Remaining work (contested content, info page, performance testing) was finished in `done/download_extended.md`
 - [256t Specification](https://256t.org)
 - [Cloudflare R2 Documentation](https://developers.cloudflare.com/r2/)
 - [HTTP Range Requests](https://developer.mozilla.org/en-US/docs/Web/HTTP/Range_requests)
