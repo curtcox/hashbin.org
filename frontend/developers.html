@@ -239,7 +239,7 @@
 
     <!-- Registration form + app list -->
     <section class="developers-grid">
-      <div class="developers-panel">
+      <div class="developers-panel" id="register">
         <h2>Register an application</h2>
         <form id="app-registration-form" class="developers-form">
           <p>Apps on one origin share storage. <a href="/docs/browser-client-safety">Read the browser client safety guide</a> and the <a href="/docs/security/">security notes</a>.</p>
@@ -298,9 +298,10 @@
       <div class="developers-panel">
         <div class="developers-panel-header">
           <h2>Your applications</h2>
-          <button id="refresh-apps" class="btn btn-secondary btn-small">Refresh</button>
+          <a href="/developers/apps" class="btn btn-secondary btn-sm">Manage all apps</a>
         </div>
-        <div id="apps-list"></div>
+        <div id="apps-summary" aria-live="polite"></div>
+        <p class="developers-list-state">Search, sort and filter your apps, and edit, check or delete them, on <a href="/developers/apps">Your applications</a>.</p>
       </div>
     </section>
 

@@ -105,7 +105,7 @@ test('opaque mode still reports null', async ({ page }) => {
 
 test('developer panel renders settings and persists the owner toggle', async ({ page }) => {
   await page.evaluate(() => localStorage.setItem('hashbin.localAuthUser', JSON.stringify({ userId: 'test' })));
-  await page.goto('/developers');
+  await page.goto(`/developers/apps#${clientId}`);
   const panel = page.locator('.developers-run');
   await expect(panel).toContainText(runOrigin);
   await expect(panel).toContainText(`frame-src ${runOrigin}`);

@@ -67,6 +67,30 @@ describe('ApplicationRegistry Durable Object', () => {
     const data = await response.json();
     expect(data.apps).toHaveLength(1);
     expect(data.apps[0].app_name).toBe('Owned App');
+    expect(data.apps[0].safety).toBeNull();
+  });
+
+  it('summarizes the latest safety check in the list', async () => {
+    const created = await (await registry.fetch(new Request('http://internal/apps', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ app_name: 'Checked', owner_user_id: 'owner_1', redirect_uris: ['https://a.example/', 'https://b.example/'] })
+    }))).json();
+    await registry.fetch(new Request(`http://internal/apps/${created.app_id}/safety`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        app_id: created.app_id,
+        checked_at: '2026-10-01T00:00:00.000Z',
+        pages: [
+          { url: 'https://a.example/', findings: [{ level: 'warn' }, { level: 'warn' }, { level: 'info' }, { level: 'ok' }] },
+          { url: 'https://b.example/', error: 'Could not read the page: timeout' }
+        ],
+        skipped: []
+      })
+    }));
+
+    const data = await (await registry.fetch(new Request('http://internal/apps?owner_user_id=owner_1'))).json();
+    expect(data.apps[0].safety).toEqual({ checked_at: '2026-10-01T00:00:00.000Z', fix: 2, consider: 1, unreadable: 1 });
   });
 
   it('looks up an application by client id for oauth validation', async () => {

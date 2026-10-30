@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Search, sort and manage the apps you registered with HashBin">
+  <title>Your Applications - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/banner.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <link rel="stylesheet" href="/css/developers.css">
+</head>
+<body>
+  <!-- Navigation Header -->
+  <header class="nav-header"></header>
+
+  <!-- Main Content -->
+  <main class="developers-main">
+    <p class="developers-breadcrumb"><a href="/developers">Developers</a> / Your applications</p>
+
+    <section class="developers-panel">
+      <div class="developers-panel-header">
+        <div>
+          <h1 class="developers-page-title">Your applications</h1>
+          <p id="apps-count" class="developers-list-state" aria-live="polite"></p>
+        </div>
+        <div class="developers-app-actions">
+          <a href="/developers#register" class="btn btn-primary btn-sm">Register an app</a>
+          <button id="refresh-apps" type="button" class="btn btn-secondary btn-sm">Refresh</button>
+        </div>
+      </div>
+
+      <form class="developers-toolbar" id="apps-toolbar" role="search">
+        <label class="developers-toolbar-search">
+          <span>Search</span>
+          <input type="search" id="apps-search" class="form-input" placeholder="Name, client ID or redirect URI" autocomplete="off">
+        </label>
+        <label>
+          <span>Hosted sandbox</span>
+          <select id="apps-sandbox" class="form-input"></select>
+        </label>
+        <label>
+          <span>Safety</span>
+          <select id="apps-safety" class="form-input"></select>
+        </label>
+        <label>
+          <span>Sort by</span>
+          <select id="apps-sort" class="form-input">
+            <option value="updated">Last updated</option>
+            <option value="created">Created</option>
+            <option value="name">Name</option>
+            <option value="safety">Safety</option>
+            <option value="sandbox">Hosted sandbox status</option>
+          </select>
+        </label>
+        <button type="button" id="apps-dir" class="btn btn-secondary btn-sm"></button>
+        <button type="button" id="reset-view" class="btn btn-secondary btn-sm">Reset</button>
+      </form>
+
+      <div id="apps-table" class="developers-apps-table-wrap"></div>
+      <p class="developers-list-state developers-table-note">Select an app's name to edit it, change its hosted sandbox, run a safety check or delete it. HashBin also checks registered apps nightly.</p>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer>
+    <p>&copy; 2026 HashBin.org | Open Source |
+      <a href="/docs/">Documentation</a> |
+      <a href="https://github.com/curtcox/hashbin.org" target="_blank">GitHub</a> |
+      <a href="/sitemap.html">Site Map</a>
+    </p>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/banner.js"></script>
+  <script type="module" src="/js/developer-apps-page.js"></script>
+</body>
+</html>

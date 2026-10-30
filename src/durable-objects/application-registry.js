@@ -88,6 +88,13 @@ function publicApp(app) {
   };
 }
 
+/** Counts from a stored safety result, or null when the app was never checked. */
+function safetySummary(result) {
+  if (!result?.checked_at) return null;
+  const count = level => result.pages.reduce((total, page) => total + (page.findings || []).filter(item => item.level === level).length, 0);
+  return { checked_at: result.checked_at, fix: count('warn'), consider: count('info'), unreadable: result.pages.filter(page => page.error).length };
+}
+
 export class ApplicationRegistry {
   constructor(state, env) {
     this.state = state;
@@ -278,9 +285,11 @@ export class ApplicationRegistry {
   async listApplications(ownerUserId) {
     const apps = (await this.loadApplications()).filter((app) => app.status !== 'deleted');
     const filtered = ownerUserId ? apps.filter((app) => app.owner_user_id === ownerUserId) : apps;
+    // The latest safety result rides along as counts so the list can sort and filter by it.
+    const safety = await Promise.all(filtered.map(app => this.state.storage.get(`safety:${app.app_id}`)));
 
     return new Response(JSON.stringify({
-      apps: filtered.map(publicApp)
+      apps: filtered.map((app, index) => ({ ...publicApp(app), safety: safetySummary(safety[index]) }))
     }), {
       headers: { 'content-type': 'application/json' }
     });

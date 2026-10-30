@@ -14,7 +14,8 @@ raw uploaded content is isolated on `256t.us`. There is no frontend build step.
 | `docs/browser-client-safety.html` | Choosing save flows, shared origins, storage and recovery |
 | `docs/sdk.html` | SDK usage, callbacks, SRI and migration |
 | `docs/api.html` | Public API reference |
-| `developers.html`, `js/developers.js` | App registration, redirect URIs and shared-origin acknowledgment |
+| `developers.html`, `js/developers.js` | App registration, redirect URIs and shared-origin acknowledgment, plus a summary of your apps |
+| `developers/apps.html`, `js/developer-apps-page.js` | Every app you registered in one table: search, sort, filter by sandbox and safety, and expand a row to edit, check or delete (`js/developer-apps.js`, `js/developer-apps-list.js`) |
 | `account.html`, `js/account.js` | Retention defaults, grants, spending/activity, revoke-all and download budgets |
 | `upload.html`, `retrieve.html`, `info.html` | Content upload, retrieval and metadata |
 | `dashboard/`, `api-keys*.html`, `transactions.html` | Uploads, suppliers, scoped API keys and account history |

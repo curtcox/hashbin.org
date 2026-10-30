@@ -29,8 +29,8 @@ for (const port of [8789, 8790]) {
           const body = JSON.parse(Buffer.concat(chunks).toString());
           response = await registry.fetch(new Request(`http://internal/apps/${appId}/run`, { method: 'PUT', body: JSON.stringify({ ...body, owner_user_id: 'test' }) }));
         }
-      } else if (url.pathname === '/developers' || /^\/(js|css|img)\/[a-zA-Z0-9_./-]+$/.test(url.pathname)) {
-        const path = url.pathname === '/developers' ? '/developers.html' : url.pathname;
+      } else if (['/developers', '/developers/apps'].includes(url.pathname) || /^\/(js|css|img)\/[a-zA-Z0-9_./-]+$/.test(url.pathname)) {
+        const path = url.pathname.startsWith('/developers') ? `${url.pathname}.html` : url.pathname;
         const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png' };
         response = new Response(await readFile(new URL(`../frontend${path}`, import.meta.url)), { headers: { 'Content-Type': types[extname(path)] || 'application/octet-stream' } });
       }

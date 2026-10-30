@@ -257,3 +257,243 @@
 .run-settings button {
   justify-self: start;
 }
+
+/* /developers: summary of the account's apps */
+.developers-summary-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.developers-stat {
+  display: block;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+  color: inherit;
+  text-decoration: none;
+}
+
+a.developers-stat:hover {
+  border-color: var(--color-primary);
+}
+
+.developers-stat strong {
+  display: block;
+  font-size: 1.6rem;
+  line-height: 1.1;
+}
+
+.developers-stat span {
+  color: var(--color-text-light);
+  font-size: 0.9rem;
+}
+
+.developers-recent {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.developers-recent li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* /developers/apps: the full table */
+.developers-breadcrumb {
+  margin: 1rem 0;
+  color: var(--color-text-light);
+}
+
+.developers-page-title {
+  font-size: 1.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.developers-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.developers-toolbar label span {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.developers-toolbar-search {
+  flex: 1 1 16rem;
+}
+
+.developers-toolbar-search input {
+  width: 100%;
+}
+
+.developers-apps-table-wrap {
+  overflow-x: auto;
+}
+
+.developers-apps-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.developers-apps-table th,
+.developers-apps-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.6rem 0.75rem 0.6rem 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.developers-apps-table th {
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.developers-apps-table code {
+  font-size: 0.82rem;
+  overflow-wrap: anywhere;
+}
+
+.developers-sort {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: inherit;
+  cursor: pointer;
+}
+
+th[aria-sort="ascending"] .developers-sort::after { content: ' ↑'; }
+th[aria-sort="descending"] .developers-sort::after { content: ' ↓'; }
+
+.developers-app-toggle {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.developers-app-toggle::before {
+  content: '▸ ';
+  display: inline-block;
+  width: 1em;
+}
+
+.developers-app-toggle[aria-expanded="true"]::before {
+  content: '▾ ';
+}
+
+.developers-app-hint,
+.developers-apps-table td small {
+  display: block;
+  color: var(--color-text-light);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.developers-app-hint {
+  padding-left: 1em;
+}
+
+.developers-app-details > td {
+  padding-right: 0;
+}
+
+.developers-table-note {
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.developers-badge {
+  display: inline-block;
+  padding: 0.1rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.developers-badge-active,
+.developers-badge-clear { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
+.developers-badge-fix,
+.developers-badge-suspended { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.developers-badge-consider,
+.developers-badge-unreadable { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+
+.developers-apps-table .col-date {
+  white-space: nowrap;
+}
+
+/* Phones: each app becomes a stacked block; the Sort by control replaces the headers. */
+@media (max-width: 720px) {
+  .developers-apps-table thead,
+  .developers-apps-table .col-secondary {
+    display: none;
+  }
+
+  .developers-app-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.4rem 0.75rem;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .developers-app-row td {
+    padding: 0;
+    border: 0;
+  }
+
+  .developers-app-row td:first-child {
+    flex-basis: 100%;
+  }
+
+  .developers-app-row td[data-label]::before {
+    content: attr(data-label) ' ';
+    color: var(--color-text-light);
+  }
+
+  .developers-app-details,
+  .developers-app-details > td {
+    display: block;
+  }
+
+  .developers-app-details[hidden] {
+    display: none;
+  }
+
+  .developers-panel {
+    padding: 1rem;
+  }
+
+  .developers-panel-header {
+    flex-wrap: wrap;
+  }
+}
+
+.developers-new-app a {
+  color: #a5f3fc;
+}

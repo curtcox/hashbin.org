@@ -713,10 +713,11 @@ Download content (public, no cookies). Returns 451 for disputed content and 404 
 
 ## Developer App Endpoints
 
-Manage OAuth apps for third-party publishing (see `/developers`). Session-only.
+Manage OAuth apps for third-party publishing (see `/developers` and `/developers/apps`). Session-only.
 
 - `POST /api/developers/apps`: register `{app_name, redirect_uris[]}` and get `client_id` (apps are public PKCE clients, with no secret)
-- `GET /api/developers/apps`: your apps
+- `GET /api/developers/apps`: your apps. Each has `run` (hosted sandbox settings) and `safety`, the latest
+  safety check as `{checked_at, fix, consider, unreadable}` counts, or `null` if it never ran
 - `PATCH /api/developers/apps/{app_id}`: change `app_name`, `redirect_uris`, `logo_url`, or `website_url`
 - `DELETE /api/developers/apps/{app_id}`: delete the app. Users can't authorize it anymore, refresh
   tokens stop working, and issued access tokens expire within an hour.
