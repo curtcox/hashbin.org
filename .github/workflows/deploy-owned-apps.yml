@@ -1,0 +1,46 @@
+name: Deploy first-party app domains
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: App to publish
+        required: true
+        default: all
+        type: choice
+        options: [all, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad]
+permissions:
+  contents: read
+concurrency:
+  group: owned-app-domains
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: hashbin.org
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: hashbin.org/package-lock.json
+      - name: Check out public client sources
+        run: |
+          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl; do
+            folder="$repo"
+            if [ "$repo" = GnuplotOnline ]; then folder=GnuPlotOnline; fi
+            git clone --depth 1 "https://github.com/curtcox/$repo.git" "$folder"
+          done
+      - run: npm ci
+        working-directory: hashbin.org
+      - name: Validate deployment tooling
+        run: npx vitest run scripts/deploy-owned-apps.test.js
+        working-directory: hashbin.org
+      - name: Publish selected static app
+        run: node scripts/deploy-owned-apps.mjs "$APP" --deploy
+        working-directory: hashbin.org
+        env:
+          APP: ${{ inputs.app }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

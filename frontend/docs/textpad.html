@@ -148,7 +148,7 @@
           configuration names the app (its client ID), where HashBin is, and the redirect URI that
           HashBin sends the user back to after they approve Textpad.
         </p>
-        <pre><code class="excerpt" data-file="app.html">import { HashBinClient } from "/sdk/hashbin.js";</code></pre>
+        <pre><code class="excerpt" data-file="app.html">import { HashBinClient } from "/sdk/v0.4.0/hashbin.js";</code></pre>
         <pre><code class="excerpt" data-file="app.html">// The client ID from registering Textpad at https://hashbin.org/developers
 let CLIENT_ID = "app_1a74e62b-d752-4a3c-81af-5c850af18c5b";
 // The HashBin service, and the domain that serves published content.
@@ -513,9 +513,14 @@ async function api(path, options) {
         </p>
         <pre><code class="excerpt" data-file="app.html">// Start up: finish a sign-in if HashBin just sent the user back, then
 // either carry on with the save they asked for or load the URL's text.
+let movedText = null;
+try { movedText = sessionStorage.getItem("hashbin:textpad:migrated-text"); sessionStorage.removeItem("hashbin:textpad:migrated-text"); } catch (_) {}
 const draft = await finishSignIn();
 shownHash = location.hash;
-if (draft) {
+if (movedText !== null &amp;&amp; !draft) {
+  currentCid = null; savedText = null; editor.value = movedText;
+  updateControls(); showAccount(); showMessage("Your unsaved text was moved. Click Save when ready.");
+} else if (draft) {
   updateControls();
   showAccount();
   save();
@@ -541,7 +546,7 @@ if (draft) {
           <li>Save <a href="/docs/textpad/app.html" download="app.html">app.html</a> to your site.</li>
           <li>
             Change the SDK import to the hosted copy:
-            <code>import { HashBinClient } from "https://hashbin.org/sdk/hashbin.js";</code>
+            <code>import { HashBinClient } from "https://hashbin.org/sdk/v0.4.0/hashbin.js";</code>
           </li>
           <li>Replace <code>CLIENT_ID</code> with your app's client ID.</li>
           <li>

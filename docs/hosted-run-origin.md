@@ -2,7 +2,7 @@
 
 H5 uses **hashbin.app** as its dedicated production domain. Both Worker configs and
 zone routes name it, and production DNS/TLS and deployment are complete. Python Online is the
-only enabled pilot, for its registered `https://curtcox.github.io` embedder with local origins off.
+only enabled pilot, now restricted to its registered `https://python.hashbin.page` embedder with local origins off. The owner confirmed persistent-file backups before retiring `https://curtcox.github.io` on 2026-10-30.
 There are no pinned runtimes; other existing and new registered apps default to `run.status = 'off'`.
 
 The domain must be separate from `hashbin.org`, `256t.us`, and the future H6 app-hosting

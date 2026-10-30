@@ -137,8 +137,10 @@
   <script type="module">
     // The HashBin browser SDK handles the OAuth sign-in, token storage and
     // token renewal. A copy of Textpad on another site imports it from
-    // "https://hashbin.org/sdk/hashbin.js".
-    import { HashBinClient } from "/sdk/hashbin.js";
+    // "https://hashbin.org/sdk/v0.4.0/hashbin.js".
+    import { HashBinClient } from "/sdk/v0.4.0/hashbin.js";
+
+    import "/js/domain-migration.js";
 
     // ------------------------------------------------------------------
     // 1. Configuration
@@ -623,9 +625,14 @@
 
     // Start up: finish a sign-in if HashBin just sent the user back, then
     // either carry on with the save they asked for or load the URL's text.
+    let movedText = null;
+    try { movedText = sessionStorage.getItem("hashbin:textpad:migrated-text"); sessionStorage.removeItem("hashbin:textpad:migrated-text"); } catch (_) {}
     const draft = await finishSignIn();
     shownHash = location.hash;
-    if (draft) {
+    if (movedText !== null && !draft) {
+      currentCid = null; savedText = null; editor.value = movedText;
+      updateControls(); showAccount(); showMessage("Your unsaved text was moved. Click Save when ready.");
+    } else if (draft) {
       updateControls();
       showAccount();
       save();

@@ -2,7 +2,9 @@
 
 ## Status
 
-**Phase:** HashBin measures deployed 2026-10-28 from `b36c126`; the production workflow and main-site health SHA were verified for that release. Section A was re-verified on 2026-10-28 (see below). Section C was implemented and pushed in all six curtcox client apps on 2026-10-28, and section D's guidance, including its protection table, is in `frontend/docs/browser-client-safety.html`. Real-provider browser acceptance and the owner hosting decision (section B) remain. Row B13 in `STATUS.md`.
+**Phase:** HashBin measures deployed 2026-10-28 from `b36c126`; the production workflow and main-site health SHA were verified for that release. Section A was re-verified on 2026-10-28 (see below). Section C was implemented and pushed in all six curtcox client apps on 2026-10-28, and section D's guidance, including its protection table, is in `frontend/docs/browser-client-safety.html`. Real-provider browser acceptance remains; the owner selected and deployed B1 on the existing domains on 2026-10-30 (see the update below). Row B13 in `STATUS.md`.
+
+**B1 and Pages follow-up (2026-10-30):** the owner selected `hashbin.page` for first-party editors, `hashbin.us` for previews, and kept `hashbin.org` for accounts/API and `hashbin.app` for existing execution origins. Nine static app deployments and the Pages preview host are live. Every app passes live HTTPS/rendering checks; Pages also passes cross-site opaque preview, injected-script rejection and offline local-host fallback. The canonical web return URLs replace the old origins; Textpad retains its native schemes. The owner confirmed Python persistent files were backed up and authorized retiring the old GitHub embedder. Draft recovery copies only known documents/public settings through a source/origin/nonce-checked popup or a backup file; it preserves old copies and never transfers credentials or Python storage permission. Source/release tooling and a manual workflow are implemented; final response-header and legacy-notice publication checks are underway. See [first-party domain operations](../docs/owned-app-hosting.md). HashBin: 886 unit tests pass; Pages: 33 unit and 19 Chromium/WebKit browser checks each pass. Firefox's installed macOS runtime still fails before app startup.
 
 ### Implemented HashBin measures
 
@@ -24,7 +26,7 @@ All six apps save with the pinned SDK's `publish()` and hold no HashBin credenti
 
 | App | Commit | C1/C2/C7 | C3 | C4 verified cache | C5 links ask first | C6 CSP |
 |---|---|---|---|---|---|---|
-| Pages Online | `e264ad8`, `c2ee027` | ✅ | ✅ opaque `srcdoc` preview; escape flags reviewed | ✅ (`a98d857`) | ✅ link/sample/CID; view links never overwrite | ✗ a meta policy also binds `srcdoc` previews, so any useful `script-src` blocks user code; needs a preview origin (B) |
+| Pages Online | `e264ad8`, `c2ee027` | ✅ | ✅ opaque `srcdoc` preview; escape flags reviewed | ✅ (`a98d857`) | ✅ link/sample/CID; view links never overwrite | ✅ deployed: strict editor CSP; `pages.hashbin.us` preview host with opaque child; verified local host offline |
 | PythonOnline | `3a89d7f` | ✅ | ◐ HTML output sandboxed with its own CSP; Python runs in a same-origin worker | ✅ local, pinned Pyodide and lockfile packages | ✅ | ✅ |
 | ManimOnline | `e802429` | ✅ | ◐ Pyodide in a same-origin worker | ✅ `offline-hashes.js` | ✅ CID hash changes over typed edits (no stored drafts) | ✅ inline editor script moved to `src/editor.js` |
 | GnuplotOnline | `883cf43` | ✅ | ✅ SVG output sanitized | ✅ | ✅ | ✅ |
@@ -340,6 +342,8 @@ project at `example.com/<repo>/`, which is one origin. Isolation needs a **custo
 project repo**, each with its own subdomain.
 
 ### B1. Own domain, one subdomain per app
+
+**Owner decision and deployment (2026-10-30):** first-party editors use `<app>.hashbin.page`; Pages previews use `pages.hashbin.us`. Existing GitHub Pages copies remain for draft recovery rather than receiving CNAME redirects. These are static-assets-only Cloudflare deployments, independent of H6 customer hosting. [Operations](../docs/owned-app-hosting.md).
 
 For example `pages.example.com` and `apptron.example.com`, each repo with its own `CNAME`.
 

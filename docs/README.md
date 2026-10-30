@@ -37,6 +37,7 @@ The public site has user-facing versions of several of these under `frontend/doc
 | [backup-and-restore.md](backup-and-restore.md) | Nightly metadata snapshots and restore |
 | [cost-safety.md](cost-safety.md) | Cost policy, download allowances, monitor and brake, invoice reconciliation |
 | [hosted-run-origin.md](hosted-run-origin.md) | Operating the `hashbin.app` hosted sandbox origin |
+| [owned-app-hosting.md](owned-app-hosting.md) | First-party editors on `hashbin.page`, previews on `hashbin.us`, releases and draft recovery |
 | [github-pages-setup.md](github-pages-setup.md) | The build report published to GitHub Pages |
 
 Setup checklists for hashbin.org itself are in `todo/deployment_setup.md`,

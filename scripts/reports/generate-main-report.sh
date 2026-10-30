@@ -594,8 +594,10 @@ cp scripts/reports/pages/diagram-oauth.js build-reports/diagram-oauth.js
 echo "GitHub Pages sign-in diagram editor copied: build-reports/diagram-oauth.html (uses build-reports/sdk)"
 
 # Bundle the browser SDK alongside generated GitHub Pages helpers so module imports stay same-origin.
+mkdir -p build-reports/src
+cp frontend/js/domain-migration.js build-reports/src/domain-migration.js
 mkdir -p build-reports/sdk
-cp frontend/sdk/hashbin.js build-reports/sdk/hashbin.js
+cp frontend/sdk/v0.4.0/hashbin.js build-reports/sdk/hashbin.js
 
 # Generate GitHub Pages upload helper page (registered app, per-save approval through HashBin Publish)
 cp scripts/reports/pages/upload-via-registered-app.js build-reports/upload-via-registered-app.js
@@ -783,6 +785,7 @@ cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF
   </div>
 
   <script type="module" src="upload-via-registered-app.js"></script>
+<script type="module" src="src/domain-migration.js"></script>
 </body>
 </html>
 UPLOAD_REGISTERED_APP_EOF

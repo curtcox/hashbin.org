@@ -12,6 +12,8 @@ comment says what it needs.
 | `check-deployment-secrets.mjs` | Validates required CI secrets and live key modes before Cloudflare writes; reports names only. |
 | `verify-deployment.sh` | Checks a deployment: home page, `/health` (config, Durable Objects, R2), the 256t.us content domain and API 404s. `npm run verify` checks `https://hashbin.org`; `npm run verify:workers-dev -- <subdomain>` checks `hashbin-worker-prod.<subdomain>.workers.dev`. |
 | `verify-hosted-run-origin.mjs` | Checks the live `hashbin.app` sandbox origin's headers (run by the deploy workflow). |
+| `deploy-owned-apps.mjs`, `install-owned-app-notices.mjs` | Stage/publish the nine first-party app origins and generate safe legacy draft-transfer notices. [Domain operations](../docs/owned-app-hosting.md). |
+| `verify-owned-apps.mjs`, `test-owned-app-migration.mjs` | Anonymous live app/preview/offline checks and cross-origin fixture draft transfers. Never approve paid uploads. |
 | `generate-oauth-signing-key.sh` | Prints a random `OAUTH_SIGNING_KEY` and how to add it as a GitHub secret. Rotating it invalidates OAuth tokens and codes. |
 | `publish.mjs` | Publishes files through a scoped OAuth grant ([guide](../docs/publishing-from-the-command-line.md)). |
 | `release-browser-sdk.mjs` | `node scripts/release-browser-sdk.mjs vX.Y.Z` freezes `frontend/sdk/hashbin.js` into an immutable release with an SRI manifest. It refuses to overwrite a release. Then add the version to `src/app-safety.js`, `src/browser-sdk-release.test.js`, an immutable cache rule in `frontend/_headers` and `frontend/docs/sdk.html`. |

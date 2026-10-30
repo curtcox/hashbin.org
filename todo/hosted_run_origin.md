@@ -2,6 +2,8 @@
 
 ## Status
 
+**Embedder migration (2026-10-30):** Python now uses `https://python.hashbin.page`; the old shared GitHub origin was removed after the owner confirmed persistent-file backups. The `hashbin.app` run origin and app ID are unchanged. [First-party domain operations](../docs/owned-app-hosting.md).
+
 **Phase:** Deployed 2026-10-28 on `hashbin.app`; SDK v0.4.0 published and Python Online's
 opt-in persistent-home implementation deployed. The owner configured the read-only analytics credential, a real current-month measurement cleared
 the brake, and production HTTPS acceptance passed: files survive fresh workers and reloads while

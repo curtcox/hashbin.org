@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase:** Planned 2026-10-28; nothing is built. This plan is ready to implement once the owner signs off the
+**Phase:** H6 customer hosting is planned; nothing in this plan is built. The owner separately approved and deployed first-party B1 origins on `hashbin.page` and preview hosts on `hashbin.us` on 2026-10-30; see [operations](../docs/owned-app-hosting.md). This plan is ready to implement once the owner signs off the
 decisions below. Split out of [security_case_studies.md](security_case_studies.md) (Part 3, H6). It is tracked
 under row B14 in `STATUS.md`. The related plan is [hosted_run_origin.md](hosted_run_origin.md) (H5).
 
@@ -44,7 +44,7 @@ What H6 adds beyond B1/B2:
 | # | Decision | Recommendation | Why |
 |---|---|---|---|
 | D1 | Should HashBin be an app host? | Yes, limited as listed below: static files, registered apps, funded accounts, an acceptable use policy, and admin suspension. Start with curtcox apps only (an allow-list flag), then open it | Removes section B for every customer. The added duty, phishing and abuse takedowns, is bounded by the limits below |
-| D2 | Domain | A new registrable domain only for H6, separate from `hashbin.org`, `256t.us` and H5's run domain, on an HSTS-preloaded TLD (`.app`). Check availability at Cloudflare Registrar | Hosted apps must not be same-site with HashBin sessions or the content domain. The flat `<slug>.<domain>` is covered by free Universal SSL |
+| D2 | Domain | Use the already-owned `hashbin.page` app domain if H6 is approved; keep `hashbin.us` for preview hosts, separate from `hashbin.org`, `256t.us` and H5’s `hashbin.app`. Customer-hosting trust/cookie policy and PSL eligibility still need review | Hosted apps must not be same-site with HashBin sessions or the content domain. The flat `<slug>.<domain>` is covered by free Universal SSL |
 | D3 | Subdomain name | A developer-chosen slug: 3–32 characters, `[a-z0-9-]`, no leading, trailing or doubled hyphen, not on the reserved list, first come first served. It cannot change once hosting starts. It is never reassigned, even after the app is deleted | Readable URLs. Changing a slug changes the origin and strands the app's storage. Reassigning one would hand old storage and links to a stranger |
 | D4 | Who pays for traffic | The app owner's balance, through a new `hosting` download identity, at the existing identified-download price `identifiedDownloadPriceUc(size)` (at least 400 µ¢ a request). The developer sets a monthly hosting cap (default $5). Per-CID anonymous allowances are not used | Predictable for the developer, and it reuses the funded-download leases already in the content Worker. Cost is about $0.30–$0.70 per million requests, against a price of $4 per million at the minimum |
 | D5 | Who may host | Accounts with at least one completed deposit, the hosting acceptable use policy accepted, and the app active. During the pilot, also `hosting_allowed` set by an admin | A deposit requirement is the main brake on throwaway phishing sites |
