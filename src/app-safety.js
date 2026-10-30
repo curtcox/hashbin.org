@@ -13,7 +13,8 @@ export async function isReleasedSdk(source) {
   return SDK_HASHES.has([...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join(''));
 }
 const MAX_BYTES = 1024 * 1024;
-const MAX_SCRIPTS = 12;
+// Each script is a subrequest; the nightly run checks 20 apps in one invocation.
+const MAX_SCRIPTS = 24;
 const NOTES = '/docs/security/';
 // Calls that obtain or keep an allowance. Reading the SDK's old token key only to revoke it
 // (retiring a pre-publish() flow) is not one.
@@ -36,13 +37,35 @@ function directive(policy, name) {
   return match ? match.slice(1) : null;
 }
 
+function sameOrigin(specifiers, baseUrl) {
+  const origin = new URL(baseUrl).origin;
+  return [...new Set(specifiers
+    .map(specifier => { try { return new URL(specifier, baseUrl); } catch { return null; } })
+    .filter(url => url && url.origin === origin).map(url => url.href))];
+}
+
 /** Same-origin script URLs the page loads, resolved against the page. */
 export function scriptUrls(html, pageUrl) {
-  const origin = new URL(pageUrl).origin;
-  return [...html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)]
-    .map(match => { try { return new URL(match[1], pageUrl); } catch { return null; } })
-    .filter(url => url && url.origin === origin).map(url => url.href);
+  return sameOrigin([...html.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)].map(match => match[1]), pageUrl);
 }
+
+/**
+ * Same-origin modules and worker files a script reaches through static or dynamic imports and
+ * `new URL(..., import.meta.url)`. Bare import specifiers are skipped: they need an import map.
+ */
+export function moduleUrls(source, scriptUrl) {
+  const specifiers = [...source.matchAll(/\b(?:import|export)\s*(?:[\w$*{}\s,]+?\s*from\s*)?["']([^"'\n]+)["']|\bimport\s*\(\s*["']([^"'\n]+)["']\s*\)|\bnew\s+URL\s*\(\s*["']([^"'\n]+)["']\s*,\s*import\.meta\.url/g)]
+    // new URL() resolves any path; an import needs ./, ../, / or a full URL.
+    .map(match => match[3] || (/^(\.{0,2}\/|https?:)/.test(match[1] || match[2]) ? match[1] || match[2] : null))
+    .filter(specifier => specifier && /\.m?js(?:[?#]|$)/.test(specifier));
+  return sameOrigin(specifiers, scriptUrl);
+}
+
+const VENDORED = /\/(vendor|node_modules)\//;
+// Ace's bundle starts its own syntax-checking workers, which run Ace's code, not the user's.
+const EDITOR_BUNDLE = /\bvar ACE_NAMESPACE\s*=/;
+// Interpreters for code that may come from users or links.
+const CODE_RUNTIME = /\bloadPyodide\s*\(|\bnew\s+WebR\s*\(/;
 
 /**
  * Analyse one page. `scripts` maps same-origin script URLs to their text, and `serviceWorker` is
@@ -69,7 +92,10 @@ export function analyzePage({ url, html, headers = {}, scripts = {}, serviceWork
     if (!headers['content-security-policy'] && /frame-ancestors/i.test(policy)) findings.push(finding('info', 'csp-meta-frame-ancestors', 'frame-ancestors has no effect in a meta tag; send it as a response header.'));
     findings.push(finding('ok', 'csp-present', 'A Content-Security-Policy is present.'));
   }
-  if (/<script\b(?![^>]*\bsrc\s*=)[^>]*>\s*\S/i.test(html)) findings.push(finding('info', 'inline-script', 'The page has inline scripts. Move them to files so the policy can forbid inline script.'));
+  // A hash or nonce (or no 'unsafe-inline') already stops injected inline scripts.
+  const inlineSources = policy && (directive(policy, 'script-src') || directive(policy, 'default-src'));
+  const inlineAllowed = !inlineSources || (inlineSources.includes("'unsafe-inline'") && !inlineSources.some(source => /^'(nonce|sha(256|384|512))-/.test(source)));
+  if (inlineAllowed && /<script\b(?![^>]*\bsrc\s*=)[^>]*>\s*\S/i.test(html)) findings.push(finding('info', 'inline-script', 'The page has inline scripts. Move them to files so the policy can forbid inline script.'));
 
   const sdk = [...code.matchAll(/hashbin\.org\/sdk\/(v\d+\.\d+\.\d+\/)?hashbin\.js/g)].map(match => match[1]?.slice(0, -1) || 'latest');
   const vendored = [...code.matchAll(/hashbin-sdk-(v\d+\.\d+\.\d+)\.m?js/g)].map(match => match[1]);
@@ -82,7 +108,9 @@ export function analyzePage({ url, html, headers = {}, scripts = {}, serviceWork
 
   // Where untrusted code runs: same-origin workers and frames keep this origin's storage.
   if (/allow-scripts[^"'>]*allow-same-origin|allow-same-origin[^"'>]*allow-scripts/.test(code)) findings.push(finding('warn', 'sandbox-same-origin', 'An iframe combines allow-scripts with allow-same-origin, which lets its content remove the sandbox.', `${NOTES}sn-2026-001`));
-  if (/new\s+(Shared)?Worker\s*\(/.test(code) && !/createSandbox\s*\(/.test(code)) findings.push(finding('info', 'worker-origin', 'The page starts workers with its own origin. If they run code from users or links, run it with createSandbox() instead.', `${NOTES}sn-2026-001`));
+  const appCode = [html, ...Object.values(scripts).filter(source => !EDITOR_BUNDLE.test(source))].join('\n');
+  if (CODE_RUNTIME.test(appCode) && !/createSandbox\s*\(/.test(code)) findings.push(finding('info', 'worker-origin', 'The page runs an interpreter (Pyodide or webR) with its own origin, so code from users or links can read this origin\'s IndexedDB and Cache Storage. Run it with createSandbox() instead.', `${NOTES}sn-2026-001`));
+  else if (/new\s+(Shared)?Worker\s*\(/.test(appCode) && !/createSandbox\s*\(/.test(code)) findings.push(finding('info', 'worker-origin', 'The page starts workers with its own origin. If they run code from users or links, run it with createSandbox() instead.', `${NOTES}sn-2026-001`));
   const usesSandbox = /createSandbox\s*\(/.test(code);
   const expected = appId && runDomain ? runOrigin(appId, runDomain) : null;
   const hosted = usesSandbox && expected && (directive(policy || '', 'frame-src') || []).includes(expected);
@@ -123,12 +151,24 @@ export async function checkApp(app, apps, { fetch: fetchImpl = fetch, now = new 
     try {
       const page = await readText(fetchImpl, url.href, 'text/html');
       const scripts = {};
-      for (const scriptUrl of scriptUrls(page.text, url.href).slice(0, MAX_SCRIPTS)) {
+      // Breadth-first, the app's own files before vendored libraries, whose imports are not
+      // followed: a bundled library's chunks would use up the budget before the app's code.
+      const own = [], vendored = [], queued = new Set();
+      const enqueue = next => {
+        if (queued.has(next)) return;
+        queued.add(next);
+        (VENDORED.test(new URL(next).pathname) ? vendored : own).push(next);
+      };
+      [...scriptUrls(page.text, url.href), ...moduleUrls(page.text, url.href)].forEach(enqueue);
+      for (let fetched = 0; fetched < MAX_SCRIPTS && (own.length || vendored.length); fetched++) {
+        const scriptUrl = own.shift() || vendored.shift();
         try {
           const source = (await readText(fetchImpl, scriptUrl, '*/*')).text;
           // Hash the bytes, never the filename: a renamed SDK is still trusted,
           // while an edited file named hashbin.js must still be scanned.
-          if (!await isReleasedSdk(source)) scripts[scriptUrl] = source;
+          if (await isReleasedSdk(source)) continue;
+          scripts[scriptUrl] = source;
+          if (!VENDORED.test(new URL(scriptUrl).pathname)) moduleUrls(source, scriptUrl).forEach(enqueue);
         } catch { /* Missing scripts are not findings. */ }
       }
       const code = [page.text, ...Object.values(scripts)].join('\n');

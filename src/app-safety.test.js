@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { analyzePage, checkApp, contentSecurityPolicy, scriptUrls, isReleasedSdk } from './app-safety.js';
+import { analyzePage, checkApp, contentSecurityPolicy, moduleUrls, scriptUrls, isReleasedSdk } from './app-safety.js';
 import { readFileSync } from 'node:fs';
 
 const ids = findings => findings.map(item => item.id);
@@ -48,6 +48,37 @@ describe('registered-app safety check', () => {
     const findings = analyzePage({ appId, app, url: 'https://other.example/', html: '<script>createSandbox({origin:"hosted"})</script>', headers: { 'content-security-policy': "default-src 'none'; frame-src https://a1932999d125c4cf6bf56806d6df1fa3a.run.example" }, runDomain: 'run.example' });
     expect(ids(findings)).toEqual(expect.arrayContaining(['sandbox-hosted', 'run-embedder-mismatch']));
     expect(ids(findings)).not.toContain('sandbox');
+  });
+
+  it('follows same-origin imports, the app\'s own files before vendored ones', async () => {
+    expect(moduleUrls(`import a from './a.js'; export * from "../b.mjs"; import 'lib'; import('/c.js?v=1');
+      new URL('w.worker.js', import.meta.url); new URL('pic.png', import.meta.url); import x from 'https://cdn.example/x.js';`, 'https://app.example/src/app.js'))
+      .toEqual(['https://app.example/src/a.js', 'https://app.example/b.mjs', 'https://app.example/c.js?v=1', 'https://app.example/src/w.worker.js']);
+    const files = {
+      '/': '<script type="module" src="src/app.js"></script>',
+      '/src/app.js': "import '../vendor/lib.js'; import './run.js';",
+      '/src/run.js': "new URL('./py.worker.js', import.meta.url)",
+      '/src/py.worker.js': 'await loadPyodide({ indexURL })',
+      '/vendor/lib.js': "import './chunk.js'; import('hashbin.org/sdk/v0.3.0/hashbin.js')"
+    };
+    const requested = [];
+    const fetch = async url => { const { pathname } = new URL(url); requested.push(pathname); return pathname in files ? new Response(files[pathname]) : new Response('', { status: 404 }); };
+    const { pages } = await checkApp({ app_id: 'app_test', redirect_uris: ['https://app.example/'] }, [], { fetch });
+    expect(requested).toEqual(['/', '/src/app.js', '/src/run.js', '/src/py.worker.js', '/vendor/lib.js']);
+    const worker = pages[0].findings.find(item => item.id === 'worker-origin');
+    expect(worker.message).toMatch(/Pyodide/);
+    expect(ids(pages[0].findings)).toContain('sdk-outdated');
+  });
+
+  it('ignores the Ace editor\'s own workers and inline scripts a policy hash already allows', () => {
+    const url = 'https://app.example/';
+    const ace = '(function(){var ACE_NAMESPACE = "ace";new Worker(r)})()';
+    expect(ids(analyzePage({ url, html: '', scripts: { ace } }))).not.toContain('worker-origin');
+    expect(ids(analyzePage({ url, html: '', scripts: { ace, app: 'new Worker("w.js")' } }))).toContain('worker-origin');
+    const inline = '<script type="module">start()</script>';
+    expect(ids(analyzePage({ url, html: inline, headers: { 'content-security-policy': "script-src 'self' 'sha256-x'" } }))).not.toContain('inline-script');
+    expect(ids(analyzePage({ url, html: inline, headers: { 'content-security-policy': "script-src 'self' 'unsafe-inline'" } }))).toContain('inline-script');
+    expect(ids(analyzePage({ url, html: inline, headers: { 'content-security-policy': "object-src 'none'" } }))).toContain('inline-script');
   });
 
   it('reads policies and same-origin scripts', () => {
