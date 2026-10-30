@@ -590,19 +590,22 @@ echo "GitHub Pages upload-and-extend verification page copied: build-reports/ver
 cp scripts/reports/pages/diagram.html build-reports/diagram.html
 echo "GitHub Pages diagram editor copied: build-reports/diagram.html"
 cp scripts/reports/pages/diagram-oauth.html build-reports/diagram-oauth.html
+cp scripts/reports/pages/diagram-oauth.js build-reports/diagram-oauth.js
 echo "GitHub Pages sign-in diagram editor copied: build-reports/diagram-oauth.html (uses build-reports/sdk)"
 
 # Bundle the browser SDK alongside generated GitHub Pages helpers so module imports stay same-origin.
 mkdir -p build-reports/sdk
 cp frontend/sdk/hashbin.js build-reports/sdk/hashbin.js
 
-# Generate GitHub Pages upload helper page (registered app OAuth flow)
+# Generate GitHub Pages upload helper page (registered app, per-save approval through HashBin Publish)
+cp scripts/reports/pages/upload-via-registered-app.js build-reports/upload-via-registered-app.js
 cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF'
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'none'; base-uri 'none'">
   <title>Upload via Registered App - HashBin.org</title>
   <style>
     body {
@@ -732,16 +735,17 @@ cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF
 </head>
 <body>
   <div class="container">
-    <h1>Upload via Registered App (OAuth)</h1>
+    <h1>Upload via Registered App</h1>
     <p class="muted">
-      This flow uses a registered HashBin app and OAuth. Users authorize the app; no API key is shared with this page.
+      This flow uses a registered HashBin app and HashBin Publish: each upload opens hashbin.org, where the user
+      signs in, picks the retention, sees the price and approves. This page never holds an API key or token.
       The app must include this page URL as a redirect URI.
     </p>
 
     <div class="compare">
-      <strong>Difference vs API key flow:</strong> Registered-app uploads are safer for end users because access is scoped and revocable,
-      but require app registration and OAuth setup. This flow uses the account default retention period for OAuth publishing.
-      If you want a quick manual upload with a custom retention slider, use
+      <strong>Difference vs API key flow:</strong> Registered-app uploads are safer for end users because every upload is
+      approved on hashbin.org and nothing on this page can spend their balance, but they need app registration.
+      If you want a quick manual upload with an API key, use
       <a href="upload-via-api-key.html">Upload via API Key</a>.
     </div>
 
@@ -754,8 +758,6 @@ cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF
       <p class="muted" id="redirect-uri-note"></p>
       <div class="row">
         <button id="save-client-id" type="button" class="secondary">Save client ID</button>
-        <button id="connect-button" type="button">Connect with HashBin OAuth</button>
-        <button id="clear-session" type="button" class="secondary">Clear local session</button>
       </div>
     </div>
 
@@ -766,11 +768,11 @@ cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF
         <input id="content-file" type="file">
       </label>
       <div class="row">
-        <button id="upload-button" type="button">Upload via OAuth app</button>
+        <button id="upload-button" type="button">Upload and approve on HashBin</button>
       </div>
     </div>
 
-    <div id="status" class="status info" aria-live="polite">Enter a client ID, connect, and upload.</div>
+    <div id="status" class="status info" aria-live="polite">Enter a client ID, choose a file, and upload.</div>
 
     <div class="links">
       <a href="index.html">Back to Build Report</a>
@@ -780,160 +782,7 @@ cat > build-reports/upload-via-registered-app.html << 'UPLOAD_REGISTERED_APP_EOF
     </div>
   </div>
 
-  <script type="module">
-    import { hashbin } from './sdk/hashbin.js';
-
-    const HASHBIN_BASE = 'https://hashbin.org';
-    const CLIENT_ID_KEY = 'hashbin:ghpages:registered-app-client-id';
-
-    const clientIdInput = document.getElementById('client-id');
-    const saveClientIdButton = document.getElementById('save-client-id');
-    const connectButton = document.getElementById('connect-button');
-    const clearSessionButton = document.getElementById('clear-session');
-    const uploadButton = document.getElementById('upload-button');
-    const fileInput = document.getElementById('content-file');
-    const statusEl = document.getElementById('status');
-    const redirectUriNote = document.getElementById('redirect-uri-note');
-
-    function getRedirectUri() {
-      return `${window.location.origin}${window.location.pathname}`;
-    }
-
-    function setStatus(message, type = 'info') {
-      statusEl.className = `status ${type}`;
-      statusEl.textContent = message;
-    }
-
-    function getClientId() {
-      return clientIdInput.value.trim();
-    }
-
-    function saveClientId() {
-      const clientId = getClientId();
-      if (!clientId) {
-        setStatus('Client ID is required.', 'error');
-        return false;
-      }
-      localStorage.setItem(CLIENT_ID_KEY, clientId);
-      setStatus('Client ID saved.', 'success');
-      return true;
-    }
-
-    function configureClient() {
-      const clientId = getClientId();
-      if (!clientId) {
-        setStatus('Enter a client ID first.', 'error');
-        return null;
-      }
-
-      localStorage.setItem(CLIENT_ID_KEY, clientId);
-      return hashbin.configure({
-        clientId,
-        redirectUri: getRedirectUri(),
-        baseUrl: HASHBIN_BASE
-      });
-    }
-
-    async function maybeHandleOAuthCallback() {
-      const params = new URLSearchParams(window.location.search);
-      if (!params.get('code') || !params.get('state')) {
-        return;
-      }
-
-      const clientId = getClientId();
-      if (!clientId) {
-        setStatus('OAuth callback detected. Enter client ID and retry once.', 'error');
-        return;
-      }
-
-      try {
-        configureClient();
-        await hashbin.handleCallback();
-        window.history.replaceState({}, document.title, getRedirectUri());
-        setStatus('OAuth connected. You can upload now.', 'success');
-      } catch (error) {
-        setStatus(`OAuth callback failed: ${error.message}`, 'error');
-      }
-    }
-
-    async function connectOAuth() {
-      try {
-        const client = configureClient();
-        if (!client) {
-          return;
-        }
-        setStatus('Redirecting to HashBin OAuth...', 'info');
-        await client.authorize({
-          scopes: ['content:write', 'balance:read'],
-          mode: 'redirect'
-        });
-      } catch (error) {
-        setStatus(`OAuth start failed: ${error.message}`, 'error');
-      }
-    }
-
-    async function uploadViaOAuth() {
-      const file = fileInput.files && fileInput.files[0];
-      if (!file) {
-        setStatus('Choose a file to upload.', 'error');
-        return;
-      }
-
-      const client = configureClient();
-      if (!client) {
-        return;
-      }
-
-      const tokens = hashbin.getTokens();
-      if (!tokens || !tokens.accessToken) {
-        setStatus('No OAuth session found. Click Connect with HashBin OAuth first.', 'error');
-        return;
-      }
-
-      uploadButton.disabled = true;
-      setStatus(`Uploading ${file.name} via registered app...`, 'info');
-
-      try {
-        const result = await hashbin.publish(file, {
-          contentType: file.type || 'application/octet-stream'
-        });
-
-        const cid = result.cid || '(unknown CID)';
-        const expires = result.expires_at ? `\nExpires: ${new Date(result.expires_at).toISOString()}` : '';
-        setStatus(
-          `Upload complete.\nCID: ${cid}${expires}\n\nView content: ${HASHBIN_BASE}/${cid}\nInspect metadata: ${HASHBIN_BASE}/info/${cid}`,
-          'success'
-        );
-      } catch (error) {
-        setStatus(`Upload failed: ${error.message}`, 'error');
-      } finally {
-        uploadButton.disabled = false;
-      }
-    }
-
-    function clearSession() {
-      try {
-        hashbin.clearTokens();
-      } catch (_error) {
-        // Ignore.
-      }
-      setStatus('Local OAuth session cleared.', 'info');
-    }
-
-    const storedClientId = localStorage.getItem(CLIENT_ID_KEY);
-    if (storedClientId) {
-      clientIdInput.value = storedClientId;
-    }
-
-    redirectUriNote.textContent = `Register this exact redirect URI in your app: ${getRedirectUri()}`;
-
-    saveClientIdButton.addEventListener('click', saveClientId);
-    connectButton.addEventListener('click', connectOAuth);
-    clearSessionButton.addEventListener('click', clearSession);
-    uploadButton.addEventListener('click', uploadViaOAuth);
-
-    await maybeHandleOAuthCallback();
-  </script>
+  <script type="module" src="upload-via-registered-app.js"></script>
 </body>
 </html>
 UPLOAD_REGISTERED_APP_EOF

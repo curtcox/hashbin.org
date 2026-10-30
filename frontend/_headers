@@ -13,6 +13,12 @@
   Referrer-Policy: no-referrer
   Cache-Control: no-store
 
+# Textpad's one inline module script is allowed by hash (src/docs-textpad.test.js keeps it current).
+/docs/textpad/app
+  Content-Security-Policy: script-src 'self' 'sha256-B03cyPZo/V4Hovi3WOk5W9/Ikjr1nfd/YAXuS/Sni44='; object-src 'none'; base-uri 'none'; frame-ancestors 'none'
+/docs/textpad/app.html
+  Content-Security-Policy: script-src 'self' 'sha256-B03cyPZo/V4Hovi3WOk5W9/Ikjr1nfd/YAXuS/Sni44='; object-src 'none'; base-uri 'none'; frame-ancestors 'none'
+
 /sdk/v0.2.0/*
   Cache-Control: public, max-age=31536000, immutable
 

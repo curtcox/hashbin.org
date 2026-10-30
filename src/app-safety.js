@@ -15,6 +15,9 @@ export async function isReleasedSdk(source) {
 const MAX_BYTES = 1024 * 1024;
 const MAX_SCRIPTS = 12;
 const NOTES = '/docs/security/';
+// Calls that obtain or keep an allowance. Reading the SDK's old token key only to revoke it
+// (retiring a pre-publish() flow) is not one.
+const ALLOWANCE = /\.(authorize|handleCallback|exchangeCode|authorizedFetch)\(|setItem\(\s*[`'"]hashbin:tokens:/;
 
 function finding(level, id, message, link = '/docs/browser-client-safety') {
   return { level, id, message, link };
@@ -49,7 +52,11 @@ export function analyzePage({ url, html, headers = {}, scripts = {}, serviceWork
   const findings = [];
   const code = [html, ...Object.values(scripts)].join('\n');
   const shared = originWarnings([url], apps, appId)[0];
-  if (shared) findings.push(finding('warn', 'shared-origin', `${shared.origin} is shared${shared.known_shared_host ? ' by every project on this host' : ` with ${shared.apps.length} other registered app(s)`}. Other apps there can read this app's storage and caches, so keep no HashBin credential here and isolate code you run.`, `${NOTES}sn-2026-003`));
+  // Hosting on a shared origin is only something to fix when this page keeps a credential or an
+  // unverified cache there; a per-save publish() app has nothing on the origin to steal.
+  const usesAllowance = ALLOWANCE.test(code);
+  const swUnverified = serviceWorker !== null && !/HashBinCache|crypto\.subtle\.digest\(\s*['"]SHA-256/.test(serviceWorker);
+  if (shared) findings.push(finding(usesAllowance || swUnverified ? 'warn' : 'info', 'shared-origin', `${shared.origin} is shared${shared.known_shared_host ? ' by every project on this host' : ` with ${shared.apps.length} other registered app(s)`}. Other apps there can read this app's storage and caches, so keep no HashBin credential here and isolate code you run.`, `${NOTES}sn-2026-003`));
 
   const policy = contentSecurityPolicy(html, headers);
   if (!policy) findings.push(finding('warn', 'csp-missing', 'No Content-Security-Policy. Keep scripts in files and restrict script-src to your site and pinned paths.'));
@@ -71,7 +78,7 @@ export function analyzePage({ url, html, headers = {}, scripts = {}, serviceWork
     else if (version !== LATEST_SDK) findings.push(finding('info', 'sdk-outdated', `The page uses SDK ${version}; ${LATEST_SDK} is current. Upgrade deliberately to get its fixes.`, '/docs/sdk#load'));
     else findings.push(finding('ok', 'sdk-current', `The page uses the current SDK release (${version}).`, '/docs/sdk#load'));
   }
-  if (/hashbin:tokens:|\.authorize\(/.test(code) && shared) findings.push(finding('warn', 'allowance-on-shared-origin', 'The page appears to use an allowance (stored tokens) on a shared origin. Prefer per-save approval with publish().', `${NOTES}sn-2026-003`));
+  if (usesAllowance && shared) findings.push(finding('warn', 'allowance-on-shared-origin', 'The page appears to use an allowance (stored tokens) on a shared origin. Prefer per-save approval with publish().', `${NOTES}sn-2026-003`));
 
   // Where untrusted code runs: same-origin workers and frames keep this origin's storage.
   if (/allow-scripts[^"'>]*allow-same-origin|allow-same-origin[^"'>]*allow-scripts/.test(code)) findings.push(finding('warn', 'sandbox-same-origin', 'An iframe combines allow-scripts with allow-same-origin, which lets its content remove the sandbox.', `${NOTES}sn-2026-001`));
@@ -84,7 +91,7 @@ export function analyzePage({ url, html, headers = {}, scripts = {}, serviceWork
   if (app?.run?.status === 'active' && !runEmbedders(app).includes(new URL(url).origin)) findings.push(finding('warn', 'run-embedder-mismatch', 'Hosted mode is enabled, but this page origin is not a registered embedder. Update the app redirect URIs or allow_local.', '/docs/sdk#hosted-sandbox'));
 
   if (serviceWorker !== null) {
-    if (/HashBinCache|crypto\.subtle\.digest\(\s*['"]SHA-256/.test(serviceWorker)) findings.push(finding('ok', 'sw-verified', 'The service worker verifies cached bytes.', '/docs/sdk#offline-cache'));
+    if (!swUnverified) findings.push(finding('ok', 'sw-verified', 'The service worker verifies cached bytes.', '/docs/sdk#offline-cache'));
     else if (shared) findings.push(finding('warn', 'sw-unverified', 'The service worker caches files without checking hashes. Other apps on this origin can write its Cache Storage.', '/docs/sdk#offline-cache'));
   }
   return findings;

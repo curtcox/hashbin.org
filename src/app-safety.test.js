@@ -10,6 +10,19 @@ describe('registered-app safety check', () => {
     expect(ids(findings)).toEqual(expect.arrayContaining(['shared-origin', 'csp-missing', 'inline-script', 'worker-origin', 'sw-unverified']));
   });
 
+  it('counts a shared origin as a fix only when the page keeps an allowance or an unverified cache there', () => {
+    const level = findings => findings.find(item => item.id === 'shared-origin').level;
+    const url = 'https://someone.github.io/app/';
+    const publishOnly = analyzePage({ url, html: '<script src="a.js"></script>', scripts: { a: 'client.publish(doc); if (storage.getItem(`hashbin:tokens:${id}`)) client.disconnect()' } });
+    expect(level(publishOnly)).toBe('info');
+    expect(ids(publishOnly)).not.toContain('allowance-on-shared-origin');
+    const allowance = analyzePage({ url, html: '<script src="a.js"></script>', scripts: { a: 'await oauth.authorize({ scopes })' } });
+    expect(level(allowance)).toBe('warn');
+    expect(ids(allowance)).toContain('allowance-on-shared-origin');
+    expect(level(analyzePage({ url, html: '', serviceWorker: 'caches.open("x")' }))).toBe('warn');
+    expect(level(analyzePage({ url, html: '', serviceWorker: 'HashBinCache.verify' }))).toBe('info');
+  });
+
   it('accepts a pinned current SDK, a strict policy, the sandbox and a verified cache', () => {
     const html = `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-x' blob:; object-src 'none'"><script src="app.js"></script>`;
     const findings = analyzePage({ url: 'https://app.example/', html, scripts: { app: "import('../vendor/hashbin-sdk-v0.4.0.mjs'); sdk.createSandbox({})" }, serviceWorker: 'HashBinCache.verify' });

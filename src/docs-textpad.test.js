@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { generate256tHash } from './utils/hash256t.js';
@@ -105,5 +106,16 @@ describe('Textpad 256t handling', () => {
   it('keeps a byte order mark so unchanged text saves to the same bytes', () => {
     const bytes = new Uint8Array([0xef, 0xbb, 0xbf, 0x68, 0x69]);
     expect(new TextEncoder().encode(decodeText(bytes))).toEqual(bytes);
+  });
+
+  it('allows its inline script by hash in the page Content-Security-Policy', () => {
+    const scripts = [...appHtml.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
+    expect(scripts).toHaveLength(1);
+    const hash = `'sha256-${createHash('sha256').update(scripts[0]).digest('base64')}'`;
+    const headers = readFileSync(new URL('../frontend/_headers', import.meta.url), 'utf8');
+    for (const path of ['/docs/textpad/app', '/docs/textpad/app.html']) {
+      const policy = new RegExp(`^${path.replace(/\./g, '\\.')}\n  Content-Security-Policy: (.*)$`, 'm').exec(headers)?.[1];
+      expect(policy).toContain(`script-src 'self' ${hash};`);
+    }
   });
 });

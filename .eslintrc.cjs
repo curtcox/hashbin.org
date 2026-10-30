@@ -1,6 +1,7 @@
 module.exports = {
   // ESLint 8 cannot parse JSON import attributes (`import x from './y.json' with { type: 'json' }`).
-  ignorePatterns: ['src/app-safety.js', 'workers/run-origin/src/index.js', 'frontend/sdk/v*/'],
+  // The diagram editor is ported page code kept in step with curtcox/modl, not this repo's style.
+  ignorePatterns: ['src/app-safety.js', 'workers/run-origin/src/index.js', 'frontend/sdk/v*/', 'scripts/reports/pages/diagram-oauth.js'],
   env: {
     es2022: true,
     node: true,
@@ -55,8 +56,8 @@ module.exports = {
   },
   overrides: [
     {
-      // Static pages and the browser SDK run in browsers, not Node.
-      files: ['frontend/**/*.js'],
+      // Static pages, the GitHub Pages helpers and the browser SDK run in browsers, not Node.
+      files: ['frontend/**/*.js', 'scripts/reports/pages/**/*.js'],
       env: { browser: true, worker: true, node: false },
       rules: {
         'node/no-missing-import': 'off',
