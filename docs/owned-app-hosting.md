@@ -9,6 +9,8 @@ The owner selected this layout on 2026-10-30:
 | `hashbin.us` | Preview hosts; currently `pages.hashbin.us` |
 | `hashbin.app` | Existing UUID-based persistent execution origins; unchanged |
 
+This keeps the account origin on its established domain and reserves `hashbin.app` for its existing execution storage. Editors and previews use different registrable domains, so a preview is also cross-site from its editor. Each editor gets its own origin, isolating browser storage and service workers from the other editors.
+
 Editor subdomains are `pages`, `python`, `manim`, `gnuplot`, `sheets`, `modl`, `diagram`,
 `upload` and `textpad`. Every editor uses `/` as its registered web return URL. Textpad
 also retains its Expo and Flutter OAuth schemes. Python's old GitHub embedder was retired
@@ -106,3 +108,32 @@ restore the shared GitHub embedder. No DNS changes are needed for ordinary asset
 
 Subdomains have separate storage but remain same-site within each parent domain. Set no
 parent-domain cookies. PSL inclusion remains a separate follow-up, not a prerequisite for B1.
+
+## Safety report outcome (2026-10-30)
+
+| App | Original findings | Result and recommendation |
+|---|---|---|
+| Gnuplot Online | Shared origin; same-origin worker | Shared-origin finding resolved by B1. Retain the worker advisory: the WASM interpreter still runs within its editor origin. See the assessment below. |
+| HashBin Textpad | Two unpinned SDK findings across web return pages | Canonical site pins SDK v0.4.0 with SRI and a hash-based script policy; old web callbacks retired. All clear. Native schemes retained. |
+| HashBin Diagram Editor | Shared origin | Dedicated editor origin, pinned helper SDK and CSP. All clear. |
+| Manim Online | Shared origin | Dedicated editor origin; existing isolated execution retained. All clear. |
+| Manual Override Diagram Language | Shared origin | Dedicated editor origin, pinned helper SDK and CSP. All clear. |
+| Pages Online | Shared origin | Dedicated editor plus separate preview site, opaque user frame and strict editor CSP. All clear. |
+| Python Online | Shared origin | Dedicated editor; old shared embedder removed from hosted execution policy after owner-confirmed backup. All clear. |
+| Registered upload helper | Shared origin | Dedicated editor origin, pinned helper SDK and CSP. All clear. |
+| Sheets | Shared origin | Dedicated editor origin; existing runtime isolation retained. All clear. |
+
+Gnuplot's worker is a fixed runner that passes user Gnuplot programs and files to the bundled
+WASM engine; it does not intentionally evaluate user JavaScript. B1 removes access to other
+apps' origin storage, but cannot remove the worker's access to its own origin. Keep per-save
+HashBin approval, verified assets and sanitized SVG output, and do not add stored allowances
+to this origin. For a stronger interpreter boundary, move the runner to an isolated execution
+origin with a narrow message protocol, bounded inputs/outputs and no editor storage access.
+That runtime migration needs its own renderer/terminal/offline acceptance checks; it remains
+a follow-up rather than suppressing the scanner's advisory.
+
+The central [committed-source deployment](https://github.com/curtcox/hashbin.org/actions/runs/41095235607)
+published all ten bundles successfully. Live checks exercised all nine editors, actual Python
+and Gnuplot execution, Pages isolation/CSP/offline behavior, and a real two-origin draft
+transfer for Pages, Python and Textpad. Real-provider sign-in acceptance in Safari/Firefox
+remains separate from these rendering checks.
