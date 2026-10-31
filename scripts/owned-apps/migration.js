@@ -1,6 +1,6 @@
 /* eslint-env browser */
 const MAX_BYTES = 12 * 1024 * 1024;
-const KEYS = { pages: ['pagesonline:project'], python: ['pythononline:work'], gnuplot: ['gnuplotonline:document'], upload: ['hashbin:ghpages:registered-app-client-id'], textpad: ['hashbin:textpad:migrated-text'] };
+const KEYS = { pages: ['pagesonline:project'], python: ['pythononline:work'], gnuplot: ['gnuplotonline:document'], audio: ['audioonline:document'], upload: ['hashbin:ghpages:registered-app-client-id'], textpad: ['hashbin:textpad:migrated-text'] };
 
 /** Validate an inert draft handoff; credentials and persistence permissions are never transferred. */
 export function validateMigration(payload, slug, app) {

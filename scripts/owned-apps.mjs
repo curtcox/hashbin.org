@@ -8,7 +8,9 @@ export const OWNED_APPS = Object.freeze({
   modl: { repo: 'modl', appId: 'app_1fe78cf6-21fc-4491-abc9-e0aefca53505', legacy: 'https://curtcox.github.io/modl/' },
   diagram: { repo: 'hashbin.org', appId: 'app_92c56b62-d5bf-4d8c-8577-79c104adf401', legacy: 'https://curtcox.github.io/hashbin.org/diagram-oauth.html' },
   upload: { repo: 'hashbin.org', appId: 'app_cfebb3a2-b0bd-47f6-b616-8f70d77e6886', legacy: 'https://curtcox.github.io/hashbin.org/upload-via-registered-app.html' },
-  textpad: { repo: 'hashbin.org', appId: 'app_1a74e62b-d752-4a3c-81af-5c850af18c5b', legacy: 'https://hashbin.org/docs/textpad/app' }
+  textpad: { repo: 'hashbin.org', appId: 'app_1a74e62b-d752-4a3c-81af-5c850af18c5b', legacy: 'https://hashbin.org/docs/textpad/app' },
+  // PLACEHOLDER app ID: replace with the registered ID once https://audio.hashbin.page/ is its return URL.
+  audio: { repo: 'AudioOnline', appId: 'app_00000000-0000-0000-0000-000000000000', legacy: 'https://curtcox.github.io/AudioOnline/' }
 });
 
 /** The approved canonical origin of a first-party editor or its preview host. */

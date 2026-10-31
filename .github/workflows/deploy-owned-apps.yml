@@ -7,7 +7,7 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad]
+        options: [all, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio]
 permissions:
   contents: read
 concurrency:
@@ -27,7 +27,7 @@ jobs:
           cache-dependency-path: hashbin.org/package-lock.json
       - name: Check out public client sources
         run: |
-          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl; do
+          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl AudioOnline; do
             folder="$repo"
             if [ "$repo" = GnuplotOnline ]; then folder=GnuPlotOnline; fi
             git clone --depth 1 "https://github.com/curtcox/$repo.git" "$folder"

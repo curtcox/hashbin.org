@@ -36,6 +36,8 @@ try {
         await page.waitForFunction(() => globalThis.PythonOnline);
         await page.evaluate(() => { PythonOnline.editor.setValue('print("new domain works")', -1); PythonOnline.run(); });
         await page.waitForFunction(() => document.getElementById('output').textContent.includes('new domain works'), null, { timeout: 90000 });
+      } else if (slug === 'audio') {
+        await page.waitForFunction(() => /^Rendered/.test(document.getElementById('status').textContent), null, { timeout: 90000 });
       } else if (slug === 'manim') {
         await page.locator('#review svg').waitFor();
       } else if (slug === 'modl' || slug === 'diagram') {

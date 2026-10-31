@@ -96,6 +96,10 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
   } else if (slug === 'manim') {
     manifest = require(join(source, 'offline-assets.js'));
     await copy(source, assets, [...manifest.local, 'offline-assets.js', 'offline-hashes.js', 'service-worker.js', 'gallery/previews']);
+  } else if (slug === 'audio') {
+    // Gallery previews stream on demand, so they are outside the offline manifest but still public assets.
+    manifest = require(join(source, 'offline-assets.js'));
+    await copy(source, assets, [...localAssets(manifest), 'offline-assets.js', 'service-worker.js', 'gallery/previews']);
   } else if (slug === 'sheets') {
     execFileSync(process.execPath, ['--input-type=module', '-e', 'const {stage}=await import(process.argv[1]);await stage(process.argv[2],process.argv[3]);', pathToFileURL(join(source, 'scripts/stage.mjs')).href, assets, execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: source, encoding: 'utf8' }).trim()], { cwd: source });
   } else if (slug === 'modl') {
@@ -122,8 +126,9 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     await mkdir(join(assets, 'src'), { recursive: true });
     await writeFile(join(assets, 'src/domain-migration.js'), await migrationSource());
     await writeFile(join(assets, 'migration.html'), (await readFile(join(root, 'scripts/owned-apps/migration.html'), 'utf8')).replace('__APP__', slug));
-    // The Pages source already inventories its migration module; rehash its configured release.
+    // Pages and Audio inventory their migration module offline; rehash the configured release.
     if (slug === 'pages') await refreshOfflineManifest(assets, manifest, 'pagesonline-');
+    if (slug === 'audio') await refreshOfflineManifest(assets, manifest, 'audioonline-');
   }
   await writeFile(join(assets, '_headers'), hostedHeaders(slug, slug === 'textpad' ? await readFile(join(assets, 'index.html'), 'utf8') : ''));
   const inventory = await assetInventory(assets);

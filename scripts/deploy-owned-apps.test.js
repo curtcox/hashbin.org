@@ -14,7 +14,8 @@ describe('first-party app deployment boundaries', () => {
 
   it('uses a distinct editor origin for each app and a separate preview site', () => {
     const origins = Object.keys(OWNED_APPS).map(ownedAppOrigin);
-    expect(new Set(origins).size).toBe(9);
+    expect(new Set(origins).size).toBe(10);
+    expect(ownedAppOrigin('audio')).toBe('https://audio.hashbin.page');
     expect(origins.every(origin => /^https:\/\/[a-z]+\.hashbin\.page$/.test(origin))).toBe(true);
     expect(ownedAppOrigin('pages-preview')).toBe('https://pages.hashbin.us');
     expect(() => ownedAppOrigin('../other')).toThrow();
@@ -55,5 +56,9 @@ describe('first-party app deployment boundaries', () => {
     expect(() => validateMigration({ ...payload, storage: { 'hashbin:tokens:client': 'secret' } }, 'python', OWNED_APPS.python)).toThrow();
     expect(() => validateMigration({ ...payload, storage: { 'pythononline:persistent-home': 'true' } }, 'python', OWNED_APPS.python)).toThrow();
     expect(() => validateMigration({ ...payload, href: 'https://attacker.example/' }, 'python', OWNED_APPS.python)).toThrow();
+    const audio = { format: 'hashbin-origin-migration', version: 1, app: 'audio', href: OWNED_APPS.audio.legacy + '?example=door', storage: { 'audioonline:document': '{"format":"hashbin-audio","version":1,"src":"from audio import *"}' } };
+    expect(validateMigration(audio, 'audio', OWNED_APPS.audio)).toBe(audio);
+    expect(migrationTarget(audio, ownedAppOrigin('audio'))).toBe('https://audio.hashbin.page/?example=door');
+    expect(() => validateMigration({ ...audio, storage: { 'hashbin:tokens:client': 'secret' } }, 'audio', OWNED_APPS.audio)).toThrow();
   });
 });
