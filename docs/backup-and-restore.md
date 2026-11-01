@@ -21,6 +21,7 @@ with the `BackupIndex` Durable Object the first time it handles a request:
 | `PAYMENT_RECORDS` | user ID | enumerated from the `USER_PROFILES` index |
 | `CONTENT_METADATA` | CID | the object itself, plus every CID in the `ExpirationIndex` each run |
 | `DISPUTE_RECORD` | `dispute:{cid}` | the object itself |
+| `ALIAS_RECORDS` | `alias:{name}` | the object itself on the first committed change |
 | `SUPPLIER_REGISTRY` | supplier ID | the object itself |
 
 Fixed-name objects (`KEY_REGISTRY`, `EXPIRATION_INDEX`, `DELETION_RECORD`, `DISPUTE_INDEX`,
@@ -82,6 +83,12 @@ node scripts/backup/restore-snapshot.mjs --run 2026-10-07T02-00-00-123Z \
 After restoring a user profile, check its balance against Stripe for deposits made after the
 snapshot time, and against `PAYMENT_RECORDS` for that user. A restore replays storage as it
 was at snapshot time, so anything written after the snapshot is lost for that object.
+
+Restore alias records together with the participating user profiles, payment records and
+platform statistics from the same completed snapshot. Their pending operations, held offers,
+money receipts and outboxes must agree; restoring one alias alone can replay a payment against
+a newer balance. Alias and profile restores schedule alarms to resume renewal and accounting
+work. Personal aliases and global ownership/offer indexes are included in `USER_PROFILES`.
 
 Use `--base-url http://localhost:8787` to rehearse against local dev
 (`npx wrangler dev --config wrangler.local.toml --local --var ADMIN_USER_ID:local_admin`, then

@@ -379,7 +379,7 @@ Names are lowercase ASCII, 1–63 unreserved characters, beginning/ending in a l
 or digit, without consecutive dots or CID lookalikes. Values must be complete CIDs,
 including inline CIDs or content hosted by other suppliers. Expired names stop
 resolving (410); owners have 30 days to renew. Suspended names return 451. Personal
-aliases disappear after the same 30-day grace. Reserved names require admin assignment.
+aliases disappear after the same 30-day grace. Reserved names require admin assignment. Admin assignment is limited to reserved names. Upheld trademark reports only suspend names; requesting reclamation through that report returns `trademark_suspension_only` (400).
 Every account has 100 personal changes/global repoints per UTC day (429 `change_limit`
 with `Retry-After`), plus a separate 100-purchase limit. Personal/global settings and global listings count as
 changes too. Keys and grants share their existing monthly spending limits.

@@ -3,7 +3,7 @@ import { verifyProduction } from './verify-production.mjs';
 import { verifyHostedRunOrigin } from './verify-hosted-run-origin.mjs';
 
 const sha = 'a'.repeat(40);
-const json = (body, status = 200) => Response.json(body, { status });
+const json = (body, status = 200, headers) => Response.json(body, { status, headers });
 
 function fixture(overrides = {}) {
   const health = {
@@ -15,6 +15,13 @@ function fixture(overrides = {}) {
     const path = url.pathname;
     const override = overrides[`${url.hostname}${path}`] || overrides[path];
     if (override) return override(health);
+    if (path.startsWith('/@')) return new Response('alias_not_found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
+    if (path.startsWith('/api/aliases/')) {
+      if (path.endsWith('/resolve')) return json({ error: 'alias_not_found' }, 404, { 'Cache-Control': 'private, no-store' });
+      return json({ name: path.split('/')[3], status: 'free', yearly_price_cents: 100,
+        sale_fee_rate: 0.1, minimum_sale_fee_cents: 10, is_owner: false, history: [] });
+    }
+    if (path === '/api/user/aliases') return json({ error: 'AUTH_MISSING' }, 401);
     if (url.hostname === '256t.us') return new Response('OK');
     if (path === '/health') return json(health);
     if (path === '/api/auth/session') return json({ error: options.headers?.Authorization ? 'AUTH_INVALID_FORMAT' : 'AUTH_MISSING' }, 401);
@@ -28,10 +35,10 @@ function fixture(overrides = {}) {
 }
 
 describe('production checklist', () => {
-  it('checks production health, five page commits, content, auth, webhooks and public APIs', async () => {
+  it('checks production health, page commits, alias bindings, auth, webhooks and public APIs', async () => {
     const options = fixture();
     await expect(verifyProduction(options)).resolves.toBe(sha);
-    expect(options.fetchImpl).toHaveBeenCalledTimes(13);
+    expect(options.fetchImpl).toHaveBeenCalledTimes(20);
     for (const [, requestOptions] of options.fetchImpl.mock.calls) {
       expect(requestOptions).toMatchObject({ redirect: 'error', cache: 'no-store' });
       expect(requestOptions.signal).toBeInstanceOf(AbortSignal);
@@ -86,11 +93,22 @@ describe('production checklist', () => {
       '/api/webhooks/clerk': () => json({}, 503),
     });
     await expect(verifyProduction(options)).rejects.toThrow('failed (2 checks)');
-    expect(options.fetchImpl).toHaveBeenCalledTimes(13);
+    expect(options.fetchImpl).toHaveBeenCalledTimes(20);
   });
 
   it('allows scheduled verification to compare pages to the live commit', async () => {
     await expect(verifyProduction({ ...fixture(), expectedSha: undefined })).resolves.toBe(sha);
+  });
+
+  it.each([
+    ['/api/aliases/', false, 'Global alias Durable Object and pricing'],
+    ['/api/aliases/', true, 'Alias API resolution binding and privacy'],
+    ['/@', false, 'Content Worker alias binding and cache'],
+  ])('rejects a missing alias integration at %s (resolve=%s)', async (prefix, resolve, message) => {
+    const options = fixture(), normal = options.fetchImpl.getMockImplementation();
+    options.fetchImpl.mockImplementation((url, request) => url.pathname.startsWith(prefix) && url.pathname.endsWith('/resolve') === resolve
+      ? json({ error: 'unavailable' }, 503) : normal(url, request));
+    await expect(verifyProduction(options)).rejects.toThrow(message);
   });
 });
 

@@ -116,10 +116,10 @@ fi
 # Create a new poor user
 poor_user="poor_rl_user_$$"
 poor_auth="Authorization: LocalDev $poor_user"
-# Upload content
+# Leave retention headroom so this exercises the balance check in 30-day months too.
 poor_content=$(printf 'Poor user content %.0s' {1..2500})
 poor_file=$(create_temp_file "$poor_content")
-response=$(http_post_file "/api/content" "$poor_file" "$poor_auth" "text/plain")
+response=$(http_post_file "/api/content?retention_months=2" "$poor_file" "$poor_auth" "text/plain")
 poor_cid=$(get_body "$response" | json_get "cid")
 # Drain balance
 for i in {1..5}; do

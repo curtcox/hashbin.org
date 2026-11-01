@@ -89,7 +89,7 @@ function renderDispute(dispute) {
         ${dispute.claim_type === 'copyright' && dispute.restore_after ? '<button type="button" class="btn btn-secondary btn-sm" data-step="court_action">Reporter filed suit</button>' : ''}
         <button type="button" class="btn btn-secondary btn-sm" data-action="closed_denied">Deny (restore content)</button>
         <button type="button" class="btn btn-secondary btn-sm btn-danger" data-action="closed_deleted">${dispute.target_type === 'alias' ? 'Uphold (suspend alias)' : 'Uphold (take down)'}</button>
-        ${dispute.target_type === 'alias' ? '<button type="button" class="btn btn-secondary btn-sm btn-danger" data-action="reclaim">Reclaim alias</button>' : ''}
+        ${dispute.target_type === 'alias' && dispute.claim_type !== 'trademark' ? '<button type="button" class="btn btn-secondary btn-sm btn-danger" data-action="reclaim">Reclaim alias</button>' : ''}
       </form>
     </section>
   `;
@@ -98,7 +98,8 @@ function renderDispute(dispute) {
 async function resolve(cid, status, reason, claimType) {
   const aliasAction = status === 'reclaim' ? 'reclaim' : 'suspend';
   if (status === 'reclaim') status = 'closed_deleted';
-  const verb = { under_review: 'mark this dispute under review', closed_denied: 'deny this dispute and restore the content', closed_deleted: 'take this content down permanently' }[status];
+  const alias = cid.startsWith('@');
+  const verb = { under_review: 'mark this dispute under review', closed_denied: alias ? 'deny this alias report' : 'deny this dispute and restore the content', closed_deleted: alias ? `${aliasAction} this alias` : 'take this content down permanently' }[status];
   const warning = claimType === NCII_CLAIM_TYPE && status === 'closed_denied'
     ? '\n\nDeny an intimate image report only if it is not a valid request (for example, it is not an intimate image). The content becomes public again.'
     : '';

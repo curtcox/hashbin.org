@@ -2,13 +2,14 @@
 
 ## Status
 
-**Phase:** All six code phases implemented locally 2026-11-01. Row B17 in `STATUS.md`.
+**Phase:** All six code phases implemented; CI corrections and production acceptance in progress 2026-11-01. Row B17 in `STATUS.md`.
 
 The owner selected $1.00/year for every global name (no tiers) and a 10% seller fee,
 minimum 10¢. Personal aliases cost 1¢ per prepaid month. API, dashboard, marketplace,
-moderation, lifecycle, immutable SDK v0.5.0 and documentation are implemented. Draft
-Terms and Privacy wording are prepared; owner/legal review and production acceptance
-remain before deployment. See [Owner decisions still open](#owner-decisions-still-open).
+moderation, lifecycle, immutable SDK v0.5.0 and documentation are implemented. Terms and Privacy wording are implemented. The owner selected no refunds for unused alias
+terms on shutdown and suspension only for upheld trademark reports (no reclamation or
+transfer). Production acceptance remains; general legal review is tracked by L5.
+See [Owner policy decisions](#owner-policy-decisions).
 
 ## Goal
 
@@ -236,8 +237,8 @@ Each phase is shippable on its own and keeps `npm run test:unit` and `npm run li
 - [x] Listing routes, buy saga (debit buyer, transfer, credit seller minus fee, fee to
       `PlatformStats`), `price_changed` guard.
 - [x] Buy button on the info page; listing controls on the dashboard.
-- [x] Draft Terms and Privacy Policy wording prepared. Owner/legal review remains
-      a deployment gate; see the open decisions below.
+- [x] Terms and Privacy Policy wording implemented with the owner's pricing, sale,
+      no-refund shutdown and trademark suspension-only policies.
 
 ### Phase 4: offers with held funds
 
@@ -254,9 +255,12 @@ Each phase is shippable on its own and keeps `npm run test:unit` and `npm run li
 
 ### Implementation and acceptance notes
 
-Verified locally 2026-11-01: 966 unit tests, lint with zero errors, all 15 API suites,
-the native account-move rehearsal, two Chrome browser flows (including upload-to-alias prefilling), and dry-run compilation
-of both the main and content Workers. No production deployment was performed.
+Verified locally 2026-11-01: the full unit suite, lint with zero errors, all 15 API
+suites including the native account-move rehearsal, all 41 Chrome browser tests
+(including both alias flows and upload-to-alias prefilling), backup/restore of held
+offers with matching balance receipts, and dry-run compilation of both Workers.
+The first push failed CI on a stress-test timeout and a retention-boundary fixture;
+both are corrected. Deployment and public binding checks are pending.
 
 - Local API acceptance covers claim → list → hold → accept → repoint between two
   accounts, fee/net balances, retry IDs, personal override, renewal, deletion and reports.
@@ -334,18 +338,20 @@ things that bound junk traffic now: the WAF rule (`todo/cost_safety_cloudflare.m
 the S20 brake (A17). The new risk caching removes is the DO calls: without it, the same
 client would cost about $170 and would add load to its own profile DO.
 
-## Owner decisions still open
+## Owner policy decisions
 
 **Decided and implemented:** $1.00/year for every name, no length tiers; 10% seller fee,
 minimum 10¢ (rounded up); no holding period on proceeds. A durable operator alert fires
 when one account's gross alias sales exceed $50 in a UTC day.
 
-1. **Terms of Service** (L5): allow alias sales to move balance between users; say an
-   alias is a license to a name, not ownership of a trademark; say names can be suspended
-   or reclaimed without refund; say what happens to names when HashBin shuts down (S17).
-2. **Fraud exposure.** Balance can't be cashed out, so a stolen card can at most become
-   another user's storage credit through a sale. The initial no-hold policy and
-   $50/day operator alert are implemented. Revisit if
-   chargebacks on deposits that bought aliases appear.
-3. **Trademark claims** on names: whether to follow a UDRP-style rule (a mark holder can
-   take a name from a bad-faith holder) or only remove abusive names.
+1. **Terms of Service** (owner, 2026-11-01): sales can move non-withdrawable balance
+   between accounts; a prepaid alias term is a revocable name license, not a trademark.
+   Unused prepaid alias years/months receive **no refund if HashBin shuts down**.
+   This alias decision does not decide the separate content-retention shutdown policy
+   in S17. General legal review remains in L5.
+2. **Fraud exposure:** no holding period and the $50/day operator alert are implemented.
+   Revisit if chargebacks on deposits that bought aliases appear.
+3. **Trademark reports** (owner, 2026-11-01): upheld reports **only suspend** names.
+   Reclamation through a trademark report is refused, and the review UI offers only
+   suspension. There is no transfer to a mark holder; admin assignment is restricted
+   to reserved names. Reclamation remains available for other abuse reports.

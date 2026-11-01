@@ -198,6 +198,38 @@ it('alerts once on more than $50 of daily gross sales and keeps proceeds distinc
   expect((await f.env.ALERT_STORE.get('global').state.storage.list({ prefix: 'alert_' })).size).toBe(1);
 });
 
+it('registers named backups and restores held offers with the matching balance receipts', async () => {
+  const register = vi.fn(async () => Response.json({ registered: true }));
+  f.env.BACKUP_INDEX = { idFromName: name => name, get: () => ({ fetch: register }) };
+  await claim();
+  const offered = await (await f.global('document', 'offer', { amount_cents: 500, request_id: 'backup-offer' }, 'buyer')).json();
+  expect(register.mock.calls.some(([request]) => {
+    return new URL(request.url).pathname === '/register';
+  })).toBe(true);
+  const registrations = await Promise.all(register.mock.calls.map(([request]) => request.json()));
+  expect(registrations).toContainEqual({ binding: 'ALIAS_RECORDS', name: 'alias:document' });
+
+  const restored = aliasFixture();
+  for (const binding of ['ALIAS_RECORDS', 'USER_PROFILES', 'PAYMENT_RECORDS', 'PLATFORM_STATS']) {
+    for (const [name, object] of f.env[binding].objects) {
+      const snapshot = await (await object.fetch(new Request('https://internal/__backup'))).json();
+      const response = await restored.env[binding].get(name).fetch(new Request('https://internal/__restore', {
+        method: 'POST', body: JSON.stringify({ entries: snapshot.entries, overwrite: true })
+      }));
+      expect(response.ok).toBe(true);
+    }
+  }
+  const restoredRecord = restored.env.ALIAS_RECORDS.get('alias:document');
+  expect(restoredRecord.state.storage.setAlarm).toHaveBeenCalled();
+  expect(await restored.balance('buyer')).toBe(9500);
+  expect((await restored.global('document', 'withdraw', { offer_id: offered.offer_id, request_id: 'return-backup-offer' }, 'buyer')).ok).toBe(true);
+  await restoredRecord.object.alarm();
+  expect(await restored.balance('buyer')).toBe(10000);
+  expect(await restored.balance('seller')).toBe(9900);
+  const transactions = await restored.env.PAYMENT_RECORDS.get('buyer').state.storage.list({ prefix: 'tx:' });
+  expect([...transactions.values()].filter(tx => tx.type === 'alias_offer_return')).toHaveLength(1);
+});
+
 it('stages a full offer book and 100 history entries without exceeding a storage value limit', async () => {
   const name = 'z'.repeat(63);
   await claim({}, name);
@@ -212,4 +244,5 @@ it('stages a full offer book and 100 history entries without exceeding a storage
   for (let i = 0; i < 15; i++) await object.object.alarm();
   expect((await object.state.storage.list({ prefix: 'outbox:' })).size).toBe(0);
   expect(await f.balance('buyer-99')).toBe(10000);
-});
+// This exercises 100 complete purchase sagas and their refund outboxes on shared CI runners.
+}, 30000);

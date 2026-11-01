@@ -69,6 +69,17 @@ it('does not extend the internal 60-second change window with another full HTTP 
   expect((await request()).headers.get('location')).toBe(`/${personalCid}`);
 });
 
+it('does not cache negative HTTP responses beyond the internal entry after a new claim', async () => {
+  expect((await request('/@new-name')).status).toBe(404);
+  vi.advanceTimersByTime(59000);
+  await f.global('new-name', 'claim', { cid });
+  const stale = await request('/@new-name');
+  expect(stale.status).toBe(404);
+  expect(stale.headers.get('cache-control')).toBe('no-store');
+  vi.advanceTimersByTime(1001);
+  expect((await request('/@new-name')).headers.get('location')).toBe(`/${cid}`);
+});
+
 it('does not resolve expired private entries or leak restricted CIDs across credentials', async () => {
   const viewer = f.env.USER_PROFILES.get('viewer');
   const alias = await viewer.state.storage.get('personal-alias:document'); alias.paid_through = new Date(Date.now() + 1000).toISOString();

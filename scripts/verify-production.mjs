@@ -46,7 +46,7 @@ export async function verifyProduction({
     deployedSha = health.gitSha;
   });
   // Workers Assets redirects .html URLs to these canonical page paths.
-  for (const path of ['/', '/upload', '/dashboard', '/api-keys', '/info']) {
+  for (const path of ['/', '/upload', '/dashboard', '/api-keys', '/info', '/dashboard/aliases/', '/aliases/view', '/docs/aliases']) {
     await check(`HTML commit ${path}`, async () => {
       assert.ok(deployedSha, 'Cannot verify HTML without healthy deployment commit');
       const response = await request(baseUrl, path);
@@ -61,9 +61,36 @@ export async function verifyProduction({
     assert.equal(response.status, 200, 'Content health must return 200');
     assert.equal(await response.text(), 'OK', 'Content health must be the dedicated Worker');
   });
+  // A fresh exact name exercises both ALIAS_RECORDS bindings without a paid claim.
+  const aliasName = `deployment-check-${crypto.randomUUID()}`;
+  await check('Global alias Durable Object and pricing', async () => {
+    const response = await request(baseUrl, `/api/aliases/${aliasName}`);
+    assert.equal(response.status, 200);
+    const info = await response.json();
+    assert.equal(info.name, aliasName);
+    assert.equal(info.status, 'free');
+    assert.equal(info.yearly_price_cents, 100);
+    assert.equal(info.sale_fee_rate, 0.1);
+    assert.equal(info.minimum_sale_fee_cents, 10);
+    assert.equal(info.is_owner, false);
+    assert.deepEqual(info.history, []);
+  });
+  await check('Alias API resolution binding and privacy', async () => {
+    const response = await request(baseUrl, `/api/aliases/${aliasName}/resolve`);
+    assert.equal(response.status, 404);
+    assert.equal((await response.json()).error, 'alias_not_found');
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  });
+  await check('Content Worker alias binding and cache', async () => {
+    const response = await request(contentUrl, `/@${aliasName}`);
+    assert.equal(response.status, 404);
+    assert.equal(await response.text(), 'alias_not_found');
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+  });
   for (const [name, path, options, status, error] of [
     ['Missing session credentials', '/api/auth/session', {}, 401, 'AUTH_MISSING'],
     ['Invalid session credentials', '/api/auth/session', { headers: { Authorization: 'Invalid' } }, 401, 'AUTH_INVALID_FORMAT'],
+    ['Private aliases require credentials', '/api/user/aliases', {}, 401, 'AUTH_MISSING'],
     ['Unsigned Clerk webhook', '/api/webhooks/clerk', { method: 'POST', body: '{}' }, 401, 'Invalid signature'],
     ['Unsigned Stripe webhook', '/api/payments/webhook', { method: 'POST', body: '{}' }, 400, 'Missing signature'],
   ]) {

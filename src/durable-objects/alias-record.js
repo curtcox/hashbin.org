@@ -243,6 +243,7 @@ export class AliasRecord {
         }
       } else if (action === 'restore') record.suspended = false;
       else if (action === 'assign') {
+        if (!isReservedAlias(name)) throw error('reserved_assignment_only');
         if (typeof data.owner_id !== 'string' || !data.owner_id || data.owner_id.length > 256 || !validateAliasCid(data.cid)) throw error('invalid_assignment');
         if (record.owner_id && record.owner_id !== data.owner_id) this.index(record, events, record.owner_id, true);
         for (const offer of record.offers) this.returnOffer(record, events, offer);

@@ -268,6 +268,7 @@ async function updateAliasDispute(request, env, input, data) {
   if (data.status === 'closed_deleted') {
     if (!hasScope(request.auth, 'admin:takedown')) return Response.json({ error: 'insufficient_scope' }, { status: 403 });
     const action = data.alias_action === 'reclaim' ? 'reclaim' : 'suspend';
+    if (dispute.claim_type === 'trademark' && action !== 'suspend') return Response.json({ error: 'trademark_suspension_only' }, { status: 400 });
     const moderated = await env.ALIAS_RECORDS.get(env.ALIAS_RECORDS.idFromName(`alias:${name}`)).fetch(new Request(`https://internal/${action}`, {
       method: 'POST', body: JSON.stringify({ name, admin: true, request_id: `dispute-${dispute.dispute_id}-${action}` })
     }));
