@@ -267,7 +267,7 @@ the main and content Workers resolve fresh missing names through `ALIAS_RECORDS`
 existing real Google session loaded its private alias dashboard, limits and pricing;
 the global information page showed the $1/year claim quote and 10%/10¢ sale terms.
 No paid production alias transactions were performed; the full two-account cycle runs
-against native local Workers. Real paid acceptance remains part of L11.
+against native local Workers. The remaining real paid two-account acceptance is part of L11.
 
 Backup-index registration retries within one minute after an initial failure, even
 without another user edit; recovery is covered by a unit test. The strict production
@@ -367,3 +367,23 @@ when one account's gross alias sales exceed $50 in a UTC day.
    Reclamation through a trademark report is refused, and the review UI offers only
    suspension. There is no transfer to a mark holder; admin assignment is restricted
    to reserved names. Reclamation remains available for other abuse reports.
+
+### Production acceptance, 2026-11-01
+
+Using the owner's signed-in production account and an approved $3.25 existing-balance
+budget, claimed `acceptance-20261101` for one year ($1), renewed it for one more year
+($1), and created the same personal name pointing at a different inline CID for one
+month (1¢). Total debits: **$2.01**, with exactly one registration, renewal and personal
+alias row in transaction history. Global paid-through is 2028-11-01; the personal
+alias is paid through 2026-12-01. Auto-renew remains off for both.
+
+Anonymous `https://256t.us/@acceptance-20261101` returned 302 to `/AAAAAAABAQ`
+with public cache control; fetching the destination returned the expected single byte
+`01`. The private dashboard lists the personal value `AAAAAAABAg` separately.
+
+**Still open (L11):** identified resolution/redirect and a sale between two production
+accounts, including seller proceeds/fee and both histories. There is currently only
+one production account. Use a separate test identity with a different email and a
+funded balance for the buyer; creating/funding that account is an owner step. No
+deposit, listing, sale, credential creation or automatic renewal was performed in this
+acceptance run.
