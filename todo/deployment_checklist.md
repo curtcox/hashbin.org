@@ -21,12 +21,22 @@ live elsewhere:
 
 `npm run verify:production` runs the credential-free post-deploy checks against all three
 production origins. Set `EXPECTED_GIT_SHA` to the full deployed commit to require an exact
-match; without it, scheduled checks compare the five HTML pages to the current health SHA.
-The HTML checks use canonical paths (`/upload`, `/dashboard`, `/api-keys`, `/info`).
+match; without it, scheduled checks compare eight HTML pages to the current health SHA.
+The HTML checks use canonical paths, including the dashboard and public alias pages.
+HTTP requests to the root and an alias info URL must permanently redirect to the exact
+HTTPS URL, preserving the host, path and query. These two checks inspect redirects
+without following them; every HTTPS check refuses redirects.
 The command fails on degraded health, a non-production environment, missing or down health
 components, mismatched page commits, content-origin failure, incorrect auth/webhook refusals,
 a broken public price calculation, API 404 failure, or unsafe hosted-origin responses.
-Requests have a 15-second timeout and refuse redirects. It never logs credentials.
+Requests have a 15-second timeout. It never logs credentials.
+
+On 2026-11-01, post-deploy validation exposed HTTP returning 200 on `hashbin.org`.
+Enabled **SSL/TLS → Edge Certificates → Always Use HTTPS** for the `hashbin.org`
+Cloudflare zone, then verified 301 redirects for the root and an alias URL with a query.
+This edge setting covers static assets as well as API routes. Keep it enabled; changing
+Worker code alone does not reliably cover requests served directly by Workers Assets.
+See [Cloudflare's setting documentation](https://developers.cloudflare.com/ssl/edge-certificates/additional-options/always-use-https/).
 
 CI runs the runtime dependency audit, unit/lint, hosted-sandbox, funded-download, local API
 and browser suites before deployment. `scripts/check-deployment-secrets.mjs` rejects missing
@@ -182,6 +192,8 @@ Owner (`ops`) work. Each item's evidence goes in the linked plan.
 - [ ] **Cloudflare:** CF1–CF10, which cover the analytics token, alert delivery
   (`POST /api/admin/alerts/test`), the `256t.us` WAF rule, billing notifications and live
   cache and funded-path acceptance (S20, S21, S22, L22).
+- [x] **HTTPS redirect:** enabled Always Use HTTPS for `hashbin.org` and verified the
+  root and alias path/query redirects in production (2026-11-01); checked on every deploy.
 - [ ] **Stripe:** ST1–ST5 (dispute notifications, Radar, webhook and checkout acceptance,
   financial evidence) and the Missouri tax registration noted under L2.
 - [ ] **Backups:** confirm a production `POST /api/admin/backups/run` reported

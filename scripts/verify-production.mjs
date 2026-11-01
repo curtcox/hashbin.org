@@ -14,7 +14,7 @@ export async function verifyProduction({
   const request = async (origin, path, options = {}) => {
     const response = await fetchImpl(new URL(path, origin), {
       ...options,
-      redirect: 'error',
+      redirect: options.redirect ?? 'error',
       cache: 'no-store',
       signal: AbortSignal.timeout(15000),
     });
@@ -30,6 +30,17 @@ export async function verifyProduction({
       log(`FAIL ${name}: ${error.message}`);
     }
   };
+  for (const path of ['/', '/aliases/view?name=https-check&source=deployment']) {
+    await check(`HTTP upgrades to HTTPS ${path}`, async () => {
+      const target = new URL(path, baseUrl);
+      assert.equal(target.protocol, 'https:', 'Production origin must use HTTPS');
+      const insecure = new URL(target);
+      insecure.protocol = 'http:';
+      const response = await request(insecure, insecure.pathname + insecure.search, { redirect: 'manual' });
+      assert.ok([301, 308].includes(response.status), 'HTTP must permanently redirect to HTTPS');
+      assert.equal(response.headers.get('location'), target.href, 'HTTPS redirect must preserve host, path and query');
+    });
+  }
   let deployedSha;
   await check('Production health and commit', async () => {
     const response = await request(baseUrl, '/health');

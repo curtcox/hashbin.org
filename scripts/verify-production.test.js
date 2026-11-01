@@ -13,8 +13,13 @@ function fixture(overrides = {}) {
   };
   const fetchImpl = vi.fn(async (url, options) => {
     const path = url.pathname;
-    const override = overrides[`${url.hostname}${path}`] || overrides[path];
+    const override = overrides[`${url.origin}${path}`] || overrides[`${url.hostname}${path}`] || overrides[path];
     if (override) return override(health);
+    if (url.protocol === 'http:') {
+      const target = new URL(url);
+      target.protocol = 'https:';
+      return Response.redirect(target.href, 301);
+    }
     if (path.startsWith('/@')) return new Response('alias_not_found', { status: 404, headers: { 'Cache-Control': 'no-store' } });
     if (path.startsWith('/api/aliases/')) {
       if (path.endsWith('/resolve')) return json({ error: 'alias_not_found' }, 404, { 'Cache-Control': 'private, no-store' });
@@ -38,9 +43,9 @@ describe('production checklist', () => {
   it('checks production health, page commits, alias bindings, auth, webhooks and public APIs', async () => {
     const options = fixture();
     await expect(verifyProduction(options)).resolves.toBe(sha);
-    expect(options.fetchImpl).toHaveBeenCalledTimes(20);
-    for (const [, requestOptions] of options.fetchImpl.mock.calls) {
-      expect(requestOptions).toMatchObject({ redirect: 'error', cache: 'no-store' });
+    expect(options.fetchImpl).toHaveBeenCalledTimes(22);
+    for (const [url, requestOptions] of options.fetchImpl.mock.calls) {
+      expect(requestOptions).toMatchObject({ redirect: url.protocol === 'http:' ? 'manual' : 'error', cache: 'no-store' });
       expect(requestOptions.signal).toBeInstanceOf(AbortSignal);
     }
     const webhookCalls = options.fetchImpl.mock.calls.filter(([url]) => url.pathname.includes('webhook'));
@@ -48,6 +53,19 @@ describe('production checklist', () => {
       expect(requestOptions).toMatchObject({ method: 'POST', body: '{}' });
       expect(requestOptions.headers).toBeUndefined();
     }
+  });
+
+  it.each([
+    ['cleartext HTML', () => new Response('HashBin')],
+    ['temporary redirect', () => Response.redirect('https://hashbin.org/', 302)],
+    ['missing destination', () => new Response(null, { status: 301 })],
+    ['cleartext destination', () => Response.redirect('http://hashbin.org/', 301)],
+    ['different host', () => Response.redirect('https://example.com/', 301)],
+    ['lost path and query', () => Response.redirect('https://hashbin.org/', 301)],
+  ])('rejects an HTTP upgrade with %s', async (_name, response) => {
+    const options = fixture({ 'http://hashbin.org/aliases/view': response });
+    await expect(verifyProduction(options)).rejects.toThrow('HTTP upgrades to HTTPS /aliases/view');
+    expect(options.fetchImpl).toHaveBeenCalledTimes(22);
   });
 
   it.each([
@@ -93,7 +111,7 @@ describe('production checklist', () => {
       '/api/webhooks/clerk': () => json({}, 503),
     });
     await expect(verifyProduction(options)).rejects.toThrow('failed (2 checks)');
-    expect(options.fetchImpl).toHaveBeenCalledTimes(20);
+    expect(options.fetchImpl).toHaveBeenCalledTimes(22);
   });
 
   it('allows scheduled verification to compare pages to the live commit', async () => {
