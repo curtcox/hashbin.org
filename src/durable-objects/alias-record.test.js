@@ -230,6 +230,23 @@ it('registers named backups and restores held offers with the matching balance r
   expect([...transactions.values()].filter(tx => tx.type === 'alias_offer_return')).toHaveLength(1);
 });
 
+it('retries a failed backup registration on an alarm without needing another edit', async () => {
+  let attempts = 0;
+  f.env.BACKUP_INDEX = { idFromName: name => name, get: () => ({ fetch: async request => {
+    const registration = await request.json();
+    return registration.binding === 'ALIAS_RECORDS' && ++attempts === 1
+      ? Response.json({ error: 'unavailable' }, { status: 503 }) : Response.json({ registered: true });
+  } }) };
+  expect((await claim()).status).toBe(201);
+  expect(attempts).toBe(1);
+  expect(await record().state.storage.getAlarm()).toBe(Date.now() + 60000);
+  vi.advanceTimersByTime(60000);
+  await record().object.alarm();
+  expect(attempts).toBe(2);
+  expect(await record().state.storage.get('__backup_registered')).toBe(true);
+  expect(await f.balance('seller')).toBe(9900);
+});
+
 it('stages a full offer book and 100 history entries without exceeding a storage value limit', async () => {
   const name = 'z'.repeat(63);
   await claim({}, name);

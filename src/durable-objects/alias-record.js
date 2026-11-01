@@ -21,7 +21,12 @@ function publicRecord(record, name) {
 
 /** One serialized authority per global name; pending debits and all effects are durable. */
 export class AliasRecord {
-  constructor(state, env) { this.state = state; this.env = env; this.queue = Promise.resolve(); }
+  constructor(state, env) { this.state = state; this.env = env; this.queue = Promise.resolve(); this.backupRegistered = false; }
+
+  async registerBackup(record) {
+    if (!this.env.BACKUP_INDEX || this.backupRegistered) return;
+    this.backupRegistered = await registerForBackup(this.state, this.env, 'ALIAS_RECORDS', `alias:${record.name}`);
+  }
 
   async fetch(request) {
     const task = this.queue.then(async () => {
@@ -336,7 +341,7 @@ export class AliasRecord {
       const stagedKeys = [...staged.keys()];
       for (let i = 0; i < stagedKeys.length; i += 128) await txn.delete(stagedKeys.slice(i, i + 128));
     });
-    await registerForBackup(this.state, this.env, 'ALIAS_RECORDS', `alias:${record.name}`);
+    await this.registerBackup(record);
   }
 
   async flushOutbox() {
@@ -384,6 +389,7 @@ export class AliasRecord {
     const storage = this.state.storage, now = Date.now();
     const record = await storage.get('alias');
     if (!record) return;
+    await this.registerBackup(record);
     const events = [];
     const expired = Date.parse(record.paid_through) <= now;
     const expiredOffers = record.offers.filter(o => expired || record.suspended || o.expires_at <= now);
@@ -431,10 +437,10 @@ export class AliasRecord {
     const record = await storage.get('alias');
     if (!record) return;
     if (record.release_pending) { await storage.deleteAll(); return; }
-    let next = Infinity;
+    let next = this.env.BACKUP_INDEX && !this.backupRegistered ? now + 60000 : Infinity;
     if (record.owner_id) {
       const expiry = Date.parse(record.paid_through);
-      next = expiry > now ? expiry : expiry + GRACE;
+      next = Math.min(next, expiry > now ? expiry : expiry + GRACE);
       if (record.auto_renew && !record.suspended) next = Math.min(next, Math.max(expiry - 7 * DAY, record.renewal_retry_at || 0));
     }
     for (const offer of record.offers) next = Math.min(next, offer.expires_at);

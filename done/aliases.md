@@ -2,13 +2,14 @@
 
 ## Status
 
-**Phase:** All six code phases implemented; CI corrections and production acceptance in progress 2026-11-01. Row B17 in `STATUS.md`.
+**Phase:** Implemented and deployed 2026-11-01. Row B17 in `STATUS.md`.
 
 The owner selected $1.00/year for every global name (no tiers) and a 10% seller fee,
 minimum 10¢. Personal aliases cost 1¢ per prepaid month. API, dashboard, marketplace,
-moderation, lifecycle, immutable SDK v0.5.0 and documentation are implemented. Terms and Privacy wording are implemented. The owner selected no refunds for unused alias
-terms on shutdown and suspension only for upheld trademark reports (no reclamation or
-transfer). Production acceptance remains; general legal review is tracked by L5.
+moderation, lifecycle, immutable SDK v0.5.0 and documentation are implemented. Terms
+and Privacy wording include the owner's no-refund shutdown policy and suspension-only
+trademark policy (no reclamation or transfer). General legal review is tracked by L5;
+paid production acceptance is tracked by L11.
 See [Owner policy decisions](#owner-policy-decisions).
 
 ## Goal
@@ -255,12 +256,23 @@ Each phase is shippable on its own and keeps `npm run test:unit` and `npm run li
 
 ### Implementation and acceptance notes
 
-Verified locally 2026-11-01: the full unit suite, lint with zero errors, all 15 API
+Verified locally 2026-11-01: 973 unit tests, lint with zero errors, all 15 API
 suites including the native account-move rehearsal, all 41 Chrome browser tests
 (including both alias flows and upload-to-alias prefilling), backup/restore of held
 offers with matching balance receipts, and dry-run compilation of both Workers.
-The first push failed CI on a stress-test timeout and a retention-boundary fixture;
-both are corrected. Deployment and public binding checks are pending.
+CI and production deployment passed at `6988983`, including the new Durable Object
+migration and both Worker bindings. The read-only production checklist passed on all
+three origins: alias pages match the deployed SHA, public quotes are correct, and both
+the main and content Workers resolve fresh missing names through `ALIAS_RECORDS`. The
+existing real Google session loaded its private alias dashboard, limits and pricing;
+the global information page showed the $1/year claim quote and 10%/10¢ sale terms.
+No paid production alias transactions were performed; the full two-account cycle runs
+against native local Workers. Real paid acceptance remains part of L11.
+
+Backup-index registration retries within one minute after an initial failure, even
+without another user edit; recovery is covered by a unit test. The strict production
+checklist and smoke workflow pass. The separate legacy deployment validator fails
+INF-010 because the HTTP homepage does not redirect to HTTPS; tracked in B15.
 
 - Local API acceptance covers claim → list → hold → accept → repoint between two
   accounts, fee/net balances, retry IDs, personal override, renewal, deletion and reports.
