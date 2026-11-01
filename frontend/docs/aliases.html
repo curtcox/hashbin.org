@@ -1,11 +1,19 @@
 <!DOCTYPE html>
 <html lang="en"><head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Global and private personal names for immutable content CIDs.">
+  <meta name="description" content="Alias rules, publishing examples for a personal home page and todo app, and security implications.">
   <title>Aliases - HashBin.org</title><link rel="icon" href="/img/hashbin-logo.png">
   <link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css">
-</head><body><header class="nav-header"></header><main><div class="container">
+  <style>
+    .alias-doc .card { margin-bottom: 1.5rem; }
+    .alias-doc pre { background: #0f172a; color: #e2e8f0; padding: 1rem; border-radius: 12px; overflow-x: auto; margin: 1rem 0; font-size: .9rem; }
+    .alias-doc ul, .alias-doc ol { padding-left: 1.5rem; }
+    .alias-doc li { margin: .5rem 0; }
+    .alias-doc p { overflow-wrap: anywhere; }
+  </style>
+</head><body><header class="nav-header"></header><main><div class="container alias-doc">
   <h1>Aliases</h1>
+  <p><a href="#hosting">Hosting behavior</a> · <a href="#home-page">Personal home page</a> · <a href="#todo-app">Todo app</a> · <a href="#security">Security</a> · <a href="#api">API</a></p>
   <p>Give a CID a name you can repoint. <a href="/dashboard/aliases/">Manage your aliases</a> or <a href="/aliases/view.html">look up an exact global name</a>. There is no alias search or directory.</p>
   <section class="card"><h2>Global names</h2><p>Each name costs $1.00 per year, regardless of length. Prepay 1–10 years from your balance; the outstanding term cannot exceed 10 years. A global name has one owner, who can change its CID for free, renew it, list a fixed price, and accept offers.</p>
     <p><code>https://256t.us/@my-document</code> redirects to the CID. The <a href="/aliases/view.html?name=my-document">information page</a> shows status, term, listing price and the last 100 value and ownership changes. Account identities are private.</p>
@@ -20,7 +28,180 @@
     <p>Resolution stops at expiry. A global owner has 30 days to renew before the name returns to the pool; expired personal records are also kept for 30 days, then deleted. Global listings and offers end at expiry. Optional auto-renew attempts a renewal 7 days before expiry using balance and the previous term length. Failed renewals retry daily during grace; keep enough balance and keep the paying credential authorized. Auto-renew is disabled when a global name is sold.</p>
     <p>Resolution follows the platform cost brake and hard stop. Abusive, impersonating or infringing names can be <a href="/disputes/submit.html">reported</a>. Admins may suspend or reclaim abusive names without refund. Upheld trademark reports only suspend names; names are not reclaimed or transferred to claimants. If HashBin shuts down, alias resolution and name licenses end without refunds for unused prepaid terms. See the <a href="/terms.html">Terms</a> and <a href="/privacy.html">Privacy Policy</a>.</p>
   </section>
-  <section class="card"><h2>API example</h2><pre><code>POST /api/user/aliases/personal
+
+  <section class="card" id="hosting">
+    <h2>What an alias can host today</h2>
+    <p><code>https://256t.us/@alex-home</code> sends an HTTP 302 redirect to <code>https://256t.us/{cid}</code>. The browser ends on the CID URL; the alias is not a custom domain, a directory, or an application runtime. <code>/a/@alex-home</code> redirects to <code>/a/{cid}</code> and requires a download identity. Alias redirects do not preserve query parameters such as <code>?download=true</code>; use the resolved CID URL for those options.</p>
+    <p>The final content response keeps <code>Content-Security-Policy: default-src 'none'; sandbox</code>, <code>X-Content-Type-Options: nosniff</code> and <code>X-Frame-Options: DENY</code>. A basic HTML document with text and links can display when served as <code>text/html</code>. Scripts, inline and external styles, images and other subresources are blocked; forms cannot submit, and the sandbox does not give the document normal origin storage. Uploaded HTML cannot relax these response headers with a meta tag.</p>
+    <p>Each alias points to one file. There is no <code>/@alex-home/about</code>, relative asset tree, index-file routing, or automatic rewriting of links. Use explicit absolute links. For an interactive web app, serve the app shell from an HTTPS origin you control, and use HashBin for verified source releases or data snapshots. The SDK's <a href="/docs/sdk#hosted-sandbox">hosted sandbox</a> runs worker code for a registered embedding app; an alias does not turn into a hosted sandbox page.</p>
+  </section>
+  <section class="card" id="home-page">
+    <h2>Example: a personal home page</h2>
+    <p>A home page about a person uses a <strong>global</strong> alias if everyone should be able to visit it. A personal alias is an account-only shortcut. Save this as <code>home.html</code>, replacing the sample name and links. It deliberately uses only HTML that works under the content host's restrictions.</p>
+    <pre><code>&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;title&gt;Alex Rivera — home&lt;/title&gt;
+&lt;main&gt;
+  &lt;h1&gt;Alex Rivera&lt;/h1&gt;
+  &lt;p&gt;I build small tools and write about the web.&lt;/p&gt;
+  &lt;h2&gt;Projects&lt;/h2&gt;
+  &lt;ul&gt;
+    &lt;li&gt;&lt;a href=&quot;https://example.com/projects&quot;&gt;My projects&lt;/a&gt;&lt;/li&gt;
+    &lt;li&gt;&lt;a href=&quot;https://todo.example.com/&quot;&gt;My todo app&lt;/a&gt;&lt;/li&gt;
+  &lt;/ul&gt;
+  &lt;p&gt;&lt;a href=&quot;https://example.com/contact&quot;&gt;Contact me&lt;/a&gt;&lt;/p&gt;
+&lt;/main&gt;
+&lt;/html&gt;</code></pre>
+    <ol>
+      <li>Upload <code>home.html</code> through the <a href="/upload.html">upload page</a>, or use the raw upload below. Preserve the <code>text/html</code> content type and copy the returned <code>cid</code>.</li>
+      <li>Look up <code>alex-home</code> on the <a href="/aliases/view.html?name=alex-home">alias information page</a> and claim it if available, choosing the uploaded CID. One year costs $1.00, in addition to content retention.</li>
+      <li>Share <code>https://256t.us/@alex-home</code>. Open it anonymously to confirm the global target, without a personal override.</li>
+      <li>For an update, upload the edited file and change the alias value to the new CID in the dashboard. The old CID still identifies the old bytes; changing an alias does not delete them. Allow up to 60 seconds for the new target to propagate.</li>
+    </ol>
+    <p>These command-line examples use an API key kept in the <code>HASHBIN_API_KEY</code> environment variable, never in the page. Upload requires <code>content:write</code>, claiming requires <code>aliases:purchase</code>, and changing a value requires <code>aliases:write</code>. Fund its account and grant enough spending capacity. Replace each CID placeholder with the complete returned CID. Upload and alias purchase are separate operations.</p>
+    <pre><code>curl --fail-with-body --silent --show-error \
+  'https://hashbin.org/api/content?retention_months=12' \
+  -H "Authorization: ApiKey $HASHBIN_API_KEY" \
+  -H 'Content-Type: text/html; charset=utf-8' \
+  --data-binary @home.html
+
+# Claim an available name; keep this ID for retries of this exact purchase.
+CLAIM_REQUEST_ID="$(uuidgen)"
+curl --fail-with-body --silent --show-error \
+  https://hashbin.org/api/aliases/alex-home/claim \
+  -H "Authorization: ApiKey $HASHBIN_API_KEY" \
+  -H 'Content-Type: application/json' \
+  --data "{\"cid\":\"YOUR_HOME_CID\",\"years\":1,\"request_id\":\"$CLAIM_REQUEST_ID\"}"
+
+# After uploading an edited home.html, repoint the name for free.
+curl --fail-with-body --silent --show-error --request PUT \
+  https://hashbin.org/api/aliases/alex-home/value \
+  -H "Authorization: ApiKey $HASHBIN_API_KEY" \
+  -H 'Content-Type: application/json' \
+  --data '{ "cid": "YOUR_NEW_HOME_CID" }'</code></pre>
+    <p>Renew both the alias and the content as needed: paying for the name does not keep the home page bytes available. Use a dedicated conventional web host if your home page needs styling, images, forms or scripts.</p>
+  </section>
+  <section class="card" id="todo-app">
+    <h2>Example: a todo app and its backups</h2>
+    <p>This small app adds, completes and deletes tasks, stores them in this browser, and exports a JSON backup. Save it as <code>todo.html</code> and serve it from an HTTPS app origin you control, such as <code>https://todo.example.com/</code>. Its script and storage <strong>will not work when opened directly through a 256t.us alias</strong>. No HashBin credentials or registration are needed for this local-storage example.</p>
+    <pre><code>&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;title&gt;My todos&lt;/title&gt;
+&lt;h1&gt;My todos&lt;/h1&gt;
+&lt;p&gt;Stored in this browser only. Export a backup before clearing site data.&lt;/p&gt;
+&lt;form id=&quot;add&quot;&gt;
+  &lt;label&gt;Task &lt;input id=&quot;task&quot; maxlength=&quot;200&quot; required&gt;&lt;/label&gt;
+  &lt;button&gt;Add&lt;/button&gt;
+&lt;/form&gt;
+&lt;ul id=&quot;tasks&quot;&gt;&lt;/ul&gt;
+&lt;button id=&quot;export&quot; type=&quot;button&quot;&gt;Export JSON backup&lt;/button&gt;
+&lt;p id=&quot;status&quot; role=&quot;status&quot;&gt;&lt;/p&gt;
+&lt;script type=&quot;module&quot;&gt;
+const key = &#x27;alex-todos-v1&#x27;;
+const list = document.querySelector(&#x27;#tasks&#x27;);
+const input = document.querySelector(&#x27;#task&#x27;);
+const status = document.querySelector(&#x27;#status&#x27;);
+let tasks = [];
+try {
+  const saved = JSON.parse(localStorage.getItem(key) || &#x27;[]&#x27;);
+  if (!Array.isArray(saved) || saved.length &gt; 1000 || saved.some(task =&gt;
+    !task || typeof task.text !== &#x27;string&#x27; || task.text.length &gt; 200 ||
+    typeof task.done !== &#x27;boolean&#x27;)) throw new Error(&#x27;Invalid backup&#x27;);
+  tasks = saved;
+} catch {
+  status.textContent = &#x27;Saved tasks could not be loaded; new edits start a fresh list.&#x27;;
+}
+function save() {
+  try {
+    localStorage.setItem(key, JSON.stringify(tasks));
+    status.textContent = &#x27;Saved in this browser.&#x27;;
+  } catch {
+    status.textContent = &#x27;Browser storage unavailable or full. Export a backup.&#x27;;
+  }
+  render();
+}
+function render() {
+  list.replaceChildren();
+  tasks.forEach((task, index) =&gt; {
+    const row = document.createElement(&#x27;li&#x27;);
+    const label = document.createElement(&#x27;label&#x27;);
+    const check = document.createElement(&#x27;input&#x27;);
+    check.type = &#x27;checkbox&#x27;;
+    check.checked = task.done;
+    check.addEventListener(&#x27;change&#x27;, () =&gt; { task.done = check.checked; save(); });
+    const text = document.createElement(&#x27;span&#x27;);
+    text.textContent = task.text;
+    label.append(check, text);
+    const remove = document.createElement(&#x27;button&#x27;);
+    remove.type = &#x27;button&#x27;;
+    remove.textContent = &#x27;Delete&#x27;;
+    remove.addEventListener(&#x27;click&#x27;, () =&gt; { tasks.splice(index, 1); save(); });
+    row.append(label, remove);
+    list.append(row);
+  });
+}
+document.querySelector(&#x27;#add&#x27;).addEventListener(&#x27;submit&#x27;, event =&gt; {
+  event.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  if (tasks.length &gt;= 1000) {
+    status.textContent = &#x27;Limit of 1,000 tasks reached. Export and remove old tasks.&#x27;;
+    return;
+  }
+  tasks.push({ text, done: false });
+  input.value = &#x27;&#x27;;
+  save();
+});
+document.querySelector(&#x27;#export&#x27;).addEventListener(&#x27;click&#x27;, () =&gt; {
+  const file = new Blob([JSON.stringify(tasks, null, 2)], { type: &#x27;application/json&#x27; });
+  const url = URL.createObjectURL(file);
+  const link = document.createElement(&#x27;a&#x27;);
+  link.href = url;
+  link.download = &#x27;todos.json&#x27;;
+  link.click();
+  setTimeout(() =&gt; URL.revokeObjectURL(url), 1000);
+});
+render();
+&lt;/script&gt;
+&lt;/html&gt;</code></pre>
+    <p>For production, move the inline script into a file on your app origin and restrict <code>script-src</code> to that origin, or allow only the script's exact hash in your CSP. Keep this app on a dedicated origin if other hosted apps are not equally trusted.</p>
+    <p>To publish a named source release, upload <code>todo.html</code> as <code>text/html</code> and claim a global name such as <code>alex-todo-source</code> using the home-page flow. Repoint it after publishing a new release. The alias shares the app's source artifact; visitors run the app at your separate app URL. Publish a simple HTML landing page linking to that URL if you want a directly usable alias entry page. An alias value cannot itself be an external app URL.</p>
+    <h3>Keep a named data snapshot</h3>
+    <p>Export <code>todos.json</code> and upload it as <code>application/json</code> instead of HTML. The example data below is public once uploaded. Create a personal alias <code>todo-backup</code> to remember its latest CID; it costs 12¢ for 12 months. These are authenticated JSON API requests, with <code>aliases:purchase</code> for creation and <code>aliases:write</code> for updates. Use a fresh unique purchase request ID, and reuse it only for the same retry.</p>
+    <pre><code>[{ "text": "Water the plants", "done": false }]
+
+POST /api/user/aliases/personal
+{ "name": "todo-backup", "cid": "YOUR_JSON_CID", "months": 12, "request_id": "UNIQUE_PURCHASE_ID" }
+
+# Export and upload a new JSON file before changing the pointer.
+PUT /api/user/aliases/personal/todo-backup
+{ "cid": "YOUR_NEW_JSON_CID" }</code></pre>
+    <p>The export button only downloads a local file; it does not upload, create or update aliases. This sample has no automatic cloud sync or restore. For an app that retrieves a snapshot, use the following with an already configured SDK v0.5.0 client authorized for <code>aliases:read</code> (see the <a href="/docs/sdk#allowance">allowance and callback guide</a>). Validate the parsed JSON against your app's schema and limits before offering an explicit import; display task strings with <code>textContent</code>.</p>
+    <pre><code>const cid = await client.resolveAlias('todo-backup');
+const response = await client.retrieve(cid); // Verifies bytes against this CID.
+const snapshot = await response.json();     // Still untrusted application data.</code></pre>
+    <p>An expired or missing personal alias falls back to the global name, even for an identified caller. Apps that require a personal result should check <code>source === 'personal'</code> in the authenticated <code>GET /api/aliases/todo-backup/resolve</code> response before retrieving it. An anonymous visitor cannot resolve your personal record. <strong>That does not make the JSON private:</strong> anyone with its CID can retrieve it. Encrypt sensitive task data before uploading, and keep the decryption key outside the published content and alias.</p>
+    <p>Aliases provide a mutable pointer to an immutable snapshot, without transactions across upload and repoint, edit merging or conflict detection. Concurrent saves can overwrite the pointer; a failed repoint can leave an uploaded snapshot unreferenced. Keep backup CIDs and handle failures before reporting a successful save.</p>
+  </section>
+  <section class="card" id="security">
+    <h2>Security implications for pages and web apps</h2>
+    <ul>
+      <li><strong>A name is mutable, not proof of identity.</strong> Owners can change targets, sell names, or lose them after expiry and the 30-day grace. A buyer or later claimant can publish different content at a familiar link. Inspect the current CID and public history; a paid name is not an endorsement or proof of a person's identity. Avoid treating an alias as a permanent trusted login or payment destination.</li>
+      <li><strong>Pin code you trust.</strong> A CID verifies bytes, not their author or safety. Resolving an alias and then verifying the returned CID still accepts whichever version the name currently selects. Review and pin an expected CID for executable releases; use a versioned SDK URL with SRI. Never load executable code from a mutable alias into a page that holds credentials without an explicit review and upgrade decision.</li>
+      <li><strong>Keep origin boundaries.</strong> Alias names and CID paths do not create separate browser origins. The content host's sandbox prevents scripts and gives documents opaque origins; do not strip its headers in a proxy to make apps run. A proxy or host that executes multiple users' apps under different paths of one origin exposes shared storage and authority. Give mutually untrusted apps separate origins, or use a sandbox with deliberately limited capabilities. HashBin's dashboard and sessions stay on a separate origin.</li>
+      <li><strong>Protect credentials and stored data.</strong> Never publish API keys, bearer tokens, decryption keys or personal task data in HTML or source. On your own app origin, injected or compromised scripts can read localStorage and use active browser allowances. Render user input as text, keep dependencies pinned, and use a restrictive CSP. Prefer <a href="/docs/sdk#publish">per-save approval</a>; when delegation is needed, request only necessary scopes, short expiry and small spending limits. A DPoP key does not prevent a script already running in its app origin from using the allowance.</li>
+      <li><strong>Personal names protect the mapping, not the content.</strong> Global CIDs and their last 100 value/ownership changes are public. Personal mappings require your identity, but content remains free to retrieve by CID, and aliases are not access control or encryption. Avoid secrets in names and public history; consider encrypting content before upload. Deleting or repointing a name does not revoke copies or remove an old CID.</li>
+      <li><strong>Resolve with the intended identity.</strong> The same link can select your personal override or the global record. Signing in to hashbin.org alone is not a download identity on 256t.us; use its download session or a permitted API/OAuth credential. The strict <code>/a/</code> route requires identity but still permits global fallback. Do not assume an anonymous share link opens your private mapping, or that fallback data is trusted. Never put credentials in URLs.</li>
+      <li><strong>Plan for availability and stale pointers.</strong> Names expire or can be suspended; content retention expires separately. Changes may take 60 seconds, and rate limits, cost brakes or unavailable suppliers can interrupt resolution/download. Handle those failures, retain known-good CIDs, and never bypass integrity verification or silently execute an unexpected replacement.</li>
+    </ul>
+    <p>See <a href="/docs/content-security.html">content security</a>, <a href="/docs/browser-client-safety">browser client safety</a> and <a href="/docs/security/">security notes</a>. Browser behavior is defined by the <a href="https://www.w3.org/TR/CSP3/#directive-sandbox">CSP sandbox specification</a> and <a href="https://html.spec.whatwg.org/multipage/browsers.html#concept-origin">HTML origin model</a>.</p>
+  </section>
+
+  <section class="card" id="api"><h2>API example</h2><pre><code>POST /api/user/aliases/personal
 { "name": "my-document", "cid": "YOUR_CID", "months": 12, "request_id": "unique-id" }
 
 GET /api/aliases/my-document/resolve

@@ -225,6 +225,13 @@ DPoP: SIGNED_PROOF_JWT</div>
         </div>
       </section>
 
+      <section class="card" id="aliases" style="margin-bottom: 2rem;">
+        <h2>Aliases</h2>
+        <p>Global and personal aliases are mutable names for CIDs. <code>GET /api/aliases/{name}/resolve</code> returns <code>{ cid, source }</code>; an identified caller's active personal alias takes precedence, otherwise resolution uses the global name. Use <code>aliases:read</code>, <code>aliases:write</code>, <code>aliases:purchase</code> and <code>aliases:sell</code> for delegated actions.</p>
+        <p><code>https://256t.us/@name</code> redirects to the file with its content security restrictions intact. It supports basic HTML text and links, but cannot run a JavaScript app. A personal alias does not make the target bytes private.</p>
+        <p><a href="/docs/aliases.html">Prices, lifecycle and API examples</a> · <a href="/docs/aliases.html#home-page">Personal home page</a> · <a href="/docs/aliases.html#todo-app">Todo app</a> · <a href="/docs/aliases.html#security">Security implications</a></p>
+      </section>
+
       <!-- Content Endpoints -->
       <section class="card" style="margin-bottom: 2rem;">
         <h2>Content</h2>

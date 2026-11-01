@@ -394,7 +394,25 @@ per account may be in flight; completed acknowledgements release that capacity.
 `https://256t.us/@{name}` issues a 302 to the CID, or `/a/{cid}` for strict
 `/a/@{name}` requests. Identified responses are `private, no-store`; anonymous
 redirect TTLs never extend the shared record's 60-second freshness window. Signed
-URLs are CID-specific and cannot target aliases. See [the public guide](../frontend/docs/aliases.html).
+URLs are CID-specific and cannot target aliases. Alias redirects do not forward query
+parameters (for example `?download=true`); apply download options to the resolved CID URL.
+The content request still needs any required download authorization; resolving a name
+with `aliases:read` does not grant `downloads:spend` or prepaid download capacity.
+
+Aliases name a single file, with no directory routing or separate origin per name.
+The final content response retains `Content-Security-Policy: default-src 'none'; sandbox`,
+`X-Content-Type-Options: nosniff` and `X-Frame-Options: DENY`. Plain HTML text and links
+can display with the correct MIME type; scripts, styling, images, form submission and
+normal origin storage are unavailable. Host an interactive app shell on your own HTTPS
+origin and use aliases for source artifacts or data snapshots. Personal mappings are
+private, but bytes remain retrievable by CID; encrypt sensitive data before upload.
+Names can be repointed, sold and reclaimed after expiry, so pin reviewed CIDs for code
+you execute. An absent or expired personal record falls back to the global name; check
+`source` when a personal result is required.
+
+See the public guide for [personal home-page publishing](../frontend/docs/aliases.html#home-page),
+[a todo app and named backups](../frontend/docs/aliases.html#todo-app), and
+[page/app security implications](../frontend/docs/aliases.html#security).
 
 ### Public Endpoints
 

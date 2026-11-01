@@ -31,6 +31,12 @@
         <p><code>256t.us</code> is run by the same operator as HashBin. It is a dedicated content sandbox that only serves raw uploaded files with strict response headers.</p>
       </div>
       <div class="card" style="margin-bottom:1.5rem;">
+        <h2>Aliases keep the same restrictions</h2>
+        <p><code>https://256t.us/@name</code> redirects to a CID. The final file keeps <code>Content-Security-Policy: default-src 'none'; sandbox</code>, <code>X-Content-Type-Options: nosniff</code> and <code>X-Frame-Options: DENY</code>. HTML text and links can display with the correct content type, but scripts, styles, images, form submission and normal origin storage are unavailable. An alias does not provide a separate app origin or directory hosting.</p>
+        <p>Host an interactive app shell on an HTTPS origin you control. Do not remove the content host's headers to run mutually untrusted apps under one origin. Alias targets can change through edits, sales or re-registration after expiry; verify bytes and pin reviewed CIDs before executing code. A private personal alias hides its mapping, not the content addressed by its CID.</p>
+        <p><a href="/docs/aliases.html#home-page">Personal home-page example</a> · <a href="/docs/aliases.html#todo-app">Todo app and backups</a> · <a href="/docs/aliases.html#security">Alias security implications</a></p>
+      </div>
+      <div class="card" style="margin-bottom:1.5rem;">
         <h2>Protect the client origin too</h2>
         <p>The separate content host protects HashBin's origin. It does not isolate two apps at different paths on your own origin, such as <code>owner.github.io/a/</code> and <code>/b/</code>. Use SDK <code>publish()</code> for hosted per-save approval without credentials in your client, or a capped DPoP allowance through <code>authorize()</code> and <code>save()</code> when silent saves are required. Same-origin scripts can still use an allowance's browser key while running.</p>
         <p><code>retrieve()</code> verifies the complete response against its CID before returning it, and <code>publish()</code>/<code>save()</code> verify returned CIDs. Check custom fetches with <code>verifyCID(cid, bytes)</code> before displaying or caching the content. Pin the SDK with a versioned URL and SRI when deliberate upgrades are appropriate.</p>
