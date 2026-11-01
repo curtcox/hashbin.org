@@ -117,6 +117,7 @@ export class DisputeIndex {
     // Add to index
     disputes.push({
       cid: data.cid,
+      ...(data.target_type === 'alias' ? { target_type: 'alias', alias_name: data.alias_name } : {}),
       dispute_id: data.dispute_id,
       claim_type: data.claim_type,
       created_at: data.created_at,

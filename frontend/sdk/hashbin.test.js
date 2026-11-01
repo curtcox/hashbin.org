@@ -18,6 +18,17 @@ function createMemoryStorage() {
 }
 
 describe('HashBin browser SDK', () => {
+  it('resolves global aliases anonymously and uses an allowance for private overrides', async () => {
+    const fetch = vi.fn(async () => Response.json({ cid: 'AAAAAAABAQ', source: 'global' }));
+    const client = new HashBinClient({ clientId: 'alias-test', redirectUri: 'https://app.test/callback', baseUrl: 'https://hashbin.test', fetch, storage: createMemoryStorage() });
+    expect(await client.resolveAlias('My.Document')).toBe('AAAAAAABAQ');
+    expect(fetch).toHaveBeenCalledWith('https://hashbin.test/api/aliases/my.document/resolve');
+    client.getTokens = () => ({ accessToken: 'token' });
+    const authorized = vi.spyOn(client, 'authorizedFetch').mockResolvedValue(Response.json({ cid: 'AAAAAAABAg', source: 'personal' }));
+    expect(await client.resolveAlias('my.document')).toBe('AAAAAAABAg');
+    expect(authorized).toHaveBeenCalledWith('/api/aliases/my.document/resolve');
+    await expect(client.resolveAlias('../unsafe')).rejects.toThrow('Invalid alias');
+  });
   it('creates an authorization request and stores PKCE transaction state', async () => {
     const storage = createMemoryStorage();
     const transactionStorage = createMemoryStorage();

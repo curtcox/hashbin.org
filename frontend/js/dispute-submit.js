@@ -25,6 +25,16 @@ const claimSelect = document.getElementById('claim_type');
 const nciiFields = document.getElementById('ncii-fields');
 
 const params = new URLSearchParams(window.location.search);
+const aliasTarget = params.get('target_type') === 'alias';
+if (aliasTarget) {
+  document.querySelector('label[for=cid]').textContent = 'Alias name';
+  document.getElementById('cid').removeAttribute('pattern');
+  document.getElementById('cid').value = params.get('name') || '';
+  document.getElementById('cid').nextElementSibling.textContent = 'The exact global name, without @. Reports are reviewed; reporting an alias does not block its content.';
+  for (const option of claimSelect.options) if (option.value && !['trademark', 'impersonation', 'abuse', 'other'].includes(option.value)) option.disabled = true;
+} else {
+  for (const option of claimSelect.options) if (['trademark', 'impersonation', 'abuse'].includes(option.value)) option.disabled = true;
+}
 if (params.get('cid')) {
   document.getElementById('cid').value = params.get('cid');
 }
@@ -113,6 +123,7 @@ async function handleSubmit(event) {
   clearErrors();
 
   const { errors, payload } = validateDisputeForm({
+    targetType: aliasTarget ? 'alias' : 'content',
     cid: document.getElementById('cid').value,
     claimType: claimSelect.value,
     evidence: evidenceInput.value,
@@ -156,7 +167,7 @@ async function handleSubmit(event) {
     document.getElementById('success-standard').classList.toggle('hidden', ncii || !dispute.expires_at);
     document.getElementById('success-open').classList.toggle('hidden', ncii || !!dispute.expires_at);
     document.getElementById('success-ncii').classList.toggle('hidden', !ncii);
-    document.getElementById('success-view').href = `/disputes/view.html?cid=${encodeURIComponent(payload.cid)}`;
+    document.getElementById('success-view').href = `/disputes/view.html?cid=${encodeURIComponent(aliasTarget ? '@' + payload.name : payload.cid)}`;
     form.classList.add('hidden');
     document.getElementById('success').classList.remove('hidden');
     window.scrollTo({ top: 0, behavior: 'smooth' });

@@ -590,6 +590,19 @@ export class HashBinClient {
     return response.json();
   }
 
+  /** Resolve an exact name to a CID; retrieve() still verifies the downloaded bytes. */
+  async resolveAlias(name) {
+    if (typeof name !== 'string' || !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$/.test(name) || name.includes('..')) {
+      throw new Error('Invalid alias name.');
+    }
+    const path = `/api/aliases/${name.toLowerCase()}/resolve`;
+    const response = this.getTokens()?.accessToken ? await this.authorizedFetch(path) : await this.fetch(`${this.baseUrl}${path}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Alias resolution failed (${response.status}).`);
+    if (typeof data.cid !== 'string' || !/^[A-Za-z0-9_-]{8,94}$/.test(data.cid)) throw new Error('Invalid alias resolution response.');
+    return data.cid;
+  }
+
   async save(content, { contentType = 'application/octet-stream', maxCostCents = null } = {}) {
     const body = await contentBytes(content);
     const suffix = maxCostCents === null ? '' : '?max_cost_cents=' + encodeURIComponent(maxCostCents);

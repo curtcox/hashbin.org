@@ -39,6 +39,8 @@ import {
 } from './api/auth.js';
 
 import { handleGetBalance, handleGetBalanceHistory } from './api/balance.js';
+import { handleUserAliases, handleResolveAlias, handleGlobalAlias } from './api/aliases.js';
+export { AliasRecord } from './durable-objects/alias-record.js';
 
 import { 
   handleCreateDeposit, 
@@ -99,6 +101,7 @@ import {
 
 import {
   handleCreateDispute,
+  handleGetAliasDisputes,
   handleListDisputes,
   handleGetDispute,
   handleGetContentDisputes
@@ -588,6 +591,7 @@ export default {
             throw new Error(`DisputeRecord returned ${closeResponse.status}`);
           }
 
+          if (dispute.target_type !== 'alias') {
           const availability = env.CONTENT_METADATA.get(env.CONTENT_METADATA.idFromName(dispute.cid));
           const availabilityResponse = await availability.fetch(new Request('http://internal/availability', {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ disputed: false })
@@ -595,6 +599,7 @@ export default {
           if (!availabilityResponse.ok) throw new Error('Failed to publish dispute closure');
           // A closed dispute no longer blocks the content: 256t.us serves 451 while this marker exists
           await env.CONTENT_BUCKET.delete(`${dispute.cid}.disputed`);
+          }
 
           // Remove from DisputeIndex
           await indexStub.fetch(new Request('http://internal/remove', {
@@ -687,6 +692,22 @@ async function fetchAssetPage(env, request, url, assetPath) {
  * route without a valid declaration.
  */
 const API_ROUTES = [
+  { method: 'GET', path: /^\/api\/aliases\/([^/]+)\/disputes$/, access: PUBLIC, handler: handleGetAliasDisputes },
+  { method: 'GET', path: /^\/api\/aliases\/([^/]+)$/, access: PUBLIC, handler: handleGlobalAlias },
+  { method: 'POST', path: /^\/api\/aliases\/([^/]+)\/(claim|renew|buy)$/, access: 'aliases:purchase', handler: handleGlobalAlias },
+  { method: 'PUT', path: /^\/api\/aliases\/([^/]+)\/value$/, access: 'aliases:write', handler: handleGlobalAlias },
+  { method: 'PATCH', path: /^\/api\/aliases\/([^/]+)$/, access: 'aliases:write', handler: handleGlobalAlias },
+  { method: ['PUT', 'DELETE'], path: /^\/api\/aliases\/([^/]+)\/listing$/, access: 'aliases:sell', handler: handleGlobalAlias },
+  { method: 'GET', path: /^\/api\/aliases\/([^/]+)\/offers$/, access: 'aliases:sell', handler: handleGlobalAlias },
+  { method: 'POST', path: /^\/api\/aliases\/([^/]+)\/offers$/, access: 'aliases:purchase', handler: handleGlobalAlias },
+  { method: 'DELETE', path: /^\/api\/aliases\/([^/]+)\/offers\/([^/]+)$/, access: 'aliases:purchase', handler: handleGlobalAlias },
+  { method: 'POST', path: /^\/api\/aliases\/([^/]+)\/offers\/([^/]+)\/(accept|decline)$/, access: 'aliases:sell', handler: handleGlobalAlias },
+  { method: 'POST', path: /^\/api\/admin\/aliases\/([^/]+)\/(suspend|restore|reclaim|assign)$/, access: 'admin:takedown', handler: handleGlobalAlias },
+  { method: 'GET', path: /^\/api\/aliases\/([^/]+)\/resolve$/, access: PUBLIC, handler: handleResolveAlias },
+  { method: 'GET', path: '/api/user/aliases', access: 'aliases:read', handler: handleUserAliases },
+  { method: 'POST', path: '/api/user/aliases/personal', access: 'aliases:purchase', handler: handleUserAliases },
+  { method: 'POST', path: /^\/api\/user\/aliases\/personal\/([^/]+)\/renew$/, access: 'aliases:purchase', handler: handleUserAliases },
+  { method: ['PUT', 'PATCH', 'DELETE'], path: /^\/api\/user\/aliases\/personal\/([^/]+)$/, access: 'aliases:write', handler: handleUserAliases },
   // Downloads (budgets and sessions belong to the account; signing spends)
   { method: ['GET', 'PUT'], path: '/api/downloads/budget', access: SESSION, handler: handleDownloads },
   { method: 'PUT', path: /^\/api\/(auth\/apikeys|oauth\/grants)\/[^/]+\/download-budget$/, access: SESSION, handler: handleDownloads },

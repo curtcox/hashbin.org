@@ -85,3 +85,7 @@ open build-reports/index.html
 The performance and API reports need `npm run dev:local` running. The generators read
 `GITHUB_REPOSITORY`, `GITHUB_SHA`, `GITHUB_SERVER_URL` and `GITHUB_RUN_ID` for source links;
 set them by hand outside Actions. The generators need `jq`.
+
+Alias acceptance: `node scripts/api-tests/test-local-aliases.mjs` runs the full local
+claim/list/offer/accept/repoint cycle, checks net balances, personal override and report
+history. It is included in `npm run test:api`.

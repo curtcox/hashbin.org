@@ -11,6 +11,9 @@ const CID_PATTERN = /^[A-Za-z0-9_-]{8,94}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const CLAIM_TYPE_LABELS = {
+  trademark: 'Trademark',
+  impersonation: 'Impersonation',
+  abuse: 'Alias abuse',
   copyright: 'Copyright',
   illegal: 'Illegal content',
   privacy: 'Privacy violation',
@@ -110,7 +113,8 @@ export function validateDisputeForm(input) {
   const isNcii = input.claimType === NCII_CLAIM_TYPE;
   const signature = (input.signature || '').trim();
 
-  if (!CID_PATTERN.test(cid)) {
+  const aliasTarget = input.targetType === 'alias';
+  if (aliasTarget ? !/^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,61}[A-Za-z0-9])?$/.test(cid) || cid.includes('..') : !CID_PATTERN.test(cid)) {
     errors.push('Enter a valid content ID (8–94 letters, digits, "-" or "_").');
   }
   if (!CLAIM_TYPE_LABELS[input.claimType]) {
@@ -157,7 +161,7 @@ export function validateDisputeForm(input) {
   return {
     errors,
     payload: {
-      cid,
+      ...(aliasTarget ? { target_type: 'alias', name: cid.toLowerCase() } : { cid }),
       claim_type: input.claimType,
       evidence,
       evidence_urls: evidenceUrls,

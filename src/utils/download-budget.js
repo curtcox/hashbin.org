@@ -12,16 +12,16 @@ export function downloadBudget(profile, now = new Date()) {
 function cidAllowed(caveats, cid) {
   return cid === undefined || !Array.isArray(caveats?.cids) || caveats.cids.includes(cid);
 }
-export function downloadIdentityValid(profile, identity, now = Date.now(), cid = undefined) {
+export function downloadIdentityValid(profile, identity, now = Date.now(), cid = undefined, scopes = ['downloads:spend']) {
   if (!identity || identity.u !== profile.user_id || profile.deleted_at) return false;
   if (identity.kind === 'key') {
     return (profile.api_keys || []).some(k => k.key_id === identity.k && !k.revoked_at &&
       new Date(k.expires_at).getTime() > now && (!identity.key_hash || identity.key_hash === k.key_hash) &&
-      k.scopes?.includes('downloads:spend') && cidAllowed(k.caveats, cid));
+      scopes.some(scope => k.scopes?.includes(scope)) && cidAllowed(k.caveats, cid));
   }
   if (identity.kind === 'oauth') {
     return (profile.oauth_grants || []).some(g => g.grant_id === identity.k && !g.revoked_at &&
-      (!identity.app_id || g.app_id === identity.app_id) && g.scopes?.includes('downloads:spend') &&
+      (!identity.app_id || g.app_id === identity.app_id) && scopes.some(scope => g.scopes?.includes(scope)) &&
       !(g.caveats?.expires_at && Date.parse(g.caveats.expires_at) <= now) && cidAllowed(g.caveats, cid));
   }
   if (identity.kind === 'session') {

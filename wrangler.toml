@@ -186,3 +186,12 @@ crons = ["0 * * * *"]  # Hourly safety checks; maintenance at 02:00 UTC
 
 # DOWNLOAD_TOKEN_SECRET: shared HMAC secret with 256t-content (required for new keys).
 # COST_SAFETY_HARD_STOP=true: emergency 503 for all content downloads.
+
+[[durable_objects.bindings]]
+name = "ALIAS_RECORDS"
+class_name = "AliasRecord"
+script_name = "hashbin-worker-prod"
+
+[[migrations]]
+tag = "v12"
+new_sqlite_classes = ["AliasRecord"]

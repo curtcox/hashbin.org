@@ -20,7 +20,7 @@ http_post "/api/balance/dev-deposit" '{"amount_cents":100000}' "$AUTH_HEADER" > 
 # Upload test content (must be >64 bytes to have rate limit)
 test_content="Rate limit purchase test content $(random_string 32) $(random_string 32)"
 temp_file=$(create_temp_file "$test_content")
-response=$(http_post_file "/api/content" "$temp_file" "$AUTH_HEADER" "text/plain")
+response=$(http_post_file "/api/content?retention_months=2" "$temp_file" "$AUTH_HEADER" "text/plain")
 body=$(get_body "$response")
 test_cid=$(json_get "$body" "cid")
 
@@ -72,7 +72,7 @@ balance_before=$(http_get "/api/balance" "$AUTH_HEADER" | get_body | json_get "b
 # Upload new content
 new_content="New content for balance test $(random_string 32) $(random_string 32)"
 new_file=$(create_temp_file "$new_content")
-response=$(http_post_file "/api/content" "$new_file" "$AUTH_HEADER" "text/plain")
+response=$(http_post_file "/api/content?retention_months=2" "$new_file" "$AUTH_HEADER" "text/plain")
 new_cid=$(get_body "$response" | json_get "cid")
 # Purchase rate limit
 http_post "/api/content/rate-limit/purchase" "{\"cid\":\"$new_cid\",\"mtbr_ms\":100,\"duration_months\":1}" "$AUTH_HEADER" > /dev/null

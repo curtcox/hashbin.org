@@ -3,6 +3,7 @@ import { baseHeaders, textResponse } from '../../shared/headers.js';
 import { parseIdentity, confirmedFunding, takeFundedDownload, hardStopped, handshake } from './funding.js';
 import { exclusive } from './mutex.js';
 import { COST_POLICY, identifiedDownloadPriceUc, FUNDED_LEASE_COST_DOLLARS } from '../../../src/utils/cost-policy.js';
+import { aliasSafety, resolveAlias, sampleAliasResolution } from '../../../src/utils/alias-resolution.js';
 const MAX_REQUESTS_PER_WINDOW = 30;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const ipWindows = new Map();
@@ -105,6 +106,38 @@ function enforceRateLimit(request) {
 
   existing.count += 1;
   return null;
+}
+
+async function serveAlias(request, env, name, strict) {
+  let response;
+  let cacheHit = false;
+  const limited = enforceRateLimit(request);
+  if (limited) response = limited;
+  else {
+    try {
+      const safety = await aliasSafety(env);
+      if (safety.hard_stop || safety.brake) response = textResponse(safety.hard_stop ? 503 : 429,
+        'Alias resolution temporarily stopped', { 'Retry-After': '60' });
+      else {
+        let identity;
+        try { identity = await parseIdentity(request, env, undefined, undefined, strict, ['aliases:read', 'downloads:spend']); }
+        catch { response = textResponse(401, 'Invalid or missing download credential'); }
+        if (!response) {
+          const result = await resolveAlias(env, name, identity);
+          cacheHit = Boolean(result.cacheHit);
+          const cacheControl = identity ? 'private, no-store' : `public, max-age=${Math.max(0, Math.min(60,
+            Math.floor((result.cacheUntil - Date.now()) / 1000)))}`;
+          response = result.cid ? new Response(null, { status: 302, headers: baseHeaders({
+            Location: `${strict ? '/a' : ''}/${result.cid}`,
+            'Cache-Control': cacheControl, 'Referrer-Policy': 'no-referrer'
+          }) }) : textResponse(result.status, result.error, { 'Cache-Control': identity ? 'private, no-store' : 'public, max-age=60' });
+        }
+      }
+    } catch { response = textResponse(503, 'Alias resolution unavailable', { 'Retry-After': '60' }); }
+  }
+  if (!response.headers.has('Cache-Control')) response.headers.set('Cache-Control', 'private, no-store');
+  sampleAliasResolution(env, name, response.status, cacheHit);
+  return response;
 }
 
 async function loadMeta(env, cid) {
@@ -277,6 +310,8 @@ export default {
     const signed = url.pathname.match(/^\/s\/([^/]+)\/([^/]+)$/);
     const strict = url.pathname.startsWith('/a/') || url.pathname.startsWith('/s/');
     const filePath = signed ? signed[2] : url.pathname.replace(/^\/a\//, '/').slice(1);
+    const alias = filePath.match(/^@([^/]+)$/);
+    if (alias && !signed) return serveAlias(request, env, alias[1], strict);
     const match = filePath.match(CID_PATTERN);
     if (!match) {
       return textResponse(404, 'Not found');

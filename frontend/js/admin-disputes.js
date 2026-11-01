@@ -70,10 +70,10 @@ function renderDispute(dispute) {
     <section class="card dispute-detail dispute-banner" style="margin-bottom: 1.5rem;" data-cid="${escapeHtml(dispute.cid)}">
       <div class="dispute-header">
         <h3 style="margin: 0;">${escapeHtml(claimTypeLabel(dispute.claim_type))}</h3>
-        <span class="dispute-badge status-${escapeHtml(dispute.status)}">${escapeHtml(statusLabel(dispute.status))}</span>
+        <span class="dispute-badge status-${escapeHtml(dispute.status)}">${escapeHtml(dispute.target_type === 'alias' && dispute.status === 'closed_deleted' ? 'Alias suspended or reclaimed' : statusLabel(dispute.status))}</span>
       </div>
       <dl>
-        <dt>CID</dt><dd class="dispute-cid"><a href="/info.html?cid=${encodeURIComponent(dispute.cid)}" target="_blank">${escapeHtml(dispute.cid)}</a></dd>
+        <dt>${dispute.target_type === 'alias' ? 'Alias' : 'CID'}</dt><dd class="dispute-cid"><a href="${dispute.target_type === 'alias' ? '/aliases/view.html?name=' + encodeURIComponent(dispute.alias_name) : '/info.html?cid=' + encodeURIComponent(dispute.cid)}" target="_blank">${escapeHtml(dispute.cid)}</a></dd>
         <dt>Reference</dt><dd><code>${escapeHtml(dispute.dispute_id)}</code></dd>
         <dt>Filed</dt><dd>${escapeHtml(formatDisputeDate(dispute.created_at))}</dd>
         ${renderNcii(dispute)}
@@ -88,13 +88,16 @@ function renderDispute(dispute) {
         ${dispute.claim_type === 'copyright' && !dispute.counter_notice_received_at ? '<button type="button" class="btn btn-secondary btn-sm" data-step="counter_notice">Counter-notice received</button>' : ''}
         ${dispute.claim_type === 'copyright' && dispute.restore_after ? '<button type="button" class="btn btn-secondary btn-sm" data-step="court_action">Reporter filed suit</button>' : ''}
         <button type="button" class="btn btn-secondary btn-sm" data-action="closed_denied">Deny (restore content)</button>
-        <button type="button" class="btn btn-secondary btn-sm btn-danger" data-action="closed_deleted">Uphold (take down)</button>
+        <button type="button" class="btn btn-secondary btn-sm btn-danger" data-action="closed_deleted">${dispute.target_type === 'alias' ? 'Uphold (suspend alias)' : 'Uphold (take down)'}</button>
+        ${dispute.target_type === 'alias' ? '<button type="button" class="btn btn-secondary btn-sm btn-danger" data-action="reclaim">Reclaim alias</button>' : ''}
       </form>
     </section>
   `;
 }
 
 async function resolve(cid, status, reason, claimType) {
+  const aliasAction = status === 'reclaim' ? 'reclaim' : 'suspend';
+  if (status === 'reclaim') status = 'closed_deleted';
   const verb = { under_review: 'mark this dispute under review', closed_denied: 'deny this dispute and restore the content', closed_deleted: 'take this content down permanently' }[status];
   const warning = claimType === NCII_CLAIM_TYPE && status === 'closed_denied'
     ? '\n\nDeny an intimate image report only if it is not a valid request (for example, it is not an intimate image). The content becomes public again.'
@@ -107,7 +110,7 @@ async function resolve(cid, status, reason, claimType) {
 
   const response = await adminFetch(`/api/admin/disputes/${encodeURIComponent(cid)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status, resolution_reason: reason || undefined })
+    body: JSON.stringify({ status, alias_action: aliasAction, resolution_reason: reason || undefined })
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {

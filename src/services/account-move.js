@@ -55,6 +55,8 @@ function movedProfile(old, from, to, newProfile, now) {
   const profile = {
     ...old,
     user_id: to,
+    aliases_closing: false,
+    alias_move_to: undefined,
     providers: newProfile?.providers?.length ? newProfile.providers : old.providers,
     api_keys: (old.api_keys || []).map(revoke),
     oauth_grants: (old.oauth_grants || []).map(revoke),
@@ -107,8 +109,8 @@ export async function moveAccount(env, { from, to, dryRun = false }) {
   const report = { from, to, dry_run: dryRun, profile: 'unchanged', payment_records: 'unchanged',
     uploads: 0, suppliers: 0, apps: 0, revoked: {} };
 
-  const oldEntries = await readEntries(env, 'USER_PROFILES', from);
-  const old = oldEntries.profile;
+  let oldEntries = await readEntries(env, 'USER_PROFILES', from);
+  let old = oldEntries.profile;
   if (!old) throw new Error(`No profile for ${from}`);
   const resuming = old.migrated_to === to;
   if (old.migrated_to && !resuming) throw new Error(`${from} was already moved to ${old.migrated_to}`);
@@ -125,6 +127,25 @@ export async function moveAccount(env, { from, to, dryRun = false }) {
       throw new Error(`${from} has download accounting still being delivered; try again in a few minutes`);
     }
 
+    if (!dryRun && env.ALIAS_RECORDS && !old.alias_move_to) {
+      const frozen = await stub(env, 'USER_PROFILES', from).fetch(new Request('https://move/aliases/close', { method: 'POST' }));
+      if (!frozen.ok) throw new Error('Could not freeze alias changes for account move');
+      oldEntries = await readEntries(env, 'USER_PROFILES', from);
+      const aliasNamesToSettle = new Set(Object.entries(oldEntries).filter(([key]) => key.startsWith('global-alias:') || key.startsWith('alias-offer:')).map(([, value]) => value.name));
+      for (const name of aliasNamesToSettle) {
+        const settled = await stub(env, 'ALIAS_RECORDS', `alias:${name}`).fetch(new Request('https://move/settle', {
+          method: 'POST', body: JSON.stringify({ name, admin: true })
+        }));
+        if (!settled.ok) throw new Error(`Alias ${name} has accounting pending; retry the move`);
+      }
+      const barrier = await stub(env, 'USER_PROFILES', from).fetch(new Request('https://move/aliases/move', {
+        method: 'POST', body: JSON.stringify({ to })
+      }));
+      if (!barrier.ok) throw new Error('Could not freeze alias credits for account move');
+      oldEntries = await readEntries(env, 'USER_PROFILES', from);
+      old = oldEntries.profile;
+    }
+    if (old.alias_move_to && old.alias_move_to !== to) throw new Error(`${from} has an unfinished move to ${old.alias_move_to}`);
     const profile = movedProfile(old, from, to, current, now);
     report.revoked = {
       api_keys: (old.api_keys || []).filter(key => !key.revoked_at).length,
@@ -137,10 +158,19 @@ export async function moveAccount(env, { from, to, dryRun = false }) {
     const payments = await readEntries(env, 'PAYMENT_RECORDS', from);
     report.payment_records = Object.keys(payments).length ? 'copied' : 'none';
 
-    if (!dryRun) {
+    if (!dryRun && current?.migrated_from !== from) {
       await writeEntries(env, 'USER_PROFILES', to, { ...oldEntries, profile });
       if (Object.keys(payments).length) await writeEntries(env, 'PAYMENT_RECORDS', to, payments);
     }
+  }
+
+  const aliasNames = new Set(Object.entries(oldEntries).filter(([key]) => key.startsWith('global-alias:') || key.startsWith('alias-offer:')).map(([, value]) => value.name));
+  report.aliases = aliasNames.size;
+  if (!dryRun) for (const name of aliasNames) {
+    const response = await stub(env, 'ALIAS_RECORDS', `alias:${name}`).fetch(new Request('https://move/move-owner', {
+      method: 'POST', body: JSON.stringify({ name, admin: true, from, to, request_id: `move-${from}-${to}`.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 100) })
+    }));
+    if (!response.ok) throw new Error(`Could not move alias ${name}`);
   }
 
   // Ownership; each step is idempotent, so a resumed move simply repeats it
@@ -155,7 +185,7 @@ export async function moveAccount(env, { from, to, dryRun = false }) {
   // Retire the old profile last, so an interrupted move can be resumed
   if (!dryRun && !resuming) {
     await writeEntries(env, 'USER_PROFILES', from, {
-      ...oldEntries,
+      ...Object.fromEntries(Object.entries(oldEntries).filter(([key]) => !key.startsWith('personal-alias:') && !key.startsWith('global-alias:') && !key.startsWith('alias-offer:'))),
       profile: { ...movedProfile(old, from, to, null, now), user_id: from, balance_cents: 0,
         moved_balance_cents: old.balance_cents || 0, migrated_from: undefined, migrated_to: to, deleted_at: now }
     });

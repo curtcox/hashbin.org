@@ -2,12 +2,13 @@
 
 ## Status
 
-**Phase:** Planned 2026-11-01; nothing built. Row B17 in `STATUS.md`.
+**Phase:** All six code phases implemented locally 2026-11-01. Row B17 in `STATUS.md`.
 
-Owner decisions are still needed before Phase 2 ships (global prices) and before Phase 3
-ships (Terms wording); see [Owner decisions still open](#owner-decisions-still-open).
-Phase 1 can start now: the personal alias price is set (A15). [Costs](#costs) has the
-cost math the limits are based on.
+The owner selected $1.00/year for every global name (no tiers) and a 10% seller fee,
+minimum 10¢. Personal aliases cost 1¢ per prepaid month. API, dashboard, marketplace,
+moderation, lifecycle, immutable SDK v0.5.0 and documentation are implemented. Draft
+Terms and Privacy wording are prepared; owner/legal review and production acceptance
+remain before deployment. See [Owner decisions still open](#owner-decisions-still-open).
 
 ## Goal
 
@@ -46,7 +47,7 @@ movement shows in both parties' transaction history; and the Terms describe it.
 | A13 | Offers | An offer debits the buyer immediately and the alias record holds the funds, so accepting can't fail on the buyer's balance. The hold is returned when the offer is declined, withdrawn, expires (default 7 days, max 30), or the alias sells, lapses or is suspended. One open offer per buyer per name. |
 | A14 | Moderation | Alias names can be reported (trademark, impersonation, abuse) through the existing dispute flow with a new target type. Admins can suspend a global alias (resolution `451`), restore it, or reclaim it (ends ownership; no refund, matching Decision #13). |
 | A15 | Personal alias price | **One cent a month per alias**, prepaid from balance (Owner, 2026-11-01). Prepaid like retention and global names, not billed monthly: creating one buys 1–120 months (default 12, so 12¢), and each has its own paid-through time. Renewal, opt-in auto-renew 7 days before expiry, and no refund on delete or account deletion (Decision #13). At expiry it stops resolving; it is kept 30 days so a renewal restores it, then deleted. Changing its value is free, within A16. |
-| A16 | Change limits | **100 changes a day per account**, counting every personal create, value change and delete and every global value change. Counted in the account's `UserProfile` DO, because the per-isolate counters in `src/auth/middleware.js` are best-effort. The limit lives in `src/utils/cost-policy.js` with the other safety limits. At 100 a day, an account holding a single alias still costs less than that alias's 0.92¢ of kept revenue ([Costs](#costs)). |
+| A16 | Change limits | **100 changes a day per account**, counting every personal create, value change and delete and every global value change. Personal/global renewal-setting changes and global listing changes also count, to bound free writes. Counted in the account's `UserProfile` DO, because the per-isolate counters in `src/auth/middleware.js` are best-effort. The limit lives in `src/utils/cost-policy.js` with the other safety limits. At 100 a day, an account holding a single alias still costs less than that alias's 0.92¢ of kept revenue ([Costs](#costs)). |
 | A17 | Cost brake | Alias resolution on 256t.us and at `/api/aliases/{name}/resolve` follows the S20 cost brake and hard stop, the same way downloads do, and is sampled in cost monitoring. |
 
 ## Architecture
@@ -70,8 +71,10 @@ movement shows in both parties' transaction history; and the Terms describe it.
 - **The owner's index of global aliases and open offers** also lives in `UserProfile`
   (`global-alias:{name}` keys), written by `AliasRecord` through its outbox, so
   `/dashboard/aliases` loads from one DO.
-- **Expiry:** reuse the `ExpirationIndex` pattern (or a new day-bucketed index) so the
-  nightly cron renews, lapses and releases names and expires offers without scanning.
+- **Expiry:** each `AliasRecord` alarm schedules its earliest renewal, offer expiry,
+  paid-through time, grace release, receipt cleanup or outbox retry. This uses native
+  per-object alarms instead of adding an index and nightly scan. The profile alarm
+  takes the minimum of personal alias deadlines and its existing download jobs.
 
 ### Money: a saga with an outbox
 
@@ -90,9 +93,12 @@ any point leaves the alias record able to finish or undo it:
    whether that `request_id` was debited and finishes or abandons accordingly.
 
 Prerequisite: `debitBalance` and `depositBalance` in `src/durable-objects/user-profile.js`
-take no idempotency key today. Add an optional `request_id` with a bounded receipt store
+now accept an optional `request_id` with a bounded receipt store
 (the download leases already keep receipts this way) so step 2, outbox credits and refunds
-are safe to retry. Copy the delivery loop from `src/durable-objects/download-outbox.js`.
+are safe to retry. Acknowledged receipts expire after 31 days; at most 1,000 unfinished
+receipts per account are retained until the source acknowledges them. Recovery atomically
+cancels an undebited intent, preventing a delayed debit from charging after abandonment.
+Credit delivery advances its durable source before acknowledging the receipt. Reuses `src/durable-objects/download-outbox.js`.
 
 New transaction types for `PaymentRecord` and the history page: `alias_registration`,
 `alias_renewal`, `alias_purchase`, `alias_sale` (net of fee, fee shown), `alias_offer_hold`,
@@ -100,7 +106,7 @@ New transaction types for `PaymentRecord` and the history page: `alias_registrat
 months).
 
 Prices and the sale fee go in `src/utils/pricing.js` (`PERSONAL_ALIAS_MONTHLY_CENTS = 1`,
-plus the global prices once set), never duplicated in the frontend; the UI reads quotes
+plus `GLOBAL_ALIAS_YEARLY_CENTS = 100` and the sale fee constants), never duplicated in the frontend; the UI reads quotes
 from the API. The daily change limit goes in `src/utils/cost-policy.js`.
 
 ### Resolution on 256t.us
@@ -199,57 +205,78 @@ Each phase is shippable on its own and keeps `npm run test:unit` and `npm run li
 
 ### Phase 1: names and paid personal aliases
 
-- [ ] `src/utils/alias-names.js`: normalize, validate (A5), reserved list (A6), refuse
+- [x] `src/utils/alias-names.js`: normalize, validate (A5), reserved list (A6), refuse
       valid 256t identifiers; table-driven tests.
-- [ ] `PERSONAL_ALIAS_MONTHLY_CENTS` in `pricing.js`, the daily change limit in
+- [x] `PERSONAL_ALIAS_MONTHLY_CENTS` in `pricing.js`, the daily change limit in
       `cost-policy.js`, and a cost test (see [Costs](#costs)) that fails if the limit or
       prices change so that one alias's kept revenue no longer covers its worst case.
-- [ ] Personal alias storage, charges, change counter and routes in `UserProfile`; the
+- [x] Personal alias storage, charges, change counter and routes in `UserProfile`; the
       `/api/user/aliases...` routes; new scopes; the `personal_alias` transaction type.
-- [ ] Renewal, auto-renew, expiry and 30-day deletion through the profile alarm.
-- [ ] `/api/aliases/{name}/resolve` with personal-only resolution.
-- [ ] `/@{name}` in the content worker (personal aliases only for now; `404` otherwise),
+- [x] Renewal, auto-renew, expiry and 30-day deletion through the profile alarm.
+- [x] `/api/aliases/{name}/resolve` with personal-only resolution.
+- [x] `/@{name}` in the content worker (personal aliases only for now; `404` otherwise),
       with tests for identity, the isolate cache, caching headers, strict paths, rate
       limiting, the brake and hard stop, and cost sampling.
-- [ ] Personal aliases section of `/dashboard/aliases`.
+- [x] Personal aliases section of `/dashboard/aliases`.
 
 ### Phase 2: claiming, renewing and repointing global aliases
 
-- [ ] Idempotent `debitBalance`/`depositBalance` with `request_id` receipts.
-- [ ] `AliasRecord` DO with claim, renew, value, auto-renew, history, outbox; bindings,
+- [x] Idempotent `debitBalance`/`depositBalance` with `request_id` receipts.
+- [x] `AliasRecord` DO with claim, renew, value, auto-renew, history, outbox; bindings,
       migration, backups.
-- [ ] Expiry index and nightly cron: auto-renew, expire, release after grace and
-      `deleteAll` on release.
-- [ ] Global value changes count toward the owner's A16 limit.
-- [ ] Global resolution on 256t.us (A7, A9) and in the resolve endpoint.
-- [ ] Public info page, dashboard owned-names section, transaction types.
-- [ ] Prices in `pricing.js` once the owner sets them.
+- [x] Per-name alarms: auto-renew, expire, release after grace and `deleteAll` on
+      release, with offer deadlines and outbox retries sharing the earliest alarm.
+- [x] Global value changes count toward the owner's A16 limit.
+- [x] Global resolution on 256t.us (A7, A9) and in the resolve endpoint.
+- [x] Public info page, dashboard owned-names section, transaction types.
+- [x] Owner-selected prices and sale fee in `pricing.js`.
 
 ### Phase 3: listings and buy-now
 
-- [ ] Listing routes, buy saga (debit buyer, transfer, credit seller minus fee, fee to
+- [x] Listing routes, buy saga (debit buyer, transfer, credit seller minus fee, fee to
       `PlatformStats`), `price_changed` guard.
-- [ ] Buy button on the info page; listing controls on the dashboard.
-- [ ] Terms and Privacy Policy wording (owner) before this phase is deployed.
+- [x] Buy button on the info page; listing controls on the dashboard.
+- [x] Draft Terms and Privacy Policy wording prepared. Owner/legal review remains
+      a deployment gate; see the open decisions below.
 
 ### Phase 4: offers with held funds
 
-- [ ] Offer routes, holds, returns on every ending (A13), offer expiry in the cron.
-- [ ] Offer UI for both sides; holds shown in transaction history.
+- [x] Offer routes, holds, returns on every ending (A13), offer expiry through alarms.
+- [x] Offer UI for both sides; holds shown in transaction history.
 
 ### Phase 5: moderation and lifecycle
 
-- [ ] Alias disputes, admin suspend/restore/reclaim/assign, reserved-name assignment.
-- [ ] Account deletion and account move handling.
-- [ ] Local API suite in `scripts/api-tests/` covering a full claim → list → offer →
+- [x] Alias disputes, admin suspend/restore/reclaim/assign, reserved-name assignment.
+- [x] Account deletion and account move handling.
+- [x] Local API suite in `scripts/api-tests/` covering a full claim → list → offer →
       accept → repoint cycle between two `LocalDev` users; Playwright test for the
       dashboard.
 
+### Implementation and acceptance notes
+
+Verified locally 2026-11-01: 966 unit tests, lint with zero errors, all 15 API suites,
+the native account-move rehearsal, two Chrome browser flows (including upload-to-alias prefilling), and dry-run compilation
+of both the main and content Workers. No production deployment was performed.
+
+- Local API acceptance covers claim → list → hold → accept → repoint between two
+  accounts, fee/net balances, retry IDs, personal override, renewal, deletion and reports.
+- Browser coverage exercises personal create/edit/renew/delete and global claim/list/buy
+  with a second account. Worker tests cover identity, private/global caches, strict paths,
+  rate limits, brake/hard stop, sampling and the combined 60-second HTTP/internal TTL.
+- Recovery tests cover lost debit/credit replies, undebited cancellation, receipts beyond
+  31 days, and a hold returned while an account move copies the balance.
+- Transaction history now uses durable chronological/type indexes with a bounded recent
+  ID view, so repeated alias purchases cannot exceed the old single-value storage limit.
+- Auto-renew enabled by a delegated credential additionally requires `aliases:purchase`
+  and charges that credential within its current spend, CID and retention limits.
+- Local sign-in tolerates concurrent first requests. API purchase fixtures now leave
+  retention headroom for fixed 30-day allowances in November/other 30-day months.
+
 ### Phase 6: SDK and docs
 
-- [ ] `resolveAlias` in `frontend/sdk/hashbin.js`; release a new SDK version and register
+- [x] `resolveAlias` in `frontend/sdk/hashbin.js`; release a new SDK version and register
       it (see `AGENTS.md`).
-- [ ] `docs/API.md`, `frontend/docs/` page on aliases, pricing page entry.
+- [x] `docs/API.md`, `frontend/docs/` page on aliases, pricing page entry.
 
 ## Costs
 
@@ -282,7 +309,7 @@ One create, value change or delete costs about **$2.51 per million**:
 
 - An account needs at least one paid alias to make any change. One personal alias brings
   in 1¢ a month, of which HashBin keeps 0.92¢ after card fees (`revenueKept`).
-- At the A16 limit of 100 changes a day: 3,000 a month × $2.51/M = **0.75¢ a month**,
+- At the A16 limit of 100 changes a day: 3,100 in a 31-day month × about $2.51/M = **0.78¢ a month**,
   under the 0.92¢ that one alias keeps. (The 60-an-hour limit first planned allowed
   43,800 a month, about 11¢: $1.32 a year, more than a global name's suggested $1.00
   yearly fee.)
@@ -309,14 +336,16 @@ client would cost about $170 and would add load to its own profile DO.
 
 ## Owner decisions still open
 
-1. **Yearly price.** Suggested $1.00/year for every name, with no length tiers to start.
-2. **Sale fee.** Suggested 10% of the price, minimum $0.10.
-3. **Terms of Service** (L5): allow alias sales to move balance between users; say an
+**Decided and implemented:** $1.00/year for every name, no length tiers; 10% seller fee,
+minimum 10¢ (rounded up); no holding period on proceeds. A durable operator alert fires
+when one account's gross alias sales exceed $50 in a UTC day.
+
+1. **Terms of Service** (L5): allow alias sales to move balance between users; say an
    alias is a license to a name, not ownership of a trademark; say names can be suspended
    or reclaimed without refund; say what happens to names when HashBin shuts down (S17).
-4. **Fraud exposure.** Balance can't be cashed out, so a stolen card can at most become
-   another user's storage credit through a sale. Suggested start: no holding period on
-   proceeds, but an alert when one account's alias sales exceed $50 in a day. Revisit if
+2. **Fraud exposure.** Balance can't be cashed out, so a stolen card can at most become
+   another user's storage credit through a sale. The initial no-hold policy and
+   $50/day operator alert are implemented. Revisit if
    chargebacks on deposits that bought aliases appear.
-5. **Trademark claims** on names: whether to follow a UDRP-style rule (a mark holder can
+3. **Trademark claims** on names: whether to follow a UDRP-style rule (a mark holder can
    take a name from a bad-faith holder) or only remove abusive names.

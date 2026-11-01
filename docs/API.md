@@ -218,6 +218,22 @@ sections after this one describe the main routes in detail.
 
 | Method | Path | Access |
 |--------|------|--------|
+| GET | `/api/aliases/{id}/disputes` | public |
+| GET | `/api/aliases/{id}` | public |
+| POST | `/api/aliases/{id}/{claim\|renew\|buy}` | `aliases:purchase` |
+| PUT | `/api/aliases/{id}/value` | `aliases:write` |
+| PATCH | `/api/aliases/{id}` | `aliases:write` |
+| PUT, DELETE | `/api/aliases/{id}/listing` | `aliases:sell` |
+| GET | `/api/aliases/{id}/offers` | `aliases:sell` |
+| POST | `/api/aliases/{id}/offers` | `aliases:purchase` |
+| DELETE | `/api/aliases/{id}/offers/{id}` | `aliases:purchase` |
+| POST | `/api/aliases/{id}/offers/{id}/{accept\|decline}` | `aliases:sell` |
+| POST | `/api/admin/aliases/{id}/{suspend\|restore\|reclaim\|assign}` | `admin:takedown` |
+| GET | `/api/aliases/{id}/resolve` | public |
+| GET | `/api/user/aliases` | `aliases:read` |
+| POST | `/api/user/aliases/personal` | `aliases:purchase` |
+| POST | `/api/user/aliases/personal/{id}/renew` | `aliases:purchase` |
+| PUT, PATCH, DELETE | `/api/user/aliases/personal/{id}` | `aliases:write` |
 | GET, PUT | `/api/downloads/budget` | account session |
 | PUT | `/api/{auth/apikeys\|oauth/grants}/{id}/download-budget` | account session |
 | GET, DELETE | `/api/downloads/sessions` | account session |
@@ -316,6 +332,69 @@ sections after this one describe the main routes in detail.
 | GET | `/api/public/deletions` | public |
 
 <!-- END GENERATED ROUTE INDEX -->
+
+### Aliases
+
+Global names cost 100 cents per year (1–10 prepaid years, maximum outstanding term
+10 years). Personal aliases cost 1 cent per month (1–120 prepaid months, default 12).
+Prices and fee quotes are returned by the API. All amounts are integer cents.
+
+- `GET /api/aliases/{name}` returns status, CID, paid-through time, yearly price,
+  listing price and the last 100 public value/ownership changes. Owner account IDs
+  are never public; `is_owner` is meaningful only for the caller's own session.
+- `GET /api/aliases/{name}/resolve` returns `{ cid, source: 'personal' | 'global' }`.
+  Optional session or `aliases:read` auth selects an active personal override first.
+  Resolution follows the cost brake/hard stop, and changes may take 60 seconds.
+- `POST /api/aliases/{name}/claim`: `{ cid, years, request_id }`.
+  `POST .../renew`: `{ years, request_id }`. Both require `aliases:purchase`.
+- `PUT .../value`: `{ cid }`; `PATCH /api/aliases/{name}`: `{ auto_renew }`.
+  Require `aliases:write`. Enabling auto-renew through a key/grant additionally
+  requires `aliases:purchase` and binds renewals to that credential's limits.
+- `PUT .../listing`: `{ price_cents }`; `DELETE .../listing`: remove it.
+  `aliases:sell`; minimum sale price 100 cents.
+- `POST .../buy`: `{ price_cents, request_id }`; `aliases:purchase`.
+  A changed listing returns `price_changed` (409). The seller receives price less
+  10%, rounded up, with a minimum fee of 10 cents; remaining term/CID transfer.
+- `GET .../offers` requires `aliases:sell`. `POST .../offers` requires
+  `aliases:purchase`: `{ amount_cents, expires_in_days, request_id }` (7 days by
+  default, at most 30). The amount is held immediately. `DELETE .../offers/{id}`
+  withdraws it. `POST .../offers/{id}/accept` or `/decline` requires `aliases:sell`.
+  Holds return on every unsuccessful ending. Acceptance consumes the existing
+  hold; its purchase transaction has zero additional debit and records the price.
+- `GET /api/user/aliases` (`aliases:read`) returns `personal`, `global`, `offers`,
+  `changes_left` and personal price/term/cap quotes. CID caveats narrow the result.
+- `POST /api/user/aliases/personal`: `{ name, cid, months, request_id }`;
+  `POST .../personal/{name}/renew`: `{ months, request_id }`. `aliases:purchase`.
+  `PUT .../personal/{name}` changes `{ cid }`, `PATCH` changes `{ auto_renew }`,
+  and `DELETE` removes without refund (`aliases:write`).
+- `POST /api/admin/aliases/{name}/suspend|restore|reclaim|assign` requires
+  `admin:takedown`. Assignment takes `{ owner_id, cid }` and can assign reserved names.
+- `GET /api/aliases/{name}/disputes` returns public report history without reporter
+  contact details.
+- `POST /api/disputes` accepts `{ target_type: 'alias', name, claim_type, evidence,
+  contact }` with `trademark`, `impersonation`, `abuse` or `other` as claim type.
+  Admin review can suspend or reclaim; reports do not automatically block content.
+
+Names are lowercase ASCII, 1–63 unreserved characters, beginning/ending in a letter
+or digit, without consecutive dots or CID lookalikes. Values must be complete CIDs,
+including inline CIDs or content hosted by other suppliers. Expired names stop
+resolving (410); owners have 30 days to renew. Suspended names return 451. Personal
+aliases disappear after the same 30-day grace. Reserved names require admin assignment.
+Every account has 100 personal changes/global repoints per UTC day (429 `change_limit`
+with `Retry-After`), plus a separate 100-purchase limit. Personal/global settings and global listings count as
+changes too. Keys and grants share their existing monthly spending limits.
+
+Supply a unique `request_id` on paid operations, reusing it only for exact retries.
+Completed receipts remain for 31 days. Unknown debit outcomes are reconciled before
+another operation; an undebited interrupted request is cancelled rather than charged
+later (`operation_cancelled`, 409: submit a fresh request ID). Outboxes retry credits,
+refunds, revenue, indexes and transactions. At most 1,000 unfinished money receipts
+per account may be in flight; completed acknowledgements release that capacity.
+
+`https://256t.us/@{name}` issues a 302 to the CID, or `/a/{cid}` for strict
+`/a/@{name}` requests. Identified responses are `private, no-store`; anonymous
+redirect TTLs never extend the shared record's 60-second freshness window. Signed
+URLs are CID-specific and cannot target aliases. See [the public guide](../frontend/docs/aliases.html).
 
 ### Public Endpoints
 

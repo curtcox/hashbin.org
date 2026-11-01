@@ -12,6 +12,10 @@ import { COST_POLICY } from '../utils/cost-policy.js';
  */
 
 export const USER_SCOPES = {
+  'aliases:read': 'Read your personal aliases and owned global aliases.',
+  'aliases:write': 'Change your alias values and renewal settings; delete personal aliases.',
+  'aliases:purchase': 'Buy and renew aliases and make or withdraw offers, paid from your balance.',
+  'aliases:sell': 'List global aliases for sale and accept or decline offers.',
   'content:write': 'Publish content, paid from your balance.',
   'content:extend': 'Extend how long content is kept, paid from your balance.',
   'content:delete': 'Delete content you uploaded.',
@@ -36,7 +40,7 @@ export const ADMIN_SCOPES = {
 };
 
 // Scopes that move money out of the balance; a monthly_spend_limit_cents caveat bounds them all.
-export const SPENDING_SCOPES = new Set(['content:write', 'content:extend', 'ratelimit:purchase', 'downloads:spend']);
+export const SPENDING_SCOPES = new Set(['content:write', 'content:extend', 'ratelimit:purchase', 'downloads:spend', 'aliases:purchase']);
 
 export const ALL_USER_SCOPES = Object.freeze(Object.keys(USER_SCOPES));
 export const ALL_ADMIN_SCOPES = Object.freeze(Object.keys(ADMIN_SCOPES));

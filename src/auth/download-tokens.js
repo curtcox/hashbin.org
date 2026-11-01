@@ -75,11 +75,11 @@ export async function verifyDownloadToken(token, secret, type, maxSeconds) {
     !Number.isInteger(payload.iat) || payload.exp <= now || payload.iat > now || payload.exp - payload.iat > maxSeconds) throw new Error('Expired or invalid token');
   return payload;
 }
-export async function verifyDownloadOAuth(token, secret, { request, env } = {}) {
+export async function verifyDownloadOAuth(token, secret, { request, env, scopes = ['downloads:spend'] } = {}) {
   if (!secret || token.length > 8192) throw new Error('Invalid OAuth token');
   const payload = await verifyOAuthJwt(token, secret);
   if (payload.token_type !== 'access' || !payload.user_id || !payload.grant_id || !payload.app_id ||
-    !Number.isFinite(payload.exp) || !payload.scopes?.includes('downloads:spend')) throw new Error('Missing download scope');
+    !Number.isFinite(payload.exp) || !scopes.some(scope => payload.scopes?.includes(scope))) throw new Error('Missing download scope');
   if (payload.cnf?.jkt) {
     if (!request || !/^DPoP /i.test(request.headers.get('authorization') || '')) throw new Error('DPoP authorization required');
     await verifyDPoP(request, env, { expectedJkt: payload.cnf.jkt, accessToken: token });

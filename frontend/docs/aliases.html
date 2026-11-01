@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Global and private personal names for immutable content CIDs.">
+  <title>Aliases - HashBin.org</title><link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css"><link rel="stylesheet" href="/css/layout.css"><link rel="stylesheet" href="/css/components.css">
+</head><body><header class="nav-header"></header><main><div class="container">
+  <h1>Aliases</h1>
+  <p>Give a CID a name you can repoint. <a href="/dashboard/aliases/">Manage your aliases</a> or <a href="/aliases/view.html">look up an exact global name</a>. There is no alias search or directory.</p>
+  <section class="card"><h2>Global names</h2><p>Each name costs $1.00 per year, regardless of length. Prepay 1–10 years from your balance; the outstanding term cannot exceed 10 years. A global name has one owner, who can change its CID for free, renew it, list a fixed price, and accept offers.</p>
+    <p><code>https://256t.us/@my-document</code> redirects to the CID. The <a href="/aliases/view.html?name=my-document">information page</a> shows status, term, listing price and the last 100 value and ownership changes. Account identities are private.</p>
+    <p>A sale transfers the current CID and remaining prepaid term. Prices start at $1.00. The seller receives balance minus a 10% fee (minimum 10¢), rounded up to a cent. Proceeds cannot be withdrawn. An offer holds the buyer’s balance immediately, expires after 7 days by default (30 maximum), and is returned when declined, withdrawn, expired, or when another sale or suspension ends it. Accepting uses the hold without charging the buyer again.</p>
+  </section>
+  <section class="card"><h2>Personal names</h2><p>Personal aliases are visible only to your account. Each costs 1¢ per calendar month, prepaid for 1–120 months (12 months by default, costing 12¢). An active personal alias overrides a global alias of the same name when you resolve it with your identity.</p>
+    <p>Use the dashboard or <code>GET /api/aliases/{name}/resolve</code> with your session or an <code>aliases:read</code> key or OAuth allowance. SDK v0.5.0 adds <code>client.resolveAlias(name)</code>, followed by <code>client.retrieve(cid)</code> to verify the bytes. On 256t.us use a download session, API key or OAuth credential with <code>aliases:read</code> or <code>downloads:spend</code>. An anonymous visit to the same URL resolves the global name. Signed URLs remain specific to one CID and do not accept aliases.</p>
+    <p>Up to 1,000 personal aliases per account. Changing values is free. Deleting a name or your account does not refund its prepaid months.</p>
+  </section>
+  <section class="card"><h2>Names, caching and expiry</h2><p>Names have 1–63 ASCII letters, digits, hyphens, underscores or dots, begin and end with a letter or digit, and cannot contain consecutive dots or be valid CIDs. Names are lowercased. Service and security names are reserved for admin assignment. Values are CIDs, including inline content and alternate suppliers; aliases cannot point to other aliases. An alias does not extend content retention.</p>
+    <p>Changes can take up to 60 seconds to reach everyone. Anonymous global redirects can be cached for up to a minute; identified responses are private and never stored by shared HTTP caches. Keep the CID if you need an immutable reference. Every account has 100 changes per UTC day, shared by personal creates, edits, settings and deletes and global value, setting and listing changes. Claims, renewals and new offers have a separate 100-per-day purchase limit.</p>
+    <p>Resolution stops at expiry. A global owner has 30 days to renew before the name returns to the pool; expired personal records are also kept for 30 days, then deleted. Global listings and offers end at expiry. Optional auto-renew attempts a renewal 7 days before expiry using balance and the previous term length. Failed renewals retry daily during grace; keep enough balance and keep the paying credential authorized. Auto-renew is disabled when a global name is sold.</p>
+    <p>Resolution follows the platform cost brake and hard stop. Abusive, impersonating or infringing names can be <a href="/disputes/submit.html">reported</a>. Admins may suspend or reclaim them without refund. See the <a href="/terms.html">Terms</a> and <a href="/privacy.html">Privacy Policy</a>.</p>
+  </section>
+  <section class="card"><h2>API example</h2><pre><code>POST /api/user/aliases/personal
+{ "name": "my-document", "cid": "YOUR_CID", "months": 12, "request_id": "unique-id" }
+
+GET /api/aliases/my-document/resolve
+{ "cid": "YOUR_CID", "source": "personal" }</code></pre><p>Use <code>aliases:read</code>, <code>aliases:write</code>, <code>aliases:purchase</code> and <code>aliases:sell</code> for their respective actions. Purchases share key/grant spending limits with uploads and downloads. Supply a unique <code>request_id</code> on purchases and reuse it only to retry the same operation; receipts are retained for 31 days. <a href="/docs/api.html">API guide</a>.</p></section>
+</div></main><script type="module" src="/js/app.js"></script></body></html>

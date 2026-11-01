@@ -24,7 +24,7 @@ src/                     Main Worker (hashbin.org): API, cron jobs, Durable Obje
   index.js               Entry point: fetch/scheduled handlers, API_ROUTES table, DO exports
   api/                   One module per API area (content, oauth, payments, disputes, admin-*)
   auth/                  Authentication: middleware, scopes, OAuth, DPoP, admin, local auth
-  durable-objects/       17 DO classes (bound in wrangler.toml) plus their helpers
+  durable-objects/       18 DO classes (bound in wrangler.toml) plus their helpers
   services/ utils/       Shared logic: pricing, cost policy and monitoring, deletion, backups
   integration/           Multi-module tests
 workers/

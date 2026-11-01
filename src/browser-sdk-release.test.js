@@ -32,9 +32,20 @@ describe('immutable browser SDK releases', () => {
       expect(manifest.files[file].integrity).toBe(sri(source));
       expect(manifest.files[file].sha256).toBe(createHash('sha256').update(source).digest('hex'));
       expect(source.toString()).not.toMatch(/^import\s/m);
+
+    }
+
+    expect(read('_headers').toString()).toContain('/sdk/v0.4.0/*\n  Cache-Control: public, max-age=31536000, immutable');
+  });
+  it('v0.5.0 pins alias resolution and the latest module/cache bytes', () => {
+    const manifest = JSON.parse(read('sdk/v0.5.0/integrity.json'));
+    for (const file of ['hashbin.js', 'hashbin-cache.js']) {
+      const source = read(`sdk/v0.5.0/${file}`);
+      expect(manifest.files[file].integrity).toBe(sri(source));
+      expect(manifest.files[file].sha256).toBe(createHash('sha256').update(source).digest('hex'));
       expect(source).toEqual(read(`sdk/${file}`));
     }
+    expect(read('_headers').toString()).toContain('/sdk/v0.5.0/*\n  Cache-Control: public, max-age=31536000, immutable');
     expect(read('docs/sdk.html').toString()).toContain(`integrity="${manifest.integrity}"`);
-    expect(read('_headers').toString()).toContain('/sdk/v0.4.0/*\n  Cache-Control: public, max-age=31536000, immutable');
   });
 });

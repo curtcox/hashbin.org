@@ -19,9 +19,11 @@ async function deliver(owner, event) {
   if (event.transaction) {
     namespace = owner.env.PAYMENT_RECORDS; name = event.user_id;
     path = '/transaction'; body = event.transaction;
+  } else if (event.alert) {
+    namespace = owner.env.ALERT_STORE; name = 'global'; path = '/create'; body = event.alert;
   } else if (event.revenue_cents !== undefined) {
     namespace = owner.env.PLATFORM_STATS; name = 'global';
-    path = '/download-revenue'; body = event;
+    path = event.revenue_type === 'alias' ? '/alias-revenue' : '/download-revenue'; body = event;
   }
   if (!namespace) throw new Error('Download accounting bindings unavailable');
   const response = await namespace.get(namespace.idFromName(name)).fetch(new Request(`https://internal${path}`, {

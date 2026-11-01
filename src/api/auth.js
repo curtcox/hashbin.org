@@ -9,6 +9,7 @@ import { authenticate, requireAuth } from '../auth/middleware.js';
 import { ALL_USER_SCOPES, parseCaveats, parseScopes } from '../auth/scopes.js';
 import { hashApiKey, generateKeyId, validateKeyName, validateExpiration, isSessionFresh } from '../auth/utils.js';
 import { createClerkClient } from '@clerk/backend';
+import { closeAccountAliases } from '../services/alias-lifecycle.js';
 
 /**
  * Handle OAuth callback endpoint
@@ -589,6 +590,7 @@ export async function handleDeleteAccount(request, env) {
   }
 
   // Delete profile in UserProfile DO (soft delete)
+  await closeAccountAliases(env, authResult.user.userId);
   const userProfileId = env.USER_PROFILES.idFromName(authResult.user.userId);
   const userProfileStub = env.USER_PROFILES.get(userProfileId);
 

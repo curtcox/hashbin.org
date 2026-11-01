@@ -29,7 +29,7 @@ export class PaymentRecord {
         const limit = parseInt(url.searchParams.get('limit') || '20');
         const offset = parseInt(url.searchParams.get('offset') || '0');
         const type = url.searchParams.get('type');
-        return await this.getTransactions(limit, offset, type);
+        return await this.state.blockConcurrencyWhile(() => this.getTransactions(limit, offset, type));
       }
 
       if (url.pathname.startsWith('/transaction/') && method === 'GET') {
@@ -61,6 +61,7 @@ export class PaymentRecord {
    * Create a new transaction record
    */
   async createTransaction(data) {
+    await this.ensureTransactionIndex();
     const existing = await this.state.storage.get(`tx:${data.transaction_id}`);
     if (existing) return Response.json(existing);
     const transaction = {
@@ -77,6 +78,12 @@ export class PaymentRecord {
       tax_cents: data.tax_cents || null, // Sales tax Stripe collected on the payment, if any
       cid: data.cid || null,
       retention_months: data.retention_months || null,
+      alias_names: data.alias_names || null,
+      alias_months: data.alias_months || null,
+      auto_renew: data.auto_renew || false,
+      price_cents: data.price_cents ?? null,
+      fee_cents: data.fee_cents ?? null,
+      from_offer: data.from_offer || false,
       // Rate limit purchase fields
       min_time_between_requests_ms: data.min_time_between_requests_ms || null,
       duration_seconds: data.duration_seconds || null,
@@ -92,18 +99,24 @@ export class PaymentRecord {
       created_at: new Date().toISOString()
     };
 
-    // Store transaction with transaction_id as key
-    await this.state.storage.put(`tx:${transaction.transaction_id}`, transaction);
-
-    // If this transaction has a Stripe session ID, index it for idempotency checking
-    if (transaction.stripe_session_id) {
-      await this.state.storage.put(`session:${transaction.stripe_session_id}`, transaction.transaction_id);
-    }
-
-    // Also add to chronological list for easy retrieval
-    const allTransactions = await this.state.storage.get('transactions') || [];
-    allTransactions.unshift(transaction.transaction_id); // newest first
-    await this.state.storage.put('transactions', allTransactions);
+    // Commit the receipt and chronological index together. A delivery retried
+    // after a crash must never find a receipt absent from the history page.
+    await this.state.storage.transaction(async storage => {
+      const sequence = ((await storage.get('transaction-count')) || 0) + 1;
+      const recent = await storage.get('transactions') || [];
+      recent.unshift(transaction.transaction_id);
+      await storage.put(`tx:${transaction.transaction_id}`, transaction);
+      if (transaction.stripe_session_id) await storage.put(`session:${transaction.stripe_session_id}`, transaction.transaction_id);
+      await storage.put(`tx-index:${String(sequence).padStart(16, '0')}`, transaction.transaction_id);
+      await storage.put(`tx-type:${encodeURIComponent(transaction.type)}:${String(sequence).padStart(16, '0')}`, transaction.transaction_id);
+      const types = await storage.get('transaction-types') || {};
+      types[transaction.type] = (types[transaction.type] || 0) + 1;
+      await storage.put('transaction-types', types);
+      await storage.put('transaction-count', sequence);
+      // Retain the legacy recent-ID view for old readers without growing one
+      // value past SQLite DO's 128 KiB per-value limit.
+      await storage.put('transactions', recent.slice(0, 100));
+    });
 
     return new Response(JSON.stringify(transaction), {
       status: 201,
@@ -115,10 +128,22 @@ export class PaymentRecord {
    * Get transaction history with pagination and filtering
    */
   async getTransactions(limit, offset, typeFilter) {
-    const allTransactionIds = await this.state.storage.get('transactions') || [];
-    
-    // Get transactions in the requested range
-    const requestedIds = allTransactionIds.slice(offset, offset + limit);
+    await this.ensureTransactionIndex();
+    limit = Number.isSafeInteger(limit) ? Math.max(1, Math.min(100, limit)) : 20;
+    offset = Number.isSafeInteger(offset) ? Math.max(0, offset) : 0;
+    const total = typeFilter ? ((await this.state.storage.get('transaction-types')) || {})[typeFilter] || 0
+      : (await this.state.storage.get('transaction-count')) || 0;
+    const prefix = typeFilter ? `tx-type:${encodeURIComponent(typeFilter)}:` : 'tx-index:';
+    let end = typeFilter ? undefined : `tx-index:${String(Math.max(0, total - offset + 1)).padStart(16, '0')}`;
+    if (typeFilter && offset >= total) return Response.json({ transactions: [], total, limit, offset });
+    let remaining = typeFilter ? offset : 0;
+    while (remaining > 0) {
+      const skip = await this.state.storage.list({ prefix, ...(end ? { end } : {}), reverse: true, limit: Math.min(128, remaining) });
+      if (!skip.size) break;
+      end = [...skip.keys()].at(-1); remaining -= skip.size;
+    }
+    const rows = await this.state.storage.list({ prefix, ...(end ? { end } : {}), reverse: true, limit });
+    const requestedIds = [...rows.values()];
     
     // Fetch full transaction objects
     const transactions = [];
@@ -138,7 +163,7 @@ export class PaymentRecord {
     return new Response(
       JSON.stringify({
         transactions: transactions,
-        total: allTransactionIds.length,
+        total,
         limit: limit,
         offset: offset
       }),
@@ -147,6 +172,31 @@ export class PaymentRecord {
         headers: { 'content-type': 'application/json' }
       }
     );
+  }
+
+  async ensureTransactionIndex() {
+    if (await this.state.storage.get('transaction-index-version') === 2) return;
+    const count = await this.state.storage.get('transaction-count');
+    const ids = (await this.state.storage.get('transactions')) || [];
+    await this.state.storage.transaction(async storage => {
+      const ordered = count === undefined ? ids.slice().reverse() : [...(await storage.list({ prefix: 'tx-index:' })).values()];
+      let entries = {}; const types = {};
+      for (const [index, id] of ordered.entries()) {
+        const sequence = String(index + 1).padStart(16, '0');
+        entries[`tx-index:${sequence}`] = id;
+        const transaction = await storage.get(`tx:${id}`);
+        if (transaction) {
+          entries[`tx-type:${encodeURIComponent(transaction.type)}:${sequence}`] = id;
+          types[transaction.type] = (types[transaction.type] || 0) + 1;
+        }
+        if (Object.keys(entries).length >= 126) { await storage.put(entries); entries = {}; }
+      }
+      if (Object.keys(entries).length) await storage.put(entries);
+      await storage.put('transaction-count', ordered.length);
+      await storage.put('transaction-types', types);
+      await storage.put('transaction-index-version', 2);
+      await storage.put('transactions', ids.slice(0, 100));
+    });
   }
 
   /**

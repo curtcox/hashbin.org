@@ -6,8 +6,10 @@ import { runEmbedders, runOrigin } from './utils/run-origin.js';
 import sdk03 from '../frontend/sdk/v0.3.0/integrity.json' with { type: 'json' };
 import sdk04 from '../frontend/sdk/v0.4.0/integrity.json' with { type: 'json' };
 
-export const LATEST_SDK = 'v0.4.0';
-const SDK_HASHES = new Set([sdk03, sdk04].flatMap(release => Object.values(release.files).map(file => file.sha256)));
+import sdk05 from '../frontend/sdk/v0.5.0/integrity.json' with { type: 'json' };
+
+export const LATEST_SDK = 'v0.5.0';
+const SDK_HASHES = new Set([sdk03, sdk04, sdk05].flatMap(release => Object.values(release.files).map(file => file.sha256)));
 export async function isReleasedSdk(source) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
   return SDK_HASHES.has([...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join(''));

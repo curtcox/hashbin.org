@@ -52,7 +52,7 @@ function renderDispute(dispute) {
     <section class="card dispute-detail ${isActiveStatus(status) ? 'dispute-banner' : ''}" style="margin-bottom: 1.5rem;">
       <div class="dispute-header">
         <h2 style="margin: 0;">${escapeHtml(claimTypeLabel(dispute.claim_type))}</h2>
-        <span class="dispute-badge status-${escapeHtml(status)}">${escapeHtml(statusLabel(status))}</span>
+        <span class="dispute-badge status-${escapeHtml(status)}">${escapeHtml(dispute.target_type === 'alias' && status === 'closed_deleted' ? 'Alias suspended or reclaimed' : statusLabel(status))}</span>
       </div>
       <dl>
         <dt>Reference</dt><dd><code>${escapeHtml(dispute.dispute_id)}</code></dd>
@@ -66,16 +66,18 @@ function renderDispute(dispute) {
 }
 
 async function load() {
-  if (!/^[A-Za-z0-9_-]{8,94}$/.test(cid)) {
+  const alias = cid.startsWith('@') ? cid.slice(1) : null;
+  if (alias ? !/^[a-z0-9](?:[a-z0-9._-]{0,61}[a-z0-9])?$/.test(alias) || alias.includes('..') : !/^[A-Za-z0-9_-]{8,94}$/.test(cid)) {
     showError('No valid content ID was provided.');
     return;
   }
 
   document.getElementById('cid-display').textContent = cid;
-  document.getElementById('content-info-link').href = `/info.html?cid=${encodeURIComponent(cid)}`;
+  document.getElementById('content-info-link').href = alias ? `/aliases/view.html?name=${encodeURIComponent(alias)}` : `/info.html?cid=${encodeURIComponent(cid)}`;
+  if (alias) document.getElementById('content-info-link').textContent = 'Alias info';
 
   try {
-    const response = await fetch(`/api/content/${encodeURIComponent(cid)}/disputes`);
+    const response = await fetch(alias ? `/api/aliases/${encodeURIComponent(alias)}/disputes` : `/api/content/${encodeURIComponent(cid)}/disputes`);
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const data = await response.json();
     const disputes = [...(data.disputes || [])]
@@ -83,12 +85,12 @@ async function load() {
 
     const hasActive = disputes.some(d => isActiveStatus(d.status));
     const reportLink = document.getElementById('report-link');
-    reportLink.href = `/disputes/submit.html?cid=${encodeURIComponent(cid)}`;
+    reportLink.href = alias ? `/disputes/submit.html?target_type=alias&name=${encodeURIComponent(alias)}` : `/disputes/submit.html?cid=${encodeURIComponent(cid)}`;
     reportLink.classList.toggle('hidden', hasActive);
     // An intimate image report replaces any other open dispute, so it is always available
     const nciiLink = document.getElementById('ncii-report-link');
     nciiLink.href = `/disputes/submit.html?cid=${encodeURIComponent(cid)}&reason=${NCII_CLAIM_TYPE}`;
-    nciiLink.classList.toggle('hidden', disputes.some(d => isActiveStatus(d.status) && d.claim_type === NCII_CLAIM_TYPE));
+    nciiLink.classList.toggle('hidden', Boolean(alias) || disputes.some(d => isActiveStatus(d.status) && d.claim_type === NCII_CLAIM_TYPE));
 
     // eslint-disable-next-line no-unsanitized/property -- renderDispute escapes every field
     historyEl.innerHTML = disputes.length === 0

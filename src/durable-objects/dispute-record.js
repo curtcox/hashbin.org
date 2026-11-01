@@ -139,7 +139,7 @@ export class DisputeRecord {
       });
     }
 
-    const validClaimTypes = ['copyright', 'illegal', 'privacy', 'harassment', 'malware', 'other', NCII_CLAIM_TYPE];
+    const validClaimTypes = data.target_type === 'alias' ? ['trademark', 'impersonation', 'abuse', 'other'] : ['copyright', 'illegal', 'privacy', 'harassment', 'malware', 'other', NCII_CLAIM_TYPE];
     if (!data.claim_type || !validClaimTypes.includes(data.claim_type)) {
       return new Response(JSON.stringify({ error: 'INVALID_CLAIM_TYPE' }), {
         status: 400,
@@ -294,6 +294,8 @@ export class DisputeRecord {
     const dispute = {
       dispute_id: `disp_${crypto.randomUUID()}`,
       cid: data.cid,
+      target_type: data.target_type === 'alias' ? 'alias' : 'content',
+      alias_name: data.target_type === 'alias' ? data.alias_name : null,
       status: 'open',
       created_at: now,
       updated_at: now,

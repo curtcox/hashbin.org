@@ -40,7 +40,7 @@ describe('handleClerkWebhook', () => {
     const { env, calls } = envWithProfile(200);
     const response = await handleClerkWebhook(new Request('https://x/api/webhooks/clerk', { method: 'POST', headers: await sign(body), body }), env);
     expect(response.status).toBe(200);
-    expect(calls).toEqual([{ name: 'user_1', method: 'DELETE' }]);
+    expect(calls).toEqual([{ name: 'user_1', method: 'POST' }, { name: 'user_1', method: 'GET' }, { name: 'user_1', method: 'DELETE' }]);
   });
 
   it('creates a profile on user.created and treats an existing one as success', async () => {

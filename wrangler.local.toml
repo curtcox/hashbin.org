@@ -161,3 +161,12 @@ deleted_classes = ["KeyRegistry"]
 
 # DOWNLOAD_TOKEN_SECRET: shared HMAC secret with 256t-content (required for new keys).
 # COST_SAFETY_HARD_STOP=true: emergency 503 for all content downloads.
+
+[[durable_objects.bindings]]
+name = "ALIAS_RECORDS"
+class_name = "AliasRecord"
+script_name = "hashbin-worker-local"
+
+[[migrations]]
+tag = "v12"
+new_sqlite_classes = ["AliasRecord"]

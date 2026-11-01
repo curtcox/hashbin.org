@@ -611,7 +611,7 @@ The following key decisions have been made to guide implementation:
 ---
 
 ### 12. Search/Discovery: Hash-Only Access
-**Decision:** No search or content discovery features. Access is exclusively via 256t hash.
+**Decision:** No search or content discovery features. Content is addressed by 256t hash. Aliases are an exception for exact-name lookup only: they resolve to a CID and offer no search or directory.
 
 **Rationale:**
 - Aligns with 256t philosophy (content-addressed storage)

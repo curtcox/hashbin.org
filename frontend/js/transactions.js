@@ -22,7 +22,7 @@ export function formatTransactionAmount(amountCents, type) {
   }
 
   // Deposits are positive (IN), purchases are negative (OUT)
-  if (type === 'deposit' || type === 'download_refund') {
+  if (type === 'deposit' || type === 'download_refund' || type === 'alias_sale' || type === 'alias_offer_return') {
     return {
       formatted: `${formatted} IN`,
       cssClass: 'amount-in'
@@ -143,7 +143,11 @@ export function getTransactionTypeLabel(type) {
     'rate_limit_purchase': 'Bandwidth Purchase',
     'download_spend': 'Download Spending Credit',
     'download_refund': 'Unused Download Credit Refund',
-    'content_deletion': 'Content Deletion'
+    'content_deletion': 'Content Deletion',
+    'personal_alias': 'Personal Alias',
+    'alias_registration': 'Alias Registration', 'alias_renewal': 'Alias Renewal',
+    'alias_purchase': 'Alias Purchase', 'alias_sale': 'Alias Sale',
+    'alias_offer_hold': 'Alias Offer Hold', 'alias_offer_return': 'Alias Offer Return'
   };
   
   return labels[type] || type;
@@ -163,6 +167,15 @@ export function buildTransactionDetails(transaction) {
     details.push(`<div><strong>CID:</strong> <a href="/info.html?cid=${encodeURIComponent(transaction.cid)}" class="cid-link">${cid}</a></div>`);
   }
   
+  if (transaction.type === 'personal_alias' || transaction.type?.startsWith('alias_')) {
+    details.push(`<div><strong>Aliases:</strong> ${escapeHtml((transaction.alias_names || []).join(', '))}</div>`);
+    if (transaction.alias_months) details.push(`<div><strong>Prepaid months:</strong> ${escapeHtml(transaction.alias_months)}</div>`);
+    if (transaction.price_cents) details.push(`<div><strong>Price:</strong> ${escapeHtml(formatBalance(transaction.price_cents))}</div>`);
+    if (transaction.fee_cents) details.push(`<div><strong>Seller fee:</strong> ${escapeHtml(formatBalance(transaction.fee_cents))}</div>`);
+    if (transaction.from_offer) details.push('<div>Paid from the existing offer hold; no additional debit.</div>');
+    if (transaction.auto_renew) details.push('<div>Automatic renewal</div>');
+  }
+
   // Type-specific details
   if (transaction.type === 'upload_payment' || transaction.type === 'cid_extension' || transaction.type === 'donation_received') {
     if (transaction.retention_months) {

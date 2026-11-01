@@ -5,6 +5,8 @@
 
 import { adminActorId } from '../auth/admin.js';
 import { handleDeleteContent } from './content-deletion.js';
+import { hasScope } from '../auth/scopes.js';
+import { normalizeAliasName } from '../utils/alias-names.js';
 
 /**
  * GET /api/admin/disputes
@@ -97,6 +99,7 @@ export async function handleAdminUpdateDispute(request, env, cid) {
 
     // Parse request body
     const data = await request.json();
+    if (cid.startsWith('@') || cid.toLowerCase().startsWith('%40')) return updateAliasDispute(request, env, decodeURIComponent(cid).slice(1), data);
 
     if (data.action === 'counter_notice' || data.action === 'court_action') {
       return recordCounterNoticeStep(request, env, cid, data);
@@ -252,6 +255,30 @@ export async function handleAdminUpdateDispute(request, env, cid) {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+}
+
+async function updateAliasDispute(request, env, input, data) {
+  const name = normalizeAliasName(input);
+  if (!name || !['under_review', 'closed_denied', 'closed_deleted'].includes(data.status)) return Response.json({ error: 'INVALID_STATUS' }, { status: 400 });
+  const stub = env.DISPUTE_RECORD.get(env.DISPUTE_RECORD.idFromName(`dispute:@${name}`));
+  const current = await stub.fetch(new Request('https://internal/dispute'));
+  if (!current.ok) return current;
+  const dispute = await current.json();
+  if (dispute.target_type !== 'alias') return Response.json({ error: 'INVALID_TARGET' }, { status: 400 });
+  if (data.status === 'closed_deleted') {
+    if (!hasScope(request.auth, 'admin:takedown')) return Response.json({ error: 'insufficient_scope' }, { status: 403 });
+    const action = data.alias_action === 'reclaim' ? 'reclaim' : 'suspend';
+    const moderated = await env.ALIAS_RECORDS.get(env.ALIAS_RECORDS.idFromName(`alias:${name}`)).fetch(new Request(`https://internal/${action}`, {
+      method: 'POST', body: JSON.stringify({ name, admin: true, request_id: `dispute-${dispute.dispute_id}-${action}` })
+    }));
+    if (!moderated.ok) return moderated;
+  }
+  const result = await stub.fetch(new Request('https://internal/dispute', { method: 'PATCH', body: JSON.stringify({
+    status: data.status, resolution: data.status.replace('closed_', ''), resolution_reason: data.resolution_reason || null, resolved_by: adminActorId(request)
+  }) }));
+  if (result.ok && data.status.startsWith('closed_')) await env.DISPUTE_INDEX.get(env.DISPUTE_INDEX.idFromName('dispute-index:global'))
+    .fetch(new Request('https://internal/remove', { method: 'POST', body: JSON.stringify({ dispute_id: dispute.dispute_id }) }));
+  return result;
 }
 
 /**

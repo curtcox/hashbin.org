@@ -8,6 +8,16 @@ import { COST_POLICY, grossUp, retentionWithinCap } from './cost-policy.js';
 // Base rate: $0.03 per GB per month
 export const BASE_RATE_PER_GB_PER_MONTH = 0.03;
 
+export const PERSONAL_ALIAS_MONTHLY_CENTS = 1;
+export const GLOBAL_ALIAS_YEARLY_CENTS = 100;
+export const ALIAS_SALE_FEE_RATE = 0.10;
+export const ALIAS_SALE_MINIMUM_FEE_CENTS = 10;
+
+/** Integer cents retained from the seller's proceeds. */
+export function aliasSaleFee(priceCents) {
+  return Math.max(ALIAS_SALE_MINIMUM_FEE_CENTS, Math.ceil(priceCents * ALIAS_SALE_FEE_RATE));
+}
+
 // Stripe fees: 2.9% + $0.30
 const STRIPE_FEE_PERCENTAGE = COST_POLICY.stripeRate;
 const STRIPE_FEE_FIXED_CENTS = COST_POLICY.stripeFixedCents;

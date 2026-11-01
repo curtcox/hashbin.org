@@ -27,7 +27,7 @@ export class PlatformStats {
     const path = url.pathname;
 
     try {
-      if (path === '/download-revenue' && request.method === 'POST') {
+      if (['/download-revenue', '/alias-revenue'].includes(path) && request.method === 'POST') {
         const event = await request.json();
         if (typeof event.user_id !== 'string' || !event.user_id || !Number.isSafeInteger(event.sequence) || event.sequence < 1 || typeof event.id !== 'string' || !/^\d{4}-\d{2}$/.test(event.period) || !Number.isFinite(event.revenue_cents)) return Response.json({ error: 'Invalid revenue' }, { status: 400 });
         return this.state.storage.transaction(async storage => {
@@ -35,7 +35,7 @@ export class PlatformStats {
           // per account rather than a permanent row for every download lease.
           const cursor = `download-sequence:${event.user_id}`;
           if (event.sequence > ((await storage.get(cursor)) || 0)) {
-            for (const key of [`revenue:${event.period}`, 'total_revenue_cents', 'download_revenue_cents']) {
+            for (const key of [`revenue:${event.period}`, 'total_revenue_cents', path === '/alias-revenue' ? 'alias_revenue_cents' : 'download_revenue_cents']) {
               await storage.put(key, Math.round((((await storage.get(key)) || 0) + event.revenue_cents) * 1e6) / 1e6);
             }
             await storage.put(cursor, event.sequence);

@@ -5,6 +5,7 @@
 
 import { hashIP } from '../utils/ip-hash.js';
 import { NCII_CLAIM_TYPE } from '../durable-objects/dispute-record.js';
+import { normalizeAliasName } from '../utils/alias-names.js';
 
 // Intimate-image reports are seen only by administrators: the explanation, links and
 // statement can identify the person shown, and the uploader must not learn who reported
@@ -36,6 +37,8 @@ export async function handleCreateDispute(request, env) {
         headers: { 'Content-Type': 'application/json', 'Retry-After': String(rate.retry_after_seconds) }
       });
     }
+
+    if (data.target_type === 'alias') return createAliasDispute(data, env, ipHash);
 
     // Validate CID
     if (!data.cid) {
@@ -182,6 +185,28 @@ export async function handleCreateDispute(request, env) {
       headers: { 'Content-Type': 'application/json' }
     });
   }
+}
+
+async function createAliasDispute(data, env, ipHash) {
+  const name = normalizeAliasName(data.name || data.alias_name);
+  if (!name) return Response.json({ error: 'invalid_name' }, { status: 400 });
+  if (!['trademark', 'impersonation', 'abuse', 'other'].includes(data.claim_type)) return Response.json({ error: 'INVALID_CLAIM_TYPE' }, { status: 400 });
+  const info = await env.ALIAS_RECORDS.get(env.ALIAS_RECORDS.idFromName(`alias:${name}`)).fetch(new Request('https://internal/info', {
+    method: 'POST', body: JSON.stringify({ name })
+  }));
+  if (!info.ok || ['free', 'reserved'].includes((await info.json()).status)) return Response.json({ error: 'alias_not_found' }, { status: 404 });
+  const stub = env.DISPUTE_RECORD.get(env.DISPUTE_RECORD.idFromName(`dispute:@${name}`));
+  const response = await stub.fetch(new Request('https://internal/dispute', { method: 'POST', body: JSON.stringify({
+    ...data, cid: `@${name}`, target_type: 'alias', alias_name: name, submitter_ip_hash: ipHash
+  }) }));
+  if (!response.ok) return response;
+  const result = await response.json();
+  const indexed = await env.DISPUTE_INDEX.get(env.DISPUTE_INDEX.idFromName('dispute-index:global')).fetch(new Request('https://internal/add', {
+    method: 'POST', body: JSON.stringify({ cid: `@${name}`, target_type: 'alias', alias_name: name,
+      dispute_id: result.dispute.dispute_id, claim_type: data.claim_type, created_at: result.dispute.created_at, expires_at: result.dispute.expires_at })
+  }));
+  if (!indexed.ok && indexed.status !== 409) throw new Error('Could not index alias report');
+  return Response.json(result, { status: 201 });
 }
 
 /**
@@ -335,4 +360,11 @@ export async function handleGetContentDisputes(request, env, cid, userId = null)
       headers: { 'Content-Type': 'application/json' }
     });
   }
+}
+
+/** Public alias reports use their own target key, never a content metadata record. */
+export async function handleGetAliasDisputes(request, env, match) {
+  const name = normalizeAliasName(match[1]);
+  if (!name) return Response.json({ error: 'invalid_name' }, { status: 404 });
+  return handleGetContentDisputes(request, env, `@${name}`);
 }

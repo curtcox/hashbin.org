@@ -341,7 +341,8 @@ drain_balance() {
   drain_file=$(mktemp)
   TEMP_FILES+=("$drain_file")
   head -c 2048 /dev/urandom > "$drain_file"
-  drain_cid=$(get_body "$(http_post_file "/api/content?retention_months=1" "$drain_file" "$auth" "application/octet-stream")" | json_get "cid")
+  # Leave headroom for a 30-day rate-limit purchase even in a 30-day calendar month.
+  drain_cid=$(get_body "$(http_post_file "/api/content?retention_months=2" "$drain_file" "$auth" "application/octet-stream")" | json_get "cid")
   for mtbr in 1100 2200 4400 8800 17600 35200 70400 140800 281600 563200; do
     for _ in 1 2 3; do
       status=$(get_status "$(http_post "/api/content/rate-limit/purchase" "{\"cid\":\"$drain_cid\",\"mtbr_ms\":$mtbr,\"duration_months\":1}" "$auth")")

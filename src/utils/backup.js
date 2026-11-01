@@ -20,7 +20,7 @@ const PUT_BATCH = 128;
  * Per-entity namespaces, in snapshot order. PAYMENT_RECORDS objects are named by
  * user ID, so they are enumerated from the USER_PROFILES index.
  */
-export const INDEXED_BINDINGS = ['USER_PROFILES', 'CONTENT_METADATA', 'DISPUTE_RECORD', 'SUPPLIER_REGISTRY'];
+export const INDEXED_BINDINGS = ['USER_PROFILES', 'CONTENT_METADATA', 'DISPUTE_RECORD', 'SUPPLIER_REGISTRY', 'ALIAS_RECORDS'];
 export const DERIVED_BINDINGS = { PAYMENT_RECORDS: 'USER_PROFILES' };
 
 /** Fixed-name objects, backed up in full every run */

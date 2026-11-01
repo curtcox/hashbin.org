@@ -52,6 +52,13 @@ export async function getOrCreateLocalProfile(env, userId) {
     })
   );
 
+  // Page scripts and the navigation can both make the first authenticated
+  // request. The other request's successful creation is also success here.
+  if (createResponse.status === 409) {
+    const existing = await userProfileStub.fetch(new Request('http://internal/profile'));
+    if (existing.ok) return { profile: await existing.json(), created: false };
+  }
+
   if (!createResponse.ok) {
     throw new Error('Failed to create local user profile');
   }

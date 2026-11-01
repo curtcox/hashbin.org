@@ -11,7 +11,7 @@ function boundedSet(map, key, value) {
   if (map.size >= 10000 && !map.has(key)) map.delete(map.keys().next().value);
   map.set(key, value);
 }
-export async function parseIdentity(request, env, cid, signedToken, strict) {
+export async function parseIdentity(request, env, cid, signedToken, strict, scopes = ['downloads:spend']) {
   if (signedToken) {
     const identity = await verifyDownloadToken(signedToken, env.DOWNLOAD_TOKEN_SECRET, 'url', 7 * 86400);
     if (identity.cid !== cid) throw new Error('Wrong CID');
@@ -20,7 +20,7 @@ export async function parseIdentity(request, env, cid, signedToken, strict) {
   const authorization = request.headers.get('Authorization');
   const apiKey = request.headers.get('X-API-Key') || (/^ApiKey /i.test(authorization || '') ? authorization.slice(7) : null);
   if (apiKey) return verifyApiKey(apiKey, env.DOWNLOAD_TOKEN_SECRET);
-  if (/^(Bearer|DPoP) /i.test(authorization || '')) return verifyDownloadOAuth(authorization.slice(authorization.indexOf(' ') + 1), env.OAUTH_SIGNING_KEY, { request, env });
+  if (/^(Bearer|DPoP) /i.test(authorization || '')) return verifyDownloadOAuth(authorization.slice(authorization.indexOf(' ') + 1), env.OAUTH_SIGNING_KEY, { request, env, scopes });
   if (authorization) throw new Error('Invalid authorization');
   const cookie = request.headers.get('Cookie')?.match(/(?:^|;\s*)__Host-hb_dl=([^;]+)/)?.[1];
   if (cookie) return verifyDownloadToken(cookie, env.DOWNLOAD_TOKEN_SECRET, 'cookie', 30 * 86400);

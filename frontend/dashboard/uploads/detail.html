@@ -364,6 +364,7 @@
               <div id="extend-message" class="alert hidden" role="status" style="margin-top: 1rem;"></div>
             </div>
 
+            <p><a id="add-alias" class="btn btn-secondary" href="/dashboard/aliases/">Add alias</a></p>
             <!-- Delete (uploader only) -->
             <div class="info-card" id="delete-card" style="display: none;">
               <h3 style="margin-bottom: 0.5rem;">🗑️ Delete Content</h3>
@@ -529,7 +530,8 @@
   <script type="module">
     // Update breadcrumb with truncated hash
     const params = new URLSearchParams(window.location.search);
-    const cid = params.get('cid');
+    const cid = params.get('cid') || window.location.pathname.match(/^\/dashboard\/uploads\/([A-Za-z0-9_-]{8,94})\/?$/)?.[1] || null;
+    document.getElementById('add-alias').href = '/dashboard/aliases/?cid=' + encodeURIComponent(cid || '');
     if (cid && cid.length > 8) {
       const truncated = cid.substring(0, 4) + '...' + cid.substring(cid.length - 4);
       document.getElementById('breadcrumb-hash').textContent = truncated;

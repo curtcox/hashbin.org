@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Manage your personal names for content on HashBin.">
+  <title>Aliases - HashBin.org</title>
+  <link rel="icon" href="/img/hashbin-logo.png">
+  <link rel="stylesheet" href="/css/base.css">
+  <link rel="stylesheet" href="/css/layout.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/auth.css">
+  <style>
+    .alias-form { display: grid; gap: 1rem; margin: 1rem 0; }
+    .alias-form label { display: grid; gap: .4rem; }
+    .alias-form input { width: 100%; padding: .6rem; }
+    .alias-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+    .alias-cid { overflow-wrap: anywhere; font-family: monospace; }
+    #alias-list article { margin: 1rem 0; }
+    #alias-message { margin: 1rem 0; }
+  </style>
+</head>
+<body>
+  <header class="nav-header"></header>
+  <main><div class="container">
+    <p><a href="/dashboard.html">Dashboard</a> · <a href="/docs/aliases.html">About aliases</a></p>
+    <h1>Aliases</h1>
+    <p>Personal aliases are visible only to you. Changes can take up to a minute to reach every viewer.</p>
+    <p id="alias-usage" aria-live="polite">Loading aliases…</p>
+    <p id="alias-message" role="status"></p>
+    <section class="card"><h2>Global names</h2><p>Anyone can resolve a global name. Buy, claim, or inspect one exact name.</p>
+      <form action="/aliases/view.html" class="alias-form"><input type="hidden" name="cid" id="global-prefill"><label>Name <input name="name" required maxlength="63"></label><button class="btn btn-secondary">Look up global alias</button></form>
+      <div id="global-alias-list"></div>
+    </section>
+    <section class="card"><h2>Your outgoing offers</h2><div id="alias-offers"></div></section>
+    <section class="card">
+      <h2 id="alias-form-title">Add a personal alias</h2>
+      <p>Prepaid from your balance. Deleting an alias or your account does not refund its prepaid term.</p>
+      <form id="alias-form" class="alias-form">
+        <label>Name <input id="alias-name" required maxlength="63" pattern="[A-Za-z0-9][A-Za-z0-9._-]*|[A-Za-z0-9]" autocomplete="off" placeholder="my-document"></label>
+        <label>Content CID <input id="alias-cid" required maxlength="94" autocomplete="off"></label>
+        <p id="alias-current" class="alias-cid" hidden></p>
+        <label id="alias-months-label">Months to prepay <input id="alias-months" type="number" min="1" max="120" value="12" required></label>
+        <p id="alias-price"></p>
+        <p id="alias-warning" role="status"></p>
+        <div class="alias-actions"><button id="alias-submit" class="btn btn-primary" type="submit">Create alias</button><button id="alias-cancel" class="btn btn-secondary" type="button" hidden>Cancel</button></div>
+      </form>
+    </section>
+    <section aria-labelledby="your-aliases"><h2 id="your-aliases">Your personal aliases</h2><div id="alias-list"></div></section>
+  </div></main>
+  <script type="module" src="/js/app.js"></script>
+  <script type="module" src="/js/aliases-page.js"></script>
+</body>
+</html>

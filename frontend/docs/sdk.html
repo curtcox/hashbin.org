@@ -27,12 +27,14 @@
     <h1>Browser SDK</h1>
     <p>Use <code>publish()</code> for a save button: the user approves on HashBin and your app never holds a credential. Use an allowance with <code>authorize()</code> and <code>save()</code> for silent saves. <a href="/docs/browser-client-safety">Choose a safe flow</a> · <a href="/docs/security/">Security notes</a> · <a href="#migration">Upgrade an existing client</a> · <a href="/docs/api#browser-publishing">API contracts</a>.</p>
 
+    <section class="card"><h2>Resolve an alias (v0.5.0)</h2><pre><code>const cid = await client.resolveAlias('my-document');
+const response = await client.retrieve(cid); // Verifies the bytes against the CID.</code></pre><p>Without an allowance this resolves the global name. Authorize <code>aliases:read</code> to use your personal override. Names can change; keep the CID when you need an immutable reference. <a href="/docs/aliases.html">Alias rules and prices</a>.</p></section>
     <section class="card" id="load"><h2>1. Load and configure</h2>
-      <p>The immutable <a href="/sdk/v0.4.0/hashbin.js">v0.4.0 release</a> has no mutable module dependencies. This tag enforces Subresource Integrity and exposes <code>window.hashbin</code>:</p>
-      <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.4.0/hashbin.js"
-  integrity="sha384-zzmaXw5svWRp0YF//G5ytyeqEowixccM/hHVDth46FnGrIlPS7fPki5vbhv+bWCr"
+      <p>The immutable <a href="/sdk/v0.5.0/hashbin.js">v0.5.0 release</a> has no mutable module dependencies. This tag enforces Subresource Integrity and exposes <code>window.hashbin</code>:</p>
+      <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.5.0/hashbin.js"
+  integrity="sha384-NTd9Lse9ztAtkBnVWMCFWQ89wuGyFezm25Huo1y+uUoC1QDsJXP9gJPirdBvGkwH"
   crossorigin="anonymous"&gt;&lt;/script&gt;</code></pre>
-      <p>Each release's <a href="/sdk/v0.4.0/integrity.json">integrity.json</a> lists SRI and SHA-256 hashes for its files. Offline-first apps can vendor the exact file instead and check it against those hashes in their tests; a vendored copy loads offline and is served by your own verified cache. v0.2.0 and v0.3.0 remain available unchanged.</p>
+      <p>Each release's <a href="/sdk/v0.5.0/integrity.json">integrity.json</a> lists SRI and SHA-256 hashes for its files. Offline-first apps can vendor the exact file instead and check it against those hashes in their tests; a vendored copy loads offline and is served by your own verified cache. v0.2.0, v0.3.0 and v0.4.0 remain available unchanged.</p>
       <p>Use <code>window.hashbin.createClient()</code> from a following module script after the SDK loads. Pinning requires deliberate upgrades for fixes. For automatic updates, import the latest module instead:</p>
       <pre><code>import { createClient } from 'https://hashbin.org/sdk/hashbin.js';
 

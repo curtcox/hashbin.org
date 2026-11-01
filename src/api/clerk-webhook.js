@@ -9,6 +9,8 @@
  * using the base64 key in CLERK_WEBHOOK_SECRET ("whsec_..."). See docs/deployment.md.
  */
 
+import { closeAccountAliases } from '../services/alias-lifecycle.js';
+
 const TIMESTAMP_TOLERANCE_SECONDS = 5 * 60;
 
 function base64ToBytes(base64) {
@@ -95,6 +97,7 @@ export async function handleClerkWebhook(request, env) {
   const profile = env.USER_PROFILES.get(env.USER_PROFILES.idFromName(userId));
 
   if (event.type === 'user.deleted') {
+    await closeAccountAliases(env, userId);
     const response = await profile.fetch(new Request('http://internal/profile', { method: 'DELETE' }));
     // 404: the user never used HashBin, nothing to delete
     return json({ received: true, deleted: response.ok }, response.ok || response.status === 404 ? 200 : 500);
