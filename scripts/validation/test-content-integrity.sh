@@ -79,18 +79,23 @@ log_section "Security - Debug Endpoints"
 # INT-005: No Debug Endpoints Exposed
 log_info "Checking for exposed debug endpoints..."
 DEBUG_PATHS=("/debug" "/admin" "/test" "/.env" "/config" "/phpinfo.php")
-ALL_404=true
+ALL_SAFE=true
 
 for path in "${DEBUG_PATHS[@]}"; do
   http_get "$TARGET_URL$path"
-  if [ "$HTTP_STATUS" != "404" ]; then
+  if [ "$HTTP_STATUS" = "404" ]; then
+    continue
+  elif [ "$HTTP_STATUS" = "307" ] && [ "$(get_header 'Location')" = "/" ]; then
+    # Unknown extensionless page paths redirect home; never follow into an admin UI.
+    continue
+  else
     log_warn "Debug path $path returned HTTP $HTTP_STATUS (expected 404)"
-    ALL_404=false
+    ALL_SAFE=false
   fi
 done
 
-if [ "$ALL_404" = true ]; then
-  log_pass "INT-005" "No Debug Endpoints Exposed" "All debug paths return 404"
+if [ "$ALL_SAFE" = true ]; then
+  log_pass "INT-005" "No Debug Endpoints Exposed" "All debug paths return 404 or redirect directly home"
 else
   log_fail "INT-005" "No Debug Endpoints Exposed" "Some debug endpoints accessible"
 fi

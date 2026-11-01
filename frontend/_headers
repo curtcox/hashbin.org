@@ -1,14 +1,17 @@
+# Security defaults for every static page and asset.
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+
 # Let other sites import the hosted SDK as a JavaScript module.
 /sdk/*
   Access-Control-Allow-Origin: *
 
 /publish
   Content-Security-Policy: frame-ancestors 'none'; base-uri 'none'; form-action 'self'
-  X-Frame-Options: DENY
   Referrer-Policy: no-referrer
   Cache-Control: no-store
 /publish.html
-  X-Frame-Options: DENY
   Content-Security-Policy: frame-ancestors 'none'; base-uri 'none'
   Referrer-Policy: no-referrer
   Cache-Control: no-store

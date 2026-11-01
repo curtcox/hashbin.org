@@ -90,7 +90,7 @@ log_info "Checking for stack traces in errors..."
 http_post "$TARGET_URL/api/payments/calculate" \
   '{"size_bytes": "invalid", "retention_months": 1}' \
   "Content-Type: application/json"
-if echo "$HTTP_BODY" | grep -qi "stack\|trace\|\.js:\|line [0-9]\+\|at "; then
+if has_stack_trace "$HTTP_BODY"; then
   log_fail "ERR-007" "No Stack Traces Exposed" "Stack trace found in error response"
 else
   log_pass "ERR-007" "No Stack Traces Exposed" "No stack traces in error response"

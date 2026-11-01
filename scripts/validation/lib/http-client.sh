@@ -15,20 +15,17 @@ http_get() {
   local header_file=$(mktemp)
   local status_file=$(mktemp)
   
-  local start_time=$(date +%s%3N)
-  
   local header_args=()
   for header in "${headers[@]}"; do
     header_args+=(-H "$header")
   done
   
-  curl -s -w "%{http_code}" -o "$temp_file" -D "$header_file" \
-    "${header_args[@]}" "$url" > "$status_file" 2>/dev/null || echo "000" > "$status_file"
+  curl -s --max-time 15 -w "%{http_code} %{time_total}" -o "$temp_file" -D "$header_file" \
+    "${header_args[@]}" "$url" > "$status_file" 2>/dev/null || echo "000 0" > "$status_file"
   
-  local end_time=$(date +%s%3N)
-  HTTP_TIME_MS=$((end_time - start_time))
+  HTTP_TIME_MS=$(awk '{printf "%.0f", $2 * 1000}' "$status_file")
   
-  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
+  HTTP_STATUS=$(awk '{print $1}' "$status_file")
   HTTP_BODY=$(cat "$temp_file")
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -51,20 +48,17 @@ http_post() {
   local header_file=$(mktemp)
   local status_file=$(mktemp)
   
-  local start_time=$(date +%s%3N)
-  
   local header_args=()
   for header in "${headers[@]}"; do
     header_args+=(-H "$header")
   done
   
-  curl -s -w "%{http_code}" -o "$temp_file" -D "$header_file" \
-    -X POST "${header_args[@]}" -d "$data" "$url" > "$status_file" 2>/dev/null || echo "000" > "$status_file"
+  curl -s --max-time 15 -w "%{http_code} %{time_total}" -o "$temp_file" -D "$header_file" \
+    -X POST "${header_args[@]}" -d "$data" "$url" > "$status_file" 2>/dev/null || echo "000 0" > "$status_file"
   
-  local end_time=$(date +%s%3N)
-  HTTP_TIME_MS=$((end_time - start_time))
+  HTTP_TIME_MS=$(awk '{printf "%.0f", $2 * 1000}' "$status_file")
   
-  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
+  HTTP_STATUS=$(awk '{print $1}' "$status_file")
   HTTP_BODY=$(cat "$temp_file")
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -85,20 +79,17 @@ http_head() {
   local header_file=$(mktemp)
   local status_file=$(mktemp)
   
-  local start_time=$(date +%s%3N)
-  
   local header_args=()
   for header in "${headers[@]}"; do
     header_args+=(-H "$header")
   done
   
-  curl -s -w "%{http_code}" -I -o /dev/null -D "$header_file" \
-    "${header_args[@]}" "$url" > "$status_file" 2>/dev/null || echo "000" > "$status_file"
+  curl -s --max-time 15 -w "%{http_code} %{time_total}" -I -o /dev/null -D "$header_file" \
+    "${header_args[@]}" "$url" > "$status_file" 2>/dev/null || echo "000 0" > "$status_file"
   
-  local end_time=$(date +%s%3N)
-  HTTP_TIME_MS=$((end_time - start_time))
+  HTTP_TIME_MS=$(awk '{printf "%.0f", $2 * 1000}' "$status_file")
   
-  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
+  HTTP_STATUS=$(awk '{print $1}' "$status_file")
   HTTP_BODY=""
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -118,20 +109,17 @@ http_delete() {
   local header_file=$(mktemp)
   local status_file=$(mktemp)
   
-  local start_time=$(date +%s%3N)
-  
   local header_args=()
   for header in "${headers[@]}"; do
     header_args+=(-H "$header")
   done
   
-  curl -s -w "%{http_code}" -o "$temp_file" -D "$header_file" \
-    -X DELETE "${header_args[@]}" "$url" > "$status_file" 2>/dev/null || echo "000" > "$status_file"
+  curl -s --max-time 15 -w "%{http_code} %{time_total}" -o "$temp_file" -D "$header_file" \
+    -X DELETE "${header_args[@]}" "$url" > "$status_file" 2>/dev/null || echo "000 0" > "$status_file"
   
-  local end_time=$(date +%s%3N)
-  HTTP_TIME_MS=$((end_time - start_time))
+  HTTP_TIME_MS=$(awk '{printf "%.0f", $2 * 1000}' "$status_file")
   
-  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
+  HTTP_STATUS=$(awk '{print $1}' "$status_file")
   HTTP_BODY=$(cat "$temp_file")
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -154,20 +142,17 @@ http_put() {
   local header_file=$(mktemp)
   local status_file=$(mktemp)
   
-  local start_time=$(date +%s%3N)
-  
   local header_args=()
   for header in "${headers[@]}"; do
     header_args+=(-H "$header")
   done
   
-  curl -s -w "%{http_code}" -o "$temp_file" -D "$header_file" \
-    -X PUT "${header_args[@]}" -d "$data" "$url" > "$status_file" 2>/dev/null || echo "000" > "$status_file"
+  curl -s --max-time 15 -w "%{http_code} %{time_total}" -o "$temp_file" -D "$header_file" \
+    -X PUT "${header_args[@]}" -d "$data" "$url" > "$status_file" 2>/dev/null || echo "000 0" > "$status_file"
   
-  local end_time=$(date +%s%3N)
-  HTTP_TIME_MS=$((end_time - start_time))
+  HTTP_TIME_MS=$(awk '{printf "%.0f", $2 * 1000}' "$status_file")
   
-  HTTP_STATUS=$(cat "$status_file" | tr -d '\n' | tail -c 3)
+  HTTP_STATUS=$(awk '{print $1}' "$status_file")
   HTTP_BODY=$(cat "$temp_file")
   HTTP_HEADERS=$(cat "$header_file")
   
@@ -182,7 +167,7 @@ http_put() {
 http_check() {
   local url="$1"
   
-  if curl -s -f -o /dev/null -w "%{http_code}" "$url" > /dev/null 2>&1; then
+  if curl -s --max-time 15 -f -o /dev/null -w "%{http_code}" "$url" > /dev/null 2>&1; then
     return 0
   else
     return 1
@@ -197,7 +182,7 @@ http_follow_redirect() {
   local url="$1"
   
   local final_url
-  final_url=$(curl -s -L -w "%{url_effective}" -o /dev/null "$url" 2>/dev/null)
+  final_url=$(curl -s --max-time 15 --max-redirs 5 -L -w "%{url_effective}" -o /dev/null "$url" 2>/dev/null)
   
   echo "$final_url"
 }
@@ -228,5 +213,12 @@ is_json() {
 get_header() {
   local header_name="$1"
   
-  echo "$HTTP_HEADERS" | grep -i "^$header_name:" | cut -d':' -f2- | xargs
+  echo "$HTTP_HEADERS" | grep -i "^$header_name:" | cut -d':' -f2- | tr -d '\r' | xargs
+}
+
+# Match actual JavaScript stack frames, not ordinary wording such as "at most".
+has_stack_trace() {
+  printf '%s' "$1" | jq -e 'has("stack") or has("trace")' > /dev/null 2>&1 ||
+    printf '%s' "$1" | jq -r '.. | strings' 2>/dev/null |
+    grep -qE '^[[:space:]]+at[[:space:]]|\.js:[0-9]+:[0-9]+'
 }

@@ -28,7 +28,7 @@ HTTPS URL, preserving the host, path and query. These two checks inspect redirec
 without following them; every HTTPS check refuses redirects.
 The command fails on degraded health, a non-production environment, missing or down health
 components, mismatched page commits, content-origin failure, incorrect auth/webhook refusals,
-a broken public price calculation, API 404 failure, or unsafe hosted-origin responses.
+a broken public price calculation, API 404 failure, missing page MIME-sniffing/frame protections, or unsafe hosted-origin responses.
 Requests have a 15-second timeout. It never logs credentials.
 
 On 2026-11-01, post-deploy validation exposed HTTP returning 200 on `hashbin.org`.
@@ -37,6 +37,16 @@ Cloudflare zone, then verified 301 redirects for the root and an alias URL with 
 This edge setting covers static assets as well as API routes. Keep it enabled; changing
 Worker code alone does not reliably cover requests served directly by Workers Assets.
 See [Cloudflare's setting documentation](https://developers.cloudflare.com/ssl/edge-certificates/additional-options/always-use-https/).
+
+The legacy Deployment Validation workflow also uses canonical asset URLs and current API
+routes. Download checks target `256t.us`; unknown extensionless page paths may redirect
+directly home, while debug files must remain absent. CORS checks require rejection of an
+unregistered origin, and stack checks distinguish actual frames from validation messages.
+HTTP helpers use curl's request timing (portable to macOS), normalize CRLF headers, and
+limit requests to 15 seconds. Performance checks require HTTP 200 before checking their
+existing latency thresholds. Static assets supply `X-Content-Type-Options: nosniff` and
+`X-Frame-Options: DENY` across the main site, including the existing publishing page.
+
 
 CI runs the runtime dependency audit, unit/lint, hosted-sandbox, funded-download, local API
 and browser suites before deployment. `scripts/check-deployment-secrets.mjs` rejects missing

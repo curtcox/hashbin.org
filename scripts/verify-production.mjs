@@ -62,6 +62,8 @@ export async function verifyProduction({
       assert.ok(deployedSha, 'Cannot verify HTML without healthy deployment commit');
       const response = await request(baseUrl, path);
       assert.equal(response.status, 200, 'Page must return 200');
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff', 'Pages must disable MIME sniffing');
+      assert.equal(response.headers.get('x-frame-options'), 'DENY', 'Pages must refuse framing');
       const html = await response.text();
       assert.ok(html.includes(`<!-- git-sha: ${deployedSha} -->`), 'HTML must match the deployed commit');
       if (path === '/') assert.match(html, /<title>[^<]*HashBin/);

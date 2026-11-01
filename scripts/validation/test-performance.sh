@@ -20,11 +20,13 @@ log_section "Response Time Tests"
 # PERF-001: Root Page Response Time
 log_info "Testing root page response time..."
 http_get "$TARGET_URL/"
+assert_http_status "$HTTP_STATUS" "200" "PERF-001" "Root Page Response Time"
 assert_response_time "$HTTP_TIME_MS" "1000" "PERF-001" "Root Page Response Time"
 
 # PERF-002: Health Endpoint Response Time
 log_info "Testing health endpoint response time..."
 http_get "$TARGET_URL/health"
+assert_http_status "$HTTP_STATUS" "200" "PERF-002" "Health Endpoint Response Time"
 assert_response_time "$HTTP_TIME_MS" "2000" "PERF-002" "Health Endpoint Response Time"
 
 # PERF-003: API Endpoint Response Time
@@ -32,11 +34,13 @@ log_info "Testing API endpoint response time..."
 http_post "$TARGET_URL/api/payments/calculate" \
   '{"size_bytes": 1048576, "retention_months": 1}' \
   "Content-Type: application/json"
+assert_http_status "$HTTP_STATUS" "200" "PERF-003" "API Endpoint Response Time"
 assert_response_time "$HTTP_TIME_MS" "500" "PERF-003" "API Endpoint Response Time"
 
 # PERF-004: Static Asset Response Time
 log_info "Testing static asset response time..."
 http_get "$TARGET_URL/css/base.css"
+assert_http_status "$HTTP_STATUS" "200" "PERF-004" "Static Asset Response Time"
 assert_response_time "$HTTP_TIME_MS" "500" "PERF-004" "Static Asset Response Time"
 
 log_section "Optimization Headers"

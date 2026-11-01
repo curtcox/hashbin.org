@@ -36,42 +36,42 @@ log_section "Application Pages"
 
 # FE-003: Dashboard Page Load
 log_info "Testing dashboard page..."
-http_get "$TARGET_URL/dashboard.html"
+http_get "$TARGET_URL/dashboard"
 assert_http_status "$HTTP_STATUS" "200" "FE-003" "Dashboard Page Load"
 
 # FE-004: Upload Page Load
 log_info "Testing upload page..."
-http_get "$TARGET_URL/upload.html"
+http_get "$TARGET_URL/upload"
 assert_http_status "$HTTP_STATUS" "200" "FE-004" "Upload Page Load"
 
 # FE-005: Retrieve Page Load
 log_info "Testing retrieve page..."
-http_get "$TARGET_URL/retrieve.html"
+http_get "$TARGET_URL/retrieve"
 assert_http_status "$HTTP_STATUS" "200" "FE-005" "Retrieve Page Load"
 
 # FE-006: Deposit Page Load
 log_info "Testing deposit page..."
-http_get "$TARGET_URL/deposit.html"
+http_get "$TARGET_URL/deposit"
 assert_http_status "$HTTP_STATUS" "200" "FE-006" "Deposit Page Load"
 
 # FE-007: Info Page Load
 log_info "Testing info page..."
-http_get "$TARGET_URL/info.html"
+http_get "$TARGET_URL/info"
 assert_http_status "$HTTP_STATUS" "200" "FE-007" "Info Page Load"
 
 # FE-008: API Keys Page Load
 log_info "Testing API keys page..."
-http_get "$TARGET_URL/api-keys.html"
+http_get "$TARGET_URL/api-keys"
 assert_http_status "$HTTP_STATUS" "200" "FE-008" "API Keys Page Load"
 
 # FE-009: API Keys Create Page Load
 log_info "Testing API keys create page..."
-http_get "$TARGET_URL/api-keys-create.html"
+http_get "$TARGET_URL/api-keys-create"
 assert_http_status "$HTTP_STATUS" "200" "FE-009" "API Keys Create Page Load"
 
 # FE-010: API Keys Detail Page Load
 log_info "Testing API keys detail page..."
-http_get "$TARGET_URL/api-keys-detail.html"
+http_get "$TARGET_URL/api-keys-detail"
 assert_http_status "$HTTP_STATUS" "200" "FE-010" "API Keys Detail Page Load"
 
 log_section "Static Assets"
@@ -98,7 +98,7 @@ log_section "Frontend Integration Tests"
 
 # FE-013: Auth Gate Script Present
 log_info "Checking for auth-gate.js in protected pages..."
-http_get "$TARGET_URL/dashboard.html"
+http_get "$TARGET_URL/dashboard"
 if echo "$HTTP_BODY" | grep -q "auth-gate"; then
   log_pass "FE-013" "Auth Gate Script Present" "Found in dashboard.html"
 else
@@ -107,9 +107,10 @@ fi
 
 # FE-014: Clerk SDK Loaded
 log_info "Checking for Clerk SDK in pages..."
-http_get "$TARGET_URL/dashboard.html"
-if echo "$HTTP_BODY" | grep -q "clerk"; then
-  log_pass "FE-014" "Clerk SDK Loaded" "Found Clerk reference in HTML"
+http_get "$TARGET_URL/js/auth.js"
+assert_http_status "$HTTP_STATUS" "200" "FE-014" "Clerk Auth Module Load"
+if echo "$HTTP_BODY" | grep -q "clerk.browser.js"; then
+  log_pass "FE-014" "Clerk SDK Loaded" "Found the Clerk SDK in the auth module"
 else
   log_fail "FE-014" "Clerk SDK Loaded" "No Clerk reference found"
 fi

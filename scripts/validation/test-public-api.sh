@@ -12,6 +12,7 @@ source "$SCRIPT_DIR/lib/assertions.sh"
 # Configuration
 TARGET_URL="${TARGET_URL:-https://hashbin.org}"
 VERBOSE="${VERBOSE:-false}"
+CONTENT_URL="${CONTENT_URL:-https://256t.us}"
 
 init_test_suite "Public API Tests"
 
@@ -76,37 +77,30 @@ fi
 
 # API-007: CID-Based Download - Non-existent
 log_info "Testing CID-based download for non-existent content..."
-FAKE_CID="bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi"
-http_get "$TARGET_URL/$FAKE_CID"
-if [ "$HTTP_STATUS" = "404" ] || [ "$HTTP_STATUS" = "400" ]; then
-  log_pass "API-007" "CID-Based Download - Non-existent" "Returns 404/400"
+# Valid 256t hash for a >64-byte fixture that this validator never uploads.
+FAKE_CID="AAAAAABybOm6O5faXBVVHqDqTQa7dh6qRtL38zG2rQ2fpSN-1gcMK-tAehGtBpjWh8gfrHY2F69f86YD0Cvhglykhwjzsg"
+http_get "$CONTENT_URL/$FAKE_CID"
+if [ "$HTTP_STATUS" = "404" ]; then
+  log_pass "API-007" "CID-Based Download - Non-existent" "Returns 404"
 else
-  log_fail "API-007" "CID-Based Download - Non-existent" "Expected 404/400, got HTTP $HTTP_STATUS"
+  log_fail "API-007" "CID-Based Download - Non-existent" "Expected 404, got HTTP $HTTP_STATUS"
 fi
 
 log_section "API Headers and Configuration"
 
-# API-008: CORS Headers Present
-log_info "Checking CORS headers on API responses..."
-http_get "$TARGET_URL/api/payments/calculate" \
-  "Origin: https://example.com"
-CORS_HEADER=$(get_header "Access-Control-Allow-Origin")
-if [ -n "$CORS_HEADER" ]; then
-  log_pass "API-008" "CORS Headers Present" "CORS header: $CORS_HEADER"
-else
-  # CORS might only be on OPTIONS preflight, check that
-  # Note: Using direct curl here because OPTIONS method is not in http_client library
-  # and is only needed for this specific CORS preflight test
-  local temp_status=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS \
+# API-008: Unregistered origins cannot make credentialed API requests.
+log_info "Checking rejection of an unregistered CORS origin..."
+temp_headers=$(mktemp)
+temp_status=$(curl -s --max-time 15 -o /dev/null -D "$temp_headers" -w "%{http_code}" -X OPTIONS \
     -H "Origin: https://example.com" \
     -H "Access-Control-Request-Method: POST" \
-    "$TARGET_URL/api/payments/calculate" 2>/dev/null || echo "000")
-  if [ "$temp_status" = "200" ] || [ "$temp_status" = "204" ]; then
-    log_pass "API-008" "CORS Headers Present" "OPTIONS preflight supported"
-  else
-    log_skip "API-008" "CORS Headers Present" "CORS headers not found (may not be configured)"
-  fi
+    "$TARGET_URL/api/payments/calculate" 2>/dev/null || true)
+if [ "$temp_status" = "403" ] && ! grep -qi '^Access-Control-Allow-Origin:' "$temp_headers"; then
+  log_pass "API-008" "Unregistered CORS Origin Refused" "Preflight returns 403 without permission"
+else
+  log_fail "API-008" "Unregistered CORS Origin Refused" "Unexpected preflight response: $temp_status"
 fi
+rm -f "$temp_headers"
 
 # API-009: Content-Type Headers
 log_info "Checking content-type headers..."

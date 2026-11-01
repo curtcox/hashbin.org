@@ -34,7 +34,7 @@ assert_http_status "$HTTP_STATUS" "401" "AUTH-003" "Balance Endpoint - No Auth"
 
 # AUTH-004: Upload Endpoint - No Auth
 log_info "Testing upload endpoint without authentication..."
-http_post "$TARGET_URL/api/content/upload" \
+http_post "$TARGET_URL/api/content" \
   '{"content":"test"}' \
   "Content-Type: application/json"
 assert_http_status "$HTTP_STATUS" "401" "AUTH-004" "Upload Endpoint - No Auth"
@@ -68,14 +68,14 @@ assert_http_status "$HTTP_STATUS" "401" "AUTH-008" "Delete Account - No Auth"
 
 # AUTH-009: Checkout Create - No Auth
 log_info "Testing checkout create without authentication..."
-http_post "$TARGET_URL/api/payments/create-checkout" \
+http_post "$TARGET_URL/api/balance/deposit" \
   '{"amount":1000}' \
   "Content-Type: application/json"
 assert_http_status "$HTTP_STATUS" "401" "AUTH-009" "Checkout Create - No Auth"
 
 # AUTH-010: Rate Limit Purchase - No Auth
 log_info "Testing rate limit purchase without authentication..."
-http_post "$TARGET_URL/api/rate-limit/purchase" \
+http_post "$TARGET_URL/api/content/rate-limit/purchase" \
   '{"plan":"pro"}' \
   "Content-Type: application/json"
 assert_http_status "$HTTP_STATUS" "401" "AUTH-010" "Rate Limit Purchase - No Auth"

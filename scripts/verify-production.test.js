@@ -34,7 +34,9 @@ function fixture(overrides = {}) {
     if (path === '/api/payments/webhook') return json({ error: 'Missing signature' }, 400);
     if (path === '/api/payments/calculate') return json({ cost_cents: 1 });
     if (path === '/api/nonexistent') return json({ error: 'Not found' }, 404);
-    return new Response(`<title>HashBin</title><!-- git-sha: ${sha} -->`);
+    return new Response(`<title>HashBin</title><!-- git-sha: ${sha} -->`, {
+      headers: { 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' },
+    });
   });
   return { fetchImpl, log: vi.fn(), expectedSha: sha };
 }
@@ -90,6 +92,8 @@ describe('production checklist', () => {
 
   it.each([
     ['/health', () => new Response('<html>Error</html>'), 'Production health and commit'],
+    ['/', () => new Response(`<!-- git-sha: ${sha} -->`), 'Pages must disable MIME sniffing'],
+    ['/', () => new Response(`<!-- git-sha: ${sha} -->`, { headers: { 'X-Content-Type-Options': 'nosniff' } }), 'Pages must refuse framing'],
     ['/upload', () => new Response(`<!-- git-sha: ${'b'.repeat(40)} -->`), 'HTML commit /upload'],
     ['/dashboard', () => new Response('', { status: 500 }), 'HTML commit /dashboard'],
     ['256t.us/health', () => new Response('Unavailable', { status: 503 }), 'Content domain health'],
