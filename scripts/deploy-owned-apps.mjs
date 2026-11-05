@@ -5,6 +5,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { dirname, resolve, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { OWNED_APPS, ownedAppOrigin } from './owned-apps.mjs';
+import { splitRuntimeAssets } from './owned-apps/apptron-assets.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
@@ -91,18 +92,18 @@ export function hostedTextpad(html) {
 
 /** Response policy complements meta policies without restricting interpreter worker scripts. */
 export function hostedHeaders(slug, html = '') {
-  const ancestors = slug === 'pages-preview' ? 'https://pages.hashbin.page https://pages.hashbin.us' : "'none'";
+  const ancestors = slug === 'pages-preview' ? 'https://pages.hashbin.page https://pages.hashbin.us' : slug === 'apptron' ? "'self'" : "'none'";
   const textpad = slug === 'textpad' ? /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)?.[1] : null;
   if (slug === 'textpad' && !textpad) throw new Error('Textpad response requires its inline-script hash policy.');
   const policy = textpad || "object-src 'none'";
-  return `/*\n  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: ${slug === 'pages-preview' ? 'no-referrer' : 'strict-origin-when-cross-origin'}\n  Content-Security-Policy: ${policy}; frame-ancestors ${ancestors}\n`;
+  return `/*\n  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: ${slug === 'pages-preview' ? 'no-referrer' : 'strict-origin-when-cross-origin'}\n  Content-Security-Policy: ${policy}; frame-ancestors ${ancestors}\n${slug === 'apptron' ? '  Cross-Origin-Opener-Policy: same-origin\n  Cross-Origin-Embedder-Policy: require-corp\n' : ''}`;
 }
 
 /** Stage one approved app with an explicit public-asset allowlist; never upload a repo root. */
 export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
   const app = slug === 'pages-preview' ? { repo: 'pages' } : OWNED_APPS[slug];
   const origin = ownedAppOrigin(slug);
-  const source = resolve(sources, app.repo);
+  const source = resolve(sources, app.repo, ...(slug === 'apptron' ? ['dist'] : []));
   const destination = join(root, 'build-reports', 'owned-apps', slug);
   const assets = join(destination, 'public');
   await rm(destination, { recursive: true, force: true });
@@ -116,6 +117,12 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
       await writeFile(join(assets, 'index.html'), index.replace('content="./preview.html"', 'content="https://pages.hashbin.us/preview.html"').replace("frame-src 'self'", "frame-src 'self' https://pages.hashbin.us"));
       await refreshOfflineManifest(assets, manifest, 'pagesonline-');
     }
+  } else if (['r', 'livelier', 'apptron'].includes(slug)) {
+    manifest = await readOfflineManifest(source);
+    const runtime = slug === 'apptron' ? JSON.parse(await readFile(join(source, 'runtime.lock'), 'utf8')) : null;
+    const runtimeManifest = runtime ? JSON.parse(await readFile(join(source, 'runtime', runtime.commit, 'runtime.json'), 'utf8')) : null;
+    const runtimeFiles = runtime ? ['runtime/' + runtime.commit + '/runtime.json', ...Object.keys(runtimeManifest.files).map(name => 'runtime/' + runtime.commit + '/' + name)] : [];
+    await copy(source, assets, [...localAssets(manifest), 'offline-assets.js', ...(slug === 'apptron' ? ['LICENSE-graphvizonline', ...runtimeFiles] : ['service-worker.js'])]);
   } else if (slug === 'manim') {
     manifest = await readOfflineManifest(source);
     await copy(source, assets, manimAssets(manifest));
@@ -156,14 +163,25 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     if (slug === 'pages') await refreshOfflineManifest(assets, manifest, 'pagesonline-');
     if (slug === 'manim' && manifest.assets) await refreshOfflineManifest(assets, manifest, 'manimonline-');
     if (slug === 'audio') await refreshOfflineManifest(assets, manifest, 'audioonline-');
-    if (['sheets', 'modl'].includes(slug) && manifest?.assets) await refreshOfflineManifest(assets, manifest, slug + '-offline-');
+    if (['sheets', 'modl', 'r', 'livelier', 'apptron'].includes(slug) && manifest?.assets) await refreshOfflineManifest(assets, manifest, slug + '-offline-');
   }
   await writeFile(join(assets, '_headers'), hostedHeaders(slug, slug === 'textpad' ? await readFile(join(assets, 'index.html'), 'utf8') : ''));
+  let chunks;
+  if (slug === 'apptron') {
+    const lock = JSON.parse(await readFile(join(assets, 'runtime.lock'), 'utf8'));
+    chunks = await splitRuntimeAssets(assets, lock);
+    await cp(join(root, 'scripts/owned-apps/chunk-response.js'), join(destination, 'chunk-response.js'));
+    await writeFile(join(destination, 'chunks.json'), JSON.stringify(chunks));
+    await writeFile(join(destination, 'worker.js'), 'import files from "./chunks.json";\nimport {chunkResponse} from "./chunk-response.js";\nexport default {fetch(request,env){return chunkResponse(request,env.ASSETS,files);}};\n');
+  }
+  const index = slug === 'pages-preview' ? '' : await readFile(join(assets, 'index.html'), 'utf8');
+  if (['r', 'livelier', 'audio', 'apptron'].includes(slug) && !index.includes('name="hashbin-client-id" content="' + app.appId + '"')) throw new Error('The registered public client ID does not match the staged app.');
   const inventory = await assetInventory(assets);
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' }).trim();
   const dirty = Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: source, encoding: 'utf8' }).trim());
   await writeFile(join(assets, 'release.json'), JSON.stringify({ app: slug, origin, repo: app.repo, revision, dirty, assets: inventory }, null, 2));
   const config = { name: `hashbin-client-${slug}`, compatibility_date: '2026-10-30', workers_dev: false, preview_urls: false, routes: [{ pattern: new URL(origin).hostname, custom_domain: true }], assets: { directory: './public', not_found_handling: 'none' } };
+  if (chunks) { config.main = './worker.js'; config.assets.binding = 'ASSETS'; config.assets.run_worker_first = ['/runtime/*', '/__runtime_chunks/*']; }
   await writeFile(join(destination, 'wrangler.json'), JSON.stringify(config, null, 2));
   return { slug, origin, config: join(destination, 'wrangler.json'), files: Object.keys(inventory).length };
 }

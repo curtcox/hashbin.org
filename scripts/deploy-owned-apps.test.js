@@ -14,7 +14,7 @@ describe('first-party app deployment boundaries', () => {
 
   it('uses a distinct editor origin for each app and a separate preview site', () => {
     const origins = Object.keys(OWNED_APPS).map(ownedAppOrigin);
-    expect(new Set(origins).size).toBe(10);
+    expect(new Set(origins).size).toBe(13);
     expect(ownedAppOrigin('audio')).toBe('https://audio.hashbin.page');
     expect(origins.every(origin => /^https:\/\/[a-z]+\.hashbin\.page$/.test(origin))).toBe(true);
     expect(ownedAppOrigin('pages-preview')).toBe('https://pages.hashbin.us');

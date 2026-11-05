@@ -7,7 +7,7 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio]
+        options: [all, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio, r, livelier, apptron]
 permissions:
   contents: read
 concurrency:
@@ -27,11 +27,20 @@ jobs:
           cache-dependency-path: hashbin.org/package-lock.json
       - name: Check out public client sources
         run: |
-          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl AudioOnline; do
+          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl AudioOnline R livelier apptron; do
             folder="$repo"
             if [ "$repo" = GnuplotOnline ]; then folder=GnuPlotOnline; fi
             git clone --depth 1 "https://github.com/curtcox/$repo.git" "$folder"
           done
+      - name: Prepare locked Apptron site
+        if: inputs.app == 'apptron' || inputs.app == 'all'
+        working-directory: apptron
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          npm ci
+          scripts/fetch-runtime.sh
+          npm run build
       - run: npm ci
         working-directory: hashbin.org
       - name: Validate deployment tooling

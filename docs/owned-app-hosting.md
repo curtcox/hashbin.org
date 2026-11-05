@@ -12,29 +12,31 @@ The owner selected this layout on 2026-10-30:
 This keeps the account origin on its established domain and reserves `hashbin.app` for its existing execution storage. Editors and previews use different registrable domains, so a preview is also cross-site from its editor. Each editor gets its own origin, isolating browser storage and service workers from the other editors.
 
 Editor subdomains are `pages`, `python`, `manim`, `gnuplot`, `sheets`, `modl`, `diagram`,
-`upload`, `textpad` and `audio`. Every editor uses `/` as its registered web return URL. Textpad
+`upload`, `textpad`, `audio`, `r`, `livelier` and `apptron`. Every editor uses `/` as its registered web return URL. Textpad
 also retains its Expo and Flutter OAuth schemes. Python's old GitHub embedder was retired
 after the owner confirmed that persistent files were backed up. App IDs are unchanged.
 
-**Audio Online (`audio`) is registered and staged but not yet deployed.** Its registry entry uses
-the placeholder app ID `app_00000000-0000-0000-0000-000000000000` until the owner registers the
-app with `https://audio.hashbin.page/` as its return URL. Before its first deployment:
+R Online, Livelier, Audio Online and Apptron Online were registered on 2026-11-05
+with their exact canonical return URLs (one per app); their public IDs are in the
+registry. Their first canonical deployments are being prepared after owner approval.
+Add old-origin migration notices only after each canonical origin is live.
 
-1. Register the app, then replace the placeholder in `scripts/owned-apps.mjs` and in the
-   `hashbin-client-id` meta tag of `curtcox/AudioOnline`'s `index.html`.
-2. Dispatch `deploy-owned-apps.yml` with `app=audio` and run the live checks below.
-3. Only then add `audio` to `scripts/install-owned-app-notices.mjs` (with the offline-manifest
-   update `pages`, `python` and `gnuplot` use) and run it. Installing the notice earlier would tell
-   GitHub Pages visitors the app has moved to an address that does not exist yet.
+Apptron's locked runtime includes files above Cloudflare's 25 MiB static-asset limit.
+Its prepared deployment splits verified files into 20 MiB static chunks and streams
+those bytes at the original runtime URLs through a narrow Worker. Runtime locks,
+full-file hashes, VM code, data grants and default networking remain unchanged.
+Only runtime/chunk paths invoke the Worker; other files use static assets directly.
+The paired same-origin VM needs COOP/COEP and permits self framing; other apps keep
+frame-ancestors none. No credentials or external fetch targets are added.
 
 This implements browser-client-safety B1 for these first-party apps. H6's customer app hosting,
 CID manifests, billing and moderation remain separate, unimplemented work.
 
 ## Hosting and source
 
-Each app is a separate Cloudflare Workers **static-assets-only** deployment named
-`hashbin-client-<slug>`. There is no application server, secret binding, wildcard DNS route,
-or runtime code added to an editor. Exact Custom Domains create Cloudflare-managed DNS records
+Each app is a separate Cloudflare Workers static deployment named
+`hashbin-client-<slug>`. There is no secret binding or wildcard DNS route. Apptron alone has a fixed-path
+large-file streaming Worker; no runtime code is added to an editor. Exact Custom Domains create Cloudflare-managed DNS records
 and certificates. The GitHub Pages copies remain at their original addresses for migration.
 Do not configure GitHub Pages CNAME redirects: that would strand access to old-origin drafts.
 
