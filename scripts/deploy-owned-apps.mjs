@@ -11,6 +11,12 @@ const require = createRequire(import.meta.url);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const localAssets = manifest => (manifest.assets || manifest.local).filter(path => !/^https?:/.test(path));
 
+/** Retain legacy Manim hash tables only for its pre-kit manifest format. */
+export function manimAssets(manifest) {
+  return [...localAssets(manifest), 'offline-assets.js', 'service-worker.js',
+    ...(!manifest.assets ? ['offline-hashes.js'] : []), 'gallery/previews'];
+}
+
 /** Generate the shared migration module from the approved app-address registry. */
 export async function migrationSource() {
   const apps = Object.fromEntries(Object.entries(OWNED_APPS).map(([slug, app]) => [slug, { legacy: app.legacy, origin: ownedAppOrigin(slug) }]));
@@ -95,7 +101,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     }
   } else if (slug === 'manim') {
     manifest = require(join(source, 'offline-assets.js'));
-    await copy(source, assets, [...manifest.local, 'offline-assets.js', 'offline-hashes.js', 'service-worker.js', 'gallery/previews']);
+    await copy(source, assets, manimAssets(manifest));
   } else if (slug === 'audio') {
     // Gallery previews stream on demand, so they are outside the offline manifest but still public assets.
     manifest = require(join(source, 'offline-assets.js'));
@@ -128,6 +134,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     await writeFile(join(assets, 'migration.html'), (await readFile(join(root, 'scripts/owned-apps/migration.html'), 'utf8')).replace('__APP__', slug));
     // Pages and Audio inventory their migration module offline; rehash the configured release.
     if (slug === 'pages') await refreshOfflineManifest(assets, manifest, 'pagesonline-');
+    if (slug === 'manim' && manifest.assets) await refreshOfflineManifest(assets, manifest, 'manimonline-');
     if (slug === 'audio') await refreshOfflineManifest(assets, manifest, 'audioonline-');
   }
   await writeFile(join(assets, '_headers'), hostedHeaders(slug, slug === 'textpad' ? await readFile(join(assets, 'index.html'), 'utf8') : ''));

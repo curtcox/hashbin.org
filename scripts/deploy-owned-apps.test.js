@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { assetInventory, hostedTextpad, hostedHeaders, refreshOfflineManifest } from './deploy-owned-apps.mjs';
+import { manimAssets, assetInventory, hostedTextpad, hostedHeaders, refreshOfflineManifest } from './deploy-owned-apps.mjs';
 import { OWNED_APPS, ownedAppOrigin } from './owned-apps.mjs';
 import { validateMigration, migrationTarget } from './owned-apps/migration.js';
 
@@ -47,6 +47,12 @@ describe('first-party app deployment boundaries', () => {
     expect(generated).toContain(createHash('sha256').update('configured preview origin').digest('hex'));
     expect(generated).toContain('pinned');
     expect(generated).not.toContain('"index.html": "old"');
+  });
+
+  it('stages both Manim generations without uploading remote runtime URLs', () => {
+    expect(manimAssets({ assets: ['index.html', 'https://runtime.example/pyodide.js'] }))
+      .toEqual(['index.html', 'offline-assets.js', 'service-worker.js', 'gallery/previews']);
+    expect(manimAssets({ local: ['index.html'] })).toContain('offline-hashes.js');
   });
 
   it('moves drafts without accepting credentials, filesystem permission, or OAuth callbacks', () => {
