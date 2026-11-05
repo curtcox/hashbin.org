@@ -49,6 +49,13 @@ describe('first-party app deployment boundaries', () => {
     expect(generated).not.toContain('"index.html": "old"');
   });
 
+  it('preserves a shared manifest cache namespace when rehashing hosted bytes', async () => {
+    await writeFile(join(directory, 'index.html'), 'Manim configured release');
+    await refreshOfflineManifest(directory, { prefix: 'manimonline-offline', version: 'old', assets: ['index.html'], hashes: {} }, 'manimonline-');
+    const generated = await readFile(join(directory, 'offline-assets.js'), 'utf8');
+    expect(generated).toMatch(/"version": "manimonline-offline-[a-f0-9]{16}"/);
+  });
+
   it('stages both Manim generations without uploading remote runtime URLs', () => {
     expect(manimAssets({ assets: ['index.html', 'https://runtime.example/pyodide.js'] }))
       .toEqual(['index.html', 'offline-assets.js', 'service-worker.js', 'gallery/previews']);
