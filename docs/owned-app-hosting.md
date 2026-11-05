@@ -18,11 +18,11 @@ after the owner confirmed that persistent files were backed up. App IDs are unch
 
 R Online, Livelier, Audio Online and Apptron Online were registered on 2026-11-05
 with their exact canonical return URLs (one per app); their public IDs are in the
-registry. Their first canonical deployments are being prepared after owner approval.
+registry. Their canonical deployments succeeded after owner approval.
 Add old-origin migration notices only after each canonical origin is live.
 
 Apptron's locked runtime includes files above Cloudflare's 25 MiB static-asset limit.
-Its prepared deployment splits verified files into 20 MiB static chunks and streams
+Its deployment splits verified files into 20 MiB static chunks and streams
 those bytes at the original runtime URLs through a narrow Worker. Runtime locks,
 full-file hashes, VM code, data grants and default networking remain unchanged.
 Only runtime/chunk paths invoke the Worker; other files use static assets directly.
