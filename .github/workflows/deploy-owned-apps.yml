@@ -39,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           npm ci
-          scripts/fetch-runtime.sh
+          GITHUB_REPOSITORY=curtcox/apptron scripts/fetch-runtime.sh
           npm run build
       - run: npm ci
         working-directory: hashbin.org
