@@ -34,6 +34,7 @@ try {
         await page.locator('#source').fill('a square printf canonical');
         await page.waitForFunction(() => document.getElementById('bash').textContent.includes('printf canonical'));
         assert.equal(await page.locator('#local').isEnabled(), true);
+        await page.waitForFunction(() => !document.getElementById('apptron').disabled, null, { timeout: 15000 });
         assert.equal(await page.locator('#apptron').isEnabled(), true);
         assert.equal(context.pages().length, 1);
       } else if (slug === 'gnuplot') {
