@@ -29,6 +29,13 @@ try {
         assert.equal(await preview.locator('h1').textContent(), 'Domain verification');
         assert.equal(new URL(await page.locator('#preview').getAttribute('src')).origin, ownedAppOrigin('pages'));
         await context.setOffline(false);
+      } else if (slug === 'gripeline') {
+        await page.waitForFunction(() => document.getElementById('status').textContent.includes('Checked'));
+        await page.locator('#source').fill('a square printf canonical');
+        await page.waitForFunction(() => document.getElementById('bash').textContent.includes('printf canonical'));
+        assert.equal(await page.locator('#local').isEnabled(), true);
+        assert.equal(await page.locator('#apptron').isEnabled(), true);
+        assert.equal(context.pages().length, 1);
       } else if (slug === 'gnuplot') {
         await page.waitForFunction(() => /^Rendered in/.test(document.getElementById('status').textContent));
         assert.ok(await page.locator('#preview svg').count());

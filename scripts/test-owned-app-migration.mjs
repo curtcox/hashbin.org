@@ -26,12 +26,12 @@ async function server() {
 let browser;
 try {
   oldURL = await server(); newURL = await server(); browser = await chromium.launch({ executablePath: process.env.OWNED_CHROMIUM_PATH || chromium.executablePath() });
-  for (slug of ['pages', 'python', 'textpad']) {
+  for (slug of ['pages', 'python', 'textpad', 'gripeline']) {
     const context = await browser.newContext();
     const old = await context.newPage();
     await old.goto(oldURL + '#original-link');
-    const key = { pages: 'pagesonline:project', python: 'pythononline:work', textpad: 'hashbin:textpad:migrated-text' }[slug];
-    const work = slug === 'pages' ? '{"files":[{"name":"index.md","text":"# Private draft"}],"entry":"index.md"}' : '{"src":"print(42)"}';
+    const key = { pages: 'pagesonline:project', python: 'pythononline:work', textpad: 'hashbin:textpad:migrated-text', gripeline: 'gripeline:draft' }[slug];
+    const work = slug === 'pages' ? '{"files":[{"name":"index.md","text":"# Private draft"}],"entry":"index.md"}' : slug === 'gripeline' ? '{"src":"a square printf 42","pos":{"a":[1.25,2.5]}}' : '{"src":"print(42)"}';
     await old.evaluate(({ key, work }) => { localStorage.setItem(key, work); localStorage.setItem('hashbin:tokens:client', 'DO NOT COPY'); localStorage.setItem('pythononline:persistent-home', 'true'); }, { key, work });
     const popup = old.waitForEvent('popup');
     await old.getByRole('button', { name: 'Move saved work', exact: true }).click();
