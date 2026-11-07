@@ -1,6 +1,6 @@
 /* eslint-env browser */
 const MAX_BYTES = 12 * 1024 * 1024;
-const KEYS = { pages: ['pagesonline:project'], python: ['pythononline:work'], gnuplot: ['gnuplotonline:document'], audio: ['audioonline:document'], upload: ['hashbin:ghpages:registered-app-client-id'], textpad: ['hashbin:textpad:migrated-text'] };
+const KEYS = { gripeline: ['gripeline:draft', 'gripeline:draft:history'], pages: ['pagesonline:project'], python: ['pythononline:work'], gnuplot: ['gnuplotonline:document'], audio: ['audioonline:document'], upload: ['hashbin:ghpages:registered-app-client-id'], textpad: ['hashbin:textpad:migrated-text'] };
 
 /** Validate an inert draft handoff; credentials and persistence permissions are never transferred. */
 export function validateMigration(payload, slug, app) {
@@ -14,6 +14,17 @@ export function validateMigration(payload, slug, app) {
     if (!allowed.includes(key) || typeof value !== 'string') throw new Error('Only this app’s drafts and public settings can be restored.');
     if (key !== 'hashbin:textpad:migrated-text' && key !== 'hashbin:ghpages:registered-app-client-id') {
       const document = JSON.parse(value);
+      if (slug === 'gripeline') {
+        const drafts = key.endsWith(':history') ? document : [value];
+        if (!Array.isArray(drafts) || drafts.length > 50) throw new Error('Invalid draft history.');
+        for (const draft of drafts) {
+          if (typeof draft !== 'string') throw new Error('Invalid draft history.');
+          const item = JSON.parse(draft);
+          if (!item || typeof item.src !== 'string' || Object.keys(item).some(key => !['src', 'pos'].includes(key))) throw new Error('Only diagram source and positions can be moved.');
+          if (item.pos && (typeof item.pos !== 'object' || Array.isArray(item.pos) || Object.values(item.pos).some(pair => !Array.isArray(pair) || pair.length !== 2 || pair.some(n => typeof n !== 'number' || !Number.isFinite(n))))) throw new Error('Invalid diagram positions.');
+        }
+        continue;
+      }
       if (!document || typeof document !== 'object' || Array.isArray(document)) throw new Error('A saved document is invalid.');
     }
   }

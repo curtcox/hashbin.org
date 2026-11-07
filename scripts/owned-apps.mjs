@@ -5,6 +5,8 @@ export const OWNED_APPS = Object.freeze({
   manim: { repo: 'ManimOnline', appId: 'app_ea30117c-555b-4759-b01a-e75dc402d177', legacy: 'https://curtcox.github.io/ManimOnline/' },
   gnuplot: { repo: 'GnuPlotOnline', appId: 'app_69800851-cef2-4274-9c7b-b1e908965181', legacy: 'https://curtcox.github.io/GnuplotOnline/' },
   sheets: { repo: 'sheets', appId: 'app_8e03e133-83b4-4ee2-b3d5-39397f573879', legacy: 'https://curtcox.github.io/sheets/index.html' },
+  // Registration is pending; publishing stays disabled until a real public ID is recorded.
+  gripeline: { repo: 'gripeline', appId: null, legacy: 'https://curtcox.github.io/gripeline/editor/' },
   modl: { repo: 'modl', appId: 'app_1fe78cf6-21fc-4491-abc9-e0aefca53505', legacy: 'https://curtcox.github.io/modl/' },
   diagram: { repo: 'hashbin.org', appId: 'app_92c56b62-d5bf-4d8c-8577-79c104adf401', legacy: 'https://curtcox.github.io/hashbin.org/diagram-oauth.html' },
   upload: { repo: 'hashbin.org', appId: 'app_cfebb3a2-b0bd-47f6-b616-8f70d77e6886', legacy: 'https://curtcox.github.io/hashbin.org/upload-via-registered-app.html' },

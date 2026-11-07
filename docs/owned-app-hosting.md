@@ -12,7 +12,7 @@ The owner selected this layout on 2026-10-30:
 This keeps the account origin on its established domain and reserves `hashbin.app` for its existing execution storage. Editors and previews use different registrable domains, so a preview is also cross-site from its editor. Each editor gets its own origin, isolating browser storage and service workers from the other editors.
 
 Editor subdomains are `pages`, `python`, `manim`, `gnuplot`, `sheets`, `modl`, `diagram`,
-`upload`, `textpad`, `audio`, `r`, `livelier` and `apptron`. Every editor uses `/` as its registered web return URL. Textpad
+`upload`, `textpad`, `audio`, `r`, `livelier`, `apptron` and `gripeline`. Every editor uses `/` as its registered web return URL. Textpad
 also retains its Expo and Flutter OAuth schemes. Python's old GitHub embedder was retired
 after the owner confirmed that persistent files were backed up. App IDs are unchanged.
 
@@ -150,3 +150,20 @@ published all ten bundles successfully. Live checks exercised all nine editors, 
 and Gnuplot execution, Pages isolation/CSP/offline behavior, and a real two-origin draft
 transfer for Pages, Python and Textpad. Real-provider sign-in acceptance in Safari/Firefox
 remains separate from these rendering checks.
+
+
+### gripeline editor
+
+The gripeline source remains in `curtcox/gripeline`; its stdlib site builder
+produces an explicit public inventory at `site/_site/editor/`. The hosting tool
+copies only that inventory, then adds the shared recovery page and rehashes the
+final migration module. Its canonical origin is `https://gripeline.hashbin.page/`.
+Registration is pending: the registry deliberately contains a null public client
+ID and the editor disables saving until an actual client is registered with the
+sole return URL `https://gripeline.hashbin.page/`. Never invent a client ID.
+Recovery permits only source, finite positions and draft history. It transfers
+no execution settings or credentials; imported drafts still require review.
+
+Apptron permits credential-free cross-origin reads only of its public runtime
+lock and manifest, so gripeline can verify the released overlay before offering
+the handoff. This does not expose VM files or change VM network settings.

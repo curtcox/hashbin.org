@@ -7,7 +7,7 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio, r, livelier, apptron]
+        options: [all, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio, r, livelier, apptron, gripeline]
 permissions:
   contents: read
 concurrency:
@@ -27,11 +27,19 @@ jobs:
           cache-dependency-path: hashbin.org/package-lock.json
       - name: Check out public client sources
         run: |
-          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl AudioOnline R livelier apptron; do
+          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl AudioOnline R livelier apptron gripeline; do
             folder="$repo"
             if [ "$repo" = GnuplotOnline ]; then folder=GnuPlotOnline; fi
             git clone --depth 1 "https://github.com/curtcox/$repo.git" "$folder"
           done
+      - uses: actions/setup-python@v5
+        if: inputs.app == 'gripeline' || inputs.app == 'all'
+        with:
+          python-version: '3.12'
+      - name: Build gripeline editor public assets
+        if: inputs.app == 'gripeline' || inputs.app == 'all'
+        working-directory: gripeline
+        run: python3 site/build.py
       - name: Prepare locked Apptron site
         if: inputs.app == 'apptron' || inputs.app == 'all'
         working-directory: apptron
