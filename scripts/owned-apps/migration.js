@@ -48,7 +48,7 @@ function download(payload) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-/** Install the old-origin move notice, or receive a handoff on a canonical app's migration page. */
+/** Offer old-origin transfers in More, or receive an explicitly requested handoff. */
 export function bootMigration(apps) {
   const slug = document.body.dataset.migrationApp;
   if (slug) {
@@ -106,9 +106,9 @@ export function bootMigration(apps) {
     }
     return validateMigration({ format: 'hashbin-origin-migration', version: 1, app: name, href: location.href, storage }, name, app);
   };
-  const notice = document.createElement('aside'); notice.setAttribute('aria-label', 'New app address');
-  notice.style.cssText = 'position:fixed;bottom:12px;right:12px;z-index:10000;max-width:calc(100vw - 48px);padding:12px;background:#fff;color:#111;border:2px solid #167c80;border-radius:8px;font:14px system-ui;box-shadow:0 3px 12px #0003';
-  const text = document.createElement('p'); text.textContent = `This app has moved to ${new URL(app.origin).hostname}.`; text.style.margin = '0 0 8px'; notice.append(text);
+  const notice = document.createElement('details');
+  const summary = document.createElement('summary'); summary.textContent = 'Move saved work'; notice.append(summary);
+  const destination = document.createElement('p'); destination.textContent = `Copy drafts to ${new URL(app.origin).hostname}, or keep a backup file.`; notice.append(destination);
   const move = document.createElement('button'); move.textContent = 'Move saved work'; notice.append(move);
   const backup = document.createElement('button'); backup.textContent = 'Download backup'; backup.style.marginLeft = '8px'; notice.append(backup);
   const problem = document.createElement('p'); problem.setAttribute('role', 'status'); notice.append(problem);
@@ -124,5 +124,12 @@ export function bootMigration(apps) {
     addEventListener('message', receive);
     setTimeout(() => removeEventListener('message', receive), 120000);
   };
-  document.body.append(notice);
+  // Recovery remains available on demand; working editors get no migration overlay.
+  const mount = () => {
+    const menu = document.querySelector('#fk-more-drawer .fk-dialog-body');
+    if (!menu) return;
+    menu.append(notice); document.removeEventListener('click', mount, true);
+  };
+  mount();
+  if (!notice.isConnected) document.addEventListener('click', mount, true);
 }
