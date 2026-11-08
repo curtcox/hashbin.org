@@ -22,9 +22,13 @@ jobs:
           ref: v0.4.0
           path: kit
       - run: npm ci
-      - run: npx vitest run scripts/deploy-ai-host.test.js
+      - run: npx vitest run scripts/deploy-ai-host.test.js scripts/secure-ai-host.test.js
       - name: Verify published kit and stage exact pilot allowlist
         run: node scripts/deploy-ai-host.mjs kit
+      - name: Enforce HTTPS only for the approved AI hostname
+        run: node scripts/secure-ai-host.mjs
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       - name: Deploy after owner approval
         run: node node_modules/wrangler/bin/wrangler.js deploy --config build-reports/ai-host/wrangler.json
         env:

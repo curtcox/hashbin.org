@@ -32,7 +32,7 @@ export async function stageAiHostDeployment({kit, output=join(root,'build-report
   const {stageAiHost}=await import(pathToFileURL(join(pin,'tools','stage-ai-host.mjs')));
   await stageAiHost({config,output:destination});
   // Cloudflare applies only the root _headers. All kit paths stay under /vX.Y.Z/.
-  await writeFile(join(output,'public','_headers'),await readFile(join(destination,'_headers')));
+  await writeFile(join(output,'public','_headers'),(await readFile(join(destination,'_headers'),'utf8'))+'  Strict-Transport-Security: max-age=31536000\n');
   const assets=await assetInventory(join(output,'public'));
   await writeFile(join(output,'public','release.json'),JSON.stringify({origin:AI_HOST.origin,kitVersion:pkg.version,publishedPinVerified:published,assets},null,2)+'\n');
   await writeFile(join(output,'wrangler.json'),JSON.stringify({name:'hashbin-ai-host',compatibility_date:'2026-11-08',workers_dev:false,preview_urls:false,routes:[{pattern:'ai.hashbin.page',custom_domain:true}],assets:{directory:'./public',not_found_handling:'none'}},null,2)+'\n');

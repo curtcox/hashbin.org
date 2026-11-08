@@ -23,3 +23,9 @@ The first deployment contains one version. Every future deployment must assemble
 all previously published version directories as well as the new one; publishing
 only a new directory would remove old entry points. Never rewrite old kit assets
 or move a release tag. The stager refuses to overwrite an existing version.
+
+The deployment configures a hostname-specific Cloudflare redirect from HTTP to
+HTTPS, preserving paths and query strings, and sends HSTS. It changes only its
+`fragment_kit_ai_force_https` rule; other app rules are retained. The existing
+Cloudflare token needs zone read and redirect-rule write permissions. A permission
+failure stops deployment. The host remains static assets without application code.
