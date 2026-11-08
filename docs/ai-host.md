@@ -26,6 +26,9 @@ or move a release tag. The stager refuses to overwrite an existing version.
 
 The deployment configures a hostname-specific Cloudflare redirect from HTTP to
 HTTPS, preserving paths and query strings, and sends HSTS. It changes only its
-`fragment_kit_ai_force_https` rule; other app rules are retained. The existing
-Cloudflare token needs zone read and redirect-rule write permissions. A permission
-failure stops deployment. The host remains static assets without application code.
+`fragment_kit_ai_force_https` rule; other app rules are retained. The owner can
+configure this rule once in Cloudflare. Subsequent deployments
+verify the public redirect without requesting zone access. Creating or changing
+the rule through the API requires zone read and redirect-rule write permissions;
+a missing rule and insufficient permission stop deployment. The host remains
+static assets without application code.
