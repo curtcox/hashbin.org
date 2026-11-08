@@ -40,6 +40,16 @@ describe('first-party app deployment boundaries', () => {
     expect(hostedHeaders('gnuplot')).not.toContain('script-src');
   });
 
+  it('allows only the packaged Pages preview to be framed by its own editor', () => {
+    const headers = hostedHeaders('pages');
+    expect(headers.split('\n/preview')[0]).toContain("frame-ancestors 'none'");
+    for (const path of ['/preview', '/preview.html']) {
+      expect(headers).toContain(`${path}\n  ! Content-Security-Policy\n  Content-Security-Policy: object-src 'none'; frame-ancestors 'self'\n`);
+    }
+    expect(hostedHeaders('python')).not.toContain('/preview');
+    expect(hostedHeaders('pages-preview')).toContain('frame-ancestors https://pages.hashbin.page https://pages.hashbin.us');
+  });
+
   it('verifies the configured deployment bytes rather than the source index', async () => {
     await writeFile(join(directory, 'index.html'), 'configured preview origin');
     await refreshOfflineManifest(directory, { version: 'old', assets: ['index.html', 'https://runtime.example/runtime.js'], hashes: { 'index.html': 'old', 'https://runtime.example/runtime.js': 'pinned' } }, 'pagesonline-');
@@ -54,6 +64,19 @@ describe('first-party app deployment boundaries', () => {
     await refreshOfflineManifest(directory, { prefix: 'manimonline-offline', version: 'old', assets: ['index.html'], hashes: {} }, 'manimonline-');
     const generated = await readFile(join(directory, 'offline-assets.js'), 'utf8');
     expect(generated).toMatch(/"version": "manimonline-offline-[a-f0-9]{16}"/);
+  });
+
+  it('updates offline copies when response policy changes without changing asset bytes', async () => {
+    await writeFile(join(directory, 'index.html'), 'same editor bytes');
+    const manifest = {assets:['index.html'],hashes:{}};
+    await refreshOfflineManifest(directory, manifest, 'pagesonline-', 'old response policy');
+    const first = await readOfflineManifest(directory);
+    const nextDirectory = await mkdtemp(join(directory, 'next-'));
+    await writeFile(join(nextDirectory, 'index.html'), 'same editor bytes');
+    await refreshOfflineManifest(nextDirectory, manifest, 'pagesonline-', 'updated response policy');
+    const second = await readOfflineManifest(nextDirectory);
+    expect(second.hashes).toEqual(first.hashes);
+    expect(second.version).not.toBe(first.version);
   });
 
   it('stages both Manim generations without uploading remote runtime URLs', () => {
