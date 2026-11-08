@@ -32,3 +32,23 @@ verify the public redirect without requesting zone access. Creating or changing
 the rule through the API requires zone read and redirect-rule write permissions;
 a missing rule and insufficient permission stop deployment. The host remains
 static assets without application code.
+
+## Deployed pilot receipt — 2026-11-08
+
+[Deployment 42522697907](https://github.com/curtcox/hashbin.org/actions/runs/42522697907)
+published Cloudflare version `12b0350c-a29e-43bc-ad2d-1ca2175b869a`. All 93
+servable assets matched the deployment inventory and every previously deployed
+`v0.4.0` byte remained unchanged. HTTP returns 301 to HTTPS with the exact path
+and query; HTTPS sends HSTS, the exact Python frame allowlist, no-referrer and
+nosniff. The owner configured only the AI hostname redirect through Cloudflare.
+
+The actual host frame, same-origin credential popup, session-only key handoff and
+Forget action passed in isolated Chromium and Playwright WebKit. A synthetic key
+and mocked provider response were used; these checks spent no provider credits.
+App storage and URLs contained no key, and the host did not remember it.
+
+Top-level to same-site frame storage shared localStorage, IndexedDB and Cache in
+Chromium. WebKit shared localStorage but partitioned IndexedDB and Cache. WebKit
+is not native Safari; Firefox and native Safari storage remain unmeasured here.
+The session credential handoff passed despite WebKit storage partitioning. See
+[the machine-readable receipt](ai-host-acceptance.json).

@@ -1,0 +1,63 @@
+{
+  "deployment": {
+    "date": "2026-11-08T20:59:45.775Z",
+    "workflow": "https://github.com/curtcox/hashbin.org/actions/runs/42522697907",
+    "commit": "af70a8445f50f81b30845d1f2272691eb8a99717",
+    "origin": "https://ai.hashbin.page",
+    "verifiedAssets": 93,
+    "versionedBytesUnchanged": true,
+    "httpRedirect": {
+      "status": 301,
+      "location": "https://ai.hashbin.page/v0.4.0/host.html?fragment_kit_https_probe=1"
+    },
+    "headers": {
+      "strict-transport-security": "max-age=31536000",
+      "content-security-policy": "default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' blob: https: http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors https://python.hashbin.page",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "cloudflareVersion": "12b0350c-a29e-43bc-ad2d-1ca2175b869a"
+  },
+  "browserAcceptance": {
+    "date": "2026-11-08T20:58:26.578Z",
+    "host": "https://ai.hashbin.page/v0.4.0/host.html",
+    "appOrigin": "https://python.hashbin.page",
+    "records": [
+      {
+        "engine": "chromium",
+        "transport": "actual deployed host and popup",
+        "provider": "mocked; no paid call",
+        "providerCalls": 1,
+        "appCredentialStored": false,
+        "hostCredentialRemembered": false,
+        "forgotten": true,
+        "topLevelToSameSiteFrameStorage": {
+          "localStorage": true,
+          "cache": true,
+          "indexedDB": true,
+          "remembered": false
+        }
+      },
+      {
+        "engine": "webkit",
+        "transport": "actual deployed host and popup",
+        "provider": "mocked; no paid call",
+        "providerCalls": 1,
+        "appCredentialStored": false,
+        "hostCredentialRemembered": false,
+        "forgotten": true,
+        "topLevelToSameSiteFrameStorage": {
+          "localStorage": true,
+          "cache": false,
+          "indexedDB": false,
+          "remembered": false
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Provider responses were mocked for the deployed-host transport checks; no paid model calls.",
+    "Playwright WebKit is not native Safari.",
+    "Firefox production storage is not measured by these local checks."
+  ]
+}
