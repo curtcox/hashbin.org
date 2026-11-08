@@ -168,3 +168,11 @@ no execution settings or credentials; imported drafts still require review.
 Apptron permits credential-free cross-origin reads only of its public runtime
 lock and manifest, so gripeline can verify the released overlay before offering
 the handoff. This does not expose VM files or change VM network settings.
+
+
+The gripeline registration and real-save acceptance are complete. The owner
+approved one $0.01, one-month save of the portable count example; the editor
+returned from in-tab review with verified source, positions and CID. The same
+saved CID produced `6` in all three native CI OSes (gripeline Actions run
+42431697655). No persistent spending allowance was created. Its normal CI uses
+local stores so this acceptance document's expiry cannot break future checks.
