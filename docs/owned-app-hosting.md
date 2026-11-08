@@ -12,29 +12,31 @@ The owner selected this layout on 2026-10-30:
 This keeps the account origin on its established domain and reserves `hashbin.app` for its existing execution storage. Editors and previews use different registrable domains, so a preview is also cross-site from its editor. Each editor gets its own origin, isolating browser storage and service workers from the other editors.
 
 Editor subdomains are `pages`, `python`, `manim`, `gnuplot`, `sheets`, `modl`, `diagram`,
-`upload`, `textpad` and `audio`. Every editor uses `/` as its registered web return URL. Textpad
+`upload`, `textpad`, `audio`, `r`, `livelier`, `apptron` and `gripeline`. Every editor uses `/` as its registered web return URL. Textpad
 also retains its Expo and Flutter OAuth schemes. Python's old GitHub embedder was retired
 after the owner confirmed that persistent files were backed up. App IDs are unchanged.
 
-**Audio Online (`audio`) is registered and staged but not yet deployed.** Its registry entry uses
-the placeholder app ID `app_00000000-0000-0000-0000-000000000000` until the owner registers the
-app with `https://audio.hashbin.page/` as its return URL. Before its first deployment:
+R Online, Livelier, Audio Online and Apptron Online were registered on 2026-11-05
+with their exact canonical return URLs (one per app); their public IDs are in the
+registry. Their canonical deployments succeeded after owner approval.
+Old-origin kit recovery actions are available on demand in More; no fixed migration notice is displayed.
 
-1. Register the app, then replace the placeholder in `scripts/owned-apps.mjs` and in the
-   `hashbin-client-id` meta tag of `curtcox/AudioOnline`'s `index.html`.
-2. Dispatch `deploy-owned-apps.yml` with `app=audio` and run the live checks below.
-3. Only then add `audio` to `scripts/install-owned-app-notices.mjs` (with the offline-manifest
-   update `pages`, `python` and `gnuplot` use) and run it. Installing the notice earlier would tell
-   GitHub Pages visitors the app has moved to an address that does not exist yet.
+Apptron's locked runtime includes files above Cloudflare's 25 MiB static-asset limit.
+Its deployment splits verified files into 20 MiB static chunks and streams
+those bytes at the original runtime URLs through a narrow Worker. Runtime locks,
+full-file hashes, VM code, data grants and default networking remain unchanged.
+Only runtime/chunk paths invoke the Worker; other files use static assets directly.
+The paired same-origin VM needs COOP/COEP and permits self framing; other apps keep
+frame-ancestors none. No credentials or external fetch targets are added.
 
 This implements browser-client-safety B1 for these first-party apps. H6's customer app hosting,
 CID manifests, billing and moderation remain separate, unimplemented work.
 
 ## Hosting and source
 
-Each app is a separate Cloudflare Workers **static-assets-only** deployment named
-`hashbin-client-<slug>`. There is no application server, secret binding, wildcard DNS route,
-or runtime code added to an editor. Exact Custom Domains create Cloudflare-managed DNS records
+Each app is a separate Cloudflare Workers static deployment named
+`hashbin-client-<slug>`. There is no secret binding or wildcard DNS route. Apptron alone has a fixed-path
+large-file streaming Worker; no runtime code is added to an editor. Exact Custom Domains create Cloudflare-managed DNS records
 and certificates. The GitHub Pages copies remain at their original addresses for migration.
 Do not configure GitHub Pages CNAME redirects: that would strand access to old-origin drafts.
 
@@ -76,7 +78,7 @@ same opaque child boundary; no external preview fetch is needed.
 
 ## Moving existing work
 
-Old copies offer **Move saved work** and **Download backup**. The popup uses source/origin/nonce
+Kit-backed old copies offer **Move saved work** and **Download backup** inside More. The popup uses source/origin/nonce
 checks, and the new app's `/migration.html` requires **Restore and open app** before writing.
 File import is also available there. Only these known values can move:
 
@@ -148,3 +150,29 @@ published all ten bundles successfully. Live checks exercised all nine editors, 
 and Gnuplot execution, Pages isolation/CSP/offline behavior, and a real two-origin draft
 transfer for Pages, Python and Textpad. Real-provider sign-in acceptance in Safari/Firefox
 remains separate from these rendering checks.
+
+
+### gripeline editor
+
+The gripeline source remains in `curtcox/gripeline`; its stdlib site builder
+produces an explicit public inventory at `site/_site/editor/`. The hosting tool
+copies only that inventory, then adds the shared recovery page and rehashes the
+final migration module. Its canonical origin is `https://gripeline.hashbin.page/`.
+Registered on 2026-11-08 with public client ID
+`app_dc8bf51a-ebee-4ef0-879e-1cccbfc1a01b` and the sole return URL
+`https://gripeline.hashbin.page/`. The editor meta tag must match the registry;
+the shared GitHub Pages mirror always disables publishing.
+Recovery permits only source, finite positions and draft history. It transfers
+no execution settings or credentials; imported drafts still require review.
+
+Apptron permits credential-free cross-origin reads only of its public runtime
+lock and manifest, so gripeline can verify the released overlay before offering
+the handoff. This does not expose VM files or change VM network settings.
+
+
+The gripeline registration and real-save acceptance are complete. The owner
+approved one $0.01, one-month save of the portable count example; the editor
+returned from in-tab review with verified source, positions and CID. The same
+saved CID produced `6` in all three native CI OSes (gripeline Actions run
+42431697655). No persistent spending allowance was created. Its normal CI uses
+local stores so this acceptance document's expiry cannot break future checks.
