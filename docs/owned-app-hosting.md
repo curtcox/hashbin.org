@@ -19,7 +19,7 @@ after the owner confirmed that persistent files were backed up. App IDs are unch
 R Online, Livelier, Audio Online and Apptron Online were registered on 2026-11-05
 with their exact canonical return URLs (one per app); their public IDs are in the
 registry. Their canonical deployments succeeded after owner approval.
-Add old-origin migration notices only after each canonical origin is live.
+Old-origin kit recovery actions are available on demand in More; no fixed migration notice is displayed.
 
 Apptron's locked runtime includes files above Cloudflare's 25 MiB static-asset limit.
 Its deployment splits verified files into 20 MiB static chunks and streams
@@ -78,7 +78,7 @@ same opaque child boundary; no external preview fetch is needed.
 
 ## Moving existing work
 
-Old copies offer **Move saved work** and **Download backup**. The popup uses source/origin/nonce
+Kit-backed old copies offer **Move saved work** and **Download backup** inside More. The popup uses source/origin/nonce
 checks, and the new app's `/migration.html` requires **Restore and open app** before writing.
 File import is also available there. Only these known values can move:
 

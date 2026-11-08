@@ -73,11 +73,11 @@ export async function assetInventory(directory) {
   return files;
 }
 
-/** Update a plain offline manifest after applying deployment-specific configuration. */
-export async function refreshOfflineManifest(directory, manifest, prefix) {
+/** Update a plain offline manifest after applying deployment-specific bytes and response policy. */
+export async function refreshOfflineManifest(directory, manifest, prefix, responsePolicy = '') {
   const next = structuredClone(manifest);
   for (const path of localAssets(next)) next.hashes[path] = sha(await readFile(join(directory, path)));
-  next.version = (next.prefix ? next.prefix + '-' : prefix) + sha(JSON.stringify(next.hashes)).slice(0, 16);
+  next.version = (next.prefix ? next.prefix + '-' : prefix) + sha(JSON.stringify(next.hashes) + responsePolicy).slice(0, 16);
   await writeFile(join(directory, 'offline-assets.js'), `// Generated for this hosted release from final asset bytes.\nconst OfflineAssets = ${JSON.stringify(next, null, 2)};\nif (typeof module !== 'undefined') module.exports = OfflineAssets;\nelse globalThis.OfflineAssets = OfflineAssets;\n`);
 }
 
@@ -101,7 +101,9 @@ export function hostedHeaders(slug, html = '') {
   const textpad = slug === 'textpad' ? /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)?.[1] : null;
   if (slug === 'textpad' && !textpad) throw new Error('Textpad response requires its inline-script hash policy.');
   const policy = textpad || "object-src 'none'";
-  return `/*\n  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: ${slug === 'pages-preview' ? 'no-referrer' : 'strict-origin-when-cross-origin'}\n  Content-Security-Policy: ${policy}; frame-ancestors ${ancestors}\n${slug === 'apptron' ? '  Cross-Origin-Opener-Policy: same-origin\n  Cross-Origin-Embedder-Policy: require-corp\n/runtime.lock\n  Access-Control-Allow-Origin: *\n/runtime/*/runtime.json\n  Access-Control-Allow-Origin: *\n' : ''}`;
+  // The offline trusted host is framed only by its own editor; other app pages remain unframeable.
+  const localPreview = slug === 'pages' ? ['/preview', '/preview.html'].map(path => `\n${path}\n  ! Content-Security-Policy\n  Content-Security-Policy: object-src 'none'; frame-ancestors 'self'\n`).join('') : '';
+  return `/*\n  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: ${slug === 'pages-preview' ? 'no-referrer' : 'strict-origin-when-cross-origin'}\n  Content-Security-Policy: ${policy}; frame-ancestors ${ancestors}\n${slug === 'apptron' ? '  Cross-Origin-Opener-Policy: same-origin\n  Cross-Origin-Embedder-Policy: require-corp\n/runtime.lock\n  Access-Control-Allow-Origin: *\n/runtime/*/runtime.json\n  Access-Control-Allow-Origin: *\n' : ''}` + localPreview;
 }
 
 /** Stage one approved app with an explicit public-asset allowlist; never upload a repo root. */
@@ -120,7 +122,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     if (slug === 'pages') {
       const index = await readFile(join(assets, 'index.html'), 'utf8');
       await writeFile(join(assets, 'index.html'), index.replace('content="./preview.html"', 'content="https://pages.hashbin.us/preview.html"').replace("frame-src 'self'", "frame-src 'self' https://pages.hashbin.us"));
-      await refreshOfflineManifest(assets, manifest, 'pagesonline-');
+      await refreshOfflineManifest(assets, manifest, 'pagesonline-', hostedHeaders(slug));
     }
   } else if (['r', 'livelier', 'apptron'].includes(slug)) {
     manifest = await readOfflineManifest(source);
@@ -165,7 +167,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     await writeFile(join(assets, migrationFolder, 'domain-migration.js'), await migrationSource());
     await writeFile(join(assets, 'migration.html'), (await readFile(join(root, 'scripts/owned-apps/migration.html'), 'utf8')).replace('__APP__', slug));
     // Rehash app-owned migration modules after applying hosted configuration.
-    if (slug === 'pages') await refreshOfflineManifest(assets, manifest, 'pagesonline-');
+    if (slug === 'pages') await refreshOfflineManifest(assets, manifest, 'pagesonline-', hostedHeaders(slug));
     if (slug === 'manim' && manifest.assets) await refreshOfflineManifest(assets, manifest, 'manimonline-');
     if (slug === 'audio') await refreshOfflineManifest(assets, manifest, 'audioonline-');
     if (['sheets', 'modl', 'r', 'livelier', 'apptron', 'gripeline'].includes(slug) && manifest?.assets) await refreshOfflineManifest(assets, manifest, slug + '-offline-');
