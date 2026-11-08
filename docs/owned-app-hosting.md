@@ -158,9 +158,10 @@ The gripeline source remains in `curtcox/gripeline`; its stdlib site builder
 produces an explicit public inventory at `site/_site/editor/`. The hosting tool
 copies only that inventory, then adds the shared recovery page and rehashes the
 final migration module. Its canonical origin is `https://gripeline.hashbin.page/`.
-Registration is pending: the registry deliberately contains a null public client
-ID and the editor disables saving until an actual client is registered with the
-sole return URL `https://gripeline.hashbin.page/`. Never invent a client ID.
+Registered on 2026-11-08 with public client ID
+`app_dc8bf51a-ebee-4ef0-879e-1cccbfc1a01b` and the sole return URL
+`https://gripeline.hashbin.page/`. The editor meta tag must match the registry;
+the shared GitHub Pages mirror always disables publishing.
 Recovery permits only source, finite positions and draft history. It transfers
 no execution settings or credentials; imported drafts still require review.
 
