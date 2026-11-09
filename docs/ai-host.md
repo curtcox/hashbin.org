@@ -52,3 +52,14 @@ Chromium. WebKit shared localStorage but partitioned IndexedDB and Cache. WebKit
 is not native Safari; Firefox and native Safari storage remain unmeasured here.
 The session credential handoff passed despite WebKit storage partitioning. See
 [the machine-readable receipt](ai-host-acceptance.json).
+
+## R adoption candidate
+
+The R migration adds published Fragment Kit 0.4.3 at `/v0.4.3/host.html`,
+allowing only `https://r.hashbin.page`. Python keeps its immutable 0.4.0
+entry point and Python-only frame/connection policy. The workflow checks out
+both exact release tags, independently verifies both published manifests, and
+assembles both directories; no existing version is dropped or rewritten.
+The root Cloudflare header file scopes each CSP to its version directory.
+No app keys, runtime secrets, execution policy or account registration change.
+This section records prepared source; deployment and browser verification follow.
