@@ -72,7 +72,10 @@ export function hostedHeaders(slug, html = '') {
   const textpad = slug === 'textpad' ? /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)?.[1] : null;
   if (slug === 'textpad' && !textpad) throw new Error('Textpad response requires its inline-script hash policy.');
   const policy = textpad || "object-src 'none'";
-  return `/*\n  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: ${slug === 'pages-preview' ? 'no-referrer' : 'strict-origin-when-cross-origin'}\n  Content-Security-Policy: ${policy}; frame-ancestors ${ancestors}\n`;
+  const headers = `/*\n  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: ${slug === 'pages-preview' ? 'no-referrer' : 'strict-origin-when-cross-origin'}\n  Content-Security-Policy: ${policy}; frame-ancestors ${ancestors}\n`;
+  // Cloudflare appends matching CSPs. Detach the blanket deny before allowing
+  // only the R host's same-origin parent, including the extensionless HTML URL.
+  return slug === 'sheets' ? headers + ['/src/workers/sandbox-host', '/src/workers/sandbox-host.html'].map(path => `\n${path}\n  ! Content-Security-Policy\n  Content-Security-Policy: object-src 'none'; frame-ancestors 'self'\n`).join('') : headers;
 }
 
 /** Stage one approved app with an explicit public-asset allowlist; never upload a repo root. */

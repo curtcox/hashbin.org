@@ -49,6 +49,16 @@ describe('first-party app deployment boundaries', () => {
     expect(generated).not.toContain('"index.html": "old"');
   });
 
+  it('permits same-origin framing only for both Sheets R host URLs', () => {
+    const headers = hostedHeaders('sheets');
+    expect(headers).toContain("Content-Security-Policy: object-src 'none'; frame-ancestors 'none'");
+    for (const path of ['/src/workers/sandbox-host', '/src/workers/sandbox-host.html']) {
+      expect(headers).toContain(`\n${path}\n  ! Content-Security-Policy\n  Content-Security-Policy: object-src 'none'; frame-ancestors 'self'\n`);
+    }
+    expect(hostedHeaders('python')).not.toContain('sandbox-host');
+    expect(headers).not.toContain('unsafe-eval');
+  });
+
   it('moves drafts without accepting credentials, filesystem permission, or OAuth callbacks', () => {
     const payload = { format: 'hashbin-origin-migration', version: 1, app: 'python', href: OWNED_APPS.python.legacy + '?code=secret&state=secret&compressed=program#hashbin_publish=secret', storage: { 'pythononline:work': '{"src":"print(42)"}' } };
     expect(validateMigration(payload, 'python', OWNED_APPS.python)).toBe(payload);

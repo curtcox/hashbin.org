@@ -44,8 +44,12 @@ try {
         await page.locator('#svg').waitFor();
         await page.locator('#svg g').first().waitFor();
       } else if (slug === 'sheets') {
-        await page.locator('#preview').waitFor();
-        await page.waitForFunction(() => document.getElementById('preview').textContent.trim().length > 0);
+        await page.goto(ownedAppOrigin(slug) + '/?example=quarto-edge');
+        await page.waitForFunction(() => /^Ready/.test(document.getElementById('render-status').textContent), null, { timeout: 100000 });
+        const plot = page.locator('#fig-measurements img');
+        await plot.waitFor();
+        assert.equal(await plot.evaluate(image => image.complete && image.naturalWidth > 0), true);
+        assert.equal(await page.locator('a[href="#fig-measurements"]').textContent(), 'Figure 1');
       } else if (slug === 'textpad') {
         await page.waitForFunction(() => document.getElementById('account').textContent.includes('Not connected'));
         await page.locator('#editor').fill('New domain text');
