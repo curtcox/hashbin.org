@@ -50,6 +50,17 @@ describe('first-party app deployment boundaries', () => {
     expect(hostedHeaders('pages-preview')).toContain('frame-ancestors https://pages.hashbin.page https://pages.hashbin.us');
   });
 
+  it('permits same-origin framing only for both Sheets R host URLs', () => {
+    const headers = hostedHeaders('sheets');
+    expect(headers.trim().split(/\n(?=\S)/).map(rule => rule.split('\n')[0])).toEqual(['/*', '/src/workers/sandbox-host', '/src/workers/sandbox-host.html']);
+    expect(headers).toContain("Content-Security-Policy: object-src 'none'; frame-ancestors 'none'");
+    for (const path of ['/src/workers/sandbox-host', '/src/workers/sandbox-host.html']) {
+      expect(headers).toContain(`\n${path}\n  ! Content-Security-Policy\n  Content-Security-Policy: object-src 'none'; frame-ancestors 'self'\n`);
+    }
+    expect(hostedHeaders('python')).not.toContain('sandbox-host');
+    expect(headers).not.toContain('unsafe-eval');
+  });
+
   it('verifies the configured deployment bytes rather than the source index', async () => {
     await writeFile(join(directory, 'index.html'), 'configured preview origin');
     await refreshOfflineManifest(directory, { version: 'old', assets: ['index.html', 'https://runtime.example/runtime.js'], hashes: { 'index.html': 'old', 'https://runtime.example/runtime.js': 'pinned' } }, 'pagesonline-');

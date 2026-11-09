@@ -101,8 +101,10 @@ export function hostedHeaders(slug, html = '') {
   const textpad = slug === 'textpad' ? /<meta http-equiv="Content-Security-Policy" content="([^"]+)">/.exec(html)?.[1] : null;
   if (slug === 'textpad' && !textpad) throw new Error('Textpad response requires its inline-script hash policy.');
   const policy = textpad || "object-src 'none'";
-  // The offline trusted host is framed only by its own editor; other app pages remain unframeable.
-  const localPreview = slug === 'pages' ? ['/preview', '/preview.html'].map(path => `\n${path}\n  ! Content-Security-Policy\n  Content-Security-Policy: object-src 'none'; frame-ancestors 'self'\n`).join('') : '';
+  // Trusted Pages preview and Sheets R hosts may be framed only by their own editor.
+  // Detach the blanket policy because Cloudflare accumulates matching CSP headers.
+  const localHosts = slug === 'pages' ? ['/preview', '/preview.html'] : slug === 'sheets' ? ['/src/workers/sandbox-host', '/src/workers/sandbox-host.html'] : [];
+  const localPreview = localHosts.map(path => `\n${path}\n  ! Content-Security-Policy\n  Content-Security-Policy: object-src 'none'; frame-ancestors 'self'\n`).join('');
   return `/*\n  Strict-Transport-Security: max-age=63072000; includeSubDomains; preload\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: ${slug === 'pages-preview' ? 'no-referrer' : 'strict-origin-when-cross-origin'}\n  Content-Security-Policy: ${policy}; frame-ancestors ${ancestors}\n${slug === 'apptron' ? '  Cross-Origin-Opener-Policy: same-origin\n  Cross-Origin-Embedder-Policy: require-corp\n/runtime.lock\n  Access-Control-Allow-Origin: *\n/runtime/*/runtime.json\n  Access-Control-Allow-Origin: *\n' : ''}` + localPreview;
 }
 
@@ -170,7 +172,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     if (slug === 'pages') await refreshOfflineManifest(assets, manifest, 'pagesonline-', hostedHeaders(slug));
     if (slug === 'manim' && manifest.assets) await refreshOfflineManifest(assets, manifest, 'manimonline-');
     if (slug === 'audio') await refreshOfflineManifest(assets, manifest, 'audioonline-');
-    if (['sheets', 'modl', 'r', 'livelier', 'apptron', 'gripeline'].includes(slug) && manifest?.assets) await refreshOfflineManifest(assets, manifest, slug + '-offline-');
+    if (['sheets', 'modl', 'r', 'livelier', 'apptron', 'gripeline'].includes(slug) && manifest?.assets) await refreshOfflineManifest(assets, manifest, slug + '-offline-', slug === 'sheets' ? hostedHeaders(slug) : '');
   }
   await writeFile(join(assets, '_headers'), hostedHeaders(slug, slug === 'textpad' ? await readFile(join(assets, 'index.html'), 'utf8') : ''));
   let chunks;

@@ -50,6 +50,15 @@ the preview host and the staged offline manifest hashes those final configured b
 The sibling checkouts must exist beside this repository. `GnuPlotOnline` is the local folder
 name of the `curtcox/GnuplotOnline` repository. Sheets uses its existing staging allowlist.
 
+Sheets' R interpreter needs its trusted `src/workers/sandbox-host.html` frame.
+Only that URL and Cloudflare's extensionless `/src/workers/sandbox-host` URL allow
+`frame-ancestors 'self'`; the editor and other assets retain `'none'`. The rule
+detaches the blanket CSP before adding the host policy, because matching CSP
+headers otherwise accumulate ([Cloudflare header rules](https://developers.cloudflare.com/workers/static-assets/headers/)).
+The host's own script policy and opaque SDK child still isolate R execution.
+The staged offline version includes the response policy, so a header-only fix
+also offers existing offline users an updated copy of the trusted host.
+
 ```sh
 node scripts/deploy-owned-apps.mjs all                 # stage only; no remote writes
 node scripts/deploy-owned-apps.mjs pages --deploy      # publish one app
@@ -110,6 +119,10 @@ records `build-reports/owned-apps/live-verification.json`; it exercises actual P
 all app starts, Pages' cross-site opaque preview, editor CSP and offline fallback. The migration
 test moves fixture drafts between two real local origins and checks that credentials do not move.
 Firefox's installed macOS build still fails before app startup; the client CI matrices retain it.
+
+Sheets verification opens the Quarto R gallery example and requires its R-generated
+plot and resolved figure reference. A static Markdown preview alone does
+not verify R startup.
 
 After deployment, verify each registration contains only its canonical web origin (plus native
 Textpad schemes), refresh the developer safety checks, and verify the Python run-origin CSP
