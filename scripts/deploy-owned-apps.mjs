@@ -172,7 +172,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     if (slug === 'pages') await refreshOfflineManifest(assets, manifest, 'pagesonline-', hostedHeaders(slug));
     if (slug === 'manim' && manifest.assets) await refreshOfflineManifest(assets, manifest, 'manimonline-');
     if (slug === 'audio') await refreshOfflineManifest(assets, manifest, 'audioonline-');
-    if (['sheets', 'modl', 'r', 'livelier', 'apptron', 'gripeline'].includes(slug) && manifest?.assets) await refreshOfflineManifest(assets, manifest, slug + '-offline-');
+    if (['sheets', 'modl', 'r', 'livelier', 'apptron', 'gripeline'].includes(slug) && manifest?.assets) await refreshOfflineManifest(assets, manifest, slug + '-offline-', slug === 'sheets' ? hostedHeaders(slug) : '');
   }
   await writeFile(join(assets, '_headers'), hostedHeaders(slug, slug === 'textpad' ? await readFile(join(assets, 'index.html'), 'utf8') : ''));
   let chunks;

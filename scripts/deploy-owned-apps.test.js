@@ -52,6 +52,7 @@ describe('first-party app deployment boundaries', () => {
 
   it('permits same-origin framing only for both Sheets R host URLs', () => {
     const headers = hostedHeaders('sheets');
+    expect(headers.trim().split(/\n(?=\S)/).map(rule => rule.split('\n')[0])).toEqual(['/*', '/src/workers/sandbox-host', '/src/workers/sandbox-host.html']);
     expect(headers).toContain("Content-Security-Policy: object-src 'none'; frame-ancestors 'none'");
     for (const path of ['/src/workers/sandbox-host', '/src/workers/sandbox-host.html']) {
       expect(headers).toContain(`\n${path}\n  ! Content-Security-Policy\n  Content-Security-Policy: object-src 'none'; frame-ancestors 'self'\n`);

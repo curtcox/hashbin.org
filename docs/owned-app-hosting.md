@@ -56,6 +56,8 @@ Only that URL and Cloudflare's extensionless `/src/workers/sandbox-host` URL all
 detaches the blanket CSP before adding the host policy, because matching CSP
 headers otherwise accumulate ([Cloudflare header rules](https://developers.cloudflare.com/workers/static-assets/headers/)).
 The host's own script policy and opaque SDK child still isolate R execution.
+The staged offline version includes the response policy, so a header-only fix
+also offers existing offline users an updated copy of the trusted host.
 
 ```sh
 node scripts/deploy-owned-apps.mjs all                 # stage only; no remote writes

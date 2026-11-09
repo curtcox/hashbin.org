@@ -59,7 +59,10 @@ try {
         await page.waitForFunction(() => /^Ready/.test(document.getElementById('render-status').textContent), null, { timeout: 100000 });
         const plot = page.locator('#fig-measurements img');
         await plot.waitFor();
-        assert.equal(await plot.evaluate(image => image.complete && image.naturalWidth > 0), true);
+        await page.waitForFunction(() => {
+          const image = document.querySelector('#fig-measurements img');
+          return image && image.complete && image.naturalWidth > 0;
+        });
         assert.equal(await page.locator('a[href="#fig-measurements"]').textContent(), 'Figure 1');
       } else if (slug === 'textpad') {
         await page.waitForFunction(() => document.getElementById('account').textContent.includes('Not connected'));
