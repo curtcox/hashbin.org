@@ -1,0 +1,183 @@
+{
+  "deployment": {
+    "date": "2026-11-08T20:59:45.775Z",
+    "workflow": "https://github.com/curtcox/hashbin.org/actions/runs/42522697907",
+    "commit": "af70a8445f50f81b30845d1f2272691eb8a99717",
+    "origin": "https://ai.hashbin.page",
+    "verifiedAssets": 93,
+    "versionedBytesUnchanged": true,
+    "httpRedirect": {
+      "status": 301,
+      "location": "https://ai.hashbin.page/v0.4.0/host.html?fragment_kit_https_probe=1"
+    },
+    "headers": {
+      "strict-transport-security": "max-age=31536000",
+      "content-security-policy": "default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' blob: https: http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors https://python.hashbin.page",
+      "referrer-policy": "no-referrer",
+      "x-content-type-options": "nosniff"
+    },
+    "cloudflareVersion": "12b0350c-a29e-43bc-ad2d-1ca2175b869a"
+  },
+  "browserAcceptance": {
+    "date": "2026-11-08T20:58:26.578Z",
+    "host": "https://ai.hashbin.page/v0.4.0/host.html",
+    "appOrigin": "https://python.hashbin.page",
+    "records": [
+      {
+        "engine": "chromium",
+        "transport": "actual deployed host and popup",
+        "provider": "mocked; no paid call",
+        "providerCalls": 1,
+        "appCredentialStored": false,
+        "hostCredentialRemembered": false,
+        "forgotten": true,
+        "topLevelToSameSiteFrameStorage": {
+          "localStorage": true,
+          "cache": true,
+          "indexedDB": true,
+          "remembered": false
+        }
+      },
+      {
+        "engine": "webkit",
+        "transport": "actual deployed host and popup",
+        "provider": "mocked; no paid call",
+        "providerCalls": 1,
+        "appCredentialStored": false,
+        "hostCredentialRemembered": false,
+        "forgotten": true,
+        "topLevelToSameSiteFrameStorage": {
+          "localStorage": true,
+          "cache": false,
+          "indexedDB": false,
+          "remembered": false
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Provider responses were mocked for the deployed-host transport checks; no paid model calls.",
+    "Playwright WebKit is not native Safari.",
+    "Firefox production storage is not measured by these local checks."
+  ],
+  "rDeployment": {
+    "date": "2026-11-09T00:12:37.215Z",
+    "workflow": "https://github.com/curtcox/hashbin.org/actions/runs/42538709784",
+    "commit": "19d94b453e27a8479f5e52de6e450e0b74e40a2c",
+    "origin": "https://ai.hashbin.page",
+    "verifiedAssets": 186,
+    "previousVersionBytesUnchanged": true,
+    "policies": [
+      {
+        "version": "0.4.0",
+        "app": "python",
+        "redirect": {
+          "status": 301,
+          "location": "https://ai.hashbin.page/v0.4.0/host.html?fragment_kit_https_probe=1"
+        },
+        "headers": {
+          "strict-transport-security": "max-age=31536000",
+          "content-security-policy": "default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' blob: https: http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors https://python.hashbin.page",
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff"
+        }
+      },
+      {
+        "version": "0.4.3",
+        "app": "r",
+        "redirect": {
+          "status": 301,
+          "location": "https://ai.hashbin.page/v0.4.3/host.html?fragment_kit_https_probe=1"
+        },
+        "headers": {
+          "strict-transport-security": "max-age=31536000",
+          "content-security-policy": "default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; style-src 'self'; connect-src 'self' blob: https: http://localhost:* http://127.0.0.1:*; worker-src 'self' blob:; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors https://r.hashbin.page",
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff"
+        }
+      }
+    ],
+    "cloudflareVersion": "47679755-d7f3-4b9d-be3e-4cfacb740a15"
+  },
+  "rDeployedHostLinux": {
+    "date": "2026-11-09T00:18:30.643Z",
+    "workflow": "https://github.com/curtcox/R/actions/runs/42538939542",
+    "source": "16b8039811a6b4c7b0284bb862bba04177546b47",
+    "host": "https://ai.hashbin.page/v0.4.3/host.html",
+    "appOrigin": "https://r.hashbin.page",
+    "records": [
+      {
+        "engine": "firefox",
+        "transport": "actual deployed host and popup",
+        "provider": "mocked; no paid call",
+        "providerCalls": 1,
+        "appCredentialStored": false,
+        "hostCredentialRemembered": false,
+        "forgotten": true,
+        "topLevelToSameSiteFrameStorage": {
+          "localStorage": true,
+          "cache": true,
+          "indexedDB": true,
+          "remembered": false
+        }
+      },
+      {
+        "engine": "chromium",
+        "transport": "actual deployed host and popup",
+        "provider": "mocked; no paid call",
+        "providerCalls": 1,
+        "appCredentialStored": false,
+        "hostCredentialRemembered": false,
+        "forgotten": true,
+        "topLevelToSameSiteFrameStorage": {
+          "localStorage": true,
+          "cache": true,
+          "indexedDB": true,
+          "remembered": false
+        }
+      },
+      {
+        "engine": "webkit",
+        "transport": "actual deployed host and popup",
+        "provider": "mocked; no paid call",
+        "providerCalls": 1,
+        "appCredentialStored": false,
+        "hostCredentialRemembered": false,
+        "forgotten": true,
+        "topLevelToSameSiteFrameStorage": {
+          "localStorage": true,
+          "cache": false,
+          "indexedDB": false,
+          "remembered": false
+        }
+      }
+    ]
+  },
+  "rStyledClientIntegration": {
+    "date": "2026-11-09T00:12:47.911Z",
+    "records": [
+      {
+        "engine": "chromium",
+        "app": "current pilot source routed at canonical origin",
+        "host": "actual deployed ai.hashbin.page/v0.4.3",
+        "provider": "mocked; no paid call",
+        "settingsBudget": true,
+        "popupKeyHandoff": true,
+        "reviewBeforeAcceptance": true,
+        "noAcceptedSourceAutoRun": true,
+        "appStoredKey": false
+      },
+      {
+        "engine": "webkit",
+        "app": "current pilot source routed at canonical origin",
+        "host": "actual deployed ai.hashbin.page/v0.4.3",
+        "provider": "mocked; no paid call",
+        "settingsBudget": true,
+        "popupKeyHandoff": true,
+        "reviewBeforeAcceptance": true,
+        "noAcceptedSourceAutoRun": true,
+        "appStoredKey": false
+      }
+    ]
+  }
+}

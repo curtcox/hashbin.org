@@ -16,19 +16,30 @@ try {
       assert.equal(response.status(), 200, slug);
       assert.match(response.headers()['strict-transport-security'] || '', /includeSubDomains/);
       if (slug === 'pages') {
-        await page.waitForFunction(() => window.pagesApp);
+        await page.waitForSelector('body[data-ready="true"]');
         await page.evaluate(() => pagesApp.setProject(Project.single('<h1>Domain verification</h1><script>console.log("preview eval",eval("1+2"));</script>')));
-        const preview = page.frameLocator('#preview').frameLocator('#preview-content');
+        const preview = page.frameLocator('#preview').frameLocator('iframe');
+        await preview.getByRole('heading', {name:'Domain verification',exact:true}).waitFor();
         assert.equal(await preview.locator('h1').textContent(), 'Domain verification');
         assert.equal(new URL(await page.locator('#preview').getAttribute('src')).origin, 'https://pages.hashbin.us');
         assert.equal(await preview.locator('h1').evaluate(() => self.origin), 'null');
         await page.evaluate(() => { const script = document.createElement('script'); script.textContent = 'globalThis.injected=true'; document.head.append(script); });
         assert.equal(await page.evaluate(() => globalThis.injected), undefined);
+        await page.waitForURL(url => url.searchParams.has('compressed') || url.hash.length > 1);
         await page.waitForFunction(() => document.getElementById('offline-status').textContent === 'Available offline');
-        await context.setOffline(true); await page.reload(); await page.waitForFunction(() => window.pagesApp);
+        await context.setOffline(true); await page.reload(); await page.waitForSelector('body[data-ready="true"]');
+        await preview.getByRole('heading', {name:'Domain verification',exact:true}).waitFor();
         assert.equal(await preview.locator('h1').textContent(), 'Domain verification');
         assert.equal(new URL(await page.locator('#preview').getAttribute('src')).origin, ownedAppOrigin('pages'));
         await context.setOffline(false);
+      } else if (slug === 'gripeline') {
+        await page.waitForFunction(() => document.getElementById('status').textContent.includes('Checked'));
+        await page.locator('#source').fill('a square printf canonical');
+        await page.waitForFunction(() => document.getElementById('bash').textContent.includes('printf canonical'));
+        assert.equal(await page.locator('#local').isEnabled(), true);
+        await page.waitForFunction(() => !document.getElementById('apptron').disabled, null, { timeout: 15000 });
+        assert.equal(await page.locator('#apptron').isEnabled(), true);
+        assert.equal(context.pages().length, 1);
       } else if (slug === 'gnuplot') {
         await page.waitForFunction(() => /^Rendered in/.test(document.getElementById('status').textContent));
         assert.ok(await page.locator('#preview svg').count());

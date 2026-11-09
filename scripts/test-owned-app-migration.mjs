@@ -17,7 +17,7 @@ async function server() {
     response.setHeader('Content-Type', url.pathname.endsWith('.js') ? 'text/javascript' : 'text/html');
     if (url.pathname === '/src/domain-migration.js') response.end(moduleSource + `\nbootMigration(${JSON.stringify({ [slug]: { legacy: oldURL, origin: new URL(newURL).origin } })});`);
     else if (url.pathname === '/migration.html') response.end(template.replace('__APP__', slug));
-    else response.end('<!doctype html><h1>App</h1><textarea id="editor">Unsaved text</textarea><script type="module" src="src/domain-migration.js"></script>');
+    else response.end(`<!doctype html><h1>App</h1><textarea id="editor">Unsaved text</textarea><button id="more-toggle" onclick="document.getElementById('fk-more-drawer').showModal()">More</button><dialog id="fk-more-drawer"><div class="fk-dialog-body"></div><button onclick="this.closest('dialog').close()">Close</button></dialog><script type="module" src="src/domain-migration.js"></script>`);
   });
   await new Promise(resolve => instance.listen(0, '127.0.0.1', resolve));
   servers.push(instance);
@@ -26,13 +26,16 @@ async function server() {
 let browser;
 try {
   oldURL = await server(); newURL = await server(); browser = await chromium.launch({ executablePath: process.env.OWNED_CHROMIUM_PATH || chromium.executablePath() });
-  for (slug of ['pages', 'python', 'textpad']) {
+  for (slug of ['pages', 'python', 'textpad', 'gripeline']) {
     const context = await browser.newContext();
     const old = await context.newPage();
     await old.goto(oldURL + '#original-link');
-    const key = { pages: 'pagesonline:project', python: 'pythononline:work', textpad: 'hashbin:textpad:migrated-text' }[slug];
-    const work = slug === 'pages' ? '{"files":[{"name":"index.md","text":"# Private draft"}],"entry":"index.md"}' : '{"src":"print(42)"}';
+    const key = { pages: 'pagesonline:project', python: 'pythononline:work', textpad: 'hashbin:textpad:migrated-text', gripeline: 'gripeline:draft' }[slug];
+    const work = slug === 'pages' ? '{"files":[{"name":"index.md","text":"# Private draft"}],"entry":"index.md"}' : slug === 'gripeline' ? '{"src":"a square printf 42","pos":{"a":[1.25,2.5]}}' : '{"src":"print(42)"}';
     await old.evaluate(({ key, work }) => { localStorage.setItem(key, work); localStorage.setItem('hashbin:tokens:client', 'DO NOT COPY'); localStorage.setItem('pythononline:persistent-home', 'true'); }, { key, work });
+    await old.getByRole('button', { name: 'More', exact: true }).click();
+    await old.locator('#fk-more-drawer summary').click();
+    assert.equal(await old.locator('aside').count(), 0);
     const popup = old.waitForEvent('popup');
     await old.getByRole('button', { name: 'Move saved work', exact: true }).click();
     const moved = await popup;
