@@ -19,12 +19,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: curtcox/Tools-for-pages-with-state-in-URL-fragments
-          ref: v0.4.0
+          ref: v0.4.3
           path: kit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: curtcox/Tools-for-pages-with-state-in-URL-fragments
+          ref: v0.4.0
+          path: previous-kit
       - run: npm ci
       - run: npx vitest run scripts/deploy-ai-host.test.js scripts/secure-ai-host.test.js
-      - name: Verify published kit and stage exact pilot allowlist
-        run: node scripts/deploy-ai-host.mjs kit
+      - name: Verify published kit and stage exact versioned app allowlists
+        run: node scripts/deploy-ai-host.mjs kit previous-kit
       - name: Enforce HTTPS only for the approved AI hostname
         run: node scripts/secure-ai-host.mjs
         env:
