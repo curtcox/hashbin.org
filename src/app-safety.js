@@ -8,8 +8,10 @@ import sdk04 from '../frontend/sdk/v0.4.0/integrity.json' with { type: 'json' };
 
 import sdk05 from '../frontend/sdk/v0.5.0/integrity.json' with { type: 'json' };
 
-export const LATEST_SDK = 'v0.5.0';
-const SDK_HASHES = new Set([sdk03, sdk04, sdk05].flatMap(release => Object.values(release.files).map(file => file.sha256)));
+import sdk06 from '../frontend/sdk/v0.6.0/integrity.json' with { type: 'json' };
+
+export const LATEST_SDK = 'v0.6.0';
+const SDK_HASHES = new Set([sdk03, sdk04, sdk05, sdk06].flatMap(release => Object.values(release.files).map(file => file.sha256)));
 export async function isReleasedSdk(source) {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(source));
   return SDK_HASHES.has([...new Uint8Array(hash)].map(byte => byte.toString(16).padStart(2, '0')).join(''));

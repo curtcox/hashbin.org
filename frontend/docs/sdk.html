@@ -30,11 +30,11 @@
     <section class="card"><h2>Resolve an alias (v0.5.0)</h2><pre><code>const cid = await client.resolveAlias('my-document');
 const response = await client.retrieve(cid); // Verifies the bytes against the CID.</code></pre><p>Without an allowance this resolves the global name. Authorize <code>aliases:read</code> to use your personal override. Names can change; keep the CID when you need an immutable reference. <a href="/docs/aliases.html">Alias rules, home-page and todo examples</a>. Personal resolution falls back to the global name when no active personal record exists; check the API response’s <code>source</code> if your app requires a personal result. A private mapping does not make CID content private. <a href="/docs/aliases.html#security">Alias security guidance</a>.</p></section>
     <section class="card" id="load"><h2>1. Load and configure</h2>
-      <p>The immutable <a href="/sdk/v0.5.0/hashbin.js">v0.5.0 release</a> has no mutable module dependencies. This tag enforces Subresource Integrity and exposes <code>window.hashbin</code>:</p>
-      <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.5.0/hashbin.js"
-  integrity="sha384-NTd9Lse9ztAtkBnVWMCFWQ89wuGyFezm25Huo1y+uUoC1QDsJXP9gJPirdBvGkwH"
+      <p>The immutable <a href="/sdk/v0.6.0/hashbin.js">v0.6.0 release</a> has no mutable module dependencies. This tag enforces Subresource Integrity and exposes <code>window.hashbin</code>:</p>
+      <pre><code>&lt;script type="module" src="https://hashbin.org/sdk/v0.6.0/hashbin.js"
+  integrity="sha384-7D/4nLe9A/bjsg1SEKYmndlQBNPg1WLMZBwOyoMRZDRv92cOuz3PgZgdpH4DQACS"
   crossorigin="anonymous"&gt;&lt;/script&gt;</code></pre>
-      <p>Each release's <a href="/sdk/v0.5.0/integrity.json">integrity.json</a> lists SRI and SHA-256 hashes for its files. Offline-first apps can vendor the exact file instead and check it against those hashes in their tests; a vendored copy loads offline and is served by your own verified cache. v0.2.0, v0.3.0 and v0.4.0 remain available unchanged.</p>
+      <p>Each release's <a href="/sdk/v0.6.0/integrity.json">integrity.json</a> lists SRI and SHA-256 hashes for its files. Offline-first apps can vendor the exact file instead and check it against those hashes in their tests; a vendored copy loads offline and is served by your own verified cache. v0.2.0, v0.3.0, v0.4.0 and v0.5.0 remain available unchanged.</p>
       <p>Use <code>window.hashbin.createClient()</code> from a following module script after the SDK loads. Pinning requires deliberate upgrades for fixes. For automatic updates, import the latest module instead:</p>
       <pre><code>import { createClient } from 'https://hashbin.org/sdk/hashbin.js';
 
@@ -133,6 +133,21 @@ sandbox.terminate();         // Stops the code and removes the frame.</code></pr
         <li><strong>Loading runtimes.</strong> In the worker, <code>hashbinSandbox.importScripts(url)</code> and <code>hashbinSandbox.import(url)</code> load classic and module scripts through the proxy; <code>hashbinSandbox.base</code> is the base URL. Chromium cannot start module workers in opaque-origin frames, so the worker itself is classic.</li>
         <li><strong>Messages.</strong> Only your page holds the channel to the worker. Treat every message from it as untrusted data.</li>
       </ul>
+      <h3>Visible DOM execution (v0.6.0)</h3>
+      <p>For Vue, HTML or other DOM renderers, explicitly choose <code>execution: 'frame'</code>. Source runs as a module in a visible opaque iframe with the same <code>allow-scripts</code> boundary. Hosted origins and module-worker options are unavailable in this mode. The returned <code>frame</code> is the render surface; size it from your page.</p>
+      <pre><code>const sandbox = hashbin.createSandbox({
+  execution: 'frame',
+  container: document.querySelector('#preview'),
+  source: `document.body.textContent = 'Isolated preview';
+    onmessage = event =&gt; postMessage({ received: event.data });`,
+  base: new URL('runtime/', location.href).href,
+  proxy: [new URL('runtime/', location.href).href]
+});
+sandbox.onmessage = ({ data }) =&gt; showOutput(data);
+sandbox.postMessage({ slide: 1 });</code></pre>
+      <p>Add <code>'sha256-MHba4tiwcOxYIRSdlDypRezjguFpToZsa3QmTEaBzAI='</code> (<code>DOM_SANDBOX_BOOTSTRAP_HASH</code>) and <code>blob:</code> to <code>script-src</code>. Unlike worker mode, this mode does not require <code>worker-src blob:</code> unless your code creates workers. The frame inherits the rest of your CSP, including style and image restrictions. The original worker bootstrap hash remains unchanged.</p>
+      <p><code>postMessage</code> and message events use the private port. Messages sent to the global frame window after boot are ignored. Messages queued by the parent arrive after source module evaluation, including top-level await, completes. The startup timeout stays active until then. <code>hashbinSandbox.import()</code> uses the same verified parent fetch proxy, including fully offline delivery. Bundle dependencies or use a blob module registry: a relative import inside a fetched blob does not resolve against the original HTTP URL. <code>importScripts()</code> remains worker-only.</p>
+      <p>Module exceptions, rejected promises and startup timeouts call <code>onerror</code> and remove the frame. Treat every received value as untrusted. DOM code can monopolize the frame's event loop; this mode does not provide worker-style interruption of CPU-bound code. It grants no same-origin, popup, modal or top-navigation permission.</p>
       <p>Python Online and Manim Online run all user code this way; see <a href="/docs/security/sn-2026-001">SN-2026-001</a> and <a href="/docs/security/sn-2026-002">SN-2026-002</a>.</p>
     </section>
 

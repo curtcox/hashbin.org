@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './frontend/tests',
   // Hosted sandboxes use their own two-origin fixture server and config.
-  testIgnore: 'hosted-sandbox.spec.js',
+  testIgnore: ['hosted-sandbox.spec.js', 'dom-sandbox.spec.js'],
   
   /* Run tests in files in parallel */
   fullyParallel: true,

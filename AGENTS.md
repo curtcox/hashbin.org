@@ -55,6 +55,7 @@ Node 22+. Run `npm install` first.
 | `npm run lint` | ESLint over `src/`, `workers/`, `scripts/`, `frontend/js/`, `frontend/sdk/`. Must report 0 errors. | nothing |
 | `npm run dev:local` | Full local stack at `http://localhost:8787` with no Clerk, Stripe or Cloudflare account | `.dev.vars` from `.dev.vars.example` |
 | `npm run test:e2e` | Playwright browser tests | starts `dev:local` if needed |
+| `npm run test:dom` | Opaque DOM sandbox and verified offline tests (Chromium, WebKit) | `npx playwright install chromium webkit` |
 | `npm run test:hosted` | Hosted sandbox tests (Chromium, WebKit) | `npx playwright install chromium webkit` |
 | `npm run test:funded:local` | Funded-download acceptance in two isolated local Workers | nothing |
 | `npm run test:api` | Local API suites in `scripts/api-tests/` | `dev:local` running |
