@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { REMAINING_AI_APPS, readOfflineManifest, modlAssets, manimAssets, assetInventory, hostedTextpad, hostedHeaders, refreshOfflineManifest } from './deploy-owned-apps.mjs';
+import { REMAINING_AI_APPS, kitLicenseAssets, readOfflineManifest, modlAssets, manimAssets, assetInventory, hostedTextpad, hostedHeaders, refreshOfflineManifest } from './deploy-owned-apps.mjs';
 import { OWNED_APPS, ownedAppOrigin } from './owned-apps.mjs';
 import { validateMigration, migrationTarget } from './owned-apps/migration.js';
 
@@ -19,6 +19,11 @@ describe('first-party app deployment boundaries', () => {
     expect(origins.every(origin => /^https:\/\/[a-z]+\.hashbin\.page$/.test(origin))).toBe(true);
     expect(ownedAppOrigin('pages-preview')).toBe('https://pages.hashbin.us');
     expect(() => ownedAppOrigin('../other')).toThrow();
+  });
+
+  it('retains root licenses for all bundled pins even when a manifest lists only module subdirectories', () => {
+    expect(kitLicenseAssets({assets:['vendor/fragment-kit-v0.4.3/src/ai/index.js','vendor/fragment-kit-v0.4.3/vendor/integrity.json','vendor/fragment-kit-v0.3.5/src/index.js','src/app.js','https://example.org/vendor/fragment-kit-v0.4.3/src/index.js']})).toEqual(['vendor/fragment-kit-v0.4.3/LICENSE','vendor/fragment-kit-v0.3.5/LICENSE']);
+    expect(kitLicenseAssets({local:['src/app.js']})).toEqual([]);
   });
 
   it('rejects secrets and symlinks before uploading assets', async () => {

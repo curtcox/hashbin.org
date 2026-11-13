@@ -189,3 +189,5 @@ returned from in-tab review with verified source, positions and CID. The same
 saved CID produced `6` in all three native CI OSes (gripeline Actions run
 42431697655). No persistent spending allowance was created. Its normal CI uses
 local stores so this acceptance document's expiry cannot break future checks.
+
+The canonical stager also retains each bundled Fragment Kit root `LICENSE` unchanged beside its module tree. A consumer offline manifest may list only `src/` and `vendor/`; that must not omit the kit license from its published distribution.

@@ -30,6 +30,14 @@ export async function readOfflineManifest(directory) {
   return require(file);
 }
 
+/** Retain each bundled kit's unchanged root license alongside its modules. */
+export function kitLicenseAssets(manifest) {
+  return [...new Set(localAssets(manifest).flatMap(file => {
+    const pin = /^(vendor\/fragment-kit-v\d+\.\d+\.\d+)\//.exec(file);
+    return pin ? [pin[1] + '/LICENSE'] : [];
+  }))];
+}
+
 /** Keep legacy MODL staging until its manifest explicitly inventories the kit release. */
 export function modlAssets(manifest) {
   return manifest?.assets ? [...localAssets(manifest), 'offline-assets.js', 'service-worker.js'] : ['index.html', 'js', 'docs'];
@@ -164,6 +172,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
       await cp(join(root, 'scripts/reports/pages/upload-via-registered-app.js'), join(assets, 'upload-via-registered-app.js'));
     }
   }
+  if (manifest) await copy(source, assets, kitLicenseAssets(manifest));
   if (slug !== 'pages-preview') {
     const migrationFolder = slug === 'modl' ? 'js' : 'src';
     await mkdir(join(assets, migrationFolder), { recursive: true });
