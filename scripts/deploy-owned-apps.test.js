@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { readOfflineManifest, modlAssets, manimAssets, assetInventory, hostedTextpad, hostedHeaders, refreshOfflineManifest } from './deploy-owned-apps.mjs';
+import { REMAINING_AI_APPS, readOfflineManifest, modlAssets, manimAssets, assetInventory, hostedTextpad, hostedHeaders, refreshOfflineManifest } from './deploy-owned-apps.mjs';
 import { OWNED_APPS, ownedAppOrigin } from './owned-apps.mjs';
 import { validateMigration, migrationTarget } from './owned-apps/migration.js';
 
@@ -145,4 +145,10 @@ describe('first-party app deployment boundaries', () => {
     expect(migrationTarget(audio, ownedAppOrigin('audio'))).toBe('https://audio.hashbin.page/?example=door');
     expect(() => validateMigration({ ...audio, storage: { 'hashbin:tokens:client': 'secret' } }, 'audio', OWNED_APPS.audio)).toThrow();
   });
+});
+
+it('the remaining-AI selection deploys only the nine requested client repos',()=>{
+ expect(REMAINING_AI_APPS).toEqual(['gnuplot','livelier','audio','pages','manim','apptron','sheets','modl','gripeline']);
+ for(const app of REMAINING_AI_APPS)expect(OWNED_APPS[app]).toBeDefined();
+ for(const excluded of ['python','r','pages-preview','diagram','upload','textpad'])expect(REMAINING_AI_APPS).not.toContain(excluded);
 });

@@ -27,9 +27,16 @@ jobs:
           ref: v0.4.0
           path: previous-kit
       - run: npm ci
-      - run: npx vitest run scripts/deploy-ai-host.test.js scripts/secure-ai-host.test.js
+      - run: npx vitest run scripts/deploy-ai-host.test.js scripts/secure-ai-host.test.js scripts/owned-apps/ai-host-handoff.test.js scripts/deploy-owned-apps.test.js
       - name: Verify published kit and stage exact versioned app allowlists
         run: node scripts/deploy-ai-host.mjs kit previous-kit
+      - name: Install the published kit’s pinned browser test tooling
+        run: npm ci
+        working-directory: kit
+      - name: Install three browser engines
+        run: node kit/node_modules/@playwright/test/cli.js install --with-deps chromium firefox webkit
+      - name: Verify isolated popup, PKCE, session keys and forget with mocked providers
+        run: node tests/ai-host-fleet.mjs
       - name: Enforce HTTPS only for the approved AI hostname
         run: node scripts/secure-ai-host.mjs
         env:

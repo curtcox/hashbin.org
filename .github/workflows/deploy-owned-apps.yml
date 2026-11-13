@@ -7,7 +7,7 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio, r, livelier, apptron, gripeline]
+        options: [all, remaining-ai, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio, r, livelier, apptron, gripeline]
 permissions:
   contents: read
 concurrency:
@@ -33,15 +33,15 @@ jobs:
             git clone --depth 1 "https://github.com/curtcox/$repo.git" "$folder"
           done
       - uses: actions/setup-python@v5
-        if: inputs.app == 'gripeline' || inputs.app == 'all'
+        if: inputs.app == 'gripeline' || inputs.app == 'all' || inputs.app == 'remaining-ai'
         with:
           python-version: '3.12'
       - name: Build gripeline editor public assets
-        if: inputs.app == 'gripeline' || inputs.app == 'all'
+        if: inputs.app == 'gripeline' || inputs.app == 'all' || inputs.app == 'remaining-ai'
         working-directory: gripeline
         run: python3 site/build.py
       - name: Prepare locked Apptron site
-        if: inputs.app == 'apptron' || inputs.app == 'all'
+        if: inputs.app == 'apptron' || inputs.app == 'all' || inputs.app == 'remaining-ai'
         working-directory: apptron
         env:
           GH_TOKEN: ${{ github.token }}

@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { OWNED_APPS, ownedAppOrigin } from './owned-apps.mjs';
 import { splitRuntimeAssets } from './owned-apps/apptron-assets.mjs';
 
+export const REMAINING_AI_APPS=Object.freeze(['gnuplot','livelier','audio','pages','manim','apptron','sheets','modl','gripeline']);
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(import.meta.url);
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -198,8 +199,8 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
 async function main() {
   const args = process.argv.slice(2);
   const slug = args.find(arg => !arg.startsWith('--'));
-  if (!slug) throw new Error('Usage: node scripts/deploy-owned-apps.mjs <app|all> [--deploy]');
-  const selected = slug === 'all' ? ['pages-preview', ...Object.keys(OWNED_APPS)] : [slug];
+  if (!slug) throw new Error('Usage: node scripts/deploy-owned-apps.mjs <app|all|remaining-ai> [--deploy]');
+  const selected = slug === 'remaining-ai' ? REMAINING_AI_APPS : slug === 'all' ? ['pages-preview', ...Object.keys(OWNED_APPS)] : [slug];
   for (const app of selected) {
     const staged = await stageOwnedApp(app);
     console.log(JSON.stringify(staged));

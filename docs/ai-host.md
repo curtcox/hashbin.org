@@ -86,3 +86,11 @@ did not auto-run and no key entered app storage. This source-integration
 check does not claim the R editor itself was already deployed. Its separate
 canonical/recovery deployment receipts are maintained in
 [Fragment Kit's R rollout](https://github.com/curtcox/Tools-for-pages-with-state-in-URL-fragments/blob/main/todo/r_ai_acceptance.json).
+
+## Remaining client host staging
+
+The new `/fleet-v0.4.3/` entry is staged only. It uses the published 0.4.3 kit, exact canonical origins for Gnuplot, Livelier, Audio, Pages, Manim, Apptron, Sheets, MODL and Gripeline, and a separate per-app storage prefix. Python `/v0.4.0/` and R `/v0.4.3/` remain immutable.
+
+Apptron retains its existing isolation. The new entry keeps COOP `same-origin`, COEP `require-corp` and CORP `cross-origin`. WebKit severs popup openers and partitions message channels under these policies, so a consumer-owned handoff encrypts temporary credentials with WebCrypto ECDH P-256 and AES-GCM. Only the host stores public keys and ciphertext, with additional data binding the nonce, kind and app; the receiving private key is nonextractable and stays in memory. Successful, expired, cancelled and invalid transfers are deleted. A session key is never written as plaintext unless the user explicitly selects Remember on this host. Encrypted leftovers after a crash cannot be recovered without the lost in-memory private key. OAuth PKCE callbacks use the same bounded encrypted handoff after scrubbing the callback URL. Keys never cross to an editor origin.
+
+This is a host UI adapter, not a new kit engine or a modification of pinned vendor bytes. Its MIT license is shipped as `LICENSE-fragment-kit`. Native Safari, GPU engines and untested providers remain unverified. Prepared assets are not production deployment evidence.

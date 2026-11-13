@@ -57,7 +57,7 @@ module.exports = {
   overrides: [
     {
       // Static pages, the GitHub Pages helpers and the browser SDK run in browsers, not Node.
-      files: ['frontend/**/*.js', 'scripts/reports/pages/**/*.js'],
+      files: ['frontend/**/*.js', 'scripts/reports/pages/**/*.js', 'scripts/owned-apps/ai-fleet-host.mjs', 'scripts/owned-apps/ai-host-handoff.mjs'],
       env: { browser: true, worker: true, node: false },
       rules: {
         'node/no-missing-import': 'off',
