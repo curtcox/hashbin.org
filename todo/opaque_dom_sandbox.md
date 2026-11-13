@@ -1,4 +1,4 @@
-# B18: opaque DOM execution
+# B20: opaque DOM execution
 
 Slidev Online cannot use the SDK's worker execution world to mount Vue: workers
 have no DOM. `createSandbox({ execution: 'frame' })` adds an explicit DOM mode

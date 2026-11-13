@@ -1,0 +1,67 @@
+{
+  "name": "Fragment Kit client AI host",
+  "storagePrefix": "fragment-kit-ai-fleet",
+  "allowedOrigins": [
+    "https://gnuplot.hashbin.page",
+    "https://livelier.hashbin.page",
+    "https://audio.hashbin.page",
+    "https://pages.hashbin.page",
+    "https://manim.hashbin.page",
+    "https://apptron.hashbin.page",
+    "https://sheets.hashbin.page",
+    "https://modl.hashbin.page",
+    "https://gripeline.hashbin.page"
+  ],
+  "routes": [
+    "openai",
+    "openrouter",
+    "anthropic",
+    "gemini",
+    "browser",
+    "paste"
+  ],
+  "models": [
+    {
+      "ref": "openai:gpt-4.1-mini-2025-04-14",
+      "name": "GPT-4.1 mini",
+      "capabilities": [
+        "generate",
+        "decide"
+      ],
+      "destination": "OpenAI",
+      "pinned": true,
+      "prices": {
+        "input": 0.4,
+        "output": 1.6
+      }
+    },
+    {
+      "ref": "openai:gpt-4.1-2025-04-14",
+      "name": "GPT-4.1",
+      "capabilities": [
+        "generate",
+        "decide"
+      ],
+      "destination": "OpenAI",
+      "pinned": true,
+      "prices": {
+        "input": 2,
+        "output": 8
+      }
+    },
+    {
+      "ref": "openai:gpt-4o-mini-2024-07-18",
+      "name": "GPT-4o mini",
+      "capabilities": [
+        "generate",
+        "decide"
+      ],
+      "destination": "OpenAI",
+      "pinned": true,
+      "prices": {
+        "input": 0.15,
+        "output": 0.6
+      }
+    }
+  ]
+}
