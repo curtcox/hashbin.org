@@ -1,8 +1,8 @@
 # AI host deployment
 
-The static credential origin is `https://ai.hashbin.page`, with two immutable
+The static credential origin is `https://ai.hashbin.page`, with three immutable
 entry points. `/v0.4.0/host.html` allows only `https://python.hashbin.page`;
-`/v0.4.3/host.html` allows only `https://r.hashbin.page`. Both are deployed and
+`/v0.4.3/host.html` allows only `https://r.hashbin.page`. The `/fleet-v0.4.3/host.html` entry allows the nine canonical origins listed below. All three are deployed and
 verified. No HashBin publisher app ID is invented: this host holds neither
 account sessions nor execution origins.
 
@@ -87,10 +87,14 @@ check does not claim the R editor itself was already deployed. Its separate
 canonical/recovery deployment receipts are maintained in
 [Fragment Kit's R rollout](https://github.com/curtcox/Tools-for-pages-with-state-in-URL-fragments/blob/main/todo/r_ai_acceptance.json).
 
-## Remaining client host staging
+## Deployed remaining-client host — 2026-11-12
 
-The new `/fleet-v0.4.3/` entry is staged only. It uses the published 0.4.3 kit, exact canonical origins for Gnuplot, Livelier, Audio, Pages, Manim, Apptron, Sheets, MODL and Gripeline, and a separate per-app storage prefix. Python `/v0.4.0/` and R `/v0.4.3/` remain immutable.
+The new `/fleet-v0.4.3/` entry is deployed. It uses the published 0.4.3 kit, exact canonical origins for Gnuplot, Livelier, Audio, Pages, Manim, Apptron, Sheets, MODL and Gripeline, and a separate per-app storage prefix. Python `/v0.4.0/` and R `/v0.4.3/` remain immutable.
 
 Apptron retains its existing isolation. The new entry keeps COOP `same-origin`, COEP `require-corp` and CORP `cross-origin`. WebKit severs popup openers and partitions message channels under these policies, so a consumer-owned handoff encrypts temporary credentials with WebCrypto ECDH P-256 and AES-GCM. Only the host stores public keys and ciphertext, with additional data binding the nonce, kind and app; the receiving private key is nonextractable and stays in memory. Successful, expired, cancelled and invalid transfers are deleted. A session key is never written as plaintext unless the user explicitly selects Remember on this host. Encrypted leftovers after a crash cannot be recovered without the lost in-memory private key. OAuth PKCE callbacks use the same bounded encrypted handoff after scrubbing the callback URL. Keys never cross to an editor origin.
 
-This is a host UI adapter, not a new kit engine or a modification of pinned vendor bytes. Its MIT license is shipped as `LICENSE-fragment-kit`. Native Safari, GPU engines and untested providers remain unverified. Prepared assets are not production deployment evidence.
+This is a host UI adapter, not a new kit engine or a modification of pinned vendor bytes. Its MIT license is shipped as `LICENSE-fragment-kit`. Native Safari, GPU engines and untested providers remain unverified. Deployment evidence is recorded below.
+
+[Run 43349881620](https://github.com/curtcox/hashbin.org/actions/runs/43349881620) published commit `89551812964eb2b6ccd8200f5801ddf73802cd87`, Cloudflare version `927ef80d-7186-4fcc-950c-f8dd29e912f7`. All 282 served files match their recorded hashes. All 188 prior versioned assets (including response-policy files) remain unchanged. HTTPS redirects retain paths and queries; all entries send HSTS. Linux Chromium, Firefox and WebKit passed manual key handoff, OAuth PKCE, session-only storage, Forget and rejection of a stale remembered-key popup with synthetic keys and mocked providers. No paid calls ran in CI. [Machine-readable receipt](ai-fleet-host-acceptance.json).
+
+The `remaining-ai` option in the owned-app deployment workflow publishes only Gnuplot, Livelier, Audio, Pages, Manim, Apptron, Sheets, MODL and Gripeline. It excludes Python, R and helper sites. This host receipt does not claim those clients were already deployed.
