@@ -660,7 +660,11 @@ export class HashBinClient {
 export const SANDBOX_BOOTSTRAP = "onmessage=function(e){var d=e.data;if(e.source!==parent||!d||d.type!=='hashbin:sandbox:boot'||!e.ports[0])return;onmessage=null;var p=e.ports[0],w=new Worker(URL.createObjectURL(new Blob([d.source],{type:'text/javascript'})));w.onmessage=function(x){p.postMessage(x.data)};w.onerror=function(x){x.preventDefault();p.postMessage({type:'hashbin:sandbox:error',message:String(x.message||'Sandbox worker failed to start.')})};p.onmessage=function(x){w.postMessage(x.data)}}";
 export const SANDBOX_BOOTSTRAP_HASH = 'sha256-IMEqdP+AkCKdxhM3X7mQM4pV/chykJXPvdtndD+XeH8=';
 
-// Runs first in the sandbox worker: approved URLs are fetched by the embedding page,
+// Opt-in DOM execution. The worker bootstrap and its CSP hash remain unchanged.
+export const DOM_SANDBOX_BOOTSTRAP = "onmessage=function(e){var d=e.data;if(e.source!==parent||!d||d.type!=='hashbin:sandbox:boot'||!e.ports[0])return;onmessage=null;addEventListener('message',function(x){if(x.isTrusted)x.stopImmediatePropagation()},true);var p=e.ports[0],u=URL.createObjectURL(new Blob([d.source],{type:'text/javascript'})),s=document.createElement('script');self.postMessage=function(data,transfer){p.postMessage(data,transfer||[])};p.onmessage=function(x){dispatchEvent(new MessageEvent('message',{data:x.data}))};addEventListener('error',function(x){x.preventDefault();p.postMessage({type:'hashbin:sandbox:error',message:String(x.message||'Sandbox frame failed.')})});addEventListener('unhandledrejection',function(x){x.preventDefault();p.postMessage({type:'hashbin:sandbox:error',message:String(x.reason&&x.reason.message||x.reason||'Sandbox frame rejected.')})});s.type='module';s.src=u;s.onload=function(){URL.revokeObjectURL(u);p.postMessage({type:'hashbin:sandbox:started'})};s.onerror=function(){URL.revokeObjectURL(u);p.postMessage({type:'hashbin:sandbox:error',message:'Sandbox frame module failed to start.'})};document.head.append(s)}";
+export const DOM_SANDBOX_BOOTSTRAP_HASH = 'sha256-W8E0+ZcpdOziGA+2GTLOp3Yp0ynz8sScU1g4420kMqY=';
+
+// Runs first in the sandbox: approved URLs are fetched by the embedding page,
 // so they come from its verified offline cache; everything else uses the network directly.
 function sandboxPrelude(config) {
   const pending = new Map();
@@ -703,25 +707,31 @@ function sandboxPrelude(config) {
     // Module scripts: dynamic import of the fetched text.
     import: async url => import(await scriptURL(url)),
     // Classic scripts: fetched, then run synchronously with importScripts.
-    importScripts: async (...urls) => { const loaded = await Promise.all(urls.map(scriptURL)); importScripts(...loaded); }
+    importScripts: async (...urls) => { if (typeof importScripts !== 'function') throw new Error('importScripts requires worker execution; use hashbinSandbox.import().'); const loaded = await Promise.all(urls.map(scriptURL)); importScripts(...loaded); }
   });
 }
 
 /**
- * Run untrusted code in a worker inside an opaque-origin iframe, isolated from the page's
- * storage, cookies, service worker and DOM. Returns a Worker-like object.
+ * Run untrusted code in an isolated iframe. Worker execution is the default;
+ * execution: 'frame' opts into a visible DOM in an opaque-origin frame only.
+ * Neither execution mode can access the embedding page's storage, cookies or DOM.
+ * Returns a Worker-like object whose frame property is the render surface.
  *
  * source: classic worker script text (or a promise of it); it runs after a prelude that
  *   defines `hashbinSandbox.import()`, `hashbinSandbox.importScripts()` and `hashbinSandbox.base`.
  *   Chromium cannot start module workers in opaque-origin frames; use hashbinSandbox.import() for modules.
- * proxy: URL prefixes the page fetches on the worker's behalf (GET only, without credentials).
+ * Frame source is a module; postMessage and message events use the private port.
+ * hashbinSandbox.import() proxies module bytes in both modes; importScripts is worker-only.
+ * proxy: URL prefixes the page fetches on the sandbox's behalf (GET only, without credentials).
  * base: the URL that relative paths in the worker resolve against.
  */
-export function createSandbox({ source, proxy = [], base = globalThis.location?.href, fetch: fetchImpl = globalThis.fetch?.bind(globalThis), container = globalThis.document?.body, origin = 'opaque', clientId, runDomain = 'hashbin.app', workerType = 'classic', timeout = 15000 } = {}) {
+export function createSandbox({ source, proxy = [], base = globalThis.location?.href, fetch: fetchImpl = globalThis.fetch?.bind(globalThis), container = globalThis.document?.body, origin = 'opaque', clientId, runDomain = 'hashbin.app', workerType = 'classic', execution = 'worker', timeout = 15000 } = {}) {
   if (!source) throw new Error('source is required');
   if (!container) throw new Error('createSandbox() requires a document.');
   if (!['opaque', 'hosted'].includes(origin)) throw new Error('origin must be opaque or hosted.');
   if (!['classic', 'module'].includes(workerType) || (origin === 'opaque' && workerType !== 'classic')) throw new Error('Module workers require origin: hosted.');
+  if (!['worker', 'frame'].includes(execution)) throw new Error('execution must be worker or frame.');
+  if (execution === 'frame' && (origin !== 'opaque' || workerType !== 'classic')) throw new Error('Frame execution requires opaque origin and no workerType.');
   if (!Number.isFinite(timeout) || timeout <= 0) throw new Error('timeout must be positive.');
   let expectedOrigin = 'null';
   if (origin === 'hosted') {
@@ -751,7 +761,7 @@ export function createSandbox({ source, proxy = [], base = globalThis.location?.
     onerror: null,
     postMessage(data, transfer = []) {
       if (closed) return;
-      if (origin === 'hosted' && !booted) queued.push([data, transfer]);
+      if ((origin === 'hosted' || execution === 'frame') && !booted) queued.push([data, transfer]);
       else port.postMessage(data, transfer);
     },
     terminate() { closed = true; clearTimeout(timer); queued.length = 0; port.close(); channel.port2.close(); frame.remove(); }
@@ -759,7 +769,7 @@ export function createSandbox({ source, proxy = [], base = globalThis.location?.
   const fail = message => {
     if (closed) return;
     const event = { message, ...(origin === 'hosted' ? { code: 'sandbox_unavailable' } : {}), preventDefault() {} };
-    if (origin === 'hosted') sandbox.terminate();
+    if (origin === 'hosted' || execution === 'frame') sandbox.terminate();
     sandbox.onerror?.(event);
   };
   const respond = async ({ id, url }) => {
@@ -784,8 +794,8 @@ export function createSandbox({ source, proxy = [], base = globalThis.location?.
       catch (error) { fail(String(error?.message || error)); }
       return;
     }
-    if (origin === 'hosted' && data?.type === 'hashbin:sandbox:started') {
-      if (!ready || booted) return;
+    if ((origin === 'hosted' || execution === 'frame') && data?.type === 'hashbin:sandbox:started') {
+      if ((origin === 'hosted' && !ready) || booted) return;
       booted = true; clearTimeout(timer);
       for (const [data, transfer] of queued.splice(0)) port.postMessage(data, transfer);
       return;
@@ -797,15 +807,21 @@ export function createSandbox({ source, proxy = [], base = globalThis.location?.
   // allow-scripts + allow-same-origin is safe ONLY because hosted mode's frame
   // is cross-origin to this page. The explicit check above enforces that boundary.
   frame.setAttribute('sandbox', origin === 'hosted' ? 'allow-scripts allow-same-origin' : 'allow-scripts');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.tabIndex = -1;
   frame.title = 'Code sandbox';
-  frame.style.display = 'none';
+  if (execution === 'worker') {
+    frame.setAttribute('aria-hidden', 'true');
+    frame.tabIndex = -1;
+    frame.style.display = 'none';
+  }
   if (origin === 'hosted') {
     frame.src = `${expectedOrigin}/frame/v0.4.0`;
     frame.addEventListener('error', () => fail('Hosted sandbox could not load.'), { once: true });
     timer = setTimeout(() => fail('Hosted sandbox timed out.'), timeout);
-  } else frame.srcdoc = `<!doctype html><meta charset="utf-8"><script>${SANDBOX_BOOTSTRAP}</script>`;
+  } else {
+    const bootstrap = execution === 'frame' ? DOM_SANDBOX_BOOTSTRAP : SANDBOX_BOOTSTRAP;
+    frame.srcdoc = `<!doctype html><meta charset="utf-8"><script>${bootstrap}</script>`;
+    if (execution === 'frame') timer = setTimeout(() => fail('Sandbox frame timed out.'), timeout);
+  }
   frame.addEventListener('load', async () => {
     try {
       if (origin === 'hosted') {
@@ -881,6 +897,8 @@ export const hashbin = {
   createSandbox,
   SANDBOX_BOOTSTRAP,
   SANDBOX_BOOTSTRAP_HASH,
+  DOM_SANDBOX_BOOTSTRAP,
+  DOM_SANDBOX_BOOTSTRAP_HASH,
   save,
   disconnect,
   handlePublishCallback,

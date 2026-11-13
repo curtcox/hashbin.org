@@ -1,0 +1,15 @@
+{
+  "version": "v0.6.0",
+  "file": "hashbin.js",
+  "integrity": "sha384-05BrWQELm8ySalrZTqdiy/H6VEf78xULsBJkpR+Og6UKMS/0lMZpL1+5jaft1fp3",
+  "files": {
+    "hashbin.js": {
+      "integrity": "sha384-05BrWQELm8ySalrZTqdiy/H6VEf78xULsBJkpR+Og6UKMS/0lMZpL1+5jaft1fp3",
+      "sha256": "6095939fda5b199d5f1f61d28166c921b9f7857a0e0c33cadf0ad702b26de097"
+    },
+    "hashbin-cache.js": {
+      "integrity": "sha384-OjeXeXB30xFV4yU2LmXTYzc0KsymrivM/l3f/rgDQuPsTzGVMnk6vYtck8n60EgP",
+      "sha256": "1019bed9cd85187d827dca3a4f3bcf98beaff5be48952f005e182844dc7561ab"
+    }
+  }
+}

@@ -44,6 +44,8 @@ jobs:
 
       - name: Verify hosted sandbox and developer controls
         run: npm run test:hosted
+      - name: Test opaque DOM sandboxes
+        run: npm run test:dom
 
       - name: Verify native funded downloads with isolated local Workers
         run: npm run test:funded:local

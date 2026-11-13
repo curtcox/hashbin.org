@@ -25,7 +25,7 @@ describe('registered-app safety check', () => {
 
   it('accepts a pinned current SDK, a strict policy, the sandbox and a verified cache', () => {
     const html = `<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-x' blob:; object-src 'none'"><script src="app.js"></script>`;
-    const findings = analyzePage({ url: 'https://app.example/', html, scripts: { app: "import('../vendor/hashbin-sdk-v0.5.0.mjs'); sdk.createSandbox({})" }, serviceWorker: 'HashBinCache.verify' });
+    const findings = analyzePage({ url: 'https://app.example/', html, scripts: { app: "import('../vendor/hashbin-sdk-v0.6.0.mjs'); sdk.createSandbox({})" }, serviceWorker: 'HashBinCache.verify' });
     expect(findings.filter(item => item.level === 'warn')).toEqual([]);
     expect(ids(findings)).toEqual(expect.arrayContaining(['csp-present', 'sdk-current', 'sandbox', 'sw-verified']));
   });
