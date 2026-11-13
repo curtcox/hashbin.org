@@ -103,3 +103,33 @@ test('reports module exceptions and removes the failed frame', async ({ page }) 
   await expect(run(page, `Promise.reject(new Error('frame rejected intentionally'));`)).rejects.toThrow(/frame rejected intentionally/);
   await expect(page.locator('iframe')).toHaveCount(0);
 });
+
+test('queues messages across top-level await', async ({ page }) => {
+  test.setTimeout(3000);
+  expect(await page.evaluate(async () => {
+    const { createSandbox } = await import('/sdk.js');
+    return new Promise((resolve, reject) => {
+      const sandbox = createSandbox({ execution: 'frame', timeout: 500,
+        source: `await new Promise(resolve => setTimeout(resolve, 100)); onmessage = event => postMessage(event.data);` });
+      sandbox.onerror = error => { sandbox.terminate(); reject(new Error(error.message)); };
+      sandbox.onmessage = event => { sandbox.terminate(); resolve(event.data); };
+      sandbox.postMessage({ queuedBeforeAwait: true });
+    });
+  })).toEqual({ queuedBeforeAwait: true });
+});
+
+test('times out module evaluation that never completes', async ({ page }) => {
+  test.setTimeout(3000);
+  await expect(run(page, `await new Promise(() => {});`, { timeout: 100 })).rejects.toThrow('Sandbox frame timed out.');
+  await expect(page.locator('iframe')).toHaveCount(0);
+});
+
+test('preserves null bodies for proxied 204, 205 and 304 responses', async ({ page }) => {
+  const result = await run(page, `const results = [];
+    for (const status of [204, 205, 304]) {
+      const response = await fetch('http://127.0.0.1:8792/empty/' + status);
+      results.push({ status: response.status, nullBody: response.body === null, text: await response.text() });
+    }
+    postMessage(results);`, { proxy: ['http://127.0.0.1:8792/empty/'] });
+  expect(result.data).toEqual([204, 205, 304].map(status => ({ status, nullBody: true, text: '' })));
+});

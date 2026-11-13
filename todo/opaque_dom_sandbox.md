@@ -13,11 +13,14 @@ Implementation prepared for SDK v0.6.0, **not deployed or published**:
   service-worker-backed module delivery. Source modules must bundle dependencies
   or use blob module registries; relative imports inside fetched blobs do not
   resolve against their original HTTP URLs.
-- Queuing until module initialization, startup timeout, exception/rejection
+- Queuing until full module evaluation (including top-level await), startup timeout, exception/rejection
   reporting and teardown. DOM scripts can monopolize the frame's event loop;
   this mode does not promise worker-style interruption of CPU-bound code.
 - Hosted origin and module-worker options are rejected for DOM mode.
 - Old immutable releases, bootstrap bytes and hashes are unchanged.
+
+Review regressions also cover messages queued across top-level await, evaluation
+that never completes, and proxied 204/205/304 responses with null bodies.
 
 Local verification:
 

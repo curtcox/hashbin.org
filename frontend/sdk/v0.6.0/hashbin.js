@@ -661,8 +661,8 @@ export const SANDBOX_BOOTSTRAP = "onmessage=function(e){var d=e.data;if(e.source
 export const SANDBOX_BOOTSTRAP_HASH = 'sha256-IMEqdP+AkCKdxhM3X7mQM4pV/chykJXPvdtndD+XeH8=';
 
 // Opt-in DOM execution. The worker bootstrap and its CSP hash remain unchanged.
-export const DOM_SANDBOX_BOOTSTRAP = "onmessage=function(e){var d=e.data;if(e.source!==parent||!d||d.type!=='hashbin:sandbox:boot'||!e.ports[0])return;onmessage=null;addEventListener('message',function(x){if(x.isTrusted)x.stopImmediatePropagation()},true);var p=e.ports[0],u=URL.createObjectURL(new Blob([d.source],{type:'text/javascript'})),s=document.createElement('script');self.postMessage=function(data,transfer){p.postMessage(data,transfer||[])};p.onmessage=function(x){dispatchEvent(new MessageEvent('message',{data:x.data}))};addEventListener('error',function(x){x.preventDefault();p.postMessage({type:'hashbin:sandbox:error',message:String(x.message||'Sandbox frame failed.')})});addEventListener('unhandledrejection',function(x){x.preventDefault();p.postMessage({type:'hashbin:sandbox:error',message:String(x.reason&&x.reason.message||x.reason||'Sandbox frame rejected.')})});s.type='module';s.src=u;s.onload=function(){URL.revokeObjectURL(u);p.postMessage({type:'hashbin:sandbox:started'})};s.onerror=function(){URL.revokeObjectURL(u);p.postMessage({type:'hashbin:sandbox:error',message:'Sandbox frame module failed to start.'})};document.head.append(s)}";
-export const DOM_SANDBOX_BOOTSTRAP_HASH = 'sha256-W8E0+ZcpdOziGA+2GTLOp3Yp0ynz8sScU1g4420kMqY=';
+export const DOM_SANDBOX_BOOTSTRAP = "onmessage=function(e){var d=e.data;if(e.source!==parent||!d||d.type!=='hashbin:sandbox:boot'||!e.ports[0])return;onmessage=null;addEventListener('message',function(x){if(x.isTrusted)x.stopImmediatePropagation()},true);var p=e.ports[0],u=URL.createObjectURL(new Blob([d.source],{type:'text/javascript'}));self.postMessage=function(data,transfer){p.postMessage(data,transfer||[])};p.onmessage=function(x){dispatchEvent(new MessageEvent('message',{data:x.data}))};addEventListener('error',function(x){x.preventDefault();p.postMessage({type:'hashbin:sandbox:error',message:String(x.message||'Sandbox frame failed.')})});addEventListener('unhandledrejection',function(x){x.preventDefault();p.postMessage({type:'hashbin:sandbox:error',message:String(x.reason&&x.reason.message||x.reason||'Sandbox frame rejected.')})});import(u).then(function(){URL.revokeObjectURL(u);p.postMessage({type:'hashbin:sandbox:started'})},function(error){URL.revokeObjectURL(u);p.postMessage({type:'hashbin:sandbox:error',message:String(error&&error.message||error||'Sandbox frame module failed to start.')})})}";
+export const DOM_SANDBOX_BOOTSTRAP_HASH = 'sha256-MHba4tiwcOxYIRSdlDypRezjguFpToZsa3QmTEaBzAI=';
 
 // Runs first in the sandbox: approved URLs are fetched by the embedding page,
 // so they come from its verified offline cache; everything else uses the network directly.
@@ -679,7 +679,12 @@ function sandboxPrelude(config) {
     if (!request) return;
     pending.delete(data.id);
     if (data.error) request.reject(new TypeError(data.error));
-    else request.resolve(new Response(data.body, { status: data.status, headers: { 'Content-Type': data.contentType || 'application/octet-stream' } }));
+    else {
+      try {
+        const body = [204, 205, 304].includes(data.status) ? null : data.body;
+        request.resolve(new Response(body, { status: data.status, headers: { 'Content-Type': data.contentType || 'application/octet-stream' } }));
+      } catch (error) { request.reject(error); }
+    }
   });
   const proxied = url => new Promise((resolve, reject) => {
     const id = ++next;

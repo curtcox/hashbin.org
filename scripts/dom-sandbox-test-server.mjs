@@ -37,6 +37,9 @@ const server = createServer((req, res) => {
     res.writeHead(200).end(); return;
   }
   if (offline) { req.socket.destroy(); return; }
+  if (/^\/empty\/(204|205|304)$/.test(req.url)) {
+    res.writeHead(Number(req.url.split('/').pop())).end(); return;
+  }
   const asset = assets[new URL(req.url, 'http://127.0.0.1').pathname];
   if (!asset) { res.writeHead(404).end(); return; }
   res.writeHead(200, { 'Content-Type': asset.type, 'Content-Security-Policy': policy, 'Cache-Control': 'no-store' });
