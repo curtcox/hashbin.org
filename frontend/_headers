@@ -16,6 +16,16 @@
   Referrer-Policy: no-referrer
   Cache-Control: no-store
 
+# devicebasedauth.org returns here with a one-time authorization code in the query.
+/auth/dba/callback
+  Content-Security-Policy: frame-ancestors 'none'; base-uri 'none'; form-action 'self'
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+/auth/dba/callback.html
+  Content-Security-Policy: frame-ancestors 'none'; base-uri 'none'; form-action 'self'
+  Referrer-Policy: no-referrer
+  Cache-Control: no-store
+
 # Textpad's one inline module script is allowed by hash (src/docs-textpad.test.js keeps it current).
 /docs/textpad/app
   Content-Security-Policy: script-src 'self' 'sha256-OUBy5GEYLr03aAKHNIriY2MrWEGIx+zZshOGr92XYJk='; object-src 'none'; base-uri 'none'; frame-ancestors 'none'
