@@ -6,7 +6,7 @@ status lists, and runs the OIDC client used for account linking. HashBin uses it
 
 - **Source:** `packages/verify/src/*.js` (without the `*.test.js` files) in
   [devicebasedauth.org](https://github.com/curtcox/device-based-auth)
-- **Commit:** `ba0841a` (package version 0.1.0)
+- **Commit:** `a6c0d77` (package version 0.1.0)
 - **License:** MIT
 
 **Do not edit these files here.** There is one credential evaluator, shared by DBA, its SDK

@@ -11,10 +11,19 @@ async function pipe(bytes, stream) {
 
 /** zlib (RFC 1950) compress. */
 export function deflate(bytes) { return pipe(bytes, new CompressionStream('deflate')); }
-/** zlib (RFC 1950) decompress, bounded so a hostile list cannot exhaust memory. */
+/** zlib (RFC 1950) decompress, stopping as soon as the output passes maxBytes. */
 export async function inflate(bytes, maxBytes = 16 * 1024 * 1024) {
-  const out = await pipe(bytes, new DecompressionStream('deflate'));
-  if (out.length > maxBytes) throw new Error('status list too large');
+  const reader = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate')).getReader();
+  const chunks = []; let size = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    size += value.length;
+    if (size > maxBytes) { await reader.cancel(); throw new Error('status list too large'); }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(size); let offset = 0;
+  for (const chunk of chunks) { out.set(chunk, offset); offset += chunk.length; }
   return out;
 }
 

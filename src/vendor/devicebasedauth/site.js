@@ -25,8 +25,10 @@ export function createSiteAuth({ audience, namespace, scopes, linkedUser, ...ver
     const userId = await linkedUser(payload.acct, { request, payload, kind: auth.kind });
     if (!userId) return { ok: false, status: 403, code: 'account_not_linked', message: `Link devicebasedauth.org account ${payload.acct} to your ${audience} account first`, dba_account: payload.acct };
     const allowed = verifier.allowedActions(payload, actions, { request, proof }).map(a => a.slice(namespace.length + 1));
-    // The tightest spend cap of any grant this credential holds applies to everything it does.
-    const caps = payload.grants.map(g => g.limits?.spend_usd_per_month).filter(v => v !== undefined);
+    // The tightest spend cap among this site's grants applies to everything the credential does
+    // here; caps on other sites' grants are theirs to enforce.
+    const ours = payload.grants.filter(g => Array.isArray(g.actions) && g.actions.some(a => a.startsWith(`${namespace}:`)));
+    const caps = ours.map(g => g.limits?.spend_usd_per_month).filter(v => v !== undefined);
     return {
       ok: true, userId, dbaAccount: payload.acct, deviceId: payload.sub, credentialId: payload.cid, kind: auth.kind,
       session: allowed.includes('session'), scopes: allowed.filter(s => s !== 'session'),
@@ -52,7 +54,13 @@ export function createSiteAuth({ audience, namespace, scopes, linkedUser, ...ver
  */
 export function createOidcClient({ clientId, redirectUri, issuer = 'https://devicebasedauth.org', fetch: fetcher = (...a) => globalThis.fetch(...a), now = () => Math.floor(Date.now() / 1000) }) {
   let discovery = null; let jwks = null;
-  const config = async () => discovery ||= await (await fetcher(`${issuer}/.well-known/openid-configuration`)).json();
+  // Only successful responses are cached, so one outage cannot poison later sign-ins.
+  async function getJson(url) {
+    const response = await fetcher(url);
+    if (!response.ok) throw Object.assign(new Error(`${url} returned ${response.status}`), { code: 'issuer_unavailable' });
+    return response.json();
+  }
+  const config = async () => discovery ||= await getJson(`${issuer}/.well-known/openid-configuration`);
 
   async function begin({ scope = 'openid profile' } = {}) {
     const c = await config();
@@ -72,9 +80,9 @@ export function createOidcClient({ clientId, redirectUri, issuer = 'https://devi
     const tokens = await response.json();
     if (!response.ok) throw Object.assign(new Error(tokens.error_description || 'Token exchange failed'), { code: tokens.error });
     const { header, payload } = decodeJws(tokens.id_token);
-    jwks ||= await (await fetcher(c.jwks_uri)).json();
-    let key = jwks.keys.find(k => k.kid === header.kid);
-    if (!key) { jwks = await (await fetcher(c.jwks_uri)).json(); key = jwks.keys.find(k => k.kid === header.kid); }
+    jwks ||= await getJson(c.jwks_uri);
+    let key = jwks.keys?.find(k => k.kid === header.kid);
+    if (!key) { jwks = await getJson(c.jwks_uri); key = jwks.keys?.find(k => k.kid === header.kid); }
     if (!key || !await verifyJws(tokens.id_token, key)) throw Object.assign(new Error('ID token signature is invalid'), { code: 'invalid_id_token' });
     const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
     if (payload.iss !== c.issuer || !audiences.includes(clientId) || (Array.isArray(payload.aud) && payload.aud.length > 1 && payload.azp !== clientId) || payload.nonce !== saved.nonce || payload.exp < now() - 60) throw Object.assign(new Error('ID token claims are invalid'), { code: 'invalid_id_token' });
