@@ -9,7 +9,7 @@ import { decodeJws, verifyJws, sha256b64u, b64u } from './jose.js';
  * createSiteAuth({ audience, namespace, scopes, linkedUser, issuer, fetch, now, online })
  *   namespace  — the site's action namespace ("hashbin")
  *   scopes     — the site's own scope names ("content:write", …); actions are `${namespace}:${scope}`
- *   linkedUser — async (dbaAccount) => local user id, or null when the DBA account is not linked
+ *   linkedUser — async (dbaAccount, { request, payload }) => local user id, or null when not linked
  * authenticate(request) returns null when the request carries no DBA credential (fall through to
  * the site's other auth), or { ok: false, status, code } / { ok: true, userId, scopes, … }.
  */
@@ -22,7 +22,7 @@ export function createSiteAuth({ audience, namespace, scopes, linkedUser, ...ver
     const auth = await verifier.authenticateRequest(request);
     if (!auth.ok) return auth.code === 'credential_required' ? null : { ok: false, status: auth.status, code: auth.code, message: auth.message };
     const { payload, proof } = auth;
-    const userId = await linkedUser(payload.acct);
+    const userId = await linkedUser(payload.acct, { request, payload, kind: auth.kind });
     if (!userId) return { ok: false, status: 403, code: 'account_not_linked', message: `Link devicebasedauth.org account ${payload.acct} to your ${audience} account first`, dba_account: payload.acct };
     const allowed = verifier.allowedActions(payload, actions, { request, proof }).map(a => a.slice(namespace.length + 1));
     // The tightest spend cap of any grant this credential holds applies to everything it does.
@@ -76,7 +76,8 @@ export function createOidcClient({ clientId, redirectUri, issuer = 'https://devi
     let key = jwks.keys.find(k => k.kid === header.kid);
     if (!key) { jwks = await (await fetcher(c.jwks_uri)).json(); key = jwks.keys.find(k => k.kid === header.kid); }
     if (!key || !await verifyJws(tokens.id_token, key)) throw Object.assign(new Error('ID token signature is invalid'), { code: 'invalid_id_token' });
-    if (payload.iss !== c.issuer || payload.aud !== clientId || payload.nonce !== saved.nonce || payload.exp < now() - 60) throw Object.assign(new Error('ID token claims are invalid'), { code: 'invalid_id_token' });
+    const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+    if (payload.iss !== c.issuer || !audiences.includes(clientId) || (Array.isArray(payload.aud) && payload.aud.length > 1 && payload.azp !== clientId) || payload.nonce !== saved.nonce || payload.exp < now() - 60) throw Object.assign(new Error('ID token claims are invalid'), { code: 'invalid_id_token' });
     return payload;
   }
 

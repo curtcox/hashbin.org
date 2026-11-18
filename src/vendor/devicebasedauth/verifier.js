@@ -2,7 +2,7 @@
  * A caching verifier for relying parties. Verifies credentials offline with the issuer's
  * JWKS and status lists (both CDN-served and cached here), and optionally online.
  */
-import { verifyJws } from './jose.js';
+import { verifyJws, decodeJws } from './jose.js';
 import { verifyCredential, verifyProof, ReplayCache, VerificationError, DEFAULT_ISSUER, STATUS_LIST_TYP, CLOCK_SKEW } from './credential.js';
 import { evaluateGrants } from './grants.js';
 import { decodeStatusList, getBit } from './status-list.js';
@@ -19,10 +19,14 @@ export function networkLocation(request) {
 
 /** Pull the credential and proof out of request headers. */
 export function credentialFromRequest(request) {
-  const auth = request.headers.get('Authorization') || '';
-  if (auth.startsWith('DBA ')) return { kind: 'device', credential: auth.slice(4).trim(), proof: request.headers.get('DPoP') || undefined };
-  if (auth.startsWith('Bearer ')) {
-    const token = auth.slice(7).trim();
+  const auth = (request.headers.get('Authorization') || '').trim();
+  const space = auth.indexOf(' ');
+  const scheme = space > 0 ? auth.slice(0, space).toLowerCase() : '';
+  const value = space > 0 ? auth.slice(space + 1).trim() : '';
+  // HTTP authentication schemes are case-insensitive (RFC 9110 §11.1).
+  if (scheme === 'dba') return { kind: 'device', credential: value, proof: request.headers.get('DPoP') || undefined };
+  if (scheme === 'bearer') {
+    const token = value;
     // Only DBA access tokens are claimed here; other bearer tokens belong to the site.
     try { const header = JSON.parse(atob(token.split('.')[0].replaceAll('-', '+').replaceAll('_', '/'))); if (header.typ === 'dba-access+jwt') return { kind: 'access', credential: token }; } catch { /* not ours */ }
   }
@@ -44,11 +48,25 @@ export function createVerifier(options = {}) {
   const replay = options.replay === false ? null : options.replay || new ReplayCache();
   let jwksCache = null; const statusCache = new Map();
 
+  let jwksFailure = null; const statusFailures = new Map();
+  const FAILURE_BACKOFF = options.failureBackoff ?? 30;
+
   async function jwks(force = false) {
     const now = clock();
     if (!force && jwksCache && jwksCache.expires > now) return jwksCache.value;
-    const response = await fetcher(`${issuer}/.well-known/jwks.json`);
-    if (!response.ok) throw new VerificationError('jwks_unavailable', `JWKS fetch failed (${response.status})`);
+    // While the issuer is unreachable, fail fast instead of fetching on every request.
+    if (jwksFailure && jwksFailure.until > now) {
+      if (jwksCache) return jwksCache.value;
+      throw new VerificationError('jwks_unavailable', jwksFailure.message);
+    }
+    let response;
+    try { response = await fetcher(`${issuer}/.well-known/jwks.json`); } catch (error) { response = { ok: false, status: error.message }; }
+    if (!response.ok) {
+      jwksFailure = { until: now + FAILURE_BACKOFF, message: `JWKS fetch failed (${response.status})` };
+      if (jwksCache) return jwksCache.value;
+      throw new VerificationError('jwks_unavailable', jwksFailure.message);
+    }
+    jwksFailure = null;
     jwksCache = { value: await response.json(), expires: now + jwksTtl };
     return jwksCache.value;
   }
@@ -56,8 +74,15 @@ export function createVerifier(options = {}) {
   async function statusBytes(uri) {
     const now = clock(); const cached = statusCache.get(uri);
     if (cached && cached.expires > now) return cached.bytes;
-    const response = await fetcher(uri, { headers: { Accept: 'application/statuslist+jwt' } });
-    if (!response.ok) throw new VerificationError('status_unavailable', `Status list fetch failed (${response.status})`);
+    const failed = statusFailures.get(uri);
+    if (failed && failed.until > now) throw new VerificationError('status_unavailable', failed.message);
+    let response;
+    try { response = await fetcher(uri, { headers: { Accept: 'application/statuslist+jwt' } }); } catch (error) { response = { ok: false, status: error.message }; }
+    if (!response.ok) {
+      statusFailures.set(uri, { until: now + FAILURE_BACKOFF, message: `Status list fetch failed (${response.status})` });
+      throw new VerificationError('status_unavailable', `Status list fetch failed (${response.status})`);
+    }
+    statusFailures.delete(uri);
     const jws = (await response.text()).trim();
     const keys = await jwks();
     let decoded = null; let kid;
@@ -80,6 +105,8 @@ export function createVerifier(options = {}) {
 
   /** Verify signature, claims and revocation. */
   async function verify(credential, { typ = 'device' } = {}) {
+    // Reject malformed input before any network fetch.
+    try { decodeJws(credential); } catch { throw new VerificationError('invalid_format', 'Not a compact JWS'); }
     let keys = await jwks(); let result;
     try { result = await verifyCredential(credential, { jwks: keys, issuer, audience, now: clock(), typ }); }
     catch (error) {
