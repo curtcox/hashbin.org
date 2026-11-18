@@ -15,6 +15,9 @@ RUN_DOMAIN = "hashbin.app"
 ENVIRONMENT = "production"
 LOG_LEVEL = "warn"
 CONTENT_DOMAIN = "256t.us"
+# devicebasedauth.org issuer for device-bound credentials and account linking (src/auth/dba.js).
+# Optional: unset means https://devicebasedauth.org.
+# DBA_ISSUER = "https://devicebasedauth.org"
 
 # Production routes
 routes = [
@@ -195,3 +198,13 @@ script_name = "hashbin-worker-prod"
 [[migrations]]
 tag = "v12"
 new_sqlite_classes = ["AliasRecord"]
+
+# devicebasedauth.org account → HashBin user index (src/durable-objects/dba-link.js)
+[[durable_objects.bindings]]
+name = "DBA_LINKS"
+class_name = "DbaLink"
+script_name = "hashbin-worker-prod"
+
+[[migrations]]
+tag = "v13"
+new_sqlite_classes = ["DbaLink"]

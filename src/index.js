@@ -41,6 +41,7 @@ import {
 import { handleGetBalance, handleGetBalanceHistory } from './api/balance.js';
 import { handleUserAliases, handleResolveAlias, handleGlobalAlias } from './api/aliases.js';
 export { AliasRecord } from './durable-objects/alias-record.js';
+export { DbaLink } from './durable-objects/dba-link.js';
 
 import { 
   handleCreateDeposit, 
@@ -158,6 +159,7 @@ import { ADMIN_SESSION, PUBLIC, SESSION, USER_SCOPES, checkAccess, isSessionAuth
 import { handleCreateAdminKey, handleListAdminKeys, handleRevokeAdminKey } from './api/admin-keys.js';
 import { handleMoveAccount } from './api/admin-accounts.js';
 import { handleClerkWebhook } from './api/clerk-webhook.js';
+import { handleFinishDbaLink, handleGetDbaLink, handleStartDbaLink, handleUnlinkDba } from './api/dba.js';
 
 // Configuration constants
 const VALID_ENVIRONMENTS = ['development', 'production', 'local'];
@@ -728,6 +730,11 @@ const API_ROUTES = [
   { method: 'DELETE', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeApiKey(request, env, m[1]) },
   { method: 'PATCH', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateApiKey(request, env, m[1]) },
   { method: 'DELETE', path: '/api/auth/account', access: SESSION, handler: handleDeleteAccount },
+  // devicebasedauth.org account link (device credentials themselves are handled in src/auth/middleware.js)
+  { method: 'GET', path: '/api/auth/dba/link', access: SESSION, handler: handleGetDbaLink },
+  { method: 'DELETE', path: '/api/auth/dba/link', access: SESSION, handler: handleUnlinkDba },
+  { method: 'POST', path: '/api/auth/dba/link/start', access: SESSION, handler: handleStartDbaLink },
+  { method: 'POST', path: '/api/auth/dba/link/finish', access: SESSION, handler: handleFinishDbaLink },
   { method: 'POST', path: '/api/developers/apps', access: SESSION, handler: handleCreateDeveloperApp },
   { method: 'GET', path: '/api/developers/apps', access: SESSION, handler: handleListDeveloperApps },
   { method: ['GET', 'PUT'], path: /^\/api\/developers\/apps\/([^/]+)\/run$/, access: SESSION, handler: (request, env, m) => handleDeveloperRun(request, env, m[1]) },

@@ -25,6 +25,8 @@ much). Each API route declares the scope it needs; anything undeclared is refuse
 | SDK app access token (OAuth + DPoP) | `Authorization: DPoP <access-token>` and `DPoP: <proof-jwt>` | Approved scopes/limits, constrained to the signing key |
 | Unbound app access token (raw OAuth) | `Authorization: Bearer <access-token>` | Approved scopes/limits, without device binding |
 | Admin key | `Authorization: ApiKey hba_…` | Only its admin scopes |
+| devicebasedauth.org device credential | `Authorization: DBA <credential>` and `DPoP: <proof-jwt>` signed by the device key | The scopes its grants name as `hashbin:<scope>`, within its spend cap; its DBA account must be linked |
+| devicebasedauth.org access token | `Authorization: Bearer <token>` (JWS `typ` `dba-access+jwt`, ≤10 minutes) | Same as the credential it came from, without device binding |
 
 Account management is **session-only**: API keys, admin keys, developer apps, account
 settings, app authorizations, download budgets and sessions, deposits, provider linking
@@ -151,6 +153,37 @@ working if `ADMIN_USER_ID` changes. There is no shared admin token.
 All key and download-token tags use separate keys derived from `DOWNLOAD_TOKEN_SECRET`, so
 one kind of credential can never verify as another.
 
+### devicebasedauth.org credentials
+
+[devicebasedauth.org](https://devicebasedauth.org) ("DBA") issues device-bound credentials:
+the private key is generated on the device and never leaves it, and the credential lists what
+that device may do, for which site, when and where. HashBin accepts them as an alternative to
+API keys.
+
+1. Link your DBA account once, signed in to HashBin: **Account Settings → devicebasedauth.org
+   → Link** (or `POST /api/auth/dba/link/start`, below). One DBA account links to at most one
+   HashBin account; credentials from unlinked DBA accounts get `403 AUTH_DBA_NOT_LINKED`.
+2. Create a credential for audience `hashbin.org` at DBA, granting the HashBin scopes it needs
+   as actions named `hashbin:<scope>`, e.g. `dba enroll --aud hashbin.org --action hashbin:content:write`.
+3. Send it with a fresh DPoP proof per request:
+   `Authorization: DBA <credential>` and `DPoP: <proof>` (the DBA SDK and CLI do this).
+
+HashBin verifies credentials offline with DBA's published keys and revocation lists (cached at
+most 5 minutes), so revoking the device at devicebasedauth.org stops it here, and everywhere
+else, within minutes. A grant's `limits.spend_usd_per_month` becomes the credential's
+`monthly_spend_limit_cents` caveat (the tightest cap of its grants applies). Time, place and
+other grant conditions are checked on every request.
+
+Limits for now: a DBA credential is never the account session, even with `hashbin:session`
+(session-only routes answer `403 session_required`), and it cannot use `downloads:spend`.
+
+| Route | Access | Does |
+|---|---|---|
+| `GET /api/auth/dba/link` | session | `{ linked, account, linked_at, issuer }` |
+| `POST /api/auth/dba/link/start` | session | `{ url }`: send the browser there; DBA returns it to `/auth/dba/callback` |
+| `POST /api/auth/dba/link/finish` | session | Body `{ code, state }` from the callback. `409 dba_account_linked_elsewhere` if another HashBin account holds the DBA account |
+| `DELETE /api/auth/dba/link` | session | Unlink; that DBA account's credentials stop working here at once |
+
 ## Rate Limits
 
 Rate limits are enforced per authentication context:
@@ -159,7 +192,7 @@ Rate limits are enforced per authentication context:
 |----------------|-------|
 | Anonymous | 100 requests/minute |
 | Signed-in session | 1,000 requests/minute |
-| Per API key, app grant or admin key | 500 requests/minute |
+| Per API key, app grant, devicebasedauth.org credential or admin key | 500 requests/minute |
 
 The content download host (`256t.us`) separately allows 30 requests per IP per
 minute for anonymous or exhausted identities. Confirmed funded content requests bypass this limit; see Funded downloads below. An HTTP 429 means the request was throttled, not that the content is
@@ -187,11 +220,14 @@ Content-Type: application/json
 | `AUTH_MISSING` | No authentication provided | 401 |
 | `AUTH_INVALID_FORMAT` | Malformed token or key | 401 |
 | `AUTH_EXPIRED` | Token or key has expired | 401 |
-| `AUTH_REVOKED` | API key has been revoked | 401 |
+| `AUTH_KEY_REVOKED` | API key or devicebasedauth.org credential has been revoked | 401 |
 | `AUTH_USER_DELETED` | User account has been deleted | 401 |
 | `AUTH_ENV_MISMATCH` | Test key in prod or vice versa | 401 |
 | `AUTH_RATE_LIMITED` | Rate limit exceeded | 429 |
 | `AUTH_KEY_LIMIT` | Maximum API keys reached (25) | 400 |
+| `AUTH_DBA_PROOF_INVALID` | devicebasedauth.org credential without a valid, unused DPoP proof for this request (`dba_code` says why) | 401 |
+| `AUTH_DBA_NOT_LINKED` | The credential's devicebasedauth.org account (`dba_account`) is not linked to a HashBin account | 403 |
+| `AUTH_DBA_UNAVAILABLE` | devicebasedauth.org's keys or revocation lists could not be fetched; verification fails closed | 503 |
 | `insufficient_scope` | The credential lacks the route's scope | 403 |
 | `session_required` | The route is for the account's own sign-in only | 403 |
 | `caveat_violation` | The request is outside one of the credential's caveats | 403 |
@@ -250,6 +286,10 @@ sections after this one describe the main routes in detail.
 | DELETE | `/api/auth/apikeys/{id}` | account session |
 | PATCH | `/api/auth/apikeys/{id}` | account session |
 | DELETE | `/api/auth/account` | account session |
+| GET | `/api/auth/dba/link` | account session |
+| DELETE | `/api/auth/dba/link` | account session |
+| POST | `/api/auth/dba/link/start` | account session |
+| POST | `/api/auth/dba/link/finish` | account session |
 | POST | `/api/developers/apps` | account session |
 | GET | `/api/developers/apps` | account session |
 | GET, PUT | `/api/developers/apps/{id}/run` | account session |
