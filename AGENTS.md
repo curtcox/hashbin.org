@@ -27,6 +27,7 @@ src/                     Main Worker (hashbin.org): API, cron jobs, Durable Obje
   durable-objects/       18 DO classes (bound in wrangler.toml) plus their helpers
   services/ utils/       Shared logic: pricing, cost policy and monitoring, deletion, backups
   integration/           Multi-module tests
+  vendor/                Third-party code copied in unchanged (devicebasedauth.org verifier); refresh by copying, never edit
 workers/
   256t-content/          256t.us download Worker (separate origin from sessions)
   run-origin/            hashbin.app hosted sandbox origin Worker
