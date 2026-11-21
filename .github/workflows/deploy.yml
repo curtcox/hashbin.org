@@ -9,6 +9,14 @@ on:
       - main
   workflow_dispatch:
 
+# One production run at a time, from deploy through the post-deploy check that production
+# serves this run's commit; overlapping runs made that check fail on a newer commit. A queued
+# run waits rather than cancelling the one deploying, and GitHub keeps only the newest queued
+# run, so a burst of pushes deploys the latest. Pull requests never deploy and get their own group.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('deploy-pr-{0}', github.event.pull_request.number) || format('production-deploy-{0}', github.ref) }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: Run Tests
