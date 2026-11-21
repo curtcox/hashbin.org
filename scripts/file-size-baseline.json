@@ -6,7 +6,6 @@
     "scripts/reports/pages/diagram-oauth.js": 48673,
     "src/api/content.js": 39263,
     "src/api/oauth.js": 43066,
-    "src/durable-objects/user-profile.js": 61523,
     "todo/content_moderation.md": 49619
   }
 }
