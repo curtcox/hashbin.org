@@ -39,6 +39,9 @@ jobs:
       - name: Lint Worker, script and frontend code
         run: npm run lint
 
+      - name: Check file sizes against limits and the ratchet baseline
+        run: npm run check:file-sizes
+
       - name: Install hosted-sandbox test browsers
         run: npx playwright install --with-deps chromium webkit
 

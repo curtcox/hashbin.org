@@ -53,6 +53,7 @@ Node 22+. Run `npm install` first.
 | `npm run test:unit` | Unit tests (Vitest, `**/*.test.js` beside the code). **Run before every commit.** | nothing |
 | `npx vitest run src/api/oauth.test.js` | One test file | nothing |
 | `npm run lint` | ESLint over `src/`, `workers/`, `scripts/`, `frontend/js/`, `frontend/sdk/`. Must report 0 errors. | nothing |
+| `npm run check:file-sizes` | File size limits per type, with a ratchet for files already over them. Also runs in the pre-push hook, unit tests and CI. | nothing |
 | `npm run dev:local` | Full local stack at `http://localhost:8787` with no Clerk, Stripe or Cloudflare account | `.dev.vars` from `.dev.vars.example` |
 | `npm run test:e2e` | Playwright browser tests | starts `dev:local` if needed |
 | `npm run test:dom` | Opaque DOM sandbox and verified offline tests (Chromium, WebKit) | `npx playwright install chromium webkit` |
@@ -93,6 +94,13 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
   new public pages from `frontend/sitemap.html`.
 - **Money** is integer cents. Storage pricing is in `src/utils/pricing.js`; Cloudflare cost
   rates and safety limits are in `src/utils/cost-policy.js`. Don't duplicate either.
+- **File sizes** have per-type limits (source code 32 KiB, HTML/CSS 64 KiB, prose 48 KiB,
+  raster images 256 KiB; the full list is `RULES` in `scripts/check-file-sizes.mjs`). Files
+  already over a limit are listed in `scripts/file-size-baseline.json` and may not grow. After
+  shrinking one, run `npm run check:file-sizes -- --update-baseline` and commit the lower
+  baseline with it. Never raise or add baseline entries to make a check pass; split the file
+  instead. `npm install` enables the pre-push hook in `.githooks/`, which also rejects big files
+  committed and deleted again before the push.
 - **Secrets** never go in the repo. Worker secrets are listed in the comment block in
   `wrangler.toml` and pushed by the deploy workflow from GitHub secrets.
 
