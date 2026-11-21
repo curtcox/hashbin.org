@@ -1,11 +1,7 @@
 {
   "comment": "Files over their size limit when the check arrived. They may not grow; after shrinking one, run: npm run check:file-sizes -- --update-baseline. See scripts/check-file-sizes.mjs.",
   "files": {
-    "docs/video-series/manim/assets/hashbin-logo.png": 988794,
-    "docs/video-series/manim/hb/common.py": 38606,
-    "examples/textpad-expo/assets/icon.png": 393493,
     "frontend/docs/textpad-flutter.html": 77855,
-    "frontend/img/hashbin-logo.png": 1528505,
     "frontend/sdk/hashbin.js": 41008,
     "scripts/reports/pages/diagram-oauth.js": 48673,
     "src/api/content.js": 39263,

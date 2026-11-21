@@ -232,7 +232,8 @@ tools/contact_sheet.sh build/videos/U2-what-it-costs.mp4 sheet.png 12  # frames 
   A pointer marks itself `audit_ignore`, since it's meant to sit on what it clicks.
 - **Logos:** `manim/assets/` holds the logos the scenes use. `tools/make_logos.py` makes them from
   `frontend/img/hashbin-logo.png` and the 256t logo in a sibling checkout of `256t.org`
-  (`examples/256t_logo.png`, or pass its path). Rerun it only if a source logo changes.
+  (`examples/256t_logo.png`, or pass its path). Rerun it only if a source logo changes. The HashBin
+  logo is WebP (`hashbin-logo.webp`): its soft glow is too big as a PNG for the repository's size check.
 - **Rebuilding:** unchanged beats aren't re-voiced. `build/` is ignored by git.
 - **No LaTeX needed:** math is set with `Text` (exponents are composed by `Expr`), so the scenes
   render without a TeX installation.

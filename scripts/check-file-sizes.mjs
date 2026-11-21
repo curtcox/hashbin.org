@@ -206,7 +206,7 @@ function reportTree({ tooBig, grew, stale }) {
     console.error(`✗ ${item.path} is ${formatBytes(item.size)}; the ${item.label} limit is ${formatBytes(item.limit)}.`);
   }
   for (const item of grew) {
-    console.error(`✗ ${item.path} grew to ${formatBytes(item.size)}; the ratchet allows ${item.allowed} bytes. Shrink it below that (limit ${formatBytes(item.limit)}).`);
+    console.error(`✗ ${item.path} grew to ${item.size} bytes; the ratchet allows ${item.allowed}. Shrink it to that or less (limit ${formatBytes(item.limit)}).`);
   }
   for (const item of stale) {
     const now = item.reason === 'gone' ? 'is gone' : item.reason === 'fixed' ? 'is now within its limit' : `shrank to ${item.size} bytes`;
