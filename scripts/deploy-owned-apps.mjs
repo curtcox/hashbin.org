@@ -163,7 +163,9 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     await cp(join(root, 'frontend/sdk/v0.4.0/hashbin.js'), join(assets, 'sdk/hashbin.js'));
     if (slug === 'diagram') {
       await cp(join(root, 'scripts/reports/pages/diagram-oauth.html'), join(assets, 'index.html'));
-      await cp(join(root, 'scripts/reports/pages/diagram-oauth.js'), join(assets, 'diagram-oauth.js'));
+      for (const script of ['diagram-oauth.js', 'diagram-dsl.js', 'diagram-render.js']) {
+        await cp(join(root, 'scripts/reports/pages', script), join(assets, script));
+      }
     } else {
       const generator = await readFile(join(root, 'scripts/reports/generate-main-report.sh'), 'utf8');
       const html = /cat > build-reports\/upload-via-registered-app\.html << 'UPLOAD_REGISTERED_APP_EOF'\n([\s\S]*?)\nUPLOAD_REGISTERED_APP_EOF/.exec(generator)?.[1];
