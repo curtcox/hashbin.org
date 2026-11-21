@@ -1,6 +1,4 @@
 {
   "comment": "Files over their size limit when the check arrived. They may not grow; after shrinking one, run: npm run check:file-sizes -- --update-baseline. See scripts/check-file-sizes.mjs.",
-  "files": {
-    "frontend/sdk/hashbin.js": 41008
-  }
+  "files": {}
 }

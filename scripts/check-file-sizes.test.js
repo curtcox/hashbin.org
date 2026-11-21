@@ -29,9 +29,11 @@ describe('ruleFor', () => {
     expect(ruleFor('frontend/_headers').label).toBe('other');
   });
 
-  it('skips immutable SDK releases but checks the live SDK', () => {
+  it('skips immutable SDK releases and gives the single-file live SDK its own limit', () => {
     expect(ruleFor('frontend/sdk/v0.6.0/hashbin.js')).toBeNull();
-    expect(ruleFor('frontend/sdk/hashbin.js').limit).toBe(CODE_LIMIT);
+    expect(ruleFor('frontend/sdk/hashbin.js')).toMatchObject({ label: 'single-file browser SDK', limit: 64 * KIB });
+    expect(ruleFor('frontend/sdk/hashbin-cache.js').limit).toBe(CODE_LIMIT);
+    expect(ruleFor('other/hashbin.js').limit).toBe(CODE_LIMIT);
   });
 });
 

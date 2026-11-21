@@ -27,8 +27,14 @@ const UPDATE_HINT = 'npm run check:file-sizes -- --update-baseline';
 /** Paths never checked. Released SDKs are immutable copies of frontend/sdk/hashbin.js, which is checked. */
 export const EXCLUDED = [/^frontend\/sdk\/v\d+\.\d+\.\d+\//];
 
-/** First matching rule wins. `names` match the file name, `extensions` the lowercase extension. */
+/**
+ * First matching rule wins. `paths` match the whole repository path, `names` the file name and
+ * `extensions` the lowercase extension.
+ */
 export const RULES = [
+  // Apps load the browser SDK as one module pinned by an SRI hash, which would not cover files it
+  // imported, so it stays a single file and gets more room than other source.
+  { label: 'single-file browser SDK', limit: 64 * KIB, paths: ['frontend/sdk/hashbin.js'] },
   { label: 'lockfile', limit: 1 * MIB, names: ['package-lock.json', 'pubspec.lock', 'yarn.lock', 'pnpm-lock.yaml'] },
   { label: 'source code', limit: 32 * KIB, extensions: ['.js', '.mjs', '.cjs', '.ts', '.py', '.sh', '.dart', '.swift', '.kt', '.kts', '.h'] },
   { label: 'markup and styles', limit: 64 * KIB, extensions: ['.html', '.css'] },
@@ -49,7 +55,7 @@ export function ruleFor(path) {
   if (EXCLUDED.some((pattern) => pattern.test(path))) return null;
   const name = basename(path);
   const ext = extname(name).toLowerCase();
-  return RULES.find((rule) => rule.names?.includes(name) || rule.extensions?.includes(ext)) || DEFAULT_RULE;
+  return RULES.find((rule) => rule.paths?.includes(path) || rule.names?.includes(name) || rule.extensions?.includes(ext)) || DEFAULT_RULE;
 }
 
 /**
