@@ -15,13 +15,16 @@ Durable Objects and R2, with Clerk for sign-in and Stripe for deposits.
 | Design and decisions for an open item | `todo/<plan>.md`, linked from the item's STATUS row |
 | Why something finished was built the way it was | `done/<plan>.md`; older implementation write-ups are in `done/history/` |
 | How to operate, deploy or configure something | [`docs/README.md`](docs/README.md) |
-| The public API | [`docs/API.md`](docs/API.md) and the route table `API_ROUTES` in `src/index.js` |
+| The public API | [`docs/API.md`](docs/API.md) and the route table `API_ROUTES` in `src/api-routes.js` |
 
 ## Repository map
 
 ```
 src/                     Main Worker (hashbin.org): API, cron jobs, Durable Objects
-  index.js               Entry point: fetch/scheduled handlers, API_ROUTES table, DO exports
+  index.js               Entry point: fetch handler, DO exports, BUNDLED_GIT_SHA
+  api-routes.js          API_ROUTES table and its access-checking dispatcher
+  scheduled-jobs.js      Cron jobs (spread into the default export)
+  health.js              /health checks and /api/config
   api/                   One module per API area (content, oauth, payments, disputes, admin-*)
   auth/                  Authentication: middleware, scopes, OAuth, DPoP, admin, local auth
   durable-objects/       18 DO classes (bound in wrangler.toml) plus their helpers
@@ -80,7 +83,7 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
 - **Tests sit beside the code** as `name.test.js` and use Vitest globals. Durable Objects are
   tested by constructing the class with an in-memory storage stub. Copy the pattern from a
   neighboring test rather than inventing one.
-- **Every API route declares its access** in `API_ROUTES` (`src/index.js`): `PUBLIC`, `SESSION`,
+- **Every API route declares its access** in `API_ROUTES` (`src/api-routes.js`): `PUBLIC`, `SESSION`,
   `ADMIN_SESSION`, or the scope(s) a delegated credential needs (`src/auth/scopes.js`). The
   dispatcher enforces it, and a test fails for any route without a valid declaration. A new
   scope needs an entry in `USER_SCOPES` or `ADMIN_SCOPES`. After changing `API_ROUTES`, run

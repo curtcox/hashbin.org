@@ -210,7 +210,7 @@ Content-Type: application/json
 
 ### Route index
 
-Every route in `API_ROUTES` (`src/index.js`) with the access it declares: public, the
+Every route in `API_ROUTES` (`src/api-routes.js`) with the access it declares: public, the
 account's own session, or the scopes a key or app token needs (any one suffices). The
 sections after this one describe the main routes in detail.
 

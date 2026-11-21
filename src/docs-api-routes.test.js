@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { apiRoutes } from './index.js';
+import { apiRoutes } from './api-routes.js';
 import { API_DOC, renderRouteIndex, withRouteIndex } from '../scripts/docs/generate-api-route-index.mjs';
 
 describe('docs/API.md route index', () => {

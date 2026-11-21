@@ -7,7 +7,6 @@
     "src/api/content.js": 39263,
     "src/api/oauth.js": 43066,
     "src/durable-objects/user-profile.js": 61523,
-    "src/index.js": 56878,
     "todo/content_moderation.md": 49619
   }
 }

@@ -7,7 +7,8 @@ vi.mock('./auth/middleware.js', async () => {
   return { ...actual, authenticate: authenticateMock, applyRateLimit: () => null };
 });
 
-import worker, { apiRoutes } from './index.js';
+import worker from './index.js';
+import { apiRoutes } from './api-routes.js';
 import { ADMIN_SESSION, ALL_ADMIN_SCOPES, ALL_USER_SCOPES, PUBLIC, SESSION, USER_SCOPES, ADMIN_SCOPES, checkAccess } from './auth/scopes.js';
 
 const unauthenticated = () => new Response(null, { status: 401 });

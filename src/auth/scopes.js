@@ -8,7 +8,7 @@ import { COST_POLICY } from '../utils/cost-policy.js';
  * API keys, OAuth grants and admin keys all hold scopes from this list. A signed-in
  * session is the account's root credential and holds every user scope; only the
  * ADMIN_USER_ID session also holds the admin scopes. Everything a route needs is
- * declared in the route table (src/index.js), which denies anything undeclared.
+ * declared in the route table (src/api-routes.js), which denies anything undeclared.
  */
 
 export const USER_SCOPES = {

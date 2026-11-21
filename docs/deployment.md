@@ -550,7 +550,7 @@ The sources of truth, rather than copies that go stale:
   `workers/*/wrangler.toml` files)
 - **Required secrets:** the comment block in `wrangler.toml` and the "Verify required secrets"
   step in `.github/workflows/deploy.yml`
-- **API endpoints:** [API.md](API.md); the route table (`API_ROUTES`) in `src/index.js`
+- **API endpoints:** [API.md](API.md); the route table (`API_ROUTES`) in `src/api-routes.js`
 - **Costs:** [cost-safety.md](cost-safety.md) and `src/utils/cost-policy.js`
 
 ## Getting Help

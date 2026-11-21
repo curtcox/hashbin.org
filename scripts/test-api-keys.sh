@@ -71,7 +71,7 @@ check "Keys are signed, routable hbk_ keys" grep -q "API_KEY_PATTERN = keyPatter
 check "Key creation requires scopes" grep -q "parseScopes(body.scopes, 'key')" "$REPO_ROOT/src/api/auth.js"
 check "Key updates can only narrow scopes" grep -q "SCOPE_WIDENING" "$REPO_ROOT/src/durable-objects/user-profile.js"
 check "Pre-scope keys are revoked when seen" grep -q "function retireUnscopedKeys" "$REPO_ROOT/src/durable-objects/user-profile.js"
-check "Key management routes are session-only" grep -q "path: '/api/auth/apikeys', access: SESSION" "$REPO_ROOT/src/index.js"
+check "Key management routes are session-only" grep -q "path: '/api/auth/apikeys', access: SESSION" "$REPO_ROOT/src/api-routes.js"
 check "Keys default to 90 days and last at most a year" grep -q "DEFAULT_KEY_LIFETIME_DAYS = 90" "$REPO_ROOT/src/auth/utils.js"
 check "No reversible key storage or reveal endpoint" absent "encryptApiKey|decryptApiKey|key_encrypted|/reveal" "$REPO_ROOT/src" "$REPO_ROOT/frontend/js"
 check "No legacy hb_ / hb2_ key formats are accepted" absent "LEGACY_PREFIX|hb_live_|startsWith\('hb2_'\)" "$REPO_ROOT/src/auth" "$REPO_ROOT/workers/256t-content/src/funding.js"

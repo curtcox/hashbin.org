@@ -218,17 +218,17 @@ else
 fi
 
 # ==========================================
-# Test 11: Rate limit routes added to index.js
+# Test 11: Rate limit routes added to api-routes.js
 # ==========================================
-log_test "Rate limit routes added to index.js"
+log_test "Rate limit routes added to api-routes.js"
 
-if grep -q "/api/content/rate-limit/purchase" src/index.js; then
+if grep -q "/api/content/rate-limit/purchase" src/api-routes.js; then
   log_pass "Rate limit purchase route found"
 else
   log_fail "Rate limit purchase route not found"
 fi
 
-if grep -q "method: 'GET'.*rate-limit" src/index.js; then
+if grep -q "method: 'GET'.*rate-limit" src/api-routes.js; then
   log_pass "Rate limit status route found"
 else
   log_fail "Rate limit status route not found"
