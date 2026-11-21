@@ -262,7 +262,7 @@ search the scripts for the value.
 | API keys | Up to 25; format `hb_` + 32 characters; expire within at most 5 years (default 1); headers `Authorization: ApiKey …` or `X-API-Key` | `src/auth/utils.js`, `src/durable-objects/user-profile.js` |
 | Browser saves | SDK `publish()` opens first-party, single-use per-save approval; client gets a verified CID and no credential. `save()` uses an explicitly approved allowance; published guidance and immutable SDK/SRI available | `docs/browser-client-safety.md`, `frontend/docs/sdk.html` |
 | OAuth | PKCE (S256), code 10 min, access 15 min, new refresh tokens 7 days idle / 90-day family max; reuse revokes the grant; refresh requires `client_id`; SDK DPoP binding, user-narrowed scopes, required monthly cap for spending | `src/api/oauth.js`, `src/auth/dpop.js` |
-| App-published retention | The user's default (1, 3, 6, or 12 months; 1 if unset) | account page, `src/api/content.js` |
+| App-published retention | The user's default (1, 3, 6, or 12 months; 1 if unset) | account page, `src/api/content-upload.js` |
 | Backups | Nightly metadata snapshots, 30 kept | STATUS L10 |
 
 ---

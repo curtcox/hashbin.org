@@ -7,7 +7,7 @@ import { verifyDPoP } from './auth/dpop.js';
 import { createPkceChallenge, signOAuthJwt, verifyOAuthJwt } from './auth/oauth.js';
 import { handleOAuthAuthorize, handleOAuthToken, handleDPoPNonce, handleRevokeAllAuthorizations, handleOAuthRevoke } from './api/oauth.js';
 import { handlePublish } from './api/publish.js';
-import { handleUploadContent } from './api/content.js';
+import { handleUploadContent } from './api/content-upload.js';
 import { ApplicationRegistry } from './durable-objects/application-registry.js';
 import { UserProfile } from './durable-objects/user-profile.js';
 

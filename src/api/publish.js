@@ -2,7 +2,7 @@ import { authenticate, requireAuth } from '../auth/middleware.js';
 import { signOAuthJwt, verifyOAuthJwt } from '../auth/oauth.js';
 import { generate256tHash } from '../utils/hash256t.js';
 import { calculateRetentionCost } from '../utils/pricing.js';
-import { handleUploadContent } from './content.js';
+import { handleUploadContent } from './content-upload.js';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 const json = (body, status = 200) => Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });

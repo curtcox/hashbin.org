@@ -69,8 +69,8 @@ absent() { ! grep -rqE --exclude="*.test.js" "$1" "${@:2}"; }
 
 check "Keys are signed, routable hbk_ keys" grep -q "API_KEY_PATTERN = keyPattern('hbk')" "$REPO_ROOT/src/auth/download-tokens.js"
 check "Key creation requires scopes" grep -q "parseScopes(body.scopes, 'key')" "$REPO_ROOT/src/api/auth.js"
-check "Key updates can only narrow scopes" grep -q "SCOPE_WIDENING" "$REPO_ROOT/src/durable-objects/user-profile.js"
-check "Pre-scope keys are revoked when seen" grep -q "function retireUnscopedKeys" "$REPO_ROOT/src/durable-objects/user-profile.js"
+check "Key updates can only narrow scopes" grep -q "SCOPE_WIDENING" "$REPO_ROOT/src/durable-objects/user-profile-keys.js"
+check "Pre-scope keys are revoked when seen" grep -q "function retireUnscopedKeys" "$REPO_ROOT/src/durable-objects/user-profile-keys.js"
 check "Key management routes are session-only" grep -q "path: '/api/auth/apikeys', access: SESSION" "$REPO_ROOT/src/api-routes.js"
 check "Keys default to 90 days and last at most a year" grep -q "DEFAULT_KEY_LIFETIME_DAYS = 90" "$REPO_ROOT/src/auth/utils.js"
 check "No reversible key storage or reveal endpoint" absent "encryptApiKey|decryptApiKey|key_encrypted|/reveal" "$REPO_ROOT/src" "$REPO_ROOT/frontend/js"

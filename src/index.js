@@ -4,7 +4,7 @@
  */
 
 import { handleStripeWebhook } from './api/payments.js';
-import { handleDownloadContent } from './api/content.js';
+import { handleDownloadContent } from './api/content-download.js';
 import { applyRateLimit, authenticate } from './auth/middleware.js';
 import { handleOAuthCorsPreflight, withOAuthCors } from './auth/oauth-cors.js';
 import { handleClerkWebhook } from './api/clerk-webhook.js';

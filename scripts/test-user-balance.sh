@@ -74,7 +74,7 @@ fi
 log_test "getBalance method returns 0 for new users with no balance"
 
 # Verify the getBalance method handles missing balance gracefully
-if grep -q "balance_cents: profile.balance_cents || 0" src/durable-objects/user-profile.js; then
+if grep -q "balance_cents: profile.balance_cents || 0" src/durable-objects/user-profile-balance.js; then
   log_pass "getBalance defaults to 0 if balance_cents is missing"
 else
   log_fail "getBalance does not default to 0"
@@ -87,7 +87,7 @@ log_test "Balance response includes all required fields"
 
 # Check that getBalance returns the expected structure
 # Store grep results to avoid multiple identical commands
-BALANCE_METHOD=$(grep -A 30 "async getBalance()" src/durable-objects/user-profile.js)
+BALANCE_METHOD=$(grep -A 30 "async getBalance()" src/durable-objects/user-profile-balance.js)
 
 if echo "$BALANCE_METHOD" | grep -q "balance_cents"; then
   if echo "$BALANCE_METHOD" | grep -q "total_deposited_cents"; then

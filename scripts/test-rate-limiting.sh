@@ -130,13 +130,13 @@ fi
 # ==========================================
 log_test "Download handler checks rate limits for non-inline content"
 
-if grep -q "rate-limit/check" src/api/content.js; then
+if grep -q "rate-limit/check" src/api/content-download.js; then
   log_pass "Rate limit check in handleDownloadContent found"
 else
   log_fail "Rate limit check in handleDownloadContent not found"
 fi
 
-if grep -q "X-RateLimit-Content-Reset" src/api/content.js; then
+if grep -q "X-RateLimit-Content-Reset" src/api/content-download.js; then
   log_pass "Rate limit headers added to responses"
 else
   log_fail "Rate limit headers not added to responses"
@@ -148,7 +148,7 @@ fi
 log_test "Inline content exemption implemented"
 
 # Check that inline content is served without rate limit check
-if grep "Inline content has no rate limit" src/api/content.js; then
+if grep "Inline content has no rate limit" src/api/content-download.js; then
   log_pass "Inline content explicitly marked as no rate limit"
 else
   log_fail "Inline content exemption comment not clear"
