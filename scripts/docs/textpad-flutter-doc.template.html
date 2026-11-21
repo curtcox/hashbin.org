@@ -48,6 +48,7 @@
   <main>
     <div class="container textpad-doc">
       <h1>Textpad for Flutter</h1>
+@@WALKTHROUGH@@
 
       <section class="card">
         <h2>What it is</h2>
@@ -178,7 +179,7 @@
 
       <section class="card">
         <h2>The code, step by step</h2>
-        <p>The excerpts below are copied exactly from the app; the <a href="#source">full source</a> is at the end of this page.</p>
+        <p>The excerpts below are copied exactly from the app; the <a href="/docs/textpad-flutter-source">full source</a> is on its own page.</p>
 
         <h3>1. Configuration</h3>
         <p>
@@ -191,7 +192,7 @@
         <h3>2. The app's URL scheme</h3>
         <p>
           On iOS, <code>ios/Runner/Info.plist</code> claims the scheme with a
-          <code>CFBundleURLTypes</code> entry (see the <a href="#source">full source</a>). On
+          <code>CFBundleURLTypes</code> entry (see the <a href="/docs/textpad-flutter-source">full source</a>). On
           Android, two activities share it. Links whose host is <code>open</code> go to the app:
         </p>
 @@EXCERPT file="android/app/src/main/AndroidManifest.xml" start="            &lt;!-- Links to a text," term="            &lt;meta-data android:name=&quot;flutter_deeplinking_enabled&quot;"@@
@@ -324,6 +325,13 @@ flutter test             # the unit tests</code></pre>
 
       <section class="card" id="source">
         <h2>Full source</h2>
+        <p>Every file of the app, in full, is on <a href="/docs/textpad-flutter-source">its own page</a>.</p>
+      </section>
+@@SOURCE_PAGE@@
+      <p><a href="/docs/textpad-flutter">&larr; Back to the Textpad for Flutter walkthrough</a></p>
+
+      <section class="card" id="source">
+        <h2>Full source</h2>
         <h3>lib/textpad.dart</h3>
 @@SOURCE file="lib/textpad.dart"@@
         <h3>lib/hashbin.dart</h3>
@@ -337,6 +345,7 @@ flutter test             # the unit tests</code></pre>
         <h3>ios/Runner/Info.plist</h3>
 @@SOURCE file="ios/Runner/Info.plist"@@
       </section>
+@@END_PAGES@@
     </div>
   </main>
 
