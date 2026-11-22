@@ -161,3 +161,29 @@ describe('DPoP replay across isolates', () => {
     expect(await body(await t.call(await t.dbaRequest(credential, { proof })))).toMatchObject({ status: 401, dba_code: 'replayed_proof' });
   });
 });
+
+describe('CORS for device credentials', () => {
+  const preflight = headers => t.call(new Request(`${ORIGIN}/api/balance`, { method: 'OPTIONS', headers: { Origin: 'https://any-app.example', 'Access-Control-Request-Method': 'GET', ...headers } }));
+
+  it('lets any origin send a device credential and read the answer', async () => {
+    const allowed = await preflight({ 'Access-Control-Request-Headers': 'authorization, dpop, dba-confirmation' });
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers.get('Access-Control-Allow-Origin')).toBe('https://any-app.example');
+    expect(allowed.headers.get('Access-Control-Allow-Headers')).toBe('authorization, content-type, dpop, dba-confirmation');
+    expect(allowed.headers.get('Access-Control-Allow-Credentials')).toBeNull();
+
+    const credential = await t.issue([{ actions: ['hashbin:balance:read'] }]);
+    const response = await t.call(await t.dbaRequest(credential, { headers: { Origin: 'https://any-app.example' } }));
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Access-Control-Allow-Origin')).toBe('https://any-app.example');
+    expect(response.headers.get('Vary')).toContain('Authorization');
+  });
+
+  it('keeps other credentials to registered origins', async () => {
+    expect((await preflight({ 'Access-Control-Request-Headers': 'authorization' })).status).toBe(403);
+    const keyCall = await t.call(new Request(`${ORIGIN}/api/balance`, { headers: { Origin: 'https://any-app.example', Authorization: 'LocalDev alice' } }));
+    expect(keyCall.headers.get('Access-Control-Allow-Origin')).toBeNull();
+    const oauthPreflight = await t.call(new Request(`${ORIGIN}/oauth/token`, { method: 'OPTIONS', headers: { Origin: 'https://any-app.example', 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'dpop' } }));
+    expect(oauthPreflight.status).toBe(403);
+  });
+});
