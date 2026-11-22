@@ -155,34 +155,12 @@ one kind of credential can never verify as another.
 
 ### devicebasedauth.org credentials
 
-[devicebasedauth.org](https://devicebasedauth.org) ("DBA") issues device-bound credentials:
-the private key is generated on the device and never leaves it, and the credential lists what
-that device may do, for which site, when and where. HashBin accepts them as an alternative to
-API keys.
-
-1. Link your DBA account once, signed in to HashBin: **Account Settings → devicebasedauth.org
-   → Link** (or `POST /api/auth/dba/link/start`, below). One DBA account links to at most one
-   HashBin account; credentials from unlinked DBA accounts get `403 AUTH_DBA_NOT_LINKED`.
-2. Create a credential for audience `hashbin.org` at DBA, granting the HashBin scopes it needs
-   as actions named `hashbin:<scope>`, e.g. `dba enroll --aud hashbin.org --action hashbin:content:write`.
-3. Send it with a fresh DPoP proof per request:
-   `Authorization: DBA <credential>` and `DPoP: <proof>` (the DBA SDK and CLI do this).
-
-HashBin verifies credentials offline with DBA's published keys and revocation lists (cached at
-most 5 minutes), so revoking the device at devicebasedauth.org stops it here, and everywhere
-else, within minutes. A grant's `limits.spend_usd_per_month` becomes the credential's
-`monthly_spend_limit_cents` caveat (the tightest cap of its grants applies). Time, place and
-other grant conditions are checked on every request.
-
-Limits for now: a DBA credential is never the account session, even with `hashbin:session`
-(session-only routes answer `403 session_required`), and it cannot use `downloads:spend`.
-
-| Route | Access | Does |
-|---|---|---|
-| `GET /api/auth/dba/link` | session | `{ linked, account, linked_at, issuer }` |
-| `POST /api/auth/dba/link/start` | session | `{ url }`: send the browser there; DBA returns it to `/auth/dba/callback` |
-| `POST /api/auth/dba/link/finish` | session | Body `{ code, state }` from the callback. `409 dba_account_linked_elsewhere` if another HashBin account holds the DBA account |
-| `DELETE /api/auth/dba/link` | session | Unlink; that DBA account's credentials stop working here at once |
+[devicebasedauth.org](https://devicebasedauth.org) ("DBA") device-bound credentials work instead
+of API keys once you link your DBA account (**Account Settings → devicebasedauth.org**). Send
+`Authorization: DBA <credential>` with a fresh `DPoP: <proof>` per request; grants name HashBin
+scopes as `hashbin:<scope>`, and `hashbin:session` makes the device a session that cannot mint
+credentials or delete the account. Spend caps, downloads, gated grants (`403 gate_pending`),
+revocation, CORS and the `/api/auth/dba/*` routes: [devicebasedauth.md](devicebasedauth.md).
 
 ## Rate Limits
 
@@ -227,9 +205,10 @@ Content-Type: application/json
 | `AUTH_KEY_LIMIT` | Maximum API keys reached (25) | 400 |
 | `AUTH_DBA_PROOF_INVALID` | devicebasedauth.org credential without a valid, unused DPoP proof for this request (`dba_code` says why) | 401 |
 | `AUTH_DBA_NOT_LINKED` | The credential's devicebasedauth.org account (`dba_account`) is not linked to a HashBin account | 403 |
-| `AUTH_DBA_UNAVAILABLE` | devicebasedauth.org's keys or revocation lists could not be fetched; verification fails closed | 503 |
+| `AUTH_DBA_UNAVAILABLE` | devicebasedauth.org's keys, revocation lists or catalog could not be fetched; verification fails closed | 503 |
+| `gate_pending` / `dba_denied` / `online_required` | A devicebasedauth.org grant that DBA decides online is waiting for its gates, was refused, or cannot be checked ([details](devicebasedauth.md#grants-that-need-dba-online)) | 403 |
 | `insufficient_scope` | The credential lacks the route's scope | 403 |
-| `session_required` | The route is for the account's own sign-in only | 403 |
+| `session_required` | The route is for a sign-in only (some also refuse devicebasedauth.org device sessions) | 403 |
 | `caveat_violation` | The request is outside one of the credential's caveats | 403 |
 | `spending_limit_exceeded` | The key's or app's monthly spending limit would be passed | 400 |
 
