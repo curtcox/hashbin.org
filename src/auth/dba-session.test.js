@@ -187,3 +187,14 @@ describe('CORS for device credentials', () => {
     expect(oauthPreflight.status).toBe(403);
   });
 });
+
+describe('device sessions on every session page route', () => {
+  it('answer without a server error', async () => {
+    const credential = await t.issue([{ actions: ['hashbin:session'] }]);
+    for (const path of ['/api/auth/session', '/api/auth/apikeys', '/api/auth/dba/link', '/api/auth/dba/credentials', '/api/developers/apps',
+      '/api/account/settings', '/api/account/authorizations', '/api/downloads/budget', '/api/downloads/sessions']) {
+      const response = await t.call(await t.dbaRequest(credential, { path }));
+      expect(response.status, path).toBeLessThan(500);
+    }
+  });
+});

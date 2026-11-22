@@ -14,6 +14,7 @@ import { memoryState } from './alias-fixture.js';
 import { UserProfile } from '../src/durable-objects/user-profile.js';
 import { DbaLink } from '../src/durable-objects/dba-link.js';
 import { DbaRevocations } from '../src/durable-objects/dba-revocations.js';
+import { ApplicationRegistry } from '../src/durable-objects/application-registry.js';
 import { ReplayCacheDO } from '../src/vendor/devicebasedauth/replay-do.js';
 import { resetDbaAuth } from '../src/auth/dba.js';
 import { forgetPushedDbaRevocations } from '../src/auth/dba-auth.js';
@@ -84,6 +85,7 @@ export async function setupDba(options = {}) {
   t.env.DBA_LINKS = namespace(DbaLink, getEnv);
   t.env.DBA_REVOCATIONS = namespace(DbaRevocations, getEnv);
   t.env.DBA_REPLAY = namespace(ReplayCacheDO, getEnv);
+  t.env.APPLICATION_REGISTRY = namespace(ApplicationRegistry, getEnv);
 
   t.credentialPayload = (grants, overrides = {}) => {
     const at = now();
