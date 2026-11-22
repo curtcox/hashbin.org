@@ -232,7 +232,8 @@ tools/contact_sheet.sh build/videos/U2-what-it-costs.mp4 sheet.png 12  # frames 
   A pointer marks itself `audit_ignore`, since it's meant to sit on what it clicks.
 - **Logos:** `manim/assets/` holds the logos the scenes use. `tools/make_logos.py` makes them from
   `frontend/img/hashbin-logo.png` and the 256t logo in a sibling checkout of `256t.org`
-  (`examples/256t_logo.png`, or pass its path). Rerun it only if a source logo changes.
+  (`examples/256t_logo.png`, or pass its path). Rerun it only if a source logo changes. The HashBin
+  logo is WebP (`hashbin-logo.webp`): its soft glow is too big as a PNG for the repository's size check.
 - **Rebuilding:** unchanged beats aren't re-voiced. `build/` is ignored by git.
 - **No LaTeX needed:** math is set with `Text` (exponents are composed by `Expr`), so the scenes
   render without a TeX installation.
@@ -261,7 +262,7 @@ search the scripts for the value.
 | API keys | Up to 25; format `hb_` + 32 characters; expire within at most 5 years (default 1); headers `Authorization: ApiKey …` or `X-API-Key` | `src/auth/utils.js`, `src/durable-objects/user-profile.js` |
 | Browser saves | SDK `publish()` opens first-party, single-use per-save approval; client gets a verified CID and no credential. `save()` uses an explicitly approved allowance; published guidance and immutable SDK/SRI available | `docs/browser-client-safety.md`, `frontend/docs/sdk.html` |
 | OAuth | PKCE (S256), code 10 min, access 15 min, new refresh tokens 7 days idle / 90-day family max; reuse revokes the grant; refresh requires `client_id`; SDK DPoP binding, user-narrowed scopes, required monthly cap for spending | `src/api/oauth.js`, `src/auth/dpop.js` |
-| App-published retention | The user's default (1, 3, 6, or 12 months; 1 if unset) | account page, `src/api/content.js` |
+| App-published retention | The user's default (1, 3, 6, or 12 months; 1 if unset) | account page, `src/api/content-upload.js` |
 | Backups | Nightly metadata snapshots, 30 kept | STATUS L10 |
 
 ---

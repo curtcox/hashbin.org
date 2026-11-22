@@ -155,34 +155,12 @@ one kind of credential can never verify as another.
 
 ### devicebasedauth.org credentials
 
-[devicebasedauth.org](https://devicebasedauth.org) ("DBA") issues device-bound credentials:
-the private key is generated on the device and never leaves it, and the credential lists what
-that device may do, for which site, when and where. HashBin accepts them as an alternative to
-API keys.
-
-1. Link your DBA account once, signed in to HashBin: **Account Settings → devicebasedauth.org
-   → Link** (or `POST /api/auth/dba/link/start`, below). One DBA account links to at most one
-   HashBin account; credentials from unlinked DBA accounts get `403 AUTH_DBA_NOT_LINKED`.
-2. Create a credential for audience `hashbin.org` at DBA, granting the HashBin scopes it needs
-   as actions named `hashbin:<scope>`, e.g. `dba enroll --aud hashbin.org --action hashbin:content:write`.
-3. Send it with a fresh DPoP proof per request:
-   `Authorization: DBA <credential>` and `DPoP: <proof>` (the DBA SDK and CLI do this).
-
-HashBin verifies credentials offline with DBA's published keys and revocation lists (cached at
-most 5 minutes), so revoking the device at devicebasedauth.org stops it here, and everywhere
-else, within minutes. A grant's `limits.spend_usd_per_month` becomes the credential's
-`monthly_spend_limit_cents` caveat (the tightest cap of its grants applies). Time, place and
-other grant conditions are checked on every request.
-
-Limits for now: a DBA credential is never the account session, even with `hashbin:session`
-(session-only routes answer `403 session_required`), and it cannot use `downloads:spend`.
-
-| Route | Access | Does |
-|---|---|---|
-| `GET /api/auth/dba/link` | session | `{ linked, account, linked_at, issuer }` |
-| `POST /api/auth/dba/link/start` | session | `{ url }`: send the browser there; DBA returns it to `/auth/dba/callback` |
-| `POST /api/auth/dba/link/finish` | session | Body `{ code, state }` from the callback. `409 dba_account_linked_elsewhere` if another HashBin account holds the DBA account |
-| `DELETE /api/auth/dba/link` | session | Unlink; that DBA account's credentials stop working here at once |
+[devicebasedauth.org](https://devicebasedauth.org) ("DBA") device-bound credentials work instead
+of API keys once you link your DBA account (**Account Settings → devicebasedauth.org**). Send
+`Authorization: DBA <credential>` with a fresh `DPoP: <proof>` per request; grants name HashBin
+scopes as `hashbin:<scope>`, and `hashbin:session` makes the device a session that cannot mint
+credentials or delete the account. Spend caps, downloads, gated grants (`403 gate_pending`),
+revocation, CORS and the `/api/auth/dba/*` routes: [devicebasedauth.md](devicebasedauth.md).
 
 ## Rate Limits
 
@@ -227,9 +205,10 @@ Content-Type: application/json
 | `AUTH_KEY_LIMIT` | Maximum API keys reached (25) | 400 |
 | `AUTH_DBA_PROOF_INVALID` | devicebasedauth.org credential without a valid, unused DPoP proof for this request (`dba_code` says why) | 401 |
 | `AUTH_DBA_NOT_LINKED` | The credential's devicebasedauth.org account (`dba_account`) is not linked to a HashBin account | 403 |
-| `AUTH_DBA_UNAVAILABLE` | devicebasedauth.org's keys or revocation lists could not be fetched; verification fails closed | 503 |
+| `AUTH_DBA_UNAVAILABLE` | devicebasedauth.org's keys, revocation lists or catalog could not be fetched; verification fails closed | 503 |
+| `gate_pending` / `dba_denied` / `online_required` | A devicebasedauth.org grant that DBA decides online is waiting for its gates, was refused, or cannot be checked ([details](devicebasedauth.md#grants-that-need-dba-online)) | 403 |
 | `insufficient_scope` | The credential lacks the route's scope | 403 |
-| `session_required` | The route is for the account's own sign-in only | 403 |
+| `session_required` | The route is for a sign-in only (some also refuse devicebasedauth.org device sessions) | 403 |
 | `caveat_violation` | The request is outside one of the credential's caveats | 403 |
 | `spending_limit_exceeded` | The key's or app's monthly spending limit would be passed | 400 |
 
@@ -246,7 +225,7 @@ Content-Type: application/json
 
 ### Route index
 
-Every route in `API_ROUTES` (`src/index.js`) with the access it declares: public, the
+Every route in `API_ROUTES` (`src/api-routes.js`) with the access it declares: public, the
 account's own session, or the scopes a key or app token needs (any one suffices). The
 sections after this one describe the main routes in detail.
 
@@ -271,36 +250,38 @@ sections after this one describe the main routes in detail.
 | POST | `/api/user/aliases/personal/{id}/renew` | `aliases:purchase` |
 | PUT, PATCH, DELETE | `/api/user/aliases/personal/{id}` | `aliases:write` |
 | GET, PUT | `/api/downloads/budget` | account session |
-| PUT | `/api/{auth/apikeys\|oauth/grants}/{id}/download-budget` | account session |
+| PUT | `/api/{auth/apikeys\|oauth/grants\|auth/dba/credentials}/{id}/download-budget` | `account-session` |
 | GET, DELETE | `/api/downloads/sessions` | account session |
-| POST | `/api/downloads/session` | account session |
+| POST | `/api/downloads/session` | `account-session` |
 | POST | `/api/downloads/sign` | `downloads:spend` |
 | GET, HEAD | `/health` | public |
 | GET | `/api/config` | public |
 | POST | `/api/auth/callback` | public |
 | GET | `/api/auth/session` | account session |
 | POST | `/api/auth/logout` | account session |
-| POST | `/api/auth/link` | account session |
-| POST | `/api/auth/apikeys` | account session |
+| POST | `/api/auth/link` | `account-session` |
+| POST | `/api/auth/apikeys` | `account-session` |
 | GET | `/api/auth/apikeys` | account session |
 | DELETE | `/api/auth/apikeys/{id}` | account session |
-| PATCH | `/api/auth/apikeys/{id}` | account session |
-| DELETE | `/api/auth/account` | account session |
+| PATCH | `/api/auth/apikeys/{id}` | `account-session` |
+| DELETE | `/api/auth/account` | `account-session` |
 | GET | `/api/auth/dba/link` | account session |
-| DELETE | `/api/auth/dba/link` | account session |
-| POST | `/api/auth/dba/link/start` | account session |
-| POST | `/api/auth/dba/link/finish` | account session |
-| POST | `/api/developers/apps` | account session |
+| DELETE | `/api/auth/dba/link` | `account-session` |
+| POST | `/api/auth/dba/link/start` | `account-session` |
+| POST | `/api/auth/dba/link/finish` | `account-session` |
+| GET | `/api/auth/dba/credentials` | account session |
+| POST | `/api/dba/events` | public |
+| POST | `/api/developers/apps` | `account-session` |
 | GET | `/api/developers/apps` | account session |
-| GET, PUT | `/api/developers/apps/{id}/run` | account session |
+| GET, PUT | `/api/developers/apps/{id}/run` | `account-session` |
 | POST | `/api/admin/apps/{id}/run/{suspend\|restore}` | `admin:takedown` |
 | GET | `/api/developers/apps/{id}/safety` | account session |
 | POST | `/api/developers/apps/{id}/safety` | account session |
-| PATCH | `/api/developers/apps/{id}` | account session |
+| PATCH | `/api/developers/apps/{id}` | `account-session` |
 | DELETE | `/api/developers/apps/{id}` | account session |
 | GET | `/api/publish/app` | public |
 | POST | `/api/publish` | account session |
-| POST | `/oauth/authorize` | account session |
+| POST | `/oauth/authorize` | `account-session` |
 | GET | `/oauth/authorize` | public |
 | GET | `/oauth/dpop-nonce` | public |
 | POST | `/oauth/token` | public |
@@ -310,7 +291,7 @@ sections after this one describe the main routes in detail.
 | DELETE | `/api/account/authorizations` | account session |
 | GET | `/api/account/authorizations` | account session |
 | DELETE | `/api/account/authorizations/{id}` | account session |
-| PATCH | `/api/account/authorizations/{id}` | account session |
+| PATCH | `/api/account/authorizations/{id}` | `account-session` |
 | GET | `/api/balance` | `balance:read` |
 | GET | `/api/balance/history` | `transactions:read` |
 | POST | `/api/balance/deposit` | account session |

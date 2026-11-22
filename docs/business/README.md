@@ -78,7 +78,7 @@ within budget (pricing sheet, sections 3–4). The
    cache hit rate, and put this at about $1,070 a year.) Settle STATUS
    **B9**: give each CID a free allowance, then have the uploader pay about $1 per extra million
    requests (twice cost), or throttle. Also set Cloudflare billing notifications now.
-3. **Cap prepaid retention.** Uploads accept any number of months (`src/api/content.js`), and
+3. **Cap prepaid retention.** Uploads accept any number of months (`src/api/content-upload.js`), and
    donations allow up to 1,200. Every prepaid month is a promise you have to keep paying R2
    for. Cap new purchases at something like 10 years, and add a discontinuation clause to the
    Terms (see Policies).

@@ -23,6 +23,8 @@ comment says what it needs.
 | `cost-safety-model.js` | The pricing-floor model behind `docs/business/price-floor.org` and `src/services/funded-margin.test.js`. |
 | `purge-cloudflare-cache.sh` | Purges the hashbin.org Cloudflare cache (also a manual workflow). |
 | `status.sh` | `npm run status`: open items in `STATUS.md` (`--all` for everything). |
+| `check-file-sizes.mjs` | `npm run check:file-sizes`: per-type file size limits with a no-growth ratchet (`file-size-baseline.json`). `--update-baseline` locks in shrinks; `--pre-push` is run by `.githooks/pre-push`. Gates CI and unit tests. |
+| `install-git-hooks.mjs` | Run by `npm install` (`prepare`): sets `core.hooksPath` to `.githooks` unless the clone already uses another hooks directory. |
 | `docs/generate-api-route-index.mjs` | Regenerates the route index in `docs/API.md` from `API_ROUTES`. `src/docs-api-routes.test.js` fails if it drifts. |
 | `docs/generate-textpad-docs.py` | Regenerates `frontend/docs/textpad*.html` from the `*.template.html` files beside it. |
 | `inject-git-sha.sh`, `inject-git-sha-code.sh` | Embed the deployed commit in the Worker and frontend (deploy workflow; see [git SHA verification](../docs/git-sha-verification.md)). |

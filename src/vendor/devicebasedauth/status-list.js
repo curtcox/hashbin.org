@@ -27,17 +27,23 @@ export async function inflate(bytes, maxBytes = 16 * 1024 * 1024) {
   return out;
 }
 
-/** Read one status bit (1 = revoked). Indexes beyond the list are 0 (valid). */
+/**
+ * Read one status bit (1 = revoked). Indexes beyond the list are 0 (valid). Plain arithmetic
+ * rather than `>>`/`&`, which would truncate the index to 32 bits and read the wrong bit.
+ */
 export function getBit(bytes, index) {
-  const byte = bytes[index >> 3];
-  return byte === undefined ? 0 : (byte >> (index & 7)) & 1;
+  if (!Number.isSafeInteger(index) || index < 0) return 0;
+  const byte = bytes[Math.floor(index / 8)];
+  return byte === undefined ? 0 : (byte >> (index % 8)) & 1;
 }
 
 /** Set one status bit in place, growing the array when needed. Returns the (possibly new) array. */
 export function setBit(bytes, index, value = 1) {
+  if (!Number.isSafeInteger(index) || index < 0 || index > 2 ** 31 - 1) throw new RangeError('status index out of range');
+  const at = Math.floor(index / 8); const mask = 1 << (index % 8);
   let out = bytes;
-  if ((index >> 3) >= out.length) { out = new Uint8Array(Math.max((index >> 3) + 1, out.length * 2)); out.set(bytes); }
-  if (value) out[index >> 3] |= 1 << (index & 7); else out[index >> 3] &= ~(1 << (index & 7));
+  if (at >= out.length) { out = new Uint8Array(Math.max(at + 1, out.length * 2)); out.set(bytes); }
+  if (value) out[at] |= mask; else out[at] &= ~mask;
   return out;
 }
 

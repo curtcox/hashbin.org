@@ -15,6 +15,7 @@
     "verify:production": "node scripts/verify-production.mjs",
     "verify:workers-dev": "scripts/verify-deployment.sh production",
     "lint": "eslint src workers scripts frontend/js frontend/sdk",
+    "check:file-sizes": "node scripts/check-file-sizes.mjs",
     "test": "npm run test:unit && bash scripts/test-grep-patterns.sh && bash scripts/test-user-balance.sh && bash scripts/test-auth-gate.sh && bash scripts/test-stripe-webhook.sh && bash scripts/test-api-keys.sh && bash scripts/test-upload-balance.sh && bash scripts/test-rate-limiting.sh && bash scripts/test-git-sha-injection.sh && bash scripts/test-transaction-history.sh && bash scripts/test-supplier-validation.sh && bash scripts/test-supplier-integration.sh",
     "status": "bash scripts/status.sh",
     "test:unit": "vitest run",
@@ -53,7 +54,8 @@
     "test:api:user": "bash scripts/api-tests/test-local-user.sh",
     "test:api:donation": "bash scripts/api-tests/test-local-donation.sh",
     "test:api:errors": "bash scripts/api-tests/test-local-errors.sh",
-    "test:api:concurrent": "bash scripts/api-tests/test-local-concurrent.sh"
+    "test:api:concurrent": "bash scripts/api-tests/test-local-concurrent.sh",
+    "prepare": "node scripts/install-git-hooks.mjs"
   },
   "keywords": [
     "256t",

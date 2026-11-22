@@ -8,7 +8,7 @@ import { COST_POLICY } from '../utils/cost-policy.js';
  * API keys, OAuth grants and admin keys all hold scopes from this list. A signed-in
  * session is the account's root credential and holds every user scope; only the
  * ADMIN_USER_ID session also holds the admin scopes. Everything a route needs is
- * declared in the route table (src/index.js), which denies anything undeclared.
+ * declared in the route table (src/api-routes.js), which denies anything undeclared.
  */
 
 export const USER_SCOPES = {
@@ -48,6 +48,9 @@ export const ALL_ADMIN_SCOPES = Object.freeze(Object.keys(ADMIN_SCOPES));
 // Route access levels besides a scope (or list of scopes, any one of which suffices).
 export const PUBLIC = 'public';
 export const SESSION = 'session';
+// The account's own sign-in, not a devicebasedauth.org device session: for routes that mint
+// credentials outliving the device (API keys, apps, OAuth grants) or end the account
+export const ACCOUNT_SESSION = 'account-session';
 // The ADMIN_USER_ID account's own session (not an admin key), for issuing admin keys
 export const ADMIN_SESSION = 'admin-session';
 
@@ -71,6 +74,11 @@ export function isSessionAuth(authResult) {
   return Boolean(authResult?.authenticated && authResult.user?.session);
 }
 
+/** The account's own sign-in (Clerk or local), not a device session. */
+export function isAccountSessionAuth(authResult) {
+  return isSessionAuth(authResult) && !authResult.user.deviceSession;
+}
+
 export function hasScope(authResult, scope) {
   return Boolean(authResult?.authenticated && authResult.user?.scopes?.includes(scope));
 }
@@ -90,6 +98,10 @@ export function sessionRequiredResponse() {
   return jsonError(403, 'session_required', 'Sign in to HashBin to use this endpoint; keys and app tokens cannot');
 }
 
+function accountSessionRequiredResponse() {
+  return jsonError(403, 'session_required', 'Sign in to HashBin to use this endpoint; keys, app tokens and device sessions cannot');
+}
+
 /**
  * Check a route's declared access against an authentication result.
  * Returns null when allowed, otherwise the error response to send.
@@ -98,8 +110,9 @@ export function checkAccess(authResult, access, unauthenticated) {
   if (access === PUBLIC) return null;
   if (!authResult?.authenticated) return unauthenticated();
   if (access === SESSION) return isSessionAuth(authResult) ? null : sessionRequiredResponse();
+  if (access === ACCOUNT_SESSION) return isAccountSessionAuth(authResult) ? null : accountSessionRequiredResponse();
   if (access === ADMIN_SESSION) {
-    if (!isSessionAuth(authResult)) return sessionRequiredResponse();
+    if (!isAccountSessionAuth(authResult)) return accountSessionRequiredResponse();
     return authResult.user.scopes?.some(scope => scope.startsWith('admin:')) ? null : jsonError(403, 'not_admin', 'Only the admin may manage admin keys');
   }
   const anyOf = Array.isArray(access) ? access : [access];
@@ -207,7 +220,8 @@ export function spenderOf(authResult) {
   if (user?.authMethod === 'oauth') return { kind: 'oauth', id: user.oauth?.grantId };
   // A DBA credential is stored at devicebasedauth.org, so its scopes and caveats travel with it
   if (user?.authMethod === 'dba') {
-    return { kind: 'dba', id: user.dba?.credentialId, account: user.dba?.account, scopes: user.scopes, caveats: user.caveats };
+    return { kind: 'dba', id: user.dba?.credentialId, account: user.dba?.account, scopes: user.scopes, caveats: user.caveats,
+      status: user.dba?.status, exp: user.dba?.exp };
   }
   return undefined;
 }

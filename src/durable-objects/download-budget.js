@@ -2,7 +2,11 @@ import { downloadBudget, downloadIdentityValid, identityKey, UC_PER_CENT as UC, 
 import { findSpender, recordSpend, rollSpend, spendRoomCents } from '../utils/credential-spend.js';
 import { readDownloadLease, downloadLeaseEntries } from './download-leases.js';
 import { stageDownloadOutbox, hasDownloadOutbox } from './download-outbox.js';
+import { checkStoredDbaSpender } from './dba-spend-check.js';
 export { flushDownloadOutbox } from './download-outbox.js';
+
+// Identities that are a credential with its own monthly spending limit (credential-spend.js)
+const DELEGATED = new Set(['key', 'oauth', 'dba']);
 
 function outbox(profile, event) {
   profile.download_event_sequence = (profile.download_event_sequence || 0) + 1;
@@ -46,7 +50,7 @@ async function returnLease(owner, profile, b, identity, data, writes, now) {
     if (b.spend.day === lease.day) usage.day_uc -= amount;
     if (b.spend.month === lease.month) usage.month_uc -= amount;
   }
-  const credential = (lease.kind === 'oauth' || lease.kind === 'key') && findSpender(profile, { kind: lease.kind, id: lease.k });
+  const credential = DELEGATED.has(lease.kind) && findSpender(profile, { kind: lease.kind, id: lease.k });
   if (credential && b.spend.month === lease.month && credential.spend_reset === (lease.spend_reset ?? lease.grant_reset)) recordSpend(credential, -amount / UC);
   if (amount) outbox(profile, { revenue_cents: -amount / UC, period: lease.month });
 }
@@ -88,8 +92,8 @@ export async function handleDownloadBudget(owner, request) {
     }
     result = { account: b.account, keys: b.keys, spend: b.spend, float_uc: b.float_uc, balance_cents: profile.balance_cents };
   } else if (path === '/download/key-budget' && method === 'PUT') {
-    const collection = data.kind === 'oauth' ? profile.oauth_grants : profile.api_keys;
-    if (!collection?.some(k => (k.key_id || k.grant_id) === data.key_id && !k.revoked_at)) return Response.json({ error: 'Key or grant not found' }, { status: 404 });
+    const collection = data.kind === 'oauth' ? profile.oauth_grants : data.kind === 'dba' ? profile.dba_credentials : profile.api_keys;
+    if (!collection?.some(k => (k.key_id || k.grant_id || k.credential_id) === data.key_id && !k.revoked_at)) return Response.json({ error: 'Key or grant not found' }, { status: 404 });
     if (!validDownloadCaps(data.caps)) return Response.json({ error: 'Invalid caps' }, { status: 400 });
     if (data.caps === null) delete b.keys[data.key_id]; else b.keys[data.key_id] = data.caps;
     result = { caps: data.caps };
@@ -116,6 +120,10 @@ export async function handleDownloadBudget(owner, request) {
     // A returned remainder is independent of eligibility for a replacement.
     // Commit it even when revocation or the hard stop rejects that replacement.
     if (owner.env.COST_SAFETY_HARD_STOP === 'true') return reply({ funded: false, reason: 'hard_stop' }, 503);
+    // A DBA credential may have been revoked at DBA since it signed this URL
+    if (data.identity?.kind === 'dba' && !await checkStoredDbaSpender(owner.env, profile, { kind: 'dba', id: data.identity.k })) {
+      return reply({ funded: false, reason: 'dba_unavailable' }, 503);
+    }
     if (!downloadIdentityValid(profile, data.identity, now.getTime(), typeof data.cid === 'string' ? data.cid : undefined)) return reply({ funded: false, reason: 'invalid_identity' }, 401);
     const identity = data.identity, price = data.price_uc;
     if (!Number.isSafeInteger(price) || price < 400 || !Number.isInteger(data.requests) || data.requests < 1 || data.requests > 250 ||
@@ -132,11 +140,14 @@ export async function handleDownloadBudget(owner, request) {
     }
     const usage = identity.k ? (b.spend.keys[identity.k] ||= { day_uc: 0, month_uc: 0 }) : null;
     let room = (profile.balance_cents || 0) * UC + b.float_uc;
-    for (const [caps, used] of [[b.account, b.spend.account], ...(identity.k ? [[b.keys[identity.k], usage]] : [])]) {
+    // Keys and grants need their own download caps; a DBA credential has them only if set
+    // (its grant's spend cap and the account caps bound it either way).
+    const ownCaps = identity.k && (identity.kind !== 'dba' || b.keys[identity.k]);
+    for (const [caps, used] of [[b.account, b.spend.account], ...(ownCaps ? [[b.keys[identity.k], usage]] : [])]) {
       room = Math.min(room, caps ? caps.daily_cap_cents * UC - used.day_uc : 0, caps ? caps.monthly_cap_cents * UC - used.month_uc : 0);
     }
     // The key or grant's own monthly spending limit applies on top of download caps
-    const credential = (identity.kind === 'oauth' || identity.kind === 'key') && findSpender(profile, { kind: identity.kind, id: identity.k }, now);
+    const credential = DELEGATED.has(identity.kind) && findSpender(profile, { kind: identity.kind, id: identity.k }, now);
     if (credential) {
       rollSpend(credential, now, owner.nextMonthlyReset(now));
       const credentialRoom = spendRoomCents(credential);

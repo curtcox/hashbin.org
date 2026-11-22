@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { handleGetOAuthAuthorizePage } from './oauth.js';
+import { handleGetOAuthAuthorizePage } from './oauth-consent-page.js';
 import { ApplicationRegistry } from '../durable-objects/application-registry.js';
 
 function createMockState(initialData = {}) {

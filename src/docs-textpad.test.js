@@ -62,6 +62,22 @@ describe('Textpad docs', () => {
     });
   }
 
+  // The native walkthroughs keep their full source on a companion page.
+  for (const [page, folder] of PAGES.slice(1)) {
+    const sourcePage = page.replace('.html', '-source.html');
+    it(`${sourcePage} holds every file in full and is linked from ${page}`, () => {
+      const sourceHtml = read(sourcePage);
+      const blocks = [...sourceHtml.matchAll(/<code class="source" data-file="([^"]*)">([\s\S]*?)<\/code>/g)];
+      expect(blocks.length).toBeGreaterThan(3);
+      for (const [, file, code] of blocks) {
+        expect(unescapeHtml(code) === read(`${folder}/${file}`), `${file} (run python3 scripts/docs/generate-textpad-docs.py)`).toBe(true);
+      }
+      const url = `/docs/${sourcePage.split('/').pop().replace('.html', '')}`;
+      expect(read(page)).toContain(`href="${url}"`);
+      expect(read(page)).not.toContain('class="source"');
+    });
+  }
+
   it('has a real client ID configured in every version', () => {
     expect(appHtml).toMatch(/let CLIENT_ID = "app_[0-9a-f-]{36}";/);
     expect(read('examples/textpad-expo/App.js')).toMatch(/\|\| "app_[0-9a-f-]{36}";/);

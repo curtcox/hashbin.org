@@ -180,3 +180,19 @@ script_name = "hashbin-worker-local"
 [[migrations]]
 tag = "v13"
 new_sqlite_classes = ["DbaLink"]
+
+# devicebasedauth.org revocations pushed by its webhook (src/durable-objects/dba-revocations.js)
+[[durable_objects.bindings]]
+name = "DBA_REVOCATIONS"
+class_name = "DbaRevocations"
+script_name = "hashbin-worker-local"
+
+# DPoP proof ids of DBA credentials, claimed once across isolates (vendored replay-do.js)
+[[durable_objects.bindings]]
+name = "DBA_REPLAY"
+class_name = "DbaReplayCache"
+script_name = "hashbin-worker-local"
+
+[[migrations]]
+tag = "v14"
+new_sqlite_classes = ["DbaRevocations", "DbaReplayCache"]

@@ -6,7 +6,8 @@ vi.mock('../auth/middleware.js', async () => ({
   authenticate: authenticateMock
 }));
 
-import { handleExtendContent, handleUploadContent } from './content.js';
+import { handleExtendContent } from './content.js';
+import { handleUploadContent } from './content-upload.js';
 
 authenticateMock.mockResolvedValue({
   authenticated: true,

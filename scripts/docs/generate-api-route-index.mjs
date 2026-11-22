@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Writes the route index in docs/API.md from API_ROUTES in src/index.js, so the reference
+ * Writes the route index in docs/API.md from API_ROUTES in src/api-routes.js, so the reference
  * lists every route and the access it declares. src/docs-api-routes.test.js fails if the
  * index drifts.
  *
@@ -9,7 +9,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { apiRoutes } from '../../src/index.js';
+import { apiRoutes } from '../../src/api-routes.js';
 
 export const API_DOC = fileURLToPath(new URL('../../docs/API.md', import.meta.url));
 export const BEGIN = '<!-- BEGIN GENERATED ROUTE INDEX: node scripts/docs/generate-api-route-index.mjs -->';

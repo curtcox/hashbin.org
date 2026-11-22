@@ -12,6 +12,7 @@ finished ones in [`../done/`](../done/).
 | [Alias guide](../frontend/docs/aliases.html) | Global/personal names, home-page publishing, a todo app with named backups, content-host limits and security |
 | [browser-client-safety.md](browser-client-safety.md) | Browser save flows (hosted approval, DPoP allowances), token lifetimes, shared origins, SRI, migration |
 | [api-keys-setup.md](api-keys-setup.md) | Scoped `hbk_` API keys and their caveats |
+| [devicebasedauth.md](devicebasedauth.md) | devicebasedauth.org device-bound credentials: linking, scopes, device sessions, gated grants, downloads, revocation, routes and setup |
 | [api-rate-limiting.md](api-rate-limiting.md) | Buying download allowance for content |
 | [publishing-from-the-command-line.md](publishing-from-the-command-line.md) | `scripts/publish.mjs`: publish files through a scoped OAuth grant |
 

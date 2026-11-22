@@ -130,13 +130,13 @@ fi
 # ==========================================
 log_test "Download handler checks rate limits for non-inline content"
 
-if grep -q "rate-limit/check" src/api/content.js; then
+if grep -q "rate-limit/check" src/api/content-download.js; then
   log_pass "Rate limit check in handleDownloadContent found"
 else
   log_fail "Rate limit check in handleDownloadContent not found"
 fi
 
-if grep -q "X-RateLimit-Content-Reset" src/api/content.js; then
+if grep -q "X-RateLimit-Content-Reset" src/api/content-download.js; then
   log_pass "Rate limit headers added to responses"
 else
   log_fail "Rate limit headers not added to responses"
@@ -148,7 +148,7 @@ fi
 log_test "Inline content exemption implemented"
 
 # Check that inline content is served without rate limit check
-if grep "Inline content has no rate limit" src/api/content.js; then
+if grep "Inline content has no rate limit" src/api/content-download.js; then
   log_pass "Inline content explicitly marked as no rate limit"
 else
   log_fail "Inline content exemption comment not clear"
@@ -218,17 +218,17 @@ else
 fi
 
 # ==========================================
-# Test 11: Rate limit routes added to index.js
+# Test 11: Rate limit routes added to api-routes.js
 # ==========================================
-log_test "Rate limit routes added to index.js"
+log_test "Rate limit routes added to api-routes.js"
 
-if grep -q "/api/content/rate-limit/purchase" src/index.js; then
+if grep -q "/api/content/rate-limit/purchase" src/api-routes.js; then
   log_pass "Rate limit purchase route found"
 else
   log_fail "Rate limit purchase route not found"
 fi
 
-if grep -q "method: 'GET'.*rate-limit" src/index.js; then
+if grep -q "method: 'GET'.*rate-limit" src/api-routes.js; then
   log_pass "Rate limit status route found"
 else
   log_fail "Rate limit status route not found"

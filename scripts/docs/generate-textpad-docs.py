@@ -2,8 +2,8 @@
 """Builds the Textpad walkthrough pages from their templates.
 
     frontend/docs/textpad.html          web version (frontend/docs/textpad/app.html)
-    frontend/docs/textpad-expo.html     Expo version (examples/textpad-expo)
-    frontend/docs/textpad-flutter.html  Flutter version (examples/textpad-flutter)
+    frontend/docs/textpad-expo.html     Expo version (examples/textpad-expo), source in textpad-expo-source.html
+    frontend/docs/textpad-flutter.html  Flutter version (examples/textpad-flutter), source in textpad-flutter-source.html
 
 In a template, each line of the form
     @@EXCERPT [file="..."] start="..." [anchor="..."] term="..."@@
@@ -16,6 +16,12 @@ excerpt loses the indentation of its first line.
 A line of the form
     @@SOURCE file="..."@@
 becomes the whole file.
+
+A template may split into two pages: lines between @@WALKTHROUGH@@ and
+@@SOURCE_PAGE@@ appear only on the page itself, and lines between
+@@SOURCE_PAGE@@ and @@END_PAGES@@ only on a companion "<page>-source.html"
+holding the full source, which keeps each page small enough for
+scripts/check-file-sizes.mjs.
 
 src/docs-textpad.test.js fails when a page no longer matches its app; run
 this script after editing either:
@@ -67,10 +73,18 @@ def build(template, output, folder, default_file):
     page = (DOCS / template).read_text()
     page = re.sub(r"^@@EXCERPT (.*?)@@$", excerpt, page, flags=re.M)
     page = re.sub(r'^@@SOURCE file="([^"]*)"@@$', full_source, page, flags=re.M)
-    if "@@" in page:
-        raise SystemExit(f"Unprocessed @@ marker in {template}")
-    (ROOT / output).write_text(page)
-    print(f"Wrote {output} with {page.count('class=\"excerpt\"')} excerpts")
+    split = re.search(r"^@@WALKTHROUGH@@\n(.*?)^@@SOURCE_PAGE@@\n(.*?)^@@END_PAGES@@\n", page, flags=re.M | re.S)
+    pages = {output: page}
+    if split:
+        before, after = page[:split.start()], page[split.end():]
+        source_page = before + split.group(2) + after
+        source_page = re.sub(r"<title>(.*?) - HashBin.org</title>", r"<title>\1: full source - HashBin.org</title>", source_page, count=1)
+        pages = {output: before + split.group(1) + after, output.replace(".html", "-source.html"): source_page}
+    for path, text in pages.items():
+        if "@@" in text:
+            raise SystemExit(f"Unprocessed @@ marker in {template}")
+        (ROOT / path).write_text(text)
+        print(f"Wrote {path} with {text.count('class=\"excerpt\"')} excerpts")
 
 
 for page in PAGES:

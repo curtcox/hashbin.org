@@ -36,6 +36,7 @@ workers_dev = true
 # DOWNLOAD_TOKEN_SECRET (required: signs API keys, admin keys and download tokens; same value on the 256t.us Worker)
 # CLERK_WEBHOOK_SECRET (required for production profile sync/deletion)
 # CLOUDFLARE_ANALYTICS_TOKEN (read-only Account Analytics token, required for cost monitoring)
+# DBA_API_KEY (optional: devicebasedauth.org API key of the hashbin.org audience owner, for online checks of gated DBA grants; billed per decision)
 # CLOUDFLARE_ACCOUNT_ID (account ID, also needed at runtime by cost monitoring)
 # GIT_SHA (automatically set by CI to the full deployed commit)
 # COST_SAFETY_ALLOWANCE_ONLY=true (optional variable on this Worker; manual brake)
@@ -208,3 +209,19 @@ script_name = "hashbin-worker-prod"
 [[migrations]]
 tag = "v13"
 new_sqlite_classes = ["DbaLink"]
+
+# devicebasedauth.org revocations pushed by its webhook (src/durable-objects/dba-revocations.js)
+[[durable_objects.bindings]]
+name = "DBA_REVOCATIONS"
+class_name = "DbaRevocations"
+script_name = "hashbin-worker-prod"
+
+# DPoP proof ids of DBA credentials, claimed once across isolates (vendored replay-do.js)
+[[durable_objects.bindings]]
+name = "DBA_REPLAY"
+class_name = "DbaReplayCache"
+script_name = "hashbin-worker-prod"
+
+[[migrations]]
+tag = "v14"
+new_sqlite_classes = ["DbaRevocations", "DbaReplayCache"]

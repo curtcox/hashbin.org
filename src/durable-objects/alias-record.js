@@ -1,6 +1,7 @@
 import { normalizeAliasName, isReservedAlias, validateAliasCid } from '../utils/alias-names.js';
 import { GLOBAL_ALIAS_YEARLY_CENTS, ALIAS_SALE_FEE_RATE, ALIAS_SALE_MINIMUM_FEE_CENTS, aliasSaleFee } from '../utils/pricing.js';
 import { retentionWithinCap } from '../utils/cost-policy.js';
+import { storedSpender } from '../utils/credential-spend.js';
 import { handleBackupRequest, registerForBackup } from '../utils/backup.js';
 
 const DAY = 86400000;
@@ -154,7 +155,7 @@ export class AliasRecord {
       if (!retentionWithinCap(claim ? null : record.paid_through, years * 12)) throw error('retention_limit');
       const end = new Date(Math.max(now, claim ? now : Date.parse(record.paid_through)));
       end.setUTCFullYear(end.getUTCFullYear() + years);
-      record.paid_through = end.toISOString(); record.renewal_years = years; record.renewal_spender = data.spender || null;
+      record.paid_through = end.toISOString(); record.renewal_years = years; record.renewal_spender = storedSpender(data.spender);
       delete record.renewal_retry_at;
       debit = { user_id: data.user_id, amount_cents: years * GLOBAL_ALIAS_YEARLY_CENTS, spender: data.spender,
         context: { cid: record.cid, retention_months: years * 12 } };
@@ -199,7 +200,7 @@ export class AliasRecord {
       owner(); active(); allowedCid(record.cid);
       if (typeof data.auto_renew !== 'boolean') throw error('invalid_auto_renew');
       record.auto_renew = data.auto_renew;
-      if (data.auto_renew) record.renewal_spender = data.spender || null;
+      if (data.auto_renew) record.renewal_spender = storedSpender(data.spender);
     } else if (action === 'listing' || action === 'unlist') {
       owner(); active(); allowedCid(record.cid);
       if (action === 'listing' && (!Number.isSafeInteger(data.price_cents) || data.price_cents < 100 || data.price_cents > 100000000)) throw error('invalid_price');

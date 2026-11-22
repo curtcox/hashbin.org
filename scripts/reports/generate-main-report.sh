@@ -591,6 +591,8 @@ cp scripts/reports/pages/diagram.html build-reports/diagram.html
 echo "GitHub Pages diagram editor copied: build-reports/diagram.html"
 cp scripts/reports/pages/diagram-oauth.html build-reports/diagram-oauth.html
 cp scripts/reports/pages/diagram-oauth.js build-reports/diagram-oauth.js
+cp scripts/reports/pages/diagram-dsl.js build-reports/diagram-dsl.js
+cp scripts/reports/pages/diagram-render.js build-reports/diagram-render.js
 echo "GitHub Pages sign-in diagram editor copied: build-reports/diagram-oauth.html (uses build-reports/sdk)"
 
 # Bundle the browser SDK alongside generated GitHub Pages helpers so module imports stay same-origin.

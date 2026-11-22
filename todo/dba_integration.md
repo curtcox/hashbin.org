@@ -1,141 +1,138 @@
 # devicebasedauth.org integration
 
-Row **S23** (device-bound keys and account linking) and **S24** (sign in with
-devicebasedauth.org) in `STATUS.md`.
+Row **S24** (device-bound keys and account linking) and **S25** (sign in with
+devicebasedauth.org) in `STATUS.md`. The user-facing reference is
+[`docs/devicebasedauth.md`](../docs/devicebasedauth.md).
 
 ## Status
 
-**Phase:** S23 implemented on branch `claude/dba-integration` (not merged or deployed).
-The owner steps below remain. S24 has not started.
+**Phase:** code complete on `main` (2026-11-22) and deployed. What remains is owner setup at
+devicebasedauth.org, a live check, and S25 Stage A (a Clerk dashboard setting).
 
-[devicebasedauth.org](https://devicebasedauth.org) ("DBA", repo
-`curtcox/device-based-auth`) issues revocable, device-bound credentials: a device makes its
-own P-256 key, and DBA signs a readable list of what that device may do, for which site, when
-and where. Its plan for HashBin is §9 of `todo/master_plan.md` in that repo. The HashBin
-scopes are mirrored there as DBA actions `hashbin:<scope>` (`src/services/first-party.js`),
-plus `hashbin:session`.
+[devicebasedauth.org](https://devicebasedauth.org) ("DBA", repo `curtcox/device-based-auth`)
+issues revocable, device-bound credentials: a device makes its own P-256 key, and DBA signs a
+readable list of what that device may do, for which site, when and where. Its plan for HashBin
+is §9 of `todo/master_plan.md` in that repo. The HashBin scopes are DBA actions
+`hashbin:<scope>`, plus `hashbin:session`.
 
 ## What exists
 
 | Piece | Where |
 |---|---|
-| Vendored verifier `@devicebasedauth/verify` (DBA commit `da2b296`); never edit, refresh by copying | `src/vendor/devicebasedauth/` (its README says how) |
-| Issuer config, shared verifier and OIDC client, link-index helpers | `src/auth/dba.js` |
-| Credential kind `dba` in the middleware: `Authorization: DBA <credential>` + `DPoP: <proof>`, and `Authorization: Bearer <token>` when the JWS `typ` is `dba-access+jwt` (checked before Clerk) | `src/auth/middleware.js` |
-| Link API: `GET`/`DELETE /api/auth/dba/link`, `POST /api/auth/dba/link/start`, `POST /api/auth/dba/link/finish` (all session-only) | `src/api/dba.js`, `API_ROUTES` in `src/index.js` |
-| `DbaLink` Durable Object: DBA account → HashBin user, one object per DBA account (binding `DBA_LINKS`, migration `v13`, backed up) | `src/durable-objects/dba-link.js` |
-| Reverse link `profile.dba_link`, pending OIDC state (storage key `dba-oidc-state`), DBA spending records `profile.dba_credentials` | `src/durable-objects/user-profile.js`, `src/utils/credential-spend.js` |
-| Account Settings section (status, Link/Unlink, CLI and browser SDK instructions) and the callback page | `frontend/account.html#dba`, `frontend/js/dba-link.js`, `frontend/auth/dba/callback.html`, `frontend/js/dba-callback.js` |
-| Docs | `docs/API.md` ("devicebasedauth.org credentials"), `frontend/docs/api.html`, `docs/backup-and-restore.md` |
-| Tests with a fake DBA issuer (credentials, status lists and ID tokens signed with the vendored `issuer.js`; JWKS, status list and OIDC endpoints served by a stubbed `fetch`) | `src/auth/dba.test.js`, `src/durable-objects/dba-link.test.js` |
+| Vendored verifier `@devicebasedauth/verify` (DBA commit `60aa3c3`); never edit, refresh by copying | `src/vendor/devicebasedauth/` (its README says how) |
+| Issuer config, the shared verifier (replay cache, catalog, online key), OIDC client, link-index helpers | `src/auth/dba.js` |
+| Validating a credential, pushed revocations, online decisions | `src/auth/dba-auth.js` (called from `src/auth/middleware.js` and the dispatcher in `src/api-routes.js`) |
+| `ACCOUNT_SESSION` access: the account's own sign-in, never a device session | `src/auth/scopes.js`, `API_ROUTES` |
+| Link and credential routes; the revocation webhook | `src/api/dba.js`, `src/api/dba-events.js` |
+| `DbaLink` (DBA account → user, `v13`, backed up), `DbaRevocations` and `DbaReplayCache` (`v14`) | `src/durable-objects/dba-link.js`, `dba-revocations.js`, vendored `replay-do.js` |
+| Profile side: `dba_link`, pending OIDC state, `dba_credentials` records, the credentials list | `src/durable-objects/user-profile-dba.js`, `src/utils/credential-spend.js` |
+| Revocation checks before stored-spender charges and download leases | `src/durable-objects/dba-spend-check.js`, `src/durable-objects/download-budget.js` |
+| Signed download links with a `dba` identity | `src/api/downloads.js`, `src/utils/download-budget.js` |
+| Any-origin CORS for `Authorization: DBA` | `src/auth/oauth-cors.js` |
+| Account Settings section (link, credentials, caps) and the callback page | `frontend/account.html#dba`, `frontend/js/dba-link.js`, `frontend/auth/dba/callback.html` |
+| Tests with a fake DBA (credentials, status lists, ID tokens and events signed with the vendored `issuer.js`; JWKS, status list, catalog, OIDC and `/authorize` served by a stubbed `fetch`) | `test-utils/dba-fixture.js`, `src/auth/dba*.test.js`, `src/durable-objects/dba-link.test.js` |
 
-It was also checked once end to end against DBA's real Worker run in-process (with DBA's own
-`test-utils/env.js`): the OIDC link, a credential enrolled at DBA reading the balance, an
-access token, scope and session refusals, and revocation at DBA answering 401.
+The branch's first version was checked once end to end against DBA's real Worker run
+in-process (OIDC link, a credential enrolled at DBA reading the balance, an access token,
+scope and session refusals, and revocation at DBA answering 401). The later additions are
+tested against the fake only.
 
 ## How it works
 
-- **Verification is offline.** DBA's JWKS (cached 1 hour) and status lists (cached at most 5
-  minutes) are fetched from `DBA_ISSUER` and kept in module-level verifiers, so the caches and
-  the DPoP replay cache survive across requests in an isolate. If they can't be fetched,
-  requests fail closed with `503 AUTH_DBA_UNAVAILABLE`. Revoking a device at DBA stops it here
-  within the status list's TTL.
-- **Account linking** is OIDC (authorization code + PKCE, no client secret) with client ID
-  `hashbin.org` and redirect `https://hashbin.org/auth/dba/callback` (in local mode,
-  `<this origin>/auth/dba/callback`). The state, nonce and PKCE verifier stay in the user's
-  profile DO for 10 minutes and are taken (deleted) on first use, so a code only completes the
-  link that started it. Finishing writes the `DbaLink` index first, then the profile. A
-  credential is accepted only when both agree, so a half-finished link or unlink never lets one
-  in. One DBA account links to one HashBin user (`409 dba_account_linked_elsewhere`); a link
-  whose owner's profile no longer names it (unlinked, deleted, moved) can be taken over.
-- **What a credential may do.** Its grants' `hashbin:<scope>` actions, evaluated now (time
-  windows, places, expiry), become the user's `scopes`, and the route table does the rest.
-  The tightest `limits.spend_usd_per_month` becomes `caveats.monthly_spend_limit_cents`
-  (rounded down). `spenderOf` returns `{ kind: 'dba', id: cid, account, scopes, caveats }`,
-  and the profile keeps the month's usage per credential (the 100 most recently used), so
-  balance debits, personal and global alias purchases and their auto-renewals all honour the
-  cap. Unlinking makes those records invalid, which also stops auto-renewals paid through a
-  DBA credential.
-- **Errors.** `AUTH_DBA_PROOF_INVALID` (401: missing, wrong, stale or replayed DPoP proof),
-  `AUTH_DBA_NOT_LINKED` (403, with `dba_account`), `AUTH_DBA_UNAVAILABLE` (503), and
-  `AUTH_KEY_REVOKED` or `AUTH_EXPIRED` (401). The DBA reason is in `dba_code`. Anything else
-  is `AUTH_INVALID_FORMAT`.
+- **Verification is offline.** DBA's JWKS (1 hour), status lists (at most 5 minutes) and the
+  hashbin.org catalog (1 hour) are cached in one verifier per issuer per isolate. Failure to
+  fetch any of them fails closed (`503 AUTH_DBA_UNAVAILABLE`). DPoP proof ids are claimed in
+  `DbaReplayCache` (16 shards), so a proof works once across all isolates; that object being
+  unreachable also fails closed.
+- **Revocation.** Status lists are authoritative. DBA's webhook (`POST /api/dba/events`,
+  public, issuer-signed) records revoked status entries in `DbaRevocations` until the
+  credential's expiry; isolates read that set at most every 30 seconds. A read failure there
+  counts as "nothing pushed" (the status list still applies).
+- **Account linking** is OIDC (authorization code + PKCE, no client secret), client ID
+  `hashbin.org`, redirect `https://hashbin.org/auth/dba/callback` (local mode: this origin's).
+  State, nonce and verifier stay in the profile DO for 10 minutes and are taken on first use.
+  Finishing writes `DbaLink` first, then the profile; a credential is accepted only when both
+  agree. One DBA account links to one user; a stale link can be taken over.
+- **Scopes.** Each `hashbin:<scope>` the grants allow offline now is held. Scopes allowed only
+  online (step-up, gates, `limits.uses`, `require.online`, gated catalog actions) are listed in
+  `user.dba.onlineScopes`; the dispatcher asks DBA's `/authorize` for the one a route needs
+  (only with `DBA_API_KEY`), answering `403 gate_pending` with DBA's `gate_request` until gates
+  settle. Confirmations (`DBA-Confirmation`) are verified and passed to the evaluator.
+- **Device sessions.** `hashbin:session` sets `session` and `deviceSession` and every user
+  scope. `SESSION` routes accept it; `ACCOUNT_SESSION` routes (keys, apps, OAuth authorize,
+  grant edits, download sessions and key budgets, provider and DBA linking, account deletion)
+  and `ADMIN_SESSION` refuse it.
+- **Spending.** The tightest `limits.spend_usd_per_month` of the `hashbin:` grants becomes
+  `monthly_spend_limit_cents`. `spenderOf` returns `{ kind: 'dba', id, account, scopes,
+  caveats, status, exp }`; the profile keeps a record per credential (100 most recent) with the
+  month's usage, status entry and expiry. Stored spenders (auto-renewals) keep only
+  `{ kind, id, account }` (`storedSpender`); before charging one the profile checks
+  `DbaRevocations` and the status list, and a record past its last-seen expiry spends nothing.
+- **Downloads.** `/api/downloads/sign` records the credential and signs links with identity
+  `{ u, k: cid, kind: 'dba' }`, expiring no later than the credential. Leases check the
+  record (linked, not revoked, unexpired, `downloads:spend`, cids caveat) and DBA revocation,
+  then apply account caps, the grant's spend cap and optional per-credential download caps.
+- **CORS.** Requests with `Authorization: DBA` get `Access-Control-Allow-Origin` for any
+  origin; `/api/` preflights asking for `dpop` are allowed from any origin.
 
 ### Decisions taken
 
-- **`hashbin:session` does not make a DBA credential the account session.** The credential
-  is `session: false`, like an API key. A session can create API keys, register apps, deposit,
-  change settings and delete the account, so a device credential holding it could mint
-  long-lived credentials that outlive revoking the device. Revisit with S24 Stage B, where
-  HashBin's own pages would run on device credentials; that needs a decision on which
-  session-only routes a device session may reach.
-- **No `downloads:spend` yet.** Signed download links outlive the request and are charged on
-  256t.us against a revocable spending identity (key, grant or browser session). DBA
-  credentials have none there yet, so `DBA_UNSUPPORTED_SCOPES` in `src/auth/dba.js` strips it.
-- **HashBin resolves `linkedUser`, not `createSiteAuth`.** The site helper's
-  `linkedUser(acct)` callback gets no request context, and a verifier created per request
-  would lose its caches. HashBin keeps one `createSiteAuth` per issuer with a pass-through
-  `linkedUser` and then looks the account up itself (index and profile).
+- **Device sessions reach everything but minting and ending the account** (owner, 2026-11-22).
+- **Any-origin CORS for DBA credentials** (owner, 2026-11-22): no cookies, non-exportable key.
+- **Online decisions are supported** when `DBA_API_KEY` is set (owner, 2026-11-22); each is
+  billed to the hashbin.org operator. Without it, online-only grants answer `online_required`.
+- **HashBin uses `createVerifier`, not `createSiteAuth`.** It needs per-request link lookups,
+  confirmations and online decisions per route; see "Upstream notes".
 - **Account moves** (`src/services/account-move.js`) drop the DBA link; the owner links again.
 
 ## Remaining
 
 ### Owner (ops)
 
-- [ ] **Set `DBA_ISSUER`** only if it is not `https://devicebasedauth.org`. It is a plain
-  variable (`wrangler.toml` `[vars]`): https only, except `http://localhost…` in local mode.
 - [ ] **Fund the operator account at devicebasedauth.org** that owns the `hashbin.org`
-  audience. DBA bills the audience operator for OIDC logins (account linking) and any online
-  decisions. HashBin verifies offline, so ordinary API calls cost the operator nothing.
-- [ ] **Deploy** (merging to `main` deploys). Migration `v13` creates `DbaLink`. Then link a
-  real DBA account in Account Settings, run
+  audience. DBA bills the audience operator for OIDC logins (linking) and online decisions.
+- [ ] **Register the revocation webhook** as the audience owner:
+  `PATCH /api/v1/audiences/hashbin.org` with `{"revocation_webhook": "https://hashbin.org/api/dba/events"}`,
+  then `POST /api/v1/audiences/hashbin.org/webhook-test` (expect status 204).
+- [ ] **Optional: `DBA_API_KEY`** GitHub secret (an API key of the audience owner with the
+  right to call `/api/v1/authorize`), pushed by the deploy workflow. Needed only for gated or
+  other online-only grants.
+- [ ] **Set `DBA_ISSUER`** only if it is not `https://devicebasedauth.org`.
+- [ ] **Live check:** link a real DBA account in Account Settings, run
   `dba enroll --aud hashbin.org --action hashbin:balance:read` and
   `dba curl https://hashbin.org/api/balance`, revoke the device at devicebasedauth.org, and
-  confirm the next call answers 401 within 5 minutes.
-- [ ] **(S24 Stage A, optional)** Add devicebasedauth.org as a custom OIDC provider in
-  HashBin's Clerk dashboard for a "Sign in with devicebasedauth.org" button (DBA decision D7:
-  check that the Clerk plan supports custom OIDC providers). DBA must register Clerk's
-  callback URL for that client. Limitation: sign-in gives an ordinary Clerk session, so
-  revoking the device stops future sign-ins but does not end that session.
+  confirm the next call answers 401 within seconds (webhook) or 5 minutes (status list).
+  Also enroll one with `hashbin:session` and confirm `POST /api/auth/apikeys` answers 403.
+- [ ] **(S25 Stage A, optional)** Add devicebasedauth.org as a custom OIDC provider in the
+  Clerk dashboard (DBA decision D7: check the Clerk plan supports it). DBA must register
+  Clerk's callback URL. Revoking the device stops future sign-ins but not that Clerk session;
+  Stage B (device sessions) is the revocable alternative.
 
 ### Code
 
-- [ ] **Local development against a local DBA.** Both Workers default to port 8787 and DBA's
-  local issuer is fixed at `http://localhost:8787`, so HashBin has to run on another port. DBA
-  only accepts the redirect URIs registered for `hashbin.org` (the production ones), so the
-  local callback must be added there first; the end-to-end check did that with
-  `PATCH /api/v1/audiences/hashbin.org` as DBA's operator. A DBA-side change could register
-  localhost callbacks for first-party audiences in local mode.
-- [ ] **CORS for browser apps on other origins.** Cross-origin API calls are allowed only
-  from registered developer-app origins (`src/auth/oauth-cors.js`). DBA credentials need no
-  cookie and are bound to a non-extractable key, so allowing any origin for
-  `Authorization: DBA` requests may be reasonable. Decide with B13 in mind.
-- [ ] **`downloads:spend` for DBA credentials** (give them a spending identity on 256t.us).
-- [ ] **Device-bound sessions (S24 Stage B):** HashBin pages using `dba.js` for API calls,
-  and the session decision above.
-- [ ] **List linked DBA credentials** (from `profile.dba_credentials`: last use, month's
-  spend) on Account Settings, like app authorizations.
-- [ ] **Auto-renewals after revocation at DBA.** An alias auto-renewal paid through a DBA
-  credential keeps working after that credential is revoked at DBA, until the account is
-  unlinked, because HashBin learns of revocations only when a credential is presented.
-  Options: check the status list from the renewal alarm, or pay renewals from the session.
-- [ ] Refresh the vendored verifier when DBA ships fixes (see "Upstream notes").
+- [ ] **Local development against a local DBA.** DBA's local issuer is fixed at
+  `http://localhost:8787`, HashBin's dev server's port too, so HashBin must run on another port,
+  and DBA only accepts the redirect URIs registered for `hashbin.org`. A DBA-side change could
+  register localhost callbacks for first-party audiences in local mode.
+- [ ] **HashBin's own pages on device credentials.** Device sessions work through the API;
+  the pages still sign in with Clerk. Using DBA's browser SDK for page API calls (and hiding
+  controls the device lacks grants for) is a frontend project of its own.
+- [ ] **Direct DBA auth on 256t.us** (downloads with `Authorization: DBA` instead of a signed
+  link). Not needed while signed links cover it.
+- [ ] Refresh the vendored verifier when DBA ships fixes.
 
 ### Upstream notes for devicebasedauth.org (`packages/verify`)
 
-- `createSiteAuth`'s `linkedUser(acct)` gets no request or context. Sites that look links up
-  through per-request bindings must either lose the verifier caches or bypass `linkedUser`
-  (HashBin bypasses it). Passing `request` as a second argument would fix it.
-- `verify()` fetches the JWKS before decoding the credential, and failed JWKS fetches are not
-  cached, so while DBA is unreachable every request with any `Authorization: DBA …` header
-  makes an outbound fetch.
-- `createOidcClient().finish` requires `aud` to be a string; OIDC allows an array.
-- `credentialFromRequest` matches `DBA ` and `Bearer ` case-sensitively; HTTP auth schemes are
-  case-insensitive.
+- `createSiteAuth().authenticate` evaluates grants without the verified confirmation
+  (`allowedActions(payload, actions, { request, proof })`), so credentials with a `confirm`
+  block fail there with `confirmation_required`. HashBin calls `decide` itself and passes it.
+- `handleEvent` applies revocations to one verifier in one isolate; Workers sites need their
+  own shared store (HashBin's `DbaRevocations`). A durable helper like `replay-do.js` would help.
 
 ## Done means
 
-S23: a HashBin user links a DBA account in production, a device enrolled for `hashbin.org`
-publishes and reads within its grants and spend cap, and revoking it at devicebasedauth.org
-stops it within 5 minutes. S24: "Sign in with devicebasedauth.org" works (Stage A), then
-HashBin's own pages run on device credentials (Stage B).
+S24: a HashBin user links a DBA account in production, a device enrolled for `hashbin.org`
+publishes, reads and signs downloads within its grants and spend cap, a gated grant waits for
+approval, and revoking the device at devicebasedauth.org stops it within seconds (webhook) and
+at most 5 minutes. S25: "Sign in with devicebasedauth.org" works (Stage A), and device
+sessions are refused every minting route in production (Stage B).

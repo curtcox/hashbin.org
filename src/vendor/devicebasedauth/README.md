@@ -6,7 +6,7 @@ status lists, and runs the OIDC client used for account linking. HashBin uses it
 
 - **Source:** `packages/verify/src/*.js` (without the `*.test.js` files) in
   [devicebasedauth.org](https://github.com/curtcox/device-based-auth)
-- **Commit:** `a6c0d77` (package version 0.1.0)
+- **Commit:** `60aa3c3` (package version 0.1.0)
 - **License:** MIT
 
 **Do not edit these files here.** There is one credential evaluator, shared by DBA, its SDK
@@ -14,7 +14,7 @@ and every site that accepts DBA credentials, and it must pass DBA's conformance 
 bugs upstream, then refresh by copying the files again and updating the commit above:
 
 ```sh
-cp ../device-based-auth/packages/verify/src/{credential,grants,index,issuer,jose,site,status-list,verifier}.js src/vendor/devicebasedauth/
+cp ../device-based-auth/packages/verify/src/{credential,events,grants,index,issuer,jose,replay-do,site,status-list,verifier}.js src/vendor/devicebasedauth/
 git -C ../device-based-auth rev-parse HEAD   # record it above
 ```
 

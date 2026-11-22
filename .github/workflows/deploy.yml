@@ -9,6 +9,14 @@ on:
       - main
   workflow_dispatch:
 
+# One production run at a time, from deploy through the post-deploy check that production
+# serves this run's commit; overlapping runs made that check fail on a newer commit. A queued
+# run waits rather than cancelling the one deploying, and GitHub keeps only the newest queued
+# run, so a burst of pushes deploys the latest. Pull requests never deploy and get their own group.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('deploy-pr-{0}', github.event.pull_request.number) || format('production-deploy-{0}', github.ref) }}
+  cancel-in-progress: false
+
 jobs:
   test:
     name: Run Tests
@@ -38,6 +46,9 @@ jobs:
 
       - name: Lint Worker, script and frontend code
         run: npm run lint
+
+      - name: Check file sizes against limits and the ratchet baseline
+        run: npm run check:file-sizes
 
       - name: Install hosted-sandbox test browsers
         run: npx playwright install --with-deps chromium webkit
@@ -231,6 +242,21 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+
+      - name: Configure devicebasedauth.org online checks
+        run: |
+          # Optional: lets device credentials use grants that need DBA's online check (step-up,
+          # gates, use counts); each decision is billed to the hashbin.org operator at DBA.
+          if [ -n "$DBA_API_KEY" ]; then
+            printf '%s' "$DBA_API_KEY" | npx wrangler secret put DBA_API_KEY
+            echo "✅ DBA_API_KEY configured"
+          else
+            echo "ℹ️ DBA_API_KEY not set; online-only DBA grants answer 403 online_required"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DBA_API_KEY: ${{ secrets.DBA_API_KEY }}
 
       - name: Configure cost monitor
         run: |

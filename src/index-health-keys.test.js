@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkClerk, checkStripe } from './index.js';
+import { checkClerk, checkStripe } from './health.js';
 
 describe('checkStripe', () => {
   const prod = { ENVIRONMENT: 'production', STRIPE_WEBHOOK_SECRET: 'whsec_x' };

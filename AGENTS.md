@@ -15,13 +15,16 @@ Durable Objects and R2, with Clerk for sign-in and Stripe for deposits.
 | Design and decisions for an open item | `todo/<plan>.md`, linked from the item's STATUS row |
 | Why something finished was built the way it was | `done/<plan>.md`; older implementation write-ups are in `done/history/` |
 | How to operate, deploy or configure something | [`docs/README.md`](docs/README.md) |
-| The public API | [`docs/API.md`](docs/API.md) and the route table `API_ROUTES` in `src/index.js` |
+| The public API | [`docs/API.md`](docs/API.md) and the route table `API_ROUTES` in `src/api-routes.js` |
 
 ## Repository map
 
 ```
 src/                     Main Worker (hashbin.org): API, cron jobs, Durable Objects
-  index.js               Entry point: fetch/scheduled handlers, API_ROUTES table, DO exports
+  index.js               Entry point: fetch handler, DO exports, BUNDLED_GIT_SHA
+  api-routes.js          API_ROUTES table and its access-checking dispatcher
+  scheduled-jobs.js      Cron jobs (spread into the default export)
+  health.js              /health checks and /api/config
   api/                   One module per API area (content, oauth, payments, disputes, admin-*)
   auth/                  Authentication: middleware, scopes, OAuth, DPoP, admin, local auth
   durable-objects/       18 DO classes (bound in wrangler.toml) plus their helpers
@@ -54,6 +57,7 @@ Node 22+. Run `npm install` first.
 | `npm run test:unit` | Unit tests (Vitest, `**/*.test.js` beside the code). **Run before every commit.** | nothing |
 | `npx vitest run src/api/oauth.test.js` | One test file | nothing |
 | `npm run lint` | ESLint over `src/`, `workers/`, `scripts/`, `frontend/js/`, `frontend/sdk/`. Must report 0 errors. | nothing |
+| `npm run check:file-sizes` | File size limits per type, with a ratchet for files already over them. Also runs in the pre-push hook, unit tests and CI. | nothing |
 | `npm run dev:local` | Full local stack at `http://localhost:8787` with no Clerk, Stripe or Cloudflare account | `.dev.vars` from `.dev.vars.example` |
 | `npm run test:e2e` | Playwright browser tests | starts `dev:local` if needed |
 | `npm run test:dom` | Opaque DOM sandbox and verified offline tests (Chromium, WebKit) | `npx playwright install chromium webkit` |
@@ -80,7 +84,7 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
 - **Tests sit beside the code** as `name.test.js` and use Vitest globals. Durable Objects are
   tested by constructing the class with an in-memory storage stub. Copy the pattern from a
   neighboring test rather than inventing one.
-- **Every API route declares its access** in `API_ROUTES` (`src/index.js`): `PUBLIC`, `SESSION`,
+- **Every API route declares its access** in `API_ROUTES` (`src/api-routes.js`): `PUBLIC`, `SESSION`,
   `ADMIN_SESSION`, or the scope(s) a delegated credential needs (`src/auth/scopes.js`). The
   dispatcher enforces it, and a test fails for any route without a valid declaration. A new
   scope needs an entry in `USER_SCOPES` or `ADMIN_SCOPES`. After changing `API_ROUTES`, run
@@ -94,6 +98,14 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
   new public pages from `frontend/sitemap.html`.
 - **Money** is integer cents. Storage pricing is in `src/utils/pricing.js`; Cloudflare cost
   rates and safety limits are in `src/utils/cost-policy.js`. Don't duplicate either.
+- **File sizes** have per-type limits (source code 32 KiB, HTML/CSS 64 KiB, prose 48 KiB,
+  raster images 256 KiB, and 64 KiB for `frontend/sdk/hashbin.js`, which must stay one
+  SRI-pinned file; the full list is `RULES` in `scripts/check-file-sizes.mjs`). When a file
+  outgrows its limit, split it. `scripts/file-size-baseline.json` is empty; it only grandfathers
+  files when a new or tighter rule arrives (`--write-baseline`), and those may not grow. After
+  shrinking one, run `npm run check:file-sizes -- --update-baseline`. Never raise or add
+  baseline entries to make a check pass. `npm install` enables the pre-push hook in `.githooks/`, which also rejects big files
+  committed and deleted again before the push.
 - **Secrets** never go in the repo. Worker secrets are listed in the comment block in
   `wrangler.toml` and pushed by the deploy workflow from GitHub secrets.
 

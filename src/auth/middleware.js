@@ -11,7 +11,7 @@ import { verifyDPoP } from './dpop.js';
 import { verifyOAuthJwt } from './oauth.js';
 import { ALL_ADMIN_SCOPES, ALL_USER_SCOPES } from './scopes.js';
 import { credentialFromRequest } from '../vendor/devicebasedauth/verifier.js';
-import { DBA_UNSUPPORTED_SCOPES, dbaSiteAuth, dbaSpendLimitCents, linkedUserId } from './dba.js';
+import { validateDbaCredential } from './dba-auth.js';
 
 // Error codes for authentication failures
 export const AUTH_ERROR_CODES = {
@@ -33,20 +33,6 @@ export const AUTH_ERROR_CODES = {
 const AUTH_ERROR_STATUS = {
   [AUTH_ERROR_CODES.AUTH_DBA_NOT_LINKED]: 403,
   [AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE]: 503
-};
-
-// DBA verifier codes (spec/credential.md in devicebasedauth.org) mapped to HashBin's
-const DBA_ERROR_CODES = {
-  expired: AUTH_ERROR_CODES.AUTH_EXPIRED,
-  revoked: AUTH_ERROR_CODES.AUTH_KEY_REVOKED,
-  proof_required: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
-  invalid_proof: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
-  key_mismatch: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
-  stale_proof: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
-  replayed_proof: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
-  use_dpop_nonce: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
-  jwks_unavailable: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE,
-  status_unavailable: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE
 };
 
 // Rate limiting windows (in milliseconds)
@@ -392,60 +378,6 @@ async function validateOAuthAccessToken(token, env, request) {
 }
 
 /**
- * Validate a devicebasedauth.org credential (or access token) and find the HashBin user
- * its DBA account is linked to. The index (DbaLink) and the user's profile must agree.
- */
-async function validateDbaCredential(request, env) {
-  const site = dbaSiteAuth(env);
-  if (!site) return { valid: false, error: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE, message: 'DBA_ISSUER is not a valid issuer' };
-
-  let result;
-  try {
-    result = await site.authenticate(request);
-  } catch (_error) {
-    return { valid: false, error: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE, message: 'Could not verify the devicebasedauth.org credential' };
-  }
-  if (!result) return { valid: false, error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT, message: 'No devicebasedauth.org credential' };
-  if (!result.ok) {
-    return {
-      valid: false,
-      error: DBA_ERROR_CODES[result.code] || AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
-      message: result.message || 'Invalid devicebasedauth.org credential',
-      details: { dba_code: result.code }
-    };
-  }
-
-  const account = result.dbaAccount;
-  const notLinked = {
-    valid: false,
-    error: AUTH_ERROR_CODES.AUTH_DBA_NOT_LINKED,
-    message: 'Link this devicebasedauth.org account to your HashBin account first (Account Settings)',
-    details: { dba_account: account }
-  };
-  try {
-    const userId = await linkedUserId(env, account);
-    if (!userId) return notLinked;
-    const response = await env.USER_PROFILES.get(env.USER_PROFILES.idFromName(userId)).fetch(new Request('http://internal/profile'));
-    if (!response.ok) return notLinked;
-    const profile = await response.json();
-    if (profile.deleted_at) return { valid: false, error: AUTH_ERROR_CODES.AUTH_USER_DELETED, message: 'User account has been deleted' };
-    if (profile.dba_link?.account !== account || profile.migrated_to) return notLinked;
-
-    const spendLimit = dbaSpendLimitCents(result.caveats);
-    return {
-      valid: true,
-      userId: profile.user_id || userId,
-      scopes: result.scopes.filter(scope => !DBA_UNSUPPORTED_SCOPES.has(scope)),
-      caveats: spendLimit === undefined ? {} : { monthly_spend_limit_cents: spendLimit },
-      profile,
-      dba: { account, deviceId: result.deviceId, credentialId: result.credentialId, kind: result.kind }
-    };
-  } catch (_error) {
-    return { valid: false, error: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE, message: 'Could not look up the devicebasedauth.org link' };
-  }
-}
-
-/**
  * Check rate limits for a given identifier
  */
 function checkRateLimit(identifier, limit) {
@@ -686,9 +618,8 @@ async function authenticateUncached(request, env) {
     };
   }
 
-  // devicebasedauth.org credential. Like an API key it holds only its granted scopes;
-  // it is never the account's session, even with hashbin:session, because a session can
-  // issue keys and change the account (todo/dba_integration.md, "Sessions").
+  // devicebasedauth.org credential (src/auth/dba-auth.js). It holds its granted scopes;
+  // with hashbin:session it is a device session, which never reaches ACCOUNT_SESSION routes.
   if (auth.type === 'dba') {
     const validation = await validateDbaCredential(request, env);
     if (!validation.valid) {
@@ -699,7 +630,8 @@ async function authenticateUncached(request, env) {
       user: {
         userId: validation.userId,
         authMethod: 'dba',
-        session: false,
+        session: validation.session,
+        deviceSession: validation.session,
         scopes: validation.scopes,
         caveats: validation.caveats,
         profile: validation.profile,

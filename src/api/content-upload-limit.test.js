@@ -12,7 +12,7 @@ vi.mock('../auth/middleware.js', async () => {
   };
 });
 
-import { handleUploadContent } from './content.js';
+import { handleUploadContent } from './content-upload.js';
 import { MAX_UPLOAD_BYTES } from '../utils/upload-limits.js';
 
 authenticateMock.mockResolvedValue({
