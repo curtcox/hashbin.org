@@ -85,3 +85,18 @@ describe('download links signed with a DBA credential', () => {
     expect((await sign(credential)).status).toBe(403);
   });
 });
+
+describe('the credentials list', () => {
+  it('shows credentials seen here with their month\'s spend and download caps', async () => {
+    const credential = await t.issue([{ actions: ['hashbin:downloads:spend'], limits: { spend_usd_per_month: 3 } }]);
+    const { identity } = await sign(credential);
+    await lease(identity);
+    const caps = { daily_cap_cents: 100, monthly_cap_cents: 200 };
+    await t.call(t.session('/api/auth/dba/credentials/crd_CRED000001/download-budget', { method: 'PUT', body: JSON.stringify({ caps }) }));
+    const response = await t.call(t.session('/api/auth/dba/credentials'));
+    expect(response.status).toBe(200);
+    const { credentials } = await response.json();
+    expect(credentials).toEqual([expect.objectContaining({ credential_id: 'crd_CRED000001', scopes: ['downloads:spend'],
+      monthly_spend_limit_cents: 300, spend_used_cents: 1, revoked: false, download_caps: caps })]);
+  });
+});

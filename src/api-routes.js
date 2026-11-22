@@ -31,7 +31,7 @@ import { handleDbaEvent } from './api/dba-events.js';
 import { handleCreateAdminKey, handleListAdminKeys, handleRevokeAdminKey } from './api/admin-keys.js';
 import { handleMoveAccount } from './api/admin-accounts.js';
 import { handleConfig, handleHealth } from './health.js';
-import { handleFinishDbaLink, handleGetDbaLink, handleStartDbaLink, handleUnlinkDba } from './api/dba.js';
+import { handleFinishDbaLink, handleGetDbaLink, handleListDbaCredentials, handleStartDbaLink, handleUnlinkDba } from './api/dba.js';
 
 /**
  * API route table. Every route declares its access: PUBLIC, SESSION (a sign-in: the
@@ -82,6 +82,7 @@ const API_ROUTES = [
   { method: 'DELETE', path: '/api/auth/dba/link', access: ACCOUNT_SESSION, handler: handleUnlinkDba },
   { method: 'POST', path: '/api/auth/dba/link/start', access: ACCOUNT_SESSION, handler: handleStartDbaLink },
   { method: 'POST', path: '/api/auth/dba/link/finish', access: ACCOUNT_SESSION, handler: handleFinishDbaLink },
+  { method: 'GET', path: '/api/auth/dba/credentials', access: SESSION, handler: handleListDbaCredentials },
   // devicebasedauth.org revocation webhook (signed by DBA's issuer key)
   { method: 'POST', path: '/api/dba/events', access: PUBLIC, handler: handleDbaEvent },
   { method: 'POST', path: '/api/developers/apps', access: ACCOUNT_SESSION, handler: handleCreateDeveloperApp },

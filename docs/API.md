@@ -290,6 +290,7 @@ sections after this one describe the main routes in detail.
 | DELETE | `/api/auth/dba/link` | `account-session` |
 | POST | `/api/auth/dba/link/start` | `account-session` |
 | POST | `/api/auth/dba/link/finish` | `account-session` |
+| GET | `/api/auth/dba/credentials` | account session |
 | POST | `/api/dba/events` | public |
 | POST | `/api/developers/apps` | `account-session` |
 | GET | `/api/developers/apps` | account session |

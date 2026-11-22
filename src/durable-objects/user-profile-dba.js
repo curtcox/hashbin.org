@@ -45,6 +45,24 @@ export const dbaMethods = {
       await this.state.storage.put('profile', profile);
       return Response.json({ link: profile.dba_link });
     }
+    if (pathname === '/dba/credentials' && method === 'GET') {
+      // Credentials from the linked DBA account seen here, most recently used first
+      const account = profile.dba_link?.account;
+      const now = Date.now();
+      const credentials = (profile.dba_credentials || []).filter(c => account && c.account === account)
+        .sort((a, b) => String(b.last_used_at || '').localeCompare(String(a.last_used_at || '')))
+        .map(c => ({
+          credential_id: c.credential_id,
+          last_used_at: c.last_used_at || null,
+          scopes: c.scopes || [],
+          monthly_spend_limit_cents: c.caveats?.monthly_spend_limit_cents ?? null,
+          spend_used_cents: c.spend_reset && Date.parse(c.spend_reset) > now ? c.spend_used_cents || 0 : 0,
+          expires_at: Number.isSafeInteger(c.exp) ? new Date(c.exp * 1000).toISOString() : null,
+          revoked: Boolean(c.revoked_at),
+          download_caps: profile.download_budget?.keys?.[c.credential_id] || null
+        }));
+      return Response.json({ credentials });
+    }
     if (pathname === '/dba/credentials/record' && method === 'POST') {
       // Remember a verified credential presented now (it may sign download links)
       const { spender } = await request.json();

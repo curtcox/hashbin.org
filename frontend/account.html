@@ -137,6 +137,7 @@
               Linking lets credentials from your devicebasedauth.org account act on this HashBin account, limited to what each one grants.
               One devicebasedauth.org account can be linked to one HashBin account. Unlinking stops all of them here at once.
             </p>
+            <div id="dba-credentials" aria-live="polite"></div>
 
             <h3>Create a device-bound key</h3>
             <p>From a terminal, with the <code>dba</code> command-line tool:</p>
@@ -154,10 +155,12 @@ const response = await dba.fetch('https://hashbin.org/api/content', {
 });</code></pre>
             <p>
               Grant HashBin scopes as actions named <code>hashbin:&lt;scope&gt;</code> (for example <code>hashbin:balance:read</code>);
-              a grant's monthly spend cap becomes the key's spending limit here. Pages on other sites can call the API only if their origin is a registered
-              <a href="/developers">developer app</a>. See the <a href="/docs/api#devicebasedauthorg-credentials">API reference</a>.
+              a grant's monthly spend cap becomes the key's spending limit here. <code>hashbin:session</code> makes the device a session: it can do
+              everything you can on this page except create API keys or apps, approve apps, change linked sign-ins or delete the account.
+              Grants that need approval (step-up or other gates at devicebasedauth.org) are checked with devicebasedauth.org on each use.
+              Pages on any site can call the API with a device credential. See the <a href="/docs/api#devicebasedauthorg-credentials">API reference</a>.
             </p>
-            <p><strong>Revoking the device at devicebasedauth.org stops it everywhere</strong>, including here, within a few minutes.</p>
+            <p><strong>Revoking the device at devicebasedauth.org stops it everywhere</strong>, including here, usually within seconds and at most five minutes.</p>
           </section>
         </div>
       </div>

@@ -154,3 +154,15 @@ export async function handleUnlinkDba(request, env) {
   if (unlinked) await releaseDbaLink(env, unlinked, user.userId);
   return json({ linked: false, unlinked });
 }
+
+/**
+ * GET /api/auth/dba/credentials: { credentials: [...] }, the linked account's credentials
+ * this account has seen (last use, scopes, month's spend, expiry, download caps). Revoking one
+ * happens at devicebasedauth.org.
+ */
+export async function handleListDbaCredentials(request, env) {
+  const { user } = await authenticate(request, env);
+  const response = await profileCall(env, user.userId, '/dba/credentials');
+  if (!response.ok) return json({ credentials: [] });
+  return json(await response.json());
+}
