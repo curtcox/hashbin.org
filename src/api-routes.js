@@ -25,16 +25,19 @@ import { handleDeveloperAppSafety } from './api/app-safety.js';
 import { handleDeveloperRun, handleAdminRun, handleRefreshRunCost } from './api/run-origin.js';
 import { authenticate, requireAuth } from './auth/middleware.js';
 import { handlePublish, handlePublishApp } from './api/publish.js';
-import { ADMIN_SESSION, PUBLIC, SESSION, checkAccess, isSessionAuth } from './auth/scopes.js';
+import { ACCOUNT_SESSION, ADMIN_SESSION, PUBLIC, SESSION, checkAccess, isSessionAuth } from './auth/scopes.js';
+import { authorizeDbaOnline } from './auth/dba-auth.js';
+import { handleDbaEvent } from './api/dba-events.js';
 import { handleCreateAdminKey, handleListAdminKeys, handleRevokeAdminKey } from './api/admin-keys.js';
 import { handleMoveAccount } from './api/admin-accounts.js';
 import { handleConfig, handleHealth } from './health.js';
 import { handleFinishDbaLink, handleGetDbaLink, handleStartDbaLink, handleUnlinkDba } from './api/dba.js';
 
 /**
- * API route table. Every route declares its access: PUBLIC, SESSION (the account's
- * own sign-in only), or the scope(s) a delegated credential needs, any one of which
- * suffices. The dispatcher enforces it before the handler runs; a test fails for any
+ * API route table. Every route declares its access: PUBLIC, SESSION (a sign-in: the
+ * account's own, or a devicebasedauth.org device session), ACCOUNT_SESSION (the account's own
+ * sign-in only: minting credentials that outlive a device, or ending the account), or the
+ * scope(s) a delegated credential needs, any one of which suffices. The dispatcher enforces it before the handler runs; a test fails for any
  * route without a valid declaration.
  */
 const API_ROUTES = [
@@ -56,9 +59,9 @@ const API_ROUTES = [
   { method: ['PUT', 'PATCH', 'DELETE'], path: /^\/api\/user\/aliases\/personal\/([^/]+)$/, access: 'aliases:write', handler: handleUserAliases },
   // Downloads (budgets and sessions belong to the account; signing spends)
   { method: ['GET', 'PUT'], path: '/api/downloads/budget', access: SESSION, handler: handleDownloads },
-  { method: 'PUT', path: /^\/api\/(auth\/apikeys|oauth\/grants)\/[^/]+\/download-budget$/, access: SESSION, handler: handleDownloads },
+  { method: 'PUT', path: /^\/api\/(auth\/apikeys|oauth\/grants)\/[^/]+\/download-budget$/, access: ACCOUNT_SESSION, handler: handleDownloads },
   { method: ['GET', 'DELETE'], path: '/api/downloads/sessions', access: SESSION, handler: handleDownloads },
-  { method: 'POST', path: '/api/downloads/session', access: SESSION, handler: handleDownloads },
+  { method: 'POST', path: '/api/downloads/session', access: ACCOUNT_SESSION, handler: handleDownloads },
   { method: 'POST', path: '/api/downloads/sign', access: 'downloads:spend', handler: handleDownloads },
 
   { method: ['GET', 'HEAD'], path: '/health', access: PUBLIC, handler: (request, env) => handleHealth(env) },
@@ -68,28 +71,30 @@ const API_ROUTES = [
   { method: 'POST', path: '/api/auth/callback', access: PUBLIC, handler: handleAuthCallback },
   { method: 'GET', path: '/api/auth/session', access: SESSION, handler: handleSessionInfo },
   { method: 'POST', path: '/api/auth/logout', access: SESSION, handler: handleLogout },
-  { method: 'POST', path: '/api/auth/link', access: SESSION, handler: handleLinkProvider },
-  { method: 'POST', path: '/api/auth/apikeys', access: SESSION, handler: handleCreateApiKey },
+  { method: 'POST', path: '/api/auth/link', access: ACCOUNT_SESSION, handler: handleLinkProvider },
+  { method: 'POST', path: '/api/auth/apikeys', access: ACCOUNT_SESSION, handler: handleCreateApiKey },
   { method: 'GET', path: '/api/auth/apikeys', access: SESSION, handler: handleListApiKeys },
   { method: 'DELETE', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeApiKey(request, env, m[1]) },
-  { method: 'PATCH', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateApiKey(request, env, m[1]) },
-  { method: 'DELETE', path: '/api/auth/account', access: SESSION, handler: handleDeleteAccount },
+  { method: 'PATCH', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: ACCOUNT_SESSION, handler: (request, env, m) => handleUpdateApiKey(request, env, m[1]) },
+  { method: 'DELETE', path: '/api/auth/account', access: ACCOUNT_SESSION, handler: handleDeleteAccount },
   // devicebasedauth.org account link (device credentials themselves are handled in src/auth/middleware.js)
   { method: 'GET', path: '/api/auth/dba/link', access: SESSION, handler: handleGetDbaLink },
-  { method: 'DELETE', path: '/api/auth/dba/link', access: SESSION, handler: handleUnlinkDba },
-  { method: 'POST', path: '/api/auth/dba/link/start', access: SESSION, handler: handleStartDbaLink },
-  { method: 'POST', path: '/api/auth/dba/link/finish', access: SESSION, handler: handleFinishDbaLink },
-  { method: 'POST', path: '/api/developers/apps', access: SESSION, handler: handleCreateDeveloperApp },
+  { method: 'DELETE', path: '/api/auth/dba/link', access: ACCOUNT_SESSION, handler: handleUnlinkDba },
+  { method: 'POST', path: '/api/auth/dba/link/start', access: ACCOUNT_SESSION, handler: handleStartDbaLink },
+  { method: 'POST', path: '/api/auth/dba/link/finish', access: ACCOUNT_SESSION, handler: handleFinishDbaLink },
+  // devicebasedauth.org revocation webhook (signed by DBA's issuer key)
+  { method: 'POST', path: '/api/dba/events', access: PUBLIC, handler: handleDbaEvent },
+  { method: 'POST', path: '/api/developers/apps', access: ACCOUNT_SESSION, handler: handleCreateDeveloperApp },
   { method: 'GET', path: '/api/developers/apps', access: SESSION, handler: handleListDeveloperApps },
-  { method: ['GET', 'PUT'], path: /^\/api\/developers\/apps\/([^/]+)\/run$/, access: SESSION, handler: (request, env, m) => handleDeveloperRun(request, env, m[1]) },
+  { method: ['GET', 'PUT'], path: /^\/api\/developers\/apps\/([^/]+)\/run$/, access: ACCOUNT_SESSION, handler: (request, env, m) => handleDeveloperRun(request, env, m[1]) },
   { method: 'POST', path: /^\/api\/admin\/apps\/([^/]+)\/run\/(suspend|restore)$/, access: 'admin:takedown', handler: (request, env, m) => handleAdminRun(request, env, m[1], m[2]) },
   { method: 'GET', path: /^\/api\/developers\/apps\/([^/]+)\/safety$/, access: SESSION, handler: (request, env, m) => handleDeveloperAppSafety(request, env, m[1]) },
   { method: 'POST', path: /^\/api\/developers\/apps\/([^/]+)\/safety$/, access: SESSION, handler: (request, env, m) => handleDeveloperAppSafety(request, env, m[1]) },
-  { method: 'PATCH', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateDeveloperApp(request, env, m[1]) },
+  { method: 'PATCH', path: /^\/api\/developers\/apps\/([^/]+)$/, access: ACCOUNT_SESSION, handler: (request, env, m) => handleUpdateDeveloperApp(request, env, m[1]) },
   { method: 'DELETE', path: /^\/api\/developers\/apps\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleDeleteDeveloperApp(request, env, m[1]) },
   { method: 'GET', path: '/api/publish/app', access: PUBLIC, handler: handlePublishApp },
   { method: 'POST', path: '/api/publish', access: SESSION, handler: handlePublish },
-  { method: 'POST', path: '/oauth/authorize', access: SESSION, handler: handleOAuthAuthorize },
+  { method: 'POST', path: '/oauth/authorize', access: ACCOUNT_SESSION, handler: handleOAuthAuthorize },
   { method: 'GET', path: '/oauth/authorize', access: PUBLIC, handler: handleGetOAuthAuthorizePage },
   { method: 'GET', path: '/oauth/dpop-nonce', access: PUBLIC, handler: handleDPoPNonce },
   { method: 'POST', path: '/oauth/token', access: PUBLIC, handler: handleOAuthToken },
@@ -99,7 +104,7 @@ const API_ROUTES = [
   { method: 'DELETE', path: '/api/account/authorizations', access: SESSION, handler: handleRevokeAllAuthorizations },
   { method: 'GET', path: '/api/account/authorizations', access: SESSION, handler: handleListAuthorizations },
   { method: 'DELETE', path: /^\/api\/account\/authorizations\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeAuthorization(request, env, m[1]) },
-  { method: 'PATCH', path: /^\/api\/account\/authorizations\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateAuthorization(request, env, m[1]) },
+  { method: 'PATCH', path: /^\/api\/account\/authorizations\/([^/]+)$/, access: ACCOUNT_SESSION, handler: (request, env, m) => handleUpdateAuthorization(request, env, m[1]) },
 
   // Balance and payments
   { method: 'GET', path: '/api/balance', access: 'balance:read', handler: handleGetBalance },
@@ -196,6 +201,9 @@ export async function handleApiRoutes(url, request, env) {
     if (!match) continue;
 
     const authResult = await authenticate(request, env);
+    // A devicebasedauth.org grant may allow this route's scope only online (src/auth/dba-auth.js)
+    const online = await authorizeDbaOnline(request, env, authResult, route.access);
+    if (online) return online;
     const denied = checkAccess(authResult, route.access, () => requireAuth(authResult));
     if (denied) return denied;
 

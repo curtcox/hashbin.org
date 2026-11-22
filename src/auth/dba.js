@@ -9,7 +9,9 @@
  * account (src/api/dba.js). See todo/dba_integration.md.
  */
 
-import { createSiteAuth, createOidcClient } from '../vendor/devicebasedauth/site.js';
+import { createOidcClient } from '../vendor/devicebasedauth/site.js';
+import { createVerifier } from '../vendor/devicebasedauth/verifier.js';
+import { durableReplayCache } from '../vendor/devicebasedauth/replay-do.js';
 import { USER_SCOPES } from './scopes.js';
 
 export const DBA_DEFAULT_ISSUER = 'https://devicebasedauth.org';
@@ -42,30 +44,40 @@ export function dbaIssuer(env) {
   return url.protocol === 'https:' || local ? url.origin : null;
 }
 
-// One verifier per issuer, kept for the life of the isolate so DBA's JWKS, status lists
-// and the DPoP replay cache survive across requests instead of being fetched every time.
-const siteAuths = new Map();
+// One verifier per issuer, kept for the life of the isolate so DBA's JWKS, status lists and
+// action catalog survive across requests instead of being fetched every time.
+const verifiers = new Map();
 const oidcClients = new Map();
 
+/** The DBA actions HashBin understands: hashbin:<scope> for every user scope, and hashbin:session. */
+export const DBA_ACTIONS = [...Object.keys(USER_SCOPES), 'session'].map(scope => `${DBA_NAMESPACE}:${scope}`);
+
 /**
- * The shared DBA site authenticator for this deployment's issuer, or null when the issuer
- * is misconfigured. Which HashBin user an `acct` belongs to is looked up per request by the
- * caller (it needs this request's env), so linkedUser here only passes the account through.
+ * The shared DBA verifier for this deployment's issuer, or null when the issuer is
+ * misconfigured.
+ *
+ * - DPoP proof ids are claimed in the DBA_REPLAY Durable Object, so a captured proof cannot be
+ *   replayed against another isolate (it fails closed when that object is unreachable).
+ * - The hashbin.org action catalog is loaded from DBA, so actions whose policy requires gates
+ *   are sent online and confirmations passed by timeout are refused where the policy says so.
+ * - DBA_API_KEY (a secret) enables online decisions for grants that need them (step-up,
+ *   gates, use counts, require.online); each one is billed to the hashbin.org operator.
  */
-export function dbaSiteAuth(env) {
+export function dbaVerifier(env) {
   const issuer = dbaIssuer(env);
   if (!issuer) return null;
-  if (!siteAuths.has(issuer)) {
-    siteAuths.set(issuer, createSiteAuth({
+  const key = `${issuer} ${env?.DBA_API_KEY ? 'online' : 'offline'}`;
+  if (!verifiers.has(key)) {
+    verifiers.set(key, createVerifier({
       audience: DBA_AUDIENCE,
-      namespace: DBA_NAMESPACE,
-      scopes: Object.keys(USER_SCOPES),
-      linkedUser: async account => account,
       issuer,
+      catalog: true,
+      ...(env?.DBA_REPLAY ? { replay: durableReplayCache(env.DBA_REPLAY) } : {}),
+      ...(env?.DBA_API_KEY ? { online: { apiKey: env.DBA_API_KEY } } : {}),
       fetch: (...args) => globalThis.fetch(...args)
     }));
   }
-  return siteAuths.get(issuer);
+  return verifiers.get(key);
 }
 
 /**
@@ -85,7 +97,7 @@ export function dbaOidcClient(env, request) {
 
 /** Forget cached verifiers and OIDC discovery (tests only). */
 export function resetDbaAuth() {
-  siteAuths.clear();
+  verifiers.clear();
   oidcClients.clear();
 }
 

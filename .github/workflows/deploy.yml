@@ -243,6 +243,21 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
 
+      - name: Configure devicebasedauth.org online checks
+        run: |
+          # Optional: lets device credentials use grants that need DBA's online check (step-up,
+          # gates, use counts); each decision is billed to the hashbin.org operator at DBA.
+          if [ -n "$DBA_API_KEY" ]; then
+            printf '%s' "$DBA_API_KEY" | npx wrangler secret put DBA_API_KEY
+            echo "✅ DBA_API_KEY configured"
+          else
+            echo "ℹ️ DBA_API_KEY not set; online-only DBA grants answer 403 online_required"
+          fi
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DBA_API_KEY: ${{ secrets.DBA_API_KEY }}
+
       - name: Configure cost monitor
         run: |
           if [ -n "$CLOUDFLARE_ANALYTICS_TOKEN" ]; then

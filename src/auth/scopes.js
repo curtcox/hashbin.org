@@ -48,6 +48,9 @@ export const ALL_ADMIN_SCOPES = Object.freeze(Object.keys(ADMIN_SCOPES));
 // Route access levels besides a scope (or list of scopes, any one of which suffices).
 export const PUBLIC = 'public';
 export const SESSION = 'session';
+// The account's own sign-in, not a devicebasedauth.org device session: for routes that mint
+// credentials outliving the device (API keys, apps, OAuth grants) or end the account
+export const ACCOUNT_SESSION = 'account-session';
 // The ADMIN_USER_ID account's own session (not an admin key), for issuing admin keys
 export const ADMIN_SESSION = 'admin-session';
 
@@ -71,6 +74,11 @@ export function isSessionAuth(authResult) {
   return Boolean(authResult?.authenticated && authResult.user?.session);
 }
 
+/** The account's own sign-in (Clerk or local), not a device session. */
+export function isAccountSessionAuth(authResult) {
+  return isSessionAuth(authResult) && !authResult.user.deviceSession;
+}
+
 export function hasScope(authResult, scope) {
   return Boolean(authResult?.authenticated && authResult.user?.scopes?.includes(scope));
 }
@@ -90,6 +98,10 @@ export function sessionRequiredResponse() {
   return jsonError(403, 'session_required', 'Sign in to HashBin to use this endpoint; keys and app tokens cannot');
 }
 
+function accountSessionRequiredResponse() {
+  return jsonError(403, 'session_required', 'Sign in to HashBin to use this endpoint; keys, app tokens and device sessions cannot');
+}
+
 /**
  * Check a route's declared access against an authentication result.
  * Returns null when allowed, otherwise the error response to send.
@@ -98,8 +110,9 @@ export function checkAccess(authResult, access, unauthenticated) {
   if (access === PUBLIC) return null;
   if (!authResult?.authenticated) return unauthenticated();
   if (access === SESSION) return isSessionAuth(authResult) ? null : sessionRequiredResponse();
+  if (access === ACCOUNT_SESSION) return isAccountSessionAuth(authResult) ? null : accountSessionRequiredResponse();
   if (access === ADMIN_SESSION) {
-    if (!isSessionAuth(authResult)) return sessionRequiredResponse();
+    if (!isAccountSessionAuth(authResult)) return accountSessionRequiredResponse();
     return authResult.user.scopes?.some(scope => scope.startsWith('admin:')) ? null : jsonError(403, 'not_admin', 'Only the admin may manage admin keys');
   }
   const anyOf = Array.isArray(access) ? access : [access];

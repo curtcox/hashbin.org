@@ -271,36 +271,37 @@ sections after this one describe the main routes in detail.
 | POST | `/api/user/aliases/personal/{id}/renew` | `aliases:purchase` |
 | PUT, PATCH, DELETE | `/api/user/aliases/personal/{id}` | `aliases:write` |
 | GET, PUT | `/api/downloads/budget` | account session |
-| PUT | `/api/{auth/apikeys\|oauth/grants}/{id}/download-budget` | account session |
+| PUT | `/api/{auth/apikeys\|oauth/grants}/{id}/download-budget` | `account-session` |
 | GET, DELETE | `/api/downloads/sessions` | account session |
-| POST | `/api/downloads/session` | account session |
+| POST | `/api/downloads/session` | `account-session` |
 | POST | `/api/downloads/sign` | `downloads:spend` |
 | GET, HEAD | `/health` | public |
 | GET | `/api/config` | public |
 | POST | `/api/auth/callback` | public |
 | GET | `/api/auth/session` | account session |
 | POST | `/api/auth/logout` | account session |
-| POST | `/api/auth/link` | account session |
-| POST | `/api/auth/apikeys` | account session |
+| POST | `/api/auth/link` | `account-session` |
+| POST | `/api/auth/apikeys` | `account-session` |
 | GET | `/api/auth/apikeys` | account session |
 | DELETE | `/api/auth/apikeys/{id}` | account session |
-| PATCH | `/api/auth/apikeys/{id}` | account session |
-| DELETE | `/api/auth/account` | account session |
+| PATCH | `/api/auth/apikeys/{id}` | `account-session` |
+| DELETE | `/api/auth/account` | `account-session` |
 | GET | `/api/auth/dba/link` | account session |
-| DELETE | `/api/auth/dba/link` | account session |
-| POST | `/api/auth/dba/link/start` | account session |
-| POST | `/api/auth/dba/link/finish` | account session |
-| POST | `/api/developers/apps` | account session |
+| DELETE | `/api/auth/dba/link` | `account-session` |
+| POST | `/api/auth/dba/link/start` | `account-session` |
+| POST | `/api/auth/dba/link/finish` | `account-session` |
+| POST | `/api/dba/events` | public |
+| POST | `/api/developers/apps` | `account-session` |
 | GET | `/api/developers/apps` | account session |
-| GET, PUT | `/api/developers/apps/{id}/run` | account session |
+| GET, PUT | `/api/developers/apps/{id}/run` | `account-session` |
 | POST | `/api/admin/apps/{id}/run/{suspend\|restore}` | `admin:takedown` |
 | GET | `/api/developers/apps/{id}/safety` | account session |
 | POST | `/api/developers/apps/{id}/safety` | account session |
-| PATCH | `/api/developers/apps/{id}` | account session |
+| PATCH | `/api/developers/apps/{id}` | `account-session` |
 | DELETE | `/api/developers/apps/{id}` | account session |
 | GET | `/api/publish/app` | public |
 | POST | `/api/publish` | account session |
-| POST | `/oauth/authorize` | account session |
+| POST | `/oauth/authorize` | `account-session` |
 | GET | `/oauth/authorize` | public |
 | GET | `/oauth/dpop-nonce` | public |
 | POST | `/oauth/token` | public |
@@ -310,7 +311,7 @@ sections after this one describe the main routes in detail.
 | DELETE | `/api/account/authorizations` | account session |
 | GET | `/api/account/authorizations` | account session |
 | DELETE | `/api/account/authorizations/{id}` | account session |
-| PATCH | `/api/account/authorizations/{id}` | account session |
+| PATCH | `/api/account/authorizations/{id}` | `account-session` |
 | GET | `/api/balance` | `balance:read` |
 | GET | `/api/balance/history` | `transactions:read` |
 | POST | `/api/balance/deposit` | account session |

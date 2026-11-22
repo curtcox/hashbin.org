@@ -9,7 +9,7 @@ vi.mock('./auth/middleware.js', async () => {
 
 import worker from './index.js';
 import { apiRoutes } from './api-routes.js';
-import { ADMIN_SESSION, ALL_ADMIN_SCOPES, ALL_USER_SCOPES, PUBLIC, SESSION, USER_SCOPES, ADMIN_SCOPES, checkAccess } from './auth/scopes.js';
+import { ACCOUNT_SESSION, ADMIN_SESSION, ALL_ADMIN_SCOPES, ALL_USER_SCOPES, PUBLIC, SESSION, USER_SCOPES, ADMIN_SCOPES, checkAccess } from './auth/scopes.js';
 
 const unauthenticated = () => new Response(null, { status: 401 });
 
@@ -23,6 +23,8 @@ const adminSession = principal([...ALL_USER_SCOPES, ...ALL_ADMIN_SCOPES], true);
 const keyWithEveryUserScope = principal([...ALL_USER_SCOPES]);
 const keyWithNoScopes = principal([]);
 const adminKey = principal([...ALL_ADMIN_SCOPES]);
+// A devicebasedauth.org credential granted hashbin:session (src/auth/dba-auth.js)
+const deviceSession = { authenticated: true, user: { ...userSession.user, deviceSession: true } };
 
 function status(authResult, access) {
   return checkAccess(authResult, access, unauthenticated)?.status ?? 200;
@@ -43,7 +45,7 @@ describe('route access declarations', () => {
   it('declares a valid access level on every route', () => {
     for (const route of routes) {
       const { access } = route;
-      const valid = access === PUBLIC || access === SESSION || access === ADMIN_SESSION || (scopesOf(access).length > 0 &&
+      const valid = access === PUBLIC || access === SESSION || access === ACCOUNT_SESSION || access === ADMIN_SESSION || (scopesOf(access).length > 0 &&
         scopesOf(access).every(scope => Object.hasOwn(USER_SCOPES, scope) || Object.hasOwn(ADMIN_SCOPES, scope)));
       expect(valid, `${route.method} ${route.path}`).toBe(true);
       expect(typeof route.handler).toBe('function');
@@ -63,7 +65,18 @@ describe('route access declarations', () => {
     for (const path of sessionOnly) {
       const matching = routes.filter(r => samplePath(r).startsWith(path) && !(path === '/oauth/authorize' && r.method === 'GET'));
       expect(matching.length, path).toBeGreaterThan(0);
-      for (const route of matching) expect(route.access, `${route.method} ${path}`).toBe(SESSION);
+      for (const route of matching) expect([SESSION, ACCOUNT_SESSION], `${route.method} ${path}`).toContain(route.access);
+    }
+  });
+
+  it('keeps minting credentials and ending the account from device sessions', () => {
+    const accountOnly = [['POST', '/api/auth/apikeys'], ['PATCH', '/api/auth/apikeys/([^/]+)'], ['POST', '/api/developers/apps'],
+      ['PATCH', '/api/developers/apps/([^/]+)'], ['POST', '/oauth/authorize'], ['DELETE', '/api/auth/account'],
+      ['POST', '/api/auth/link'], ['POST', '/api/auth/dba/link/start'], ['DELETE', '/api/auth/dba/link'],
+      ['POST', '/api/downloads/session'], ['PATCH', '/api/account/authorizations/([^/]+)']];
+    for (const [method, path] of accountOnly) {
+      const route = routes.find(r => samplePath(r) === path && [r.method].flat().includes(method));
+      expect(route?.access, `${method} ${path}`).toBe(ACCOUNT_SESSION);
     }
   });
 
@@ -77,12 +90,22 @@ describe('route access declarations', () => {
     expect(status(keyWithNoScopes, access)).toBe(403);
     if (access === ADMIN_SESSION) {
       expect(status(adminSession, access)).toBe(200);
+      expect(status({ authenticated: true, user: { ...adminSession.user, deviceSession: true } }, access)).toBe(403);
       expect(status(userSession, access)).toBe(403);
       expect(status(adminKey, access)).toBe(403);
       expect(status(keyWithEveryUserScope, access)).toBe(403);
       return;
     }
+    if (access === ACCOUNT_SESSION) {
+      expect(status(userSession, access)).toBe(200);
+      expect(status(adminSession, access)).toBe(200);
+      expect(status(deviceSession, access)).toBe(403);
+      expect(status(keyWithEveryUserScope, access)).toBe(403);
+      expect(status(adminKey, access)).toBe(403);
+      return;
+    }
     if (access === SESSION) {
+      expect(status(deviceSession, access)).toBe(200);
       expect(status(userSession, access)).toBe(200);
       expect(status(adminSession, access)).toBe(200);
       expect(status(keyWithEveryUserScope, access)).toBe(403);

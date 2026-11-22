@@ -5,117 +5,17 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import worker from '../index.js';
-import { memoryState } from '../../test-utils/alias-fixture.js';
-import { UserProfile } from '../durable-objects/user-profile.js';
-import { DbaLink } from '../durable-objects/dba-link.js';
 import { authenticate, requireAuth } from './middleware.js';
-import { dbaIssuer, dbaSpendLimitCents, resetDbaAuth } from './dba.js';
+import { dbaIssuer, dbaSpendLimitCents } from './dba.js';
 import { spenderOf } from './scopes.js';
-import { issuerSigner, jwksFor, signCredential, signAccessToken, signStatusList } from '../vendor/devicebasedauth/issuer.js';
+import { issuerSigner, signCredential, signAccessToken } from '../vendor/devicebasedauth/issuer.js';
 import { createProof } from '../vendor/devicebasedauth/credential.js';
-import { exportPublicJwk, generateKeyPair, jwkThumbprint, signJws } from '../vendor/devicebasedauth/jose.js';
+import { DBA_ACCOUNT, ISSUER, ORIGIN, STATUS_URI, newDevice, newIssuerKey, now, setupDba } from '../../test-utils/dba-fixture.js';
 
-const ISSUER = 'https://dba.test';
-const ORIGIN = 'http://localhost:8787';
-const STATUS_URI = `${ISSUER}/status/1`;
-const DBA_ACCOUNT = 'alice_dba';
-const now = () => Math.floor(Date.now() / 1000);
-
-let env, issuerKey, signer, device, statusBytes, oidc, fetchCalls;
-
-function namespace(Class) {
-  const objects = new Map();
-  return {
-    idFromName: name => name,
-    get: name => {
-      if (!objects.has(name)) objects.set(name, new Class(memoryState(), env));
-      return objects.get(name);
-    },
-    objects
-  };
-}
-
-async function newIssuerKey() {
-  const pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
-  return { kid: 'test-1', jwk: await crypto.subtle.exportKey('jwk', pair.privateKey) };
-}
-
-async function newDevice() {
-  const pair = await generateKeyPair(true);
-  const publicJwk = await exportPublicJwk(pair.publicKey);
-  return { privateKey: pair.privateKey, publicJwk, jkt: await jwkThumbprint(publicJwk) };
-}
-
-function credentialPayload(grants, overrides = {}) {
-  const t = now();
-  return {
-    iss: ISSUER, sub: 'dev_LAPTOP0001', acct: DBA_ACCOUNT, aud: ['hashbin.org'],
-    cid: 'crd_CRED000001', jti: 'crd_CRED000001.1', iat: t, nbf: t, exp: t + 3600,
-    cnf: { jkt: device.jkt }, grants, status: { status_list: { idx: 5, uri: STATUS_URI } }, ver: 1,
-    ...overrides
-  };
-}
-
-const issue = (grants, overrides) => signCredential(credentialPayload(grants, overrides), signer);
-
-async function dbaRequest(credential, { method = 'GET', path = '/api/balance', proof = true, body } = {}) {
-  const url = `${ORIGIN}${path}`;
-  const headers = { Authorization: `DBA ${credential}` };
-  if (proof === true) headers.DPoP = await createProof({ privateKey: device.privateKey, publicJwk: device.publicJwk, method, url, credential });
-  else if (proof) headers.DPoP = proof;
-  return new Request(url, { method, headers, ...(body ? { body: JSON.stringify(body) } : {}) });
-}
-
-const session = (path, init = {}, user = 'alice') => new Request(`${ORIGIN}${path}`, {
-  ...init, headers: { Authorization: `LocalDev ${user}`, 'content-type': 'application/json', ...(init.headers || {}) }
-});
-const call = request => worker.fetch(request, env, {});
-
-/** The fake DBA: JWKS, one status list, and an OIDC provider that signs in DBA_ACCOUNT. */
-function fakeDba() {
-  return vi.fn(async (input, init = {}) => {
-    const url = String(input);
-    fetchCalls.push(url);
-    if (url === `${ISSUER}/.well-known/jwks.json`) return Response.json(jwksFor([issuerKey]));
-    if (url === STATUS_URI) return new Response(await signStatusList({ uri: STATUS_URI, bytes: statusBytes, issuer: ISSUER }, signer));
-    if (url === `${ISSUER}/.well-known/openid-configuration`) {
-      return Response.json({ issuer: ISSUER, authorization_endpoint: `${ISSUER}/oauth/authorize`, token_endpoint: `${ISSUER}/oauth/token`, jwks_uri: `${ISSUER}/.well-known/jwks.json` });
-    }
-    if (url === `${ISSUER}/oauth/token`) {
-      const form = new URLSearchParams(init.body);
-      oidc.tokenRequests.push(Object.fromEntries(form));
-      if (form.get('code') !== 'good-code') return Response.json({ error: 'invalid_grant', error_description: 'Unknown code' }, { status: 400 });
-      const t = now();
-      const idToken = await signJws({ typ: 'JWT', kid: issuerKey.kid }, { iss: ISSUER, aud: 'hashbin.org', sub: oidc.account, acct: oidc.account, nonce: oidc.nonce, iat: t, exp: t + 300 }, signer.key);
-      return Response.json({ id_token: idToken, token_type: 'Bearer' });
-    }
-    return new Response('not found', { status: 404 });
-  });
-}
-
-/** Run the link flow as `user` for DBA account `account`; returns the finish response. */
-async function link(user = 'alice', account = DBA_ACCOUNT) {
-  const started = await call(session('/api/auth/dba/link/start', { method: 'POST' }, user));
-  expect(started.status).toBe(200);
-  const authorize = new URL((await started.json()).url);
-  oidc.nonce = authorize.searchParams.get('nonce');
-  oidc.account = account;
-  return call(session('/api/auth/dba/link/finish', { method: 'POST', body: JSON.stringify({ code: 'good-code', state: authorize.searchParams.get('state') }) }, user));
-}
+let env, signer, device, statusBytes, oidc, fetchCalls, call, session, link, issue, dbaRequest, credentialPayload;
 
 beforeEach(async () => {
-  resetDbaAuth();
-  issuerKey = await newIssuerKey();
-  signer = await issuerSigner(issuerKey);
-  device = await newDevice();
-  statusBytes = new Uint8Array(16);
-  oidc = { tokenRequests: [], nonce: null, account: DBA_ACCOUNT };
-  fetchCalls = [];
-  env = { ENVIRONMENT: 'local', DBA_ISSUER: ISSUER };
-  env.USER_PROFILES = namespace(UserProfile);
-  env.DBA_LINKS = namespace(DbaLink);
-  vi.stubGlobal('fetch', fakeDba());
+  ({ env, signer, device, statusBytes, oidc, fetchCalls, call, session, link, issue, dbaRequest, credentialPayload } = await setupDba());
 });
 
 afterEach(() => vi.unstubAllGlobals());
@@ -198,14 +98,16 @@ describe('linking a devicebasedauth.org account', () => {
     expect((await link('bob')).status).toBe(200);
   });
 
-  it('keeps linking to the account session', async () => {
+  it('keeps linking and unlinking to the account session', async () => {
     await link('alice');
     const credential = await issue([{ actions: ['hashbin:session', 'hashbin:balance:read'] }]);
-    for (const [method, path] of [['GET', '/api/auth/dba/link'], ['DELETE', '/api/auth/dba/link'], ['POST', '/api/auth/dba/link/start']]) {
+    for (const [method, path] of [['DELETE', '/api/auth/dba/link'], ['POST', '/api/auth/dba/link/start'], ['POST', '/api/auth/dba/link/finish']]) {
       const response = await call(await dbaRequest(credential, { method, path }));
       expect(response.status, `${method} ${path}`).toBe(403);
       expect((await response.json()).error).toBe('session_required');
     }
+    // A device session may still see the link
+    expect((await call(await dbaRequest(credential, { path: '/api/auth/dba/link' }))).status).toBe(200);
   });
 });
 
@@ -213,7 +115,7 @@ describe('authenticating with a devicebasedauth.org credential', () => {
   beforeEach(async () => { expect((await link('alice')).status).toBe(200); });
 
   it('maps granted hashbin: actions to scopes and acts as the linked user', async () => {
-    const credential = await issue([{ actions: ['hashbin:balance:read', 'hashbin:content:write', 'other:thing'] }, { actions: ['hashbin:session'] }]);
+    const credential = await issue([{ actions: ['hashbin:balance:read', 'hashbin:content:write', 'other:thing'] }]);
     const auth = await authenticate(await dbaRequest(credential), env);
     expect(auth).toMatchObject({ authenticated: true, user: {
       userId: 'alice', authMethod: 'dba', session: false, scopes: ['content:write', 'balance:read'], caveats: {},
