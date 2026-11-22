@@ -21,13 +21,6 @@ export const DBA_CLIENT_ID = 'hashbin.org';
 export const DBA_REDIRECT_URI = 'https://hashbin.org/auth/dba/callback';
 export const DBA_CALLBACK_PATH = '/auth/dba/callback';
 
-/**
- * Scopes a DBA credential cannot use yet, even when its grants name them. Signed download
- * links outlive the request and need a revocable spending identity on 256t.us (keys and app
- * grants have one; DBA credentials do not yet), so `downloads:spend` stays with keys.
- */
-export const DBA_UNSUPPORTED_SCOPES = new Set(['downloads:spend']);
-
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /**

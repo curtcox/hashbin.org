@@ -271,7 +271,7 @@ sections after this one describe the main routes in detail.
 | POST | `/api/user/aliases/personal/{id}/renew` | `aliases:purchase` |
 | PUT, PATCH, DELETE | `/api/user/aliases/personal/{id}` | `aliases:write` |
 | GET, PUT | `/api/downloads/budget` | account session |
-| PUT | `/api/{auth/apikeys\|oauth/grants}/{id}/download-budget` | `account-session` |
+| PUT | `/api/{auth/apikeys\|oauth/grants\|auth/dba/credentials}/{id}/download-budget` | `account-session` |
 | GET, DELETE | `/api/downloads/sessions` | account session |
 | POST | `/api/downloads/session` | `account-session` |
 | POST | `/api/downloads/sign` | `downloads:spend` |

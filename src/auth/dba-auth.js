@@ -14,7 +14,7 @@
  */
 
 import { ACCOUNT_SESSION, ADMIN_SESSION, ALL_USER_SCOPES, PUBLIC, SESSION } from './scopes.js';
-import { DBA_ACTIONS, DBA_NAMESPACE, DBA_UNSUPPORTED_SCOPES, dbaSpendLimitCents, dbaVerifier, linkedUserId } from './dba.js';
+import { DBA_ACTIONS, DBA_NAMESPACE, dbaSpendLimitCents, dbaVerifier, linkedUserId } from './dba.js';
 
 // DBA verifier codes (spec/credential.md in devicebasedauth.org) mapped to HashBin's
 // AUTH_ERROR_CODES (src/auth/middleware.js). Anything else is AUTH_INVALID_FORMAT.
@@ -141,7 +141,6 @@ export async function validateDbaCredential(request, env) {
   const online = [];
   for (const action of DBA_ACTIONS) {
     const scope = action.slice(DBA_NAMESPACE.length + 1);
-    if (DBA_UNSUPPORTED_SCOPES.has(scope)) continue;
     const decision = verifier.decide(payload, { action }, { request, proof, confirmation });
     if (decision.allow) offline.push(scope);
     else if (decision.online_required) online.push(scope);
@@ -162,9 +161,9 @@ export async function validateDbaCredential(request, env) {
   };
 }
 
-/** A device session holds every user scope except those DBA credentials cannot use yet. */
+/** A device session holds every user scope, like the account's own sign-in. */
 function deviceSessionScopes() {
-  return ALL_USER_SCOPES.filter(scope => !DBA_UNSUPPORTED_SCOPES.has(scope));
+  return [...ALL_USER_SCOPES];
 }
 
 /** Make an authenticated DBA user a device session (after an online allow of hashbin:session). */

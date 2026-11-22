@@ -135,10 +135,6 @@ describe('authenticating with a devicebasedauth.org credential', () => {
     expect((await response.json()).error).toBe('insufficient_scope');
   });
 
-  it('never grants downloads:spend yet', async () => {
-    const credential = await issue([{ actions: ['hashbin:downloads:spend', 'hashbin:balance:read'] }]);
-    expect((await authenticate(await dbaRequest(credential), env)).user.scopes).toEqual(['balance:read']);
-  });
 
   it('applies grant conditions such as time windows', async () => {
     const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];

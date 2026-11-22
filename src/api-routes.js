@@ -59,7 +59,7 @@ const API_ROUTES = [
   { method: ['PUT', 'PATCH', 'DELETE'], path: /^\/api\/user\/aliases\/personal\/([^/]+)$/, access: 'aliases:write', handler: handleUserAliases },
   // Downloads (budgets and sessions belong to the account; signing spends)
   { method: ['GET', 'PUT'], path: '/api/downloads/budget', access: SESSION, handler: handleDownloads },
-  { method: 'PUT', path: /^\/api\/(auth\/apikeys|oauth\/grants)\/[^/]+\/download-budget$/, access: ACCOUNT_SESSION, handler: handleDownloads },
+  { method: 'PUT', path: /^\/api\/(auth\/apikeys|oauth\/grants|auth\/dba\/credentials)\/[^/]+\/download-budget$/, access: ACCOUNT_SESSION, handler: handleDownloads },
   { method: ['GET', 'DELETE'], path: '/api/downloads/sessions', access: SESSION, handler: handleDownloads },
   { method: 'POST', path: '/api/downloads/session', access: ACCOUNT_SESSION, handler: handleDownloads },
   { method: 'POST', path: '/api/downloads/sign', access: 'downloads:spend', handler: handleDownloads },

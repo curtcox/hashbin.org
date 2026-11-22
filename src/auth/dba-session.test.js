@@ -26,7 +26,7 @@ describe('device sessions (hashbin:session)', () => {
     const credential = await t.issue([{ actions: ['hashbin:session'], limits: { spend_usd_per_month: 2 } }]);
     const auth = await authenticate(await t.dbaRequest(credential), t.env);
     expect(auth.user).toMatchObject({ authMethod: 'dba', session: true, deviceSession: true, caveats: { monthly_spend_limit_cents: 200 } });
-    expect(auth.user.scopes).toEqual(ALL_USER_SCOPES.filter(scope => scope !== 'downloads:spend'));
+    expect(auth.user.scopes).toEqual(ALL_USER_SCOPES);
     expect(spenderOf(auth)).toMatchObject({ kind: 'dba', id: 'crd_CRED000001', caveats: { monthly_spend_limit_cents: 200 } });
   });
 

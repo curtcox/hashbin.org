@@ -24,6 +24,14 @@ export function downloadIdentityValid(profile, identity, now = Date.now(), cid =
       (!identity.app_id || g.app_id === identity.app_id) && scopes.some(scope => g.scopes?.includes(scope)) &&
       !(g.caveats?.expires_at && Date.parse(g.caveats.expires_at) <= now) && cidAllowed(g.caveats, cid));
   }
+  if (identity.kind === 'dba') {
+    // A devicebasedauth.org credential's record (src/utils/credential-spend.js), while the
+    // profile is linked to its DBA account and it is neither revoked nor past its expiry
+    const account = profile.dba_link?.account;
+    return Boolean(account) && (profile.dba_credentials || []).some(c => c.credential_id === identity.k && c.account === account &&
+      !c.revoked_at && Number.isSafeInteger(c.exp) && c.exp * 1000 > now && scopes.some(scope => c.scopes?.includes(scope)) &&
+      cidAllowed(c.caveats, cid));
+  }
   if (identity.kind === 'session') {
     const s = profile.download_budget?.sessions?.[identity.sid];
     return Boolean(s && !s.revoked_at && s.active && s.expires_at > now);

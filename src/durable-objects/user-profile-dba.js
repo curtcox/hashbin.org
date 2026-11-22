@@ -4,6 +4,8 @@
  * UserProfile.prototype (user-profile.js), so `this` is the Durable Object.
  */
 
+import { findSpender } from '../utils/credential-spend.js';
+
 // Storage key of a devicebasedauth.org link in progress (outside the profile; single use)
 const DBA_OIDC_STATE = 'dba-oidc-state';
 
@@ -42,6 +44,17 @@ export const dbaMethods = {
       profile.updated_at = new Date().toISOString();
       await this.state.storage.put('profile', profile);
       return Response.json({ link: profile.dba_link });
+    }
+    if (pathname === '/dba/credentials/record' && method === 'POST') {
+      // Remember a verified credential presented now (it may sign download links)
+      const { spender } = await request.json();
+      if (spender?.kind !== 'dba' || !Array.isArray(spender.scopes)) return Response.json({ error: 'invalid_request' }, { status: 400 });
+      if (profile.deleted_at) return Response.json({ error: 'account_closed' }, { status: 403 });
+      const record = findSpender(profile, spender);
+      if (!record) return Response.json({ error: 'invalid_credential' }, { status: 403 });
+      profile.updated_at = new Date().toISOString();
+      await this.state.storage.put('profile', profile);
+      return Response.json({ credential_id: record.credential_id });
     }
     if (pathname === '/dba/link' && method === 'DELETE') {
       const data = await request.json().catch(() => ({}));

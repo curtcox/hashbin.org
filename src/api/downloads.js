@@ -1,5 +1,5 @@
 import { authenticate, requireAuth } from '../auth/middleware.js';
-import { checkCaveats } from '../auth/scopes.js';
+import { checkCaveats, spenderOf } from '../auth/scopes.js';
 import { signDownloadToken } from '../auth/download-tokens.js';
 import { getContentBaseUrl } from '../utils/content-domain.js';
 import { validate256tCID } from '../utils/hash256t.js';
@@ -24,8 +24,9 @@ async function routeDownloads(request, env) {
   try {
     const data = ['PUT', 'POST', 'DELETE'].includes(method) ? await request.json() : {};
     if (path === '/api/downloads/budget' && ['GET', 'PUT'].includes(method)) return call('/download/budget', method, method === 'PUT' ? data : undefined);
-    const key = path.match(/^\/api\/(auth\/apikeys|oauth\/grants)\/([^/]+)\/download-budget$/);
-    if (key && method === 'PUT') return call('/download/key-budget', 'PUT', { key_id: key[2], kind: key[1] === 'oauth/grants' ? 'oauth' : 'key', caps: data.caps });
+    const key = path.match(/^\/api\/(auth\/apikeys|oauth\/grants|auth\/dba\/credentials)\/([^/]+)\/download-budget$/);
+    const kinds = { 'auth/apikeys': 'key', 'oauth/grants': 'oauth', 'auth/dba/credentials': 'dba' };
+    if (key && method === 'PUT') return call('/download/key-budget', 'PUT', { key_id: key[2], kind: kinds[key[1]], caps: data.caps });
     if (path === '/api/downloads/sessions' && ['GET', 'DELETE'].includes(method)) return call('/download/sessions', method, method === 'DELETE' ? { sid: data.session_id } : undefined);
     if (minting && method === 'POST') {
       if (!env.DOWNLOAD_TOKEN_SECRET) return json({ error: 'Download signing is not configured' }, 503);
@@ -34,14 +35,22 @@ async function routeDownloads(request, env) {
         const caveatDenied = checkCaveats(auth, { cid });
         if (caveatDenied) return caveatDenied;
       }
-      const seconds = data.expires_in ?? 3600;
+      let seconds = data.expires_in ?? 3600;
       if (!Number.isInteger(seconds) || seconds < 1 || seconds > 7 * 86400) return json({ error: 'expires_in must be 1–604800 seconds' }, 400);
       const iat = Math.floor(Date.now() / 1000);
       // Account URLs use a revocable browser session as their spending identity.
       let identity;
       if (user.keyId) identity = { u: user.userId, k: user.keyId, kind: 'key' };
       else if (user.oauth) identity = { u: user.userId, k: user.oauth.grantId, kind: 'oauth', app_id: user.oauth.appId };
-      else {
+      else if (user.dba) {
+        // The profile keeps this credential's record (scopes, cap, status, expiry), which
+        // every funded download checks; links never outlive the credential.
+        const recorded = await call('/dba/credentials/record', 'POST', { spender: spenderOf(auth) });
+        if (!recorded.ok) return recorded;
+        seconds = Math.min(seconds, user.dba.exp - iat);
+        if (seconds < 1) return json({ error: 'This devicebasedauth.org credential has expired' }, 401);
+        identity = { u: user.userId, k: user.dba.credentialId, kind: 'dba' };
+      } else {
         const created = await call('/download/sessions', 'POST', {});
         if (!created.ok) return created;
         const { sid } = await created.json();
