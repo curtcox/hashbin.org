@@ -31,6 +31,7 @@ export { AdminActionLog } from './durable-objects/admin-action-log.js';
 export { ApplicationRegistry } from './durable-objects/application-registry.js';
 export { BackupIndex } from './durable-objects/backup-index.js';
 export { AliasRecord } from './durable-objects/alias-record.js';
+export { DbaLink } from './durable-objects/dba-link.js';
 
 // Git SHA embedded at build time - replaced during deployment
 // This constant forces code changes on each deploy, ensuring wrangler uploads new code

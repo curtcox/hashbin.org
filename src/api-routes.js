@@ -29,6 +29,7 @@ import { ADMIN_SESSION, PUBLIC, SESSION, checkAccess, isSessionAuth } from './au
 import { handleCreateAdminKey, handleListAdminKeys, handleRevokeAdminKey } from './api/admin-keys.js';
 import { handleMoveAccount } from './api/admin-accounts.js';
 import { handleConfig, handleHealth } from './health.js';
+import { handleFinishDbaLink, handleGetDbaLink, handleStartDbaLink, handleUnlinkDba } from './api/dba.js';
 
 /**
  * API route table. Every route declares its access: PUBLIC, SESSION (the account's
@@ -73,6 +74,11 @@ const API_ROUTES = [
   { method: 'DELETE', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleRevokeApiKey(request, env, m[1]) },
   { method: 'PATCH', path: /^\/api\/auth\/apikeys\/([^/]+)$/, access: SESSION, handler: (request, env, m) => handleUpdateApiKey(request, env, m[1]) },
   { method: 'DELETE', path: '/api/auth/account', access: SESSION, handler: handleDeleteAccount },
+  // devicebasedauth.org account link (device credentials themselves are handled in src/auth/middleware.js)
+  { method: 'GET', path: '/api/auth/dba/link', access: SESSION, handler: handleGetDbaLink },
+  { method: 'DELETE', path: '/api/auth/dba/link', access: SESSION, handler: handleUnlinkDba },
+  { method: 'POST', path: '/api/auth/dba/link/start', access: SESSION, handler: handleStartDbaLink },
+  { method: 'POST', path: '/api/auth/dba/link/finish', access: SESSION, handler: handleFinishDbaLink },
   { method: 'POST', path: '/api/developers/apps', access: SESSION, handler: handleCreateDeveloperApp },
   { method: 'GET', path: '/api/developers/apps', access: SESSION, handler: handleListDeveloperApps },
   { method: ['GET', 'PUT'], path: /^\/api\/developers\/apps\/([^/]+)\/run$/, access: SESSION, handler: (request, env, m) => handleDeveloperRun(request, env, m[1]) },

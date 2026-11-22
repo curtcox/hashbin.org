@@ -117,6 +117,48 @@
               </div>
             </div>
           </section>
+
+          <section class="card" id="dba" style="margin-top: 2rem;">
+            <div class="account-panel-header">
+              <div>
+                <h2 class="card-title">devicebasedauth.org</h2>
+                <p class="account-panel-copy">
+                  Use device-bound keys from <a href="https://devicebasedauth.org" rel="noopener">devicebasedauth.org</a> instead of API keys.
+                  Each device makes its own key, which never leaves it, and its credential says exactly what it may do here, when and where.
+                </p>
+              </div>
+            </div>
+            <p id="dba-link-status" class="account-status" role="status">Checking link…</p>
+            <div class="account-retention-row">
+              <button id="dba-link" class="btn btn-primary" type="button" hidden>Link devicebasedauth.org</button>
+              <button id="dba-unlink" class="btn btn-secondary" type="button" hidden>Unlink</button>
+            </div>
+            <p class="account-muted">
+              Linking lets credentials from your devicebasedauth.org account act on this HashBin account, limited to what each one grants.
+              One devicebasedauth.org account can be linked to one HashBin account. Unlinking stops all of them here at once.
+            </p>
+
+            <h3>Create a device-bound key</h3>
+            <p>From a terminal, with the <code>dba</code> command-line tool:</p>
+            <pre class="account-code"><code>dba enroll --aud hashbin.org --action hashbin:content:write
+dba curl -X POST -H 'Content-Type: text/plain' --data-binary @note.txt https://hashbin.org/api/content</code></pre>
+            <p>From a web page, with the browser SDK (the key is a non-extractable WebCrypto key; call <code>enroll</code> from a click handler so its approval popup opens):</p>
+            <pre class="account-code"><code>import { DBA } from 'https://devicebasedauth.org/sdk/dba.js';
+
+const dba = new DBA();
+if (!await dba.ready()) {
+  await dba.enroll({ aud: ['hashbin.org'], grants: [{ actions: ['hashbin:content:write'] }] });
+}
+const response = await dba.fetch('https://hashbin.org/api/content', {
+  method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: 'Hello'
+});</code></pre>
+            <p>
+              Grant HashBin scopes as actions named <code>hashbin:&lt;scope&gt;</code> (for example <code>hashbin:balance:read</code>);
+              a grant's monthly spend cap becomes the key's spending limit here. Pages on other sites can call the API only if their origin is a registered
+              <a href="/developers">developer app</a>. See the <a href="/docs/api#devicebasedauthorg-credentials">API reference</a>.
+            </p>
+            <p><strong>Revoking the device at devicebasedauth.org stops it everywhere</strong>, including here, within a few minutes.</p>
+          </section>
         </div>
       </div>
     </div>

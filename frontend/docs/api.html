@@ -101,6 +101,11 @@ Content: https://256t.us/{cid}</div>
         <div class="code-block">Authorization: ApiKey hbk_...
 X-API-Key: hbk_...</div>
         <p>Each key holds only the scopes you give it (for example <code>content:write</code> to publish, <code>balance:read</code> to read the balance) and can carry limits: a monthly spending limit, largest upload, longest retention, allowed content types, or specific CIDs. Anything else answers <code>403</code>. Keys, apps, settings and deposits always need your own sign-in. Create and narrow keys from your <a href="/api-keys.html">dashboard</a>; see the <a href="https://github.com/curtcox/hashbin.org/blob/main/docs/API.md#scopes">full scope reference</a>.</p>
+        <h3 style="margin-top: 1.5rem;" id="devicebasedauthorg-credentials">Device-bound keys from devicebasedauth.org</h3>
+        <p>Instead of an API key, a device can use a credential from <a href="https://devicebasedauth.org" rel="noopener">devicebasedauth.org</a>. The device makes its own key, which never leaves it, and signs a fresh proof for every request:</p>
+        <div class="code-block">Authorization: DBA &lt;credential&gt;
+DPoP: &lt;proof&gt;</div>
+        <p>Link your devicebasedauth.org account once in <a href="/account#dba">Account Settings</a>, then grant HashBin scopes as actions named <code>hashbin:&lt;scope&gt;</code>, e.g. <code>dba enroll --aud hashbin.org --action hashbin:content:write</code>. A grant's monthly spend cap becomes the credential's spending limit. Revoking the device at devicebasedauth.org stops it here within minutes. Short-lived devicebasedauth.org access tokens (<code>dba token --aud hashbin.org</code>) are accepted as <code>Authorization: Bearer</code>. See the <a href="https://github.com/curtcox/hashbin.org/blob/main/docs/API.md#devicebasedauthorg-credentials">full reference</a>.</p>
         <p style="margin-top: 1rem;">For third-party browser integrations, use the hosted SDK at <code>https://hashbin.org/sdk/hashbin.js</code> (or an integrity-pinned release) and follow the <a href="/docs/sdk.html">SDK Guide</a> and <a href="/docs/browser-client-safety">browser client safety guide</a>. Raw files are served from <code>256t.us</code>; see <a href="/docs/content-security.html">content security</a>.</p>
       </section>
 

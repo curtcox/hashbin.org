@@ -11,6 +11,7 @@ import { handlePersonalAliases, maintainPersonalAliases, countAliasChange } from
 import { keyMethods } from './user-profile-keys.js';
 import { oauthMethods } from './user-profile-oauth.js';
 import { balanceMethods } from './user-profile-balance.js';
+import { dbaMethods } from './user-profile-dba.js';
 
 export class UserProfile {
   constructor(state, env) {
@@ -109,6 +110,7 @@ export class UserProfile {
         return Response.json({ closed: true });
       }
       if (url.pathname.startsWith('/download/')) return await handleDownloadBudget(this, request);
+      if (url.pathname.startsWith('/dba/')) return await this.handleDba(url.pathname, method, request);
       if (url.pathname === '/inline-upload' && method === 'POST') {
         return await this.state.blockConcurrencyWhile(async () => {
           const hour = Math.floor(Date.now() / 3600000);
@@ -724,4 +726,4 @@ export class UserProfile {
 }
 
 // Methods kept in sibling modules, installed so `this` and method names are unchanged.
-Object.assign(UserProfile.prototype, keyMethods, oauthMethods, balanceMethods);
+Object.assign(UserProfile.prototype, keyMethods, oauthMethods, balanceMethods, dbaMethods);

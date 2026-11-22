@@ -23,6 +23,7 @@ with the `BackupIndex` Durable Object the first time it handles a request:
 | `DISPUTE_RECORD` | `dispute:{cid}` | the object itself |
 | `ALIAS_RECORDS` | `alias:{name}` | the object itself on the first committed change |
 | `SUPPLIER_REGISTRY` | supplier ID | the object itself |
+| `DBA_LINKS` | devicebasedauth.org account | the object itself when a link is made (the profile's `dba_link` holds the reverse) |
 
 Fixed-name objects (`KEY_REGISTRY`, `EXPIRATION_INDEX`, `DELETION_RECORD`, `DISPUTE_INDEX`,
 `ADMIN_ACTION_LOG`, `APPLICATION_REGISTRY`, `AUDIT_LOG`, `INFRASTRUCTURE_COST`, `ALERT_STORE`,

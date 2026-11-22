@@ -13,3 +13,8 @@ DOWNLOAD_TOKEN_SECRET=replace-with-another-random-local-value
 # `Authorization: LocalDev local_admin`) to use /admin pages; run the API tests with
 # ADMIN_USER=local_admin to include the admin checks.
 ADMIN_USER_ID=local_admin
+
+# devicebasedauth.org issuer for device credentials and account linking. Unset means
+# https://devicebasedauth.org; local mode also accepts a local DBA over http, e.g.
+# http://localhost:8788 (run DBA on another port than this Worker's 8787).
+# DBA_ISSUER=http://localhost:8788

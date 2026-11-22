@@ -1,7 +1,8 @@
 module.exports = {
   // ESLint 8 cannot parse JSON import attributes (`import x from './y.json' with { type: 'json' }`).
   // The diagram editor is ported page code kept in step with curtcox/modl, not this repo's style.
-  ignorePatterns: ['src/app-safety.js', 'workers/run-origin/src/index.js', 'frontend/sdk/v*/', 'scripts/reports/pages/diagram-oauth.js'],
+  // src/vendor/ is third-party code copied in unchanged (its README says how to refresh it).
+  ignorePatterns: ['src/app-safety.js', 'src/vendor/', 'workers/run-origin/src/index.js', 'frontend/sdk/v*/', 'scripts/reports/pages/diagram-oauth.js'],
   env: {
     es2022: true,
     node: true,

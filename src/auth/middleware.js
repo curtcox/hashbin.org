@@ -10,6 +10,8 @@ import { getOrCreateLocalProfile, validateLocalUserId } from './local-auth.js';
 import { verifyDPoP } from './dpop.js';
 import { verifyOAuthJwt } from './oauth.js';
 import { ALL_ADMIN_SCOPES, ALL_USER_SCOPES } from './scopes.js';
+import { credentialFromRequest } from '../vendor/devicebasedauth/verifier.js';
+import { DBA_UNSUPPORTED_SCOPES, dbaSiteAuth, dbaSpendLimitCents, linkedUserId } from './dba.js';
 
 // Error codes for authentication failures
 export const AUTH_ERROR_CODES = {
@@ -19,7 +21,32 @@ export const AUTH_ERROR_CODES = {
   AUTH_KEY_REVOKED: 'AUTH_KEY_REVOKED',
   AUTH_USER_DELETED: 'AUTH_USER_DELETED',
   AUTH_RATE_LIMITED: 'AUTH_RATE_LIMITED',
-  AUTH_KEY_LIMIT: 'AUTH_KEY_LIMIT'
+  AUTH_KEY_LIMIT: 'AUTH_KEY_LIMIT',
+  // devicebasedauth.org credentials (src/auth/dba.js)
+  AUTH_DBA_PROOF_INVALID: 'AUTH_DBA_PROOF_INVALID',
+  AUTH_DBA_NOT_LINKED: 'AUTH_DBA_NOT_LINKED',
+  AUTH_DBA_UNAVAILABLE: 'AUTH_DBA_UNAVAILABLE'
+};
+
+// Failures that are not "who are you?" (401): a known DBA account that isn't linked here,
+// and DBA's keys or revocation lists being unreachable (verification fails closed).
+const AUTH_ERROR_STATUS = {
+  [AUTH_ERROR_CODES.AUTH_DBA_NOT_LINKED]: 403,
+  [AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE]: 503
+};
+
+// DBA verifier codes (spec/credential.md in devicebasedauth.org) mapped to HashBin's
+const DBA_ERROR_CODES = {
+  expired: AUTH_ERROR_CODES.AUTH_EXPIRED,
+  revoked: AUTH_ERROR_CODES.AUTH_KEY_REVOKED,
+  proof_required: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
+  invalid_proof: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
+  key_mismatch: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
+  stale_proof: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
+  replayed_proof: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
+  use_dpop_nonce: AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID,
+  jwks_unavailable: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE,
+  status_unavailable: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE
 };
 
 // Rate limiting windows (in milliseconds)
@@ -43,10 +70,14 @@ const rateLimitCache = new Map();
  * - Authorization: Bearer <clerk-jwt>
  * - Authorization: ApiKey <api-key>
  * - X-API-Key: <api-key>
+ * - Authorization: DBA <credential> (+ DPoP), or Bearer <DBA access token>
  */
 function extractAuth(request) {
   const authHeader = request.headers.get('authorization');
   const apiKeyHeader = request.headers.get('x-api-key');
+
+  // DBA access tokens are bearer JWTs too; their typ (dba-access+jwt) tells them from Clerk's.
+  if (credentialFromRequest(request)) return { type: 'dba', value: null };
 
   if (authHeader) {
     const parts = authHeader.split(' ');
@@ -361,6 +392,60 @@ async function validateOAuthAccessToken(token, env, request) {
 }
 
 /**
+ * Validate a devicebasedauth.org credential (or access token) and find the HashBin user
+ * its DBA account is linked to. The index (DbaLink) and the user's profile must agree.
+ */
+async function validateDbaCredential(request, env) {
+  const site = dbaSiteAuth(env);
+  if (!site) return { valid: false, error: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE, message: 'DBA_ISSUER is not a valid issuer' };
+
+  let result;
+  try {
+    result = await site.authenticate(request);
+  } catch (_error) {
+    return { valid: false, error: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE, message: 'Could not verify the devicebasedauth.org credential' };
+  }
+  if (!result) return { valid: false, error: AUTH_ERROR_CODES.AUTH_INVALID_FORMAT, message: 'No devicebasedauth.org credential' };
+  if (!result.ok) {
+    return {
+      valid: false,
+      error: DBA_ERROR_CODES[result.code] || AUTH_ERROR_CODES.AUTH_INVALID_FORMAT,
+      message: result.message || 'Invalid devicebasedauth.org credential',
+      details: { dba_code: result.code }
+    };
+  }
+
+  const account = result.dbaAccount;
+  const notLinked = {
+    valid: false,
+    error: AUTH_ERROR_CODES.AUTH_DBA_NOT_LINKED,
+    message: 'Link this devicebasedauth.org account to your HashBin account first (Account Settings)',
+    details: { dba_account: account }
+  };
+  try {
+    const userId = await linkedUserId(env, account);
+    if (!userId) return notLinked;
+    const response = await env.USER_PROFILES.get(env.USER_PROFILES.idFromName(userId)).fetch(new Request('http://internal/profile'));
+    if (!response.ok) return notLinked;
+    const profile = await response.json();
+    if (profile.deleted_at) return { valid: false, error: AUTH_ERROR_CODES.AUTH_USER_DELETED, message: 'User account has been deleted' };
+    if (profile.dba_link?.account !== account || profile.migrated_to) return notLinked;
+
+    const spendLimit = dbaSpendLimitCents(result.caveats);
+    return {
+      valid: true,
+      userId: profile.user_id || userId,
+      scopes: result.scopes.filter(scope => !DBA_UNSUPPORTED_SCOPES.has(scope)),
+      caveats: spendLimit === undefined ? {} : { monthly_spend_limit_cents: spendLimit },
+      profile,
+      dba: { account, deviceId: result.deviceId, credentialId: result.credentialId, kind: result.kind }
+    };
+  } catch (_error) {
+    return { valid: false, error: AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE, message: 'Could not look up the devicebasedauth.org link' };
+  }
+}
+
+/**
  * Check rate limits for a given identifier
  */
 function checkRateLimit(identifier, limit) {
@@ -601,6 +686,29 @@ async function authenticateUncached(request, env) {
     };
   }
 
+  // devicebasedauth.org credential. Like an API key it holds only its granted scopes;
+  // it is never the account's session, even with hashbin:session, because a session can
+  // issue keys and change the account (todo/dba_integration.md, "Sessions").
+  if (auth.type === 'dba') {
+    const validation = await validateDbaCredential(request, env);
+    if (!validation.valid) {
+      return { authenticated: false, user: null, error: validation.error, ...(validation.details ? { details: validation.details } : {}) };
+    }
+    return {
+      authenticated: true,
+      user: {
+        userId: validation.userId,
+        authMethod: 'dba',
+        session: false,
+        scopes: validation.scopes,
+        caveats: validation.caveats,
+        profile: validation.profile,
+        dba: validation.dba
+      },
+      error: null
+    };
+  }
+
   // Admin key authentication
   if (auth.type === 'apikey' && auth.value?.startsWith('hba_')) {
     const validation = await validateAdminKey(auth.value, env);
@@ -664,10 +772,11 @@ export function requireAuth(authResult) {
     return new Response(
       JSON.stringify({
         error: errorCode,
-        message: getErrorMessage(errorCode)
+        message: getErrorMessage(errorCode),
+        ...(authResult.details || {})
       }),
       {
-        status: 401,
+        status: AUTH_ERROR_STATUS[errorCode] || 401,
         headers: { 'content-type': 'application/json' }
       }
     );
@@ -684,7 +793,7 @@ export function applyRateLimit(request, authResult) {
   if (authResult.authenticated) {
     // Each credential has its own budget: the account's session, or one key or app grant
     const user = authResult.user;
-    const credentialId = user.keyId || user.oauth?.grantId || user.userId || 'admin';
+    const credentialId = user.keyId || user.oauth?.grantId || user.dba?.credentialId || user.userId || 'admin';
     identifier = `${user.authMethod}:${credentialId}`;
     limit = user.session ? USER_RATE_LIMIT : KEY_RATE_LIMIT;
   } else {
@@ -731,7 +840,10 @@ function getErrorMessage(errorCode) {
     [AUTH_ERROR_CODES.AUTH_KEY_REVOKED]: 'API key has been revoked',
     [AUTH_ERROR_CODES.AUTH_USER_DELETED]: 'User account has been deleted',
     [AUTH_ERROR_CODES.AUTH_RATE_LIMITED]: 'Rate limit exceeded',
-    [AUTH_ERROR_CODES.AUTH_KEY_LIMIT]: 'Maximum API keys limit reached'
+    [AUTH_ERROR_CODES.AUTH_KEY_LIMIT]: 'Maximum API keys limit reached',
+    [AUTH_ERROR_CODES.AUTH_DBA_PROOF_INVALID]: 'Missing or invalid DPoP proof for the devicebasedauth.org credential',
+    [AUTH_ERROR_CODES.AUTH_DBA_NOT_LINKED]: 'This devicebasedauth.org account is not linked to a HashBin account',
+    [AUTH_ERROR_CODES.AUTH_DBA_UNAVAILABLE]: 'devicebasedauth.org credentials cannot be verified right now'
   };
   return messages[errorCode] || 'Authentication failed';
 }

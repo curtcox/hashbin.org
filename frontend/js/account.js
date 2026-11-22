@@ -3,6 +3,7 @@ import { requireAuth } from '/js/auth-gate.js';
 import { escapeHtml } from '/js/html.js';
 import { authenticatedFetch, handleApiError, showToast } from '/js/utils.js';
 import { renderNavHeader } from '/js/nav-header.js';
+import { mountDbaLink } from '/js/dba-link.js';
 
 renderNavHeader();
 await requireAuth();
@@ -252,4 +253,4 @@ document.getElementById('download-browser-enable').addEventListener('click', asy
   try { await browseWithBudget(); } catch (error) { showToast(error.message, 'error'); }
 });
 await loadDownloadBudget();
-await Promise.all([loadSettings(), loadAuthorizations()]);
+await Promise.all([loadSettings(), loadAuthorizations(), mountDbaLink()]);

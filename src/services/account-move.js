@@ -63,6 +63,10 @@ function movedProfile(old, from, to, newProfile, now) {
     oauth_refresh_tokens: (old.oauth_refresh_tokens || []).map(revoke),
     admin_keys: (old.admin_keys || []).map(revoke),
     oauth_used_codes: [],
+    // The DbaLink index names the old ID, so the devicebasedauth.org link is dropped; the
+    // owner links again from the new account (the old link is then taken over as stale).
+    dba_link: undefined,
+    dba_credentials: [],
     migrated_from: from,
     migrated_at: now,
     updated_at: now
