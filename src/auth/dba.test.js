@@ -158,7 +158,8 @@ describe('authenticating with a devicebasedauth.org credential', () => {
     const auth = await authenticate(await dbaRequest(credential), env);
     expect(auth.user.caveats).toEqual({ monthly_spend_limit_cents: 29 });
     expect(spenderOf(auth)).toEqual({ kind: 'dba', id: 'crd_CRED000001', account: DBA_ACCOUNT,
-      scopes: ['aliases:purchase', 'content:write'].filter(s => auth.user.scopes.includes(s)), caveats: { monthly_spend_limit_cents: 29 } });
+      scopes: ['aliases:purchase', 'content:write'].filter(s => auth.user.scopes.includes(s)), caveats: { monthly_spend_limit_cents: 29 },
+      status: { uri: STATUS_URI, idx: 5 }, exp: auth.user.dba.exp });
     expect(dbaSpendLimitCents({ spend_usd_per_month: 0 })).toBe(0);
     expect(dbaSpendLimitCents({})).toBeUndefined();
   });

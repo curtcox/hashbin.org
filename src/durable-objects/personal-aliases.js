@@ -1,7 +1,8 @@
 import { normalizeAliasName, isReservedAlias, validateAliasCid } from '../utils/alias-names.js';
 import { COST_POLICY, retentionWithinCap } from '../utils/cost-policy.js';
 import { PERSONAL_ALIAS_MONTHLY_CENTS } from '../utils/pricing.js';
-import { findSpender, recordSpend, rollSpend, spendRoomCents } from '../utils/credential-spend.js';
+import { findSpender, recordSpend, rollSpend, spendRoomCents, storedSpender } from '../utils/credential-spend.js';
+import { checkStoredDbaSpender } from './dba-spend-check.js';
 import { downloadIdentityValid } from '../utils/download-budget.js';
 import { stageDownloadOutbox } from './download-outbox.js';
 
@@ -136,7 +137,7 @@ export async function handlePersonalAliases(owner, request) {
     charge(profile, entries, amount, [name], months);
     alias = { ...(alias || { name, cid: data.cid, auto_renew: false, created_at: new Date(now).toISOString() }),
       paid_through: advance(Math.max(now, Date.parse(alias?.paid_through) || now), months),
-      renewal_months: months, renewal_spender: data.spender || null };
+      renewal_months: months, renewal_spender: storedSpender(data.spender) };
     delete alias.renewal_retry_at;
   } else {
     if (!alias) return fail('alias_not_found', 404);
@@ -150,7 +151,7 @@ export async function handlePersonalAliases(owner, request) {
       // Session permission to enable auto-renew is explicit; delegated purchases
       // remain tied to the key/grant that originally paid for this term.
       alias.auto_renew = data.auto_renew;
-      if (data.auto_renew) alias.renewal_spender = data.spender || null;
+      if (data.auto_renew) alias.renewal_spender = storedSpender(data.spender);
     }
   }
   // Settings count too: otherwise an unlimited free PATCH loop bypasses A16.
@@ -194,7 +195,8 @@ export async function maintainPersonalAliases(owner) {
     const due = Math.max(expiry - RENEW_BEFORE, alias.renewal_retry_at || 0);
     if (alias.auto_renew && due <= now) {
       const amount = alias.renewal_months * PERSONAL_ALIAS_MONTHLY_CENTS;
-      const spender = alias.renewal_spender ? findSpender(profile, alias.renewal_spender) : null;
+      const checked = await checkStoredDbaSpender(owner.env, profile, alias.renewal_spender);
+      const spender = checked && alias.renewal_spender ? findSpender(profile, alias.renewal_spender) : null;
       if (spender) rollSpend(spender, new Date(now), owner.nextMonthlyReset(new Date(now)));
       if ((!alias.renewal_spender || (spender && spender.scopes?.includes('aliases:purchase') &&
         (!spender.caveats?.cids || spender.caveats.cids.includes(alias.cid)) &&

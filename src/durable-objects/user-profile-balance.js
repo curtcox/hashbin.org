@@ -3,6 +3,7 @@
  * on UserProfile.prototype (user-profile.js), so `this` is the Durable Object.
  */
 import { findSpender, recordSpend, rollSpend, spendRoomCents } from '../utils/credential-spend.js';
+import { checkStoredDbaSpender } from './dba-spend-check.js';
 import { checkCaveats } from '../auth/scopes.js';
 import { COST_POLICY } from '../utils/cost-policy.js';
 import { stageDownloadOutbox } from './download-outbox.js';
@@ -161,6 +162,9 @@ export const balanceMethods = {
     }
 
     // A key or app grant spends within its own monthly limit
+    if (!await checkStoredDbaSpender(this.env, profile, data.spender)) {
+      return Response.json({ error: 'dba_unavailable', message: 'Could not check the devicebasedauth.org credential; retry' }, { status: 503 });
+    }
     const spender = data.spender ? findSpender(profile, data.spender) : null;
     if (data.spender && !spender) {
       return Response.json({ error: 'invalid_credential', message: 'The key or app authorization is no longer valid' }, { status: 400 });

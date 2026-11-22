@@ -220,7 +220,8 @@ export function spenderOf(authResult) {
   if (user?.authMethod === 'oauth') return { kind: 'oauth', id: user.oauth?.grantId };
   // A DBA credential is stored at devicebasedauth.org, so its scopes and caveats travel with it
   if (user?.authMethod === 'dba') {
-    return { kind: 'dba', id: user.dba?.credentialId, account: user.dba?.account, scopes: user.scopes, caveats: user.caveats };
+    return { kind: 'dba', id: user.dba?.credentialId, account: user.dba?.account, scopes: user.scopes, caveats: user.caveats,
+      status: user.dba?.status, exp: user.dba?.exp };
   }
   return undefined;
 }

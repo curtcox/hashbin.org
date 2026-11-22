@@ -47,7 +47,11 @@ function findDbaSpender(profile, spender, now) {
   if (!account || (spender.account !== undefined && spender.account !== account)) return null;
   const records = profile.dba_credentials ||= [];
   let record = records.find(entry => entry.credential_id === spender.id && entry.account === account);
+  // A spender stored for later (auto-renewals: storedSpender) carries no scopes; one from
+  // this request's verified credential does.
   const fresh = Array.isArray(spender.scopes);
+  // Revoked (seen by dba-spend-check.js), or past the expiry of the version last presented
+  if (!fresh && record && (record.revoked_at || (Number.isSafeInteger(record.exp) && record.exp * 1000 <= now.getTime()))) return null;
   if (!record && !fresh) return null;
   if (!record) {
     record = { credential_id: spender.id, account, last_used_at: now.toISOString() };
@@ -61,8 +65,21 @@ function findDbaSpender(profile, spender, now) {
     record.scopes = spender.scopes;
     record.caveats = spender.caveats || {};
     record.last_used_at = now.toISOString();
+    if (spender.status) record.status = { uri: spender.status.uri, idx: spender.status.idx };
+    if (Number.isSafeInteger(spender.exp)) record.exp = spender.exp;
+    delete record.revoked_at;
   }
   return record;
+}
+
+/**
+ * The form of a spender to keep for later charges (auto-renewals). A DBA credential is then
+ * identified only: its scopes, caveats, status and expiry are read from the profile's record
+ * at charge time, not from a copy that would go stale.
+ */
+export function storedSpender(spender) {
+  if (!spender) return null;
+  return spender.kind === 'dba' ? { kind: 'dba', id: spender.id, account: spender.account } : spender;
 }
 
 /**
