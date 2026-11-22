@@ -19,7 +19,7 @@ plus `hashbin:session`.
 
 | Piece | Where |
 |---|---|
-| Vendored verifier `@devicebasedauth/verify` (DBA commit `da2b296`); never edit, refresh by copying | `src/vendor/devicebasedauth/` (its README says how) |
+| Vendored verifier `@devicebasedauth/verify` (DBA commit `60aa3c3`); never edit, refresh by copying | `src/vendor/devicebasedauth/` (its README says how) |
 | Issuer config, shared verifier and OIDC client, link-index helpers | `src/auth/dba.js` |
 | Credential kind `dba` in the middleware: `Authorization: DBA <credential>` + `DPoP: <proof>`, and `Authorization: Bearer <token>` when the JWS `typ` is `dba-access+jwt` (checked before Clerk) | `src/auth/middleware.js` |
 | Link API: `GET`/`DELETE /api/auth/dba/link`, `POST /api/auth/dba/link/start`, `POST /api/auth/dba/link/finish` (all session-only) | `src/api/dba.js`, `API_ROUTES` in `src/index.js` |

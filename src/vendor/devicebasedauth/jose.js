@@ -56,11 +56,18 @@ export async function importJwk(jwk, usage = jwk.d ? 'sign' : 'verify') {
   return crypto.subtle.importKey('jwk', key, ES256, false, [usage]);
 }
 
-/** Sign a compact JWS with ES256. */
+/**
+ * Sign a compact JWS with ES256. `privateKey` is a WebCrypto private key, or an external signer
+ * `{ sign(bytes) }` resolving to the 64-byte r ‖ s signature over SHA-256 of `bytes`, for keys
+ * that live in a TPM, HSM or secure element and never come into this process.
+ */
 export async function signJws(header, payload, privateKey) {
   const input = `${b64u(JSON.stringify({ ...header, alg: 'ES256' }))}.${b64u(JSON.stringify(payload))}`;
-  const signature = new Uint8Array(await crypto.subtle.sign(SIGN, privateKey, encoder.encode(input)));
-  return `${input}.${b64u(signature)}`;
+  const bytes = encoder.encode(input);
+  const signature = typeof privateKey?.sign === 'function' ? await privateKey.sign(bytes) : await crypto.subtle.sign(SIGN, privateKey, bytes);
+  const raw = signature instanceof Uint8Array ? signature : new Uint8Array(signature);
+  if (raw.length !== 64) throw new Error('an ES256 signature is 64 bytes (r ‖ s)');
+  return `${input}.${b64u(raw)}`;
 }
 
 /**

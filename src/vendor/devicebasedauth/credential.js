@@ -9,6 +9,7 @@ export const CREDENTIAL_TYP = 'dba-device+jwt';
 export const ACCESS_TYP = 'dba-access+jwt';
 export const PROOF_TYP = 'dpop+jwt';
 export const STATUS_LIST_TYP = 'statuslist+jwt';
+export const CONFIRMATION_TYP = 'dba-confirmation+jwt';
 export const DEFAULT_ISSUER = 'https://devicebasedauth.org';
 export const CLOCK_SKEW = 60;
 export const PROOF_MAX_AGE = 60;
@@ -17,6 +18,9 @@ export const PROOF_MAX_AGE = 60;
 export class VerificationError extends Error {
   constructor(code, message = code) { super(message); this.code = code; }
 }
+/** Largest status-list index a credential may carry (spec/credential.md §7). */
+export const MAX_STATUS_INDEX = 2 ** 31 - 1;
+
 const fail = (code, message) => { throw new VerificationError(code, message); };
 
 /** Decode a credential or access token for display. Does NOT verify anything. */
@@ -35,7 +39,7 @@ export function validateCredentialPayload(payload, { typ = CREDENTIAL_TYP } = {}
   if (payload.exp <= payload.nbf) errors.push('exp must be after nbf');
   if (payload.ver !== VOCABULARY_VERSION) errors.push(`ver must be ${VOCABULARY_VERSION}`);
   const status = payload.status?.status_list;
-  if (!status || !Number.isSafeInteger(status.idx) || status.idx < 0 || typeof status.uri !== 'string') errors.push('status.status_list must have idx and uri');
+  if (!status || !Number.isSafeInteger(status.idx) || status.idx < 0 || status.idx > MAX_STATUS_INDEX || typeof status.uri !== 'string') errors.push('status.status_list must have idx (0 to 2^31-1) and uri');
   if (typ === CREDENTIAL_TYP && typeof payload.cnf?.jkt !== 'string') errors.push('cnf.jkt is required');
   errors.push(...validateGrants(payload.grants));
   return errors;
@@ -61,6 +65,34 @@ export async function verifyCredential(jws, { jwks, issuer = DEFAULT_ISSUER, aud
   if (audience !== undefined && !payload.aud.includes(audience)) fail('wrong_audience', `Not valid for ${audience}`);
   if (now + CLOCK_SKEW < payload.nbf) fail('not_yet_valid', 'Credential is not valid yet');
   if (now - CLOCK_SKEW >= payload.exp) fail('expired', 'Credential has expired');
+  return { header, payload };
+}
+
+/**
+ * Verify a confirmation (typ "dba-confirmation+jwt", spec/credential.md §9) for an
+ * already-verified device credential payload: issuer signature, issuer, and the binding to the
+ * credential (same cid, sub and cnf.jkt). Time is not checked here: the evaluator compares
+ * iat/exp with its clock (spec/evaluation.md §3.6), as DBA does with its own record online.
+ * Returns { header, payload }.
+ */
+export async function verifyConfirmation(jws, { jwks, issuer = DEFAULT_ISSUER, credential, audience } = {}) {
+  let decoded;
+  try { decoded = decodeJws(jws); } catch { fail('invalid_format', 'Confirmation is not a compact JWS'); }
+  const { header, payload } = decoded;
+  if (header.typ !== CONFIRMATION_TYP) fail('wrong_type', `Expected typ ${CONFIRMATION_TYP}`);
+  const jwk = jwks?.keys?.find(k => k.kid === header.kid);
+  if (!jwk) fail('unknown_kid', `Unknown signing key ${header.kid}`);
+  if (!await verifyJws(jws, jwk)) fail('invalid_signature', 'Confirmation signature does not verify');
+  if (payload.iss !== issuer) fail('wrong_issuer', `Issuer is not ${issuer}`);
+  const problems = [];
+  if (typeof payload.cid !== 'string' || typeof payload.sub !== 'string' || typeof payload.cnf?.jkt !== 'string') problems.push('cid, sub and cnf.jkt are required');
+  if (!Number.isSafeInteger(payload.iat) || !Number.isSafeInteger(payload.exp) || payload.exp <= payload.iat) problems.push('iat and exp must be NumericDates with exp after iat');
+  if (typeof payload.by_timeout !== 'boolean') problems.push('by_timeout must be true or false');
+  if (!Array.isArray(payload.aud) || payload.aud.some(a => typeof a !== 'string')) problems.push('aud must be a list of audiences');
+  if (problems.length) fail('invalid_claims', problems.join('; '));
+  if (!credential || payload.cid !== credential.cid || payload.sub !== credential.sub) fail('wrong_credential', 'Confirmation is for another credential');
+  if (payload.cnf.jkt !== credential.cnf?.jkt) fail('key_mismatch', 'Confirmation is for another device key');
+  if (audience !== undefined && !payload.aud.includes(audience)) fail('wrong_audience', `Confirmation is not valid for ${audience}`);
   return { header, payload };
 }
 
@@ -95,7 +127,7 @@ export class ReplayCache {
 /**
  * Verify a DPoP proof for a request.
  * options: { method, url, credential (compact string; checks ath), jkt (expected thumbprint),
- *            now, nonce (required value, if any), replay (ReplayCache or {check}) }
+ *            now, nonce (required value, if any), replay (ReplayCache or { check(key, now) → boolean | Promise<boolean> }) }
  * Returns the proof payload (including any device-reported loc).
  */
 export async function verifyProof(proof, { method, url, credential, jkt, now = Math.floor(Date.now() / 1000), nonce, replay }) {
@@ -106,13 +138,18 @@ export async function verifyProof(proof, { method, url, credential, jkt, now = M
   let thumbprint;
   try { thumbprint = await jwkThumbprint(header.jwk); } catch { fail('invalid_proof', 'DPoP proof jwk is not a P-256 key'); }
   if (jkt && thumbprint !== jkt) fail('key_mismatch', 'DPoP proof was not signed by the credential key');
-  if (!await verifyJws(proof, header.jwk)) fail('invalid_proof', 'DPoP proof signature does not verify');
+  // A jwk with the right members but no point on the curve makes WebCrypto throw; that is a bad
+  // proof (401), not a server error.
+  let signed = false;
+  try { signed = !!await verifyJws(proof, header.jwk); } catch { signed = false; }
+  if (!signed) fail('invalid_proof', 'DPoP proof signature does not verify');
   if (payload.htm !== method.toUpperCase()) fail('invalid_proof', 'DPoP proof htm does not match the request method');
   if (payload.htu !== htu(url)) fail('invalid_proof', 'DPoP proof htu does not match the request URL');
   if (!Number.isSafeInteger(payload.iat) || payload.iat > now + CLOCK_SKEW || payload.iat < now - PROOF_MAX_AGE - CLOCK_SKEW) fail('stale_proof', 'DPoP proof iat is outside the allowed window');
   if (typeof payload.jti !== 'string' || payload.jti.length < 8 || payload.jti.length > 128) fail('invalid_proof', 'DPoP proof jti is missing');
   if (credential !== undefined && payload.ath !== await sha256b64u(credential)) fail('invalid_proof', 'DPoP proof ath does not match the credential');
   if (nonce !== undefined && payload.nonce !== nonce) fail('use_dpop_nonce', 'DPoP nonce required');
-  if (replay && !replay.check(`${thumbprint}:${payload.jti}`, now)) fail('replayed_proof', 'DPoP proof was already used');
+  // check may be async (a shared cache such as durableReplayCache).
+  if (replay && !(await replay.check(`${thumbprint}:${payload.jti}`, now))) fail('replayed_proof', 'DPoP proof was already used');
   return { ...payload, jkt: thumbprint };
 }
