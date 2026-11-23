@@ -53,15 +53,13 @@ async function loadClerk() {
 
     // Load Clerk from CDN with publishable key
     // The clerk.browser.js bundle auto-initializes, so we pass the key via data attribute
-    if (!window.Clerk) {
-      await loadClerkScript(publishableKey);
-    }
+    await loadClerkScript(publishableKey);
 
     // After loading, window.Clerk is the initialized Clerk instance
     clerkInstance = window.Clerk;
 
     // Wait for Clerk to be ready
-    await clerkInstance.load();
+    await clerkInstance.load({ ui: { ClerkUI: window.__internal_ClerkUICtor } });
 
     // Set up auth state listener
     clerkInstance.addListener((session) => {
@@ -85,22 +83,27 @@ export const initializeClerk = initializeAuth;
  * @returns {Promise<void>}
  */
 function loadClerkScript(publishableKey) {
-  return new Promise((resolve, reject) => {
-    if (window.Clerk) {
-      resolve();
-      return;
-    }
+  return Promise.all([
+    window.Clerk ? null : loadScript(CLERK_SRC, { 'data-clerk-publishable-key': publishableKey }),
+    window.__internal_ClerkUICtor ? null : loadScript(CLERK_UI_SRC)
+  ]);
+}
 
+// Clerk refuses sign-in from clerk-js versions it calls outdated (v5 stopped working in November
+// 2026). Since v6 the sign-in UI is a separate package that registers its constructor on window,
+// which Clerk.load() is then given.
+const CLERK_SRC = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@6/dist/clerk.browser.js';
+const CLERK_UI_SRC = 'https://cdn.jsdelivr.net/npm/@clerk/ui@1/dist/ui.browser.js';
+
+function loadScript(src, attributes = {}) {
+  return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js';
+    script.src = src;
     script.async = true;
     script.crossOrigin = 'anonymous';
-    // Pass publishable key via data attribute - required for auto-initialization
-    script.setAttribute('data-clerk-publishable-key', publishableKey);
-
+    for (const [name, value] of Object.entries(attributes)) script.setAttribute(name, value);
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Failed to load Clerk script'));
-
     document.head.appendChild(script);
   });
 }
