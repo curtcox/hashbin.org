@@ -4,7 +4,7 @@ Slidev Online cannot use the SDK's worker execution world to mount Vue: workers
 have no DOM. `createSandbox({ execution: 'frame' })` adds an explicit DOM mode
 with the same opaque `allow-scripts` boundary. Worker execution remains the default.
 
-Implementation prepared for SDK v0.6.0, **not deployed or published**:
+Released in SDK v0.6.0 (live at `https://hashbin.org/sdk/v0.6.0/`):
 
 - One-time parent-authenticated bootstrap and a transferred private message port.
 - A visible iframe; author source evaluates as a blob module only inside it.
@@ -37,13 +37,12 @@ module exceptions/rejections, default worker compatibility, and fully offline
 module import after a service-worker-backed reload. The test server refuses HTTP
 connections during that last check, so the test cannot fall back to network.
 
+Done: the v0.6.0 release is deployed and its live `integrity.json` matches the repository;
+Fragment Kit v0.4.4 vendors it; Slidev Online is deployed on `https://slides.hashbin.page`
+with that kit, and `ai.hashbin.page` has its `/slides-v0.4.4/` entry.
+
 Remaining:
 
-1. Review and merge the SDK v0.6.0 proposal; check the production deployment.
-2. Verify the versioned files and integrity manifest from the live origin.
-3. Update Fragment Kit through its vendor/release workflow; do not patch v0.4.3.
-4. Vendor the new kit release in Slidev Online, then finish its Phase 0 visual
-   fidelity and complete-runtime performance gates before product phases.
-
-No account setup, registration, release tags or production deployment were
-performed by the implementation task.
+1. Live acceptance of DOM mode in Slidev Online (rendering, isolation, offline module delivery).
+2. Slidev's Phase 0 visual-fidelity and runtime-performance gates, tracked in the Slidev
+   repository.
