@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {AI_HOST,FLEET_HOST,assertAiHostPreserved,validateAiHost,aiHostVersionHeaders} from './deploy-ai-host.mjs';
+import {AI_HOST,FLEET_HOST,SLIDES_HOST,assertAiHostPreserved,validateAiHost,aiHostVersionHeaders} from './deploy-ai-host.mjs';
 describe('AI credential host registry',()=>{
   it('keeps Python and R response policies in separate version paths',()=>{
     const policy=origin=>'/*\n  Content-Security-Policy: frame-ancestors '+origin+'\n';
@@ -34,6 +34,19 @@ describe('remaining-client credential host',()=>{
   expect(headers).toContain('Cross-Origin-Embedder-Policy: require-corp');
   expect(headers).toContain('Cross-Origin-Resource-Policy: cross-origin');
   expect(aiHostVersionHeaders('0.4.3',source)).not.toContain('Cross-Origin-Embedder');
+ });
+});
+
+describe('Slidev credential host',()=>{
+ it('allows only the Slidev canonical origin on its own v0.4.4 entry',()=>{
+  expect(SLIDES_HOST).toEqual({path:'slides-v0.4.4',kitVersion:'0.4.4',allowedOrigins:['https://slides.hashbin.page']});
+  expect(()=>validateAiHost({allowedOrigins:SLIDES_HOST.allowedOrigins},SLIDES_HOST.path)).not.toThrow();
+  for(const origin of ['https://curtcox.github.io','https://r.hashbin.page','https://evil.example'])expect(()=>validateAiHost({allowedOrigins:[...SLIDES_HOST.allowedOrigins,origin]},SLIDES_HOST.path)).toThrow('registry review');
+  for(const version of ['0.4.0','0.4.3',FLEET_HOST.path])expect(()=>validateAiHost({allowedOrigins:SLIDES_HOST.allowedOrigins},version)).toThrow('registry review');
+ });
+ it('scopes its policy to the new path without fleet isolation headers',()=>{
+  const headers=aiHostVersionHeaders(SLIDES_HOST.path,'/*\n  Content-Security-Policy: frame-ancestors https://slides.hashbin.page\n');
+  expect(headers).toBe('/slides-v0.4.4/*\n  Content-Security-Policy: frame-ancestors https://slides.hashbin.page\n');
  });
 });
 

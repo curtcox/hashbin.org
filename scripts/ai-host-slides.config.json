@@ -1,0 +1,32 @@
+{
+  "name": "Fragment Kit AI host",
+  "storagePrefix": "fragment-kit-ai-host",
+  "allowedOrigins": [
+    "https://slides.hashbin.page"
+  ],
+  "routes": [
+    "openai",
+    "openrouter",
+    "anthropic",
+    "gemini",
+    "local",
+    "browser",
+    "paste"
+  ],
+  "models": [
+    {
+      "ref": "openai:gpt-4.1-mini-2025-04-14",
+      "name": "GPT-4.1 mini",
+      "capabilities": [
+        "generate",
+        "decide"
+      ],
+      "destination": "OpenAI",
+      "pinned": true,
+      "prices": {
+        "input": 0.4,
+        "output": 1.6
+      }
+    }
+  ]
+}

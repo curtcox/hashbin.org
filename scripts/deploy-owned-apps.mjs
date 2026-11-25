@@ -121,13 +121,13 @@ export function hostedHeaders(slug, html = '') {
 export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
   const app = slug === 'pages-preview' ? { repo: 'pages' } : OWNED_APPS[slug];
   const origin = ownedAppOrigin(slug);
-  const source = resolve(sources, app.repo, ...(slug === 'apptron' ? ['dist'] : slug === 'gripeline' ? ['site', '_site', 'editor'] : []));
+  const source = resolve(sources, app.repo, ...(slug === 'apptron' ? ['dist'] : slug === 'gripeline' ? ['site', '_site', 'editor'] : slug === 'slides' ? ['online', 'dist'] : []));
   const destination = join(root, 'build-reports', 'owned-apps', slug);
   const assets = join(destination, 'public');
   await rm(destination, { recursive: true, force: true });
   await mkdir(assets, { recursive: true });
   let manifest;
-  if (['pages', 'python', 'gnuplot', 'gripeline'].includes(slug)) {
+  if (['pages', 'python', 'gnuplot', 'gripeline', 'slides'].includes(slug)) {
     manifest = await readOfflineManifest(source);
     await copy(source, assets, [...localAssets(manifest), 'offline-assets.js', 'service-worker.js']);
     if (slug === 'pages') {
@@ -184,6 +184,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     if (slug === 'pages') await refreshOfflineManifest(assets, manifest, 'pagesonline-', hostedHeaders(slug));
     if (slug === 'manim' && manifest.assets) await refreshOfflineManifest(assets, manifest, 'manimonline-');
     if (slug === 'audio') await refreshOfflineManifest(assets, manifest, 'audioonline-');
+    if (slug === 'slides') await refreshOfflineManifest(assets, manifest, 'slidevonline-');
     if (['sheets', 'modl', 'r', 'livelier', 'apptron', 'gripeline'].includes(slug) && manifest?.assets) await refreshOfflineManifest(assets, manifest, slug + '-offline-', slug === 'sheets' ? hostedHeaders(slug) : '');
   }
   await writeFile(join(assets, '_headers'), hostedHeaders(slug, slug === 'textpad' ? await readFile(join(assets, 'index.html'), 'utf8') : ''));
@@ -196,7 +197,7 @@ export async function stageOwnedApp(slug, { sources = dirname(root) } = {}) {
     await writeFile(join(destination, 'worker.js'), 'import files from "./chunks.json";\nimport {chunkResponse} from "./chunk-response.js";\nexport default {fetch(request,env){return chunkResponse(request,env.ASSETS,files);}};\n');
   }
   const index = slug === 'pages-preview' ? '' : await readFile(join(assets, 'index.html'), 'utf8');
-  if (['r', 'livelier', 'audio', 'apptron', 'gripeline'].includes(slug) && !index.includes('name="hashbin-client-id" content="' + (app.appId ?? '') + '"')) throw new Error('The registered public client ID does not match the staged app.');
+  if (['r', 'livelier', 'audio', 'apptron', 'gripeline', 'slides'].includes(slug) && !index.includes('name="hashbin-client-id" content="' + (app.appId ?? '') + '"')) throw new Error('The registered public client ID does not match the staged app.');
   const inventory = await assetInventory(assets);
   const revision = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: source, encoding: 'utf8' }).trim();
   const dirty = Boolean(execFileSync('git', ['status', '--porcelain'], { cwd: source, encoding: 'utf8' }).trim());
