@@ -8,7 +8,7 @@ records) lives in Durable Objects, which this system snapshots nightly to the
 - **Recovery point:** up to 24 hours (nightly snapshot). Stripe's dashboard is an independent
   record of every deposit.
 - **Retention:** the 30 most recent snapshots. Older ones are deleted when a run finishes.
-- **Not covered:** a per-write event log (Decision #15's ≤1h RPO) is deferred (STATUS.md B8).
+- **Not covered:** a per-write event log for a recovery point under an hour (STATUS.md B8).
 
 ## How it works
 
@@ -25,10 +25,15 @@ with the `BackupIndex` Durable Object the first time it handles a request:
 | `SUPPLIER_REGISTRY` | supplier ID | the object itself |
 | `DBA_LINKS` | devicebasedauth.org account | the object itself when a link is made (the profile's `dba_link` holds the reverse) |
 
-Fixed-name objects (`KEY_REGISTRY`, `EXPIRATION_INDEX`, `DELETION_RECORD`, `DISPUTE_INDEX`,
-`ADMIN_ACTION_LOG`, `APPLICATION_REGISTRY`, `AUDIT_LOG`, `INFRASTRUCTURE_COST`, `ALERT_STORE`,
-`PLATFORM_STATS`) are always included. The list lives in `src/utils/backup.js`. **When you add a
-new Durable Object class that holds state, add it there.**
+Fixed-name objects (`EXPIRATION_INDEX`, `DELETION_RECORD`, `DISPUTE_INDEX`, `ADMIN_ACTION_LOG`,
+`APPLICATION_REGISTRY`, `AUDIT_LOG`, `INFRASTRUCTURE_COST`, `ALERT_STORE`, `PLATFORM_STATS`) are
+always included. The list lives in `src/utils/backup.js`. **When you add a new Durable Object
+class that holds state, add it there.**
+
+Deliberately left out: `BACKUP_INDEX` itself; `DBA_REVOCATIONS`, a cache of revocations that
+devicebasedauth.org's status lists stay authoritative for; `DBA_REPLAY`, short-lived DPoP proof
+IDs; and `CONTEST_RECORDS` and `MESSAGE_THREADS`, which are bound (and checked by `/health`)
+but store nothing.
 
 The daily cron (`0 2 * * *`) starts a run. `BackupIndex` then processes 50 objects per alarm
 invocation until it's done, so a run isn't limited by one invocation's subrequest budget. Each
