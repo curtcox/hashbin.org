@@ -1,9 +1,9 @@
 # Legal Pages: Review Checklist
 
 `frontend/terms.html`, `frontend/privacy.html`, and `frontend/dmca.html` are **drafts** written
-from this repo's decisions and code (2026-10-07). They aren't legal advice. Before launch
-(STATUS.md L5–L7), fill in the placeholders, settle the policy choices, have them reviewed, then
-remove the yellow "DRAFT" notice from each page.
+from this repo's decisions and code. They aren't legal advice. The owner decided not to have
+them reviewed by a lawyer (STATUS L5). Before launch (STATUS L5–L7), fill in the placeholders,
+settle the policy choices below, then remove the yellow "DRAFT" notice from each page.
 
 ## Placeholders
 
@@ -35,8 +35,8 @@ These are written to match the current code. Change the code or the text if you 
    never expire. Content stays blocked until an admin decides, or until a recorded counter-notice
    restores it 12 weekdays later (inside the 10–14 business-day window) unless the reporter
    reports a court action. Upheld (deleted) content can't be restored or re-uploaded, which
-   DMCA §3 now says. Ask the lawyer whether deleting rather than only blocking upheld copyright
-   content loses § 512(g) protection, and whether that last sentence is acceptable.
+   DMCA §3 now says. Open question for the owner: whether deleting rather than only blocking
+   upheld copyright content loses § 512(g) protection, and whether that sentence is acceptable.
 6. **Repeat-infringer threshold** `[NUMBER]` upheld removals in `[PERIOD]` (DMCA §5). Safe harbor
    requires a reasonably implemented policy. Strikes are tracked automatically and the cron alerts
    at the code defaults of **3 in 365 days** (`REPEAT_INFRINGER_*` in `src/api/admin-disputes.js`).
