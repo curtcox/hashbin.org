@@ -13,7 +13,7 @@ finished ones in [`../done/`](../done/).
 | [browser-client-safety.md](browser-client-safety.md) | Browser save flows (hosted approval, DPoP allowances), token lifetimes, shared origins, SRI, migration |
 | [api-keys-setup.md](api-keys-setup.md) | Scoped `hbk_` API keys and their caveats |
 | [devicebasedauth.md](devicebasedauth.md) | devicebasedauth.org device-bound credentials: linking, scopes, device sessions, gated grants, downloads, revocation, routes and setup |
-| [api-rate-limiting.md](api-rate-limiting.md) | Buying download allowance for content |
+| [api-rate-limiting.md](api-rate-limiting.md) | Buying extra downloads for a file (the rate-limit purchase API) |
 | [publishing-from-the-command-line.md](publishing-from-the-command-line.md) | `scripts/publish.mjs`: publish files through a scoped OAuth grant |
 
 The public site has user-facing versions of several of these under `frontend/docs/`
