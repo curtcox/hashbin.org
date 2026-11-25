@@ -76,6 +76,15 @@ describe('first-party app deployment boundaries', () => {
     expect(generated).not.toContain('"index.html": "old"');
   });
 
+  it('never lists the publisher-generated release.json as an offline asset', async () => {
+    await writeFile(join(directory, 'index.html'), 'Slidev configured release');
+    await refreshOfflineManifest(directory, { prefix: 'slidevonline', version: 'old', assets: ['index.html', 'release.json'], hashes: { 'index.html': 'old', 'release.json': 'source build' } }, 'slidevonline-');
+    const generated = await readOfflineManifest(directory);
+    expect(generated.assets).toEqual(['index.html']);
+    expect(generated.hashes).not.toHaveProperty('release.json');
+    expect(generated.version).toMatch(/^slidevonline-[a-f0-9]{16}$/);
+  });
+
   it('preserves a shared manifest cache namespace when rehashing hosted bytes', async () => {
     await writeFile(join(directory, 'index.html'), 'Manim configured release');
     await refreshOfflineManifest(directory, { prefix: 'manimonline-offline', version: 'old', assets: ['index.html'], hashes: {} }, 'manimonline-');

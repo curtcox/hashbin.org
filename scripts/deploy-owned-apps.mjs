@@ -85,6 +85,9 @@ export async function assetInventory(directory) {
 /** Update a plain offline manifest after applying deployment-specific bytes and response policy. */
 export async function refreshOfflineManifest(directory, manifest, prefix, responsePolicy = '') {
   const next = structuredClone(manifest);
+  // The publisher replaces release.json with its own inventory, so it can never be a verified offline asset.
+  for (const list of ['assets', 'local']) if (Array.isArray(next[list])) next[list] = next[list].filter(path => path !== 'release.json');
+  delete next.hashes['release.json'];
   for (const path of localAssets(next)) next.hashes[path] = sha(await readFile(join(directory, path)));
   next.version = (next.prefix ? next.prefix + '-' : prefix) + sha(JSON.stringify(next.hashes) + responsePolicy).slice(0, 16);
   await writeFile(join(directory, 'offline-assets.js'), `// Generated for this hosted release from final asset bytes.\nconst OfflineAssets = ${JSON.stringify(next, null, 2)};\nif (typeof module !== 'undefined') module.exports = OfflineAssets;\nelse globalThis.OfflineAssets = OfflineAssets;\n`);
