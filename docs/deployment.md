@@ -215,8 +215,6 @@ acceptance item. Details:
 
 - `ADMIN_USER_ID`: the admin's Clerk user ID; that sign-in holds every admin scope and issues
   scoped admin keys (`/admin/keys.html`)
-- `API_KEY_ENCRYPTION_KEY` is no longer used (keys are stored as hashes only); delete it with
-  `wrangler secret delete API_KEY_ENCRYPTION_KEY`
 - `CLERK_WEBHOOK_SECRET`: Clerk webhook signing secret. Use authorized webhook management APIs
   where available; the [Clerk plan](../todo/clerk_remaining.md#2-webhook-and-secret-provisioning)
   documents the managed Svix access check and specific UI fallback. Configure the endpoint
@@ -226,6 +224,9 @@ acceptance item. Details:
   directly). Test with `POST /api/admin/alerts/test`.
 - `CLOUDFLARE_ANALYTICS_TOKEN`: a read-only Account Analytics token for cost monitoring
   ([cost safety](cost-safety.md))
+- `DBA_API_KEY` (optional): lets devicebasedauth.org credentials use grants that need DBA's
+  online check (step-up, gates, use counts). Without it those grants answer
+  `403 online_required` ([devicebasedauth.md](devicebasedauth.md)).
 
 Generate the OAuth signing key value:
 
@@ -300,7 +301,8 @@ git push origin main
 ```
 
 In the **Actions** tab, the "Deploy to Cloudflare" workflow:
-1. Runs the runtime audit, unit/lint, local API, browser, hosted-sandbox and funded-download tests
+1. Runs the runtime audit, lint, file-size, unit, local API, browser, hosted-sandbox, DOM-sandbox
+   and funded-download checks
 2. Creates the R2 buckets if needed and pushes Worker secrets from GitHub secrets
 3. Deploys the three Workers listed above
 4. Verifies the workers.dev URL, the custom domain, and the git SHA embedded in the health

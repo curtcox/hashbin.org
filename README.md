@@ -60,7 +60,7 @@ Cloudflare account:
 git clone https://github.com/curtcox/hashbin.org.git
 cd hashbin.org
 npm install
-cp .dev.vars.example .dev.vars   # then set a random local-only OAUTH_SIGNING_KEY
+cp .dev.vars.example .dev.vars   # then replace the placeholder secrets with random values
 npm run dev:local                # http://localhost:8787
 ```
 
@@ -78,7 +78,6 @@ instead only when you want real Clerk and Stripe test keys in `.dev.vars`.
 - `npm run check:file-sizes` - Per-type file size limits (also run by the pre-push hook and CI)
 - `npm test` - Unit tests plus the shell checks (some need `npm run dev:local` running)
 - `npm run status` - One-screen summary of `STATUS.md`
-- `npm run deploy` - Deploy the main Worker by hand (CI deploys every push to `main`)
 - `npm run verify:production` - Strict post-deploy checks for all three production origins
 
 Working in this repo as an agent or new contributor? Start with [AGENTS.md](AGENTS.md).
@@ -207,7 +206,7 @@ Quick summary:
 3. Add the GitHub secrets checked by the workflow's "Verify required secrets" step
    (including `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `OAUTH_SIGNING_KEY`,
    `DOWNLOAD_TOKEN_SECRET`, Stripe keys)
-4. Push to `main` (or `npm run deploy` by hand)
+4. Push to `main` (or rerun the workflow: `gh workflow run deploy.yml --ref main`)
 5. Verify: `npm run verify:production`
 
 ## Testing

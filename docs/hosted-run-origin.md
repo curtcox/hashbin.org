@@ -1,9 +1,9 @@
 # Hosted sandbox operations
 
-H5 uses **hashbin.app** as its dedicated production domain. Both Worker configs and
-zone routes name it, and production DNS/TLS and deployment are complete. Python Online is the
-only enabled pilot, now restricted to its registered `https://python.hashbin.page` embedder with local origins off. The owner confirmed persistent-file backups before retiring `https://curtcox.github.io` on 2026-10-30.
-There are no pinned runtimes; other existing and new registered apps default to `run.status = 'off'`.
+The hosted sandbox (H5 in [`todo/hosted_run_origin.md`](../todo/hosted_run_origin.md), tracked under STATUS B14) runs on **hashbin.app**, served by `hashbin-run-prod`
+(`workers/run-origin/`). Python Online is the only enabled app, restricted to its registered
+`https://python.hashbin.page` embedder with local origins off. There are no pinned runtimes;
+other registered apps default to `run.status = 'off'`.
 
 The domain must be separate from `hashbin.org`, `256t.us`, and the future H6 app-hosting
 domain. Set the same `RUN_DOMAIN` in the main Worker and
@@ -22,10 +22,8 @@ Playwright switch that disables storage partitioning is overridden to restore th
 browser default. Exit 0 means persistence passed in the selected engines, 1 means a
 measured persistence failure, and 2 means a browser could not be measured.
 
-Results from 2026-10-28 are recorded in
-[the plan](../todo/hosted_run_origin.md#phase-0-results-2026-10-28) and
-[the JSON report](hosted-run-origin-measurements.json). Chromium and WebKit passed.
-Firefox exited before opening a profile. Safari's seven-day ITP behavior remains a
+Measured results are in [the JSON report](hosted-run-origin-measurements.json): Chromium and
+WebKit passed; Firefox exited before opening a profile. Safari's seven-day ITP behavior remains a
 manual acceptance item; Playwright WebKit is not a Safari ITP retention guarantee.
 
 `npm run test:hosted` exercises the actual run Worker/registry classes through a local
@@ -95,7 +93,7 @@ uploading through the stored publisher grant, verifies returned CIDs and maximum
 retention, and atomically writes the manifest. It refuses to overwrite pinned paths.
 A failed upload/retention check may leave uploaded content that needs an operator
 extension or cleanup; it never writes a partial manifest. Redeploy the run Worker
-after reviewing manifest changes. No upstream files were uploaded during implementation.
+after reviewing manifest changes.
 
 Renewal checklist: include **every CID in `workers/run-origin/runtimes.json`** in the
 operator's regular expiration-index review. Verify ownership, retention and remaining
@@ -134,42 +132,36 @@ registered embedding origin, can access it. Treat stored data as untrusted. Opaq
 mode remains the default for code from share links. Cross-origin isolation and an
 offline service worker are not enabled by this rollout.
 
-## Python Online pilot and remaining acceptance
+## Python Online pilot
 
-The Python Online implementation plan is [tracked in its repository](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md). The deployed pilot adds an explicit “Keep files between runs” preference, mounts IDBFS at `/home/pyodide`,
-loads stored files with `FS.syncfs(true)`, and flushes writes with `FS.syncfs(false)`
-before confirming save. Only opt-in runs use hosted mode; link code stays opaque by
-default. Its browser suite checks persistence, fresh-worker/reload restoration, editor isolation, incoming-link
-guards and failed-save reporting. Runtime files still use the existing verified proxy; direct runtime
-pins need approved uploads. Test real Safari retention before promising long-lived storage.
+Python Online is the only enabled app. Its "Keep files between runs" preference mounts IDBFS at
+`/home/pyodide`, loads stored files with `FS.syncfs(true)` and flushes writes with
+`FS.syncfs(false)` before confirming a save. Only opt-in runs use hosted mode; code from links
+stays opaque. Runtime files still come through the existing verified proxy, because direct
+runtime pins need approved uploads. Its plan is
+[in the Python Online repository](https://github.com/curtcox/PythonOnline/blob/main/todo/hosted_run_origin.md),
+and its live hosted tests run there.
 
-The domain expires 2027-10-28 according to public RDAP checked 2026-10-28. PSL submission needs
-a longer registration term and qualifying public usage under the current
-[PSL guidelines](https://github.com/publicsuffix/list/wiki/Guidelines). No PSL PR or renewal purchase
-was made during rollout.
+The hosted frame stays at `/frame/v0.4.0` for SDK v0.4.0 and loads the immutable
+`/frame/v0.4.1.js` bootstrap. That script is stored as literal text, because serializing a
+bundled function captured esbuild helpers that the served script lacked; a production-bundle
+regression test covers this. Frame HTML is sent with `Cache-Control: no-cache, no-transform`
+so Cloudflare can't inject beacons and registry policies stay fresh.
 
-Operators can obtain fresh run-budget evidence from `/admin/costs` with **Measure hosted run costs
-now** (`POST /api/admin/cost-safety/run/refresh`, `admin:costs`). The action runs the actual Analytics
-Engine query and records its actor; it accepts no request-count or brake overrides. SQL timestamp bounds
-use `toDateTime`, because Analytics Engine rejects comparisons between DateTime and bare strings.
+## Run-cost measurement
 
+The hourly monitor needs `CLOUDFLARE_ANALYTICS_TOKEN` (Account Analytics Read only, installed by
+the deploy workflow; rotate it before 2027-01-26 and never commit it). For fresh evidence, use
+**Measure hosted run costs now** on `/admin/costs` (`POST /api/admin/cost-safety/run/refresh`,
+`admin:costs`), which runs the real Analytics Engine query, records the actor and accepts no
+overrides. Its SQL compares timestamps with `toDateTime`, because Analytics Engine rejects
+comparing a DateTime with a bare string.
 
-Production acceptance (2026-10-28): the owner configured `CLOUDFLARE_ANALYTICS_TOKEN` with only
-Account Analytics Read for the existing account. The Actions deployment installed it, and an audited
-real measurement cleared the run brake (39 requests, less than one cent). Rotate before 2027-01-26;
-never commit or paste the token into chat. `npm run test:hosted:live` passed against production HTTPS:
-files survive a fresh worker and reload, editor DOM/storage are inaccessible, and incoming linked
-code runs opaque again. Screenshots are generated in Python Online's `test-results/live-hosted.png`.
+## Open items
 
-The hosted frame remains `/frame/v0.4.0` for SDK v0.4.0 compatibility and loads the corrected
-immutable `/frame/v0.4.1.js` bootstrap. A patch script URL avoids browsers' cached initial bundle.
-The script is stored as literal text: serializing a function after bundling captured esbuild helper
-references that did not exist in the served script. A production-bundle regression test covers this.
-Frame HTML uses `Cache-Control: no-cache, no-transform` to prevent automatic beacon injection while
-retaining fresh registry policies. Published SDK v0.4.0 files are unchanged.
+- `hashbin.app` expires 2027-10-28 (public RDAP). PSL submission needs a longer registration
+  and qualifying public use under the [PSL guidelines](https://github.com/publicsuffix/list/wiki/Guidelines).
+- Direct runtime pins (`runtimes.json` is empty).
+- Native Safari ITP retention and Firefox measurements, before promising long-lived storage.
 
-Final acceptance evidence: [HashBin tests and deployment](https://github.com/curtcox/hashbin.org/actions/runs/40778712524)
-and [Python Online Chromium/Firefox/WebKit CI](https://github.com/curtcox/PythonOnline/actions/runs/40779949350)
-passed. These cover the committed implementation; subsequent acceptance-note changes do not alter
-shipped SDK/runtime assets. Direct runtime uploads, PSL eligibility and remaining browser retention
-measurements stay open in the plan.
+Details are in [`todo/hosted_run_origin.md`](../todo/hosted_run_origin.md).
