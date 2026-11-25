@@ -1,100 +1,76 @@
-# AI host deployment
+# AI credential host
 
-The static credential origin is `https://ai.hashbin.page`, with three immutable
-entry points. `/v0.4.0/host.html` allows only `https://python.hashbin.page`;
-`/v0.4.3/host.html` allows only `https://r.hashbin.page`. The `/fleet-v0.4.3/host.html` entry allows the nine canonical origins listed below. All three are deployed and
-verified. No HashBin publisher app ID is invented: this host holds neither
-account sessions nor execution origins.
+`https://ai.hashbin.page` is a static-assets-only Cloudflare deployment (`hashbin-ai-host`)
+that holds users' AI provider keys for opt-in Fragment Kit editors. It holds no HashBin
+account sessions, runs no application code, has no HashBin publisher app ID and is separate
+from editor, preview, account and run origins. No API keys or model weights are packaged.
 
-The manual workflow requires both actual published kit manifests, stages
-verified public assets, applies the kit CSP/frame-ancestors headers and uses a
-separate static-assets-only Cloudflare deployment. No API keys or weights are
-packaged. Add required owner reviewers to the `ai-host-production` environment
-before dispatch. Do not dispatch without owner approval. No main-site deployment
-is needed to publish this host.
+## Entries
 
-For a new version, release the kit and review its consumer adoption first. After
-dispatch, verify HTTPS, versioned asset hashes, response CSP, blocked non-allowlisted
-frames, per-app popup consent, memory-only/remembered-key behavior and Forget app.
-Measure actual Safari/Firefox storage before relying on cross-app persistence.
-Keep new consumers in paste/direct mode until their live checks pass. Record the workflow,
-Cloudflare version and browser results before marking it deployed in STATUS.md.
+Each entry is an immutable directory built from one published Fragment Kit release, and its
+CSP allows framing only by the editors listed for it.
 
-The first deployment contained one version. Every future deployment must assemble
-all previously published version directories as well as the new one; publishing
-only a new directory would remove old entry points. Never rewrite old kit assets
-or move a release tag. The stager refuses to overwrite an existing version.
+| Entry | Kit | Allowed editor origins | Config |
+|-------|-----|------------------------|--------|
+| `/v0.4.0/host.html` | 0.4.0 | `python.hashbin.page` | `scripts/ai-host.config.json` |
+| `/v0.4.3/host.html` | 0.4.3 | `r.hashbin.page` | `scripts/ai-host-r.config.json` |
+| `/fleet-v0.4.3/host.html` | 0.4.3 | `gnuplot`, `livelier`, `audio`, `pages`, `manim`, `apptron`, `sheets`, `modl`, `gripeline` (all `.hashbin.page`) | `scripts/ai-host-fleet.config.json` |
+| `/slides-v0.4.4/host.html` | 0.4.4 | `slides.hashbin.page` | `scripts/ai-host-slides.config.json` |
 
-The deployment configures a hostname-specific Cloudflare redirect from HTTP to
-HTTPS, preserving paths and query strings, and sends HSTS. It changes only its
-`fragment_kit_ai_force_https` rule; other app rules are retained. The owner can
-configure this rule once in Cloudflare. Subsequent deployments
-verify the public redirect without requesting zone access. Creating or changing
-the rule through the API requires zone read and redirect-rule write permissions;
-a missing rule and insufficient permission stop deployment. The host remains
-static assets without application code.
+The live `https://ai.hashbin.page/release.json` lists the entries, kit versions and the hash
+of every served asset. `validateAiHost` in `scripts/deploy-ai-host.mjs` refuses any config
+whose origins differ from the registered list for its entry, so adding an editor is a code
+change that gets reviewed.
 
-## Deployed pilot receipt — 2026-11-08
+The fleet entry sends COOP `same-origin`, COEP `require-corp` and CORP `cross-origin` (for
+Apptron). Because WebKit severs popup openers and partitions message channels under those
+policies, the fleet entry hands credentials over with a consumer-owned encrypted handoff:
+WebCrypto ECDH P-256 plus AES-GCM, with the nonce, kind and app bound as additional data. The
+host stores only public keys and ciphertext; the receiving private key is non-extractable and
+stays in memory, and every completed, expired, cancelled or invalid transfer is deleted. OAuth
+PKCE callbacks use the same handoff after scrubbing the callback URL. A key is stored as
+plaintext only if the user picks **Remember** on this host, and keys never reach an editor
+origin. This is a host UI adapter, not a change to the pinned kit bytes; the kit's MIT license
+ships as `LICENSE-fragment-kit`.
 
-[Deployment 42522697907](https://github.com/curtcox/hashbin.org/actions/runs/42522697907)
-published Cloudflare version `12b0350c-a29e-43bc-ad2d-1ca2175b869a`. All 93
-servable assets matched the deployment inventory and every previously deployed
-`v0.4.0` byte remained unchanged. HTTP returns 301 to HTTPS with the exact path
-and query; HTTPS sends HSTS, the exact Python frame allowlist, no-referrer and
-nosniff. The owner configured only the AI hostname redirect through Cloudflare.
+## Deploying
 
-The actual host frame, same-origin credential popup, session-only key handoff and
-Forget action passed in isolated Chromium and Playwright WebKit. A synthetic key
-and mocked provider response were used; these checks spent no provider credits.
-App storage and URLs contained no key, and the host did not remember it.
+Dispatch `.github/workflows/deploy-ai-host.yml` only with the owner's approval; the
+`ai-host-production` environment should have the owner as a required reviewer. It does not
+deploy the main site. The workflow:
 
-Top-level to same-site frame storage shared localStorage, IndexedDB and Cache in
-Chromium. WebKit shared localStorage but partitioned IndexedDB and Cache. WebKit
-is not native Safari; Firefox and native Safari storage remain unmeasured here.
-The session credential handoff passed despite WebKit storage partitioning. See
-[the machine-readable receipt](ai-host-acceptance.json).
+1. Checks out the exact kit tags for every entry (v0.4.0, v0.4.3, v0.4.4) and runs the
+   host unit tests.
+2. Runs `node scripts/deploy-ai-host.mjs kit previous-kit slides-kit`, which verifies each
+   published kit manifest, stages every entry, scopes each CSP to its own directory, writes
+   `release.json` and the Wrangler config to `build-reports/ai-host/`, and checks that every
+   previously published versioned byte is unchanged. It refuses to overwrite a staged version.
+3. Runs `tests/ai-host-fleet.mjs` in Chromium, Firefox and WebKit: popup consent, PKCE, session
+   keys, Forget and stale-popup rejection, with synthetic keys and mocked providers (no paid calls).
+4. Runs `scripts/secure-ai-host.mjs`, which checks the hostname's HTTP→HTTPS redirect rule
+   (`fragment_kit_ai_force_https`, paths and queries kept). Creating or changing that rule needs
+   zone read and redirect-rule write permissions; a missing rule or permission stops the deploy.
+5. Deploys with Wrangler.
 
-## Deployed R adoption receipt — 2026-11-09
+Every deployment must assemble all earlier entries as well as the new one: publishing only a new
+directory would delete the old entry points. Never rewrite old kit assets or move a release tag.
 
-The R migration adds published Fragment Kit 0.4.3 at `/v0.4.3/host.html`,
-allowing only `https://r.hashbin.page`. Python keeps its immutable 0.4.0
-entry point and Python-only frame/connection policy. The workflow checks out
-both exact release tags, independently verifies both published manifests, and
-assembles both directories; no existing version is dropped or rewritten.
-The root Cloudflare header file scopes each CSP to its version directory.
-No app keys, runtime secrets, execution policy or account registration change.
-[Deployment 42538709784](https://github.com/curtcox/hashbin.org/actions/runs/42538709784)
-published Cloudflare version `47679755-d7f3-4b9d-be3e-4cfacb740a15` from
-`19d94b453e27a8479f5e52de6e450e0b74e40a2c`. All 186 servable files matched
-the independently verified staged pins. Every previously deployed Python
-versioned byte and its exact frame policy remained unchanged. Both versioned
-host URLs upgrade HTTP to HTTPS, retaining path/query, and send HSTS,
-no-referrer and nosniff.
+To add an entry: release the kit and review consumer adoption first, add a config and its
+registered origin list in `deploy-ai-host.mjs`, check out the new tag in the workflow, and keep
+new consumers in paste/direct mode until their live checks pass. After dispatch, verify HTTPS
+and HSTS, asset hashes against `release.json`, response CSP, refusal of non-allowlisted frames,
+per-app popup consent, memory-only and remembered keys, and Forget. Then record the run in
+`STATUS.md`.
 
-[Manual browser run 42538939542](https://github.com/curtcox/R/actions/runs/42538939542)
-passed real deployed-host popup, session-key handoff, provider transport,
-credential isolation and Forget in Chromium, Firefox and WebKit on Linux.
-Provider responses were mocked and keys synthetic; no paid calls occurred.
-Chromium/Firefox shared top-level-to-frame localStorage, Cache and IndexedDB.
-WebKit shared localStorage and partitioned Cache/IndexedDB; session handoff
-still passed. Native Safari and GPU behavior remain unverified.
+## Known limits
 
-The styled R client source at `16b8039811a6b4c7b0284bb862bba04177546b47`,
-routed at its canonical origin, also passed settings, real host popup,
-streaming proposal, review and acceptance in Chromium/WebKit. Accepted code
-did not auto-run and no key entered app storage. This source-integration
-check does not claim the R editor itself was already deployed. Its separate
-canonical/recovery deployment receipts are maintained in
-[Fragment Kit's R rollout](https://github.com/curtcox/Tools-for-pages-with-state-in-URL-fragments/blob/main/todo/r_ai_acceptance.json).
+- Browser checks run Chromium, Firefox and Playwright WebKit on Linux. Native Safari, GPU
+  engines and untested providers are unverified.
+- Chromium and Firefox share top-level-to-frame localStorage, IndexedDB and Cache. WebKit shares
+  localStorage but partitions IndexedDB and Cache; the session handoff still works there. Measure
+  native Safari storage before relying on cross-app persistence.
+- Encrypted handoff leftovers after a crash cannot be recovered, because the in-memory private
+  key is gone.
 
-## Deployed remaining-client host — 2026-11-12
-
-The new `/fleet-v0.4.3/` entry is deployed. It uses the published 0.4.3 kit, exact canonical origins for Gnuplot, Livelier, Audio, Pages, Manim, Apptron, Sheets, MODL and Gripeline, and a separate per-app storage prefix. Python `/v0.4.0/` and R `/v0.4.3/` remain immutable.
-
-Apptron retains its existing isolation. The new entry keeps COOP `same-origin`, COEP `require-corp` and CORP `cross-origin`. WebKit severs popup openers and partitions message channels under these policies, so a consumer-owned handoff encrypts temporary credentials with WebCrypto ECDH P-256 and AES-GCM. Only the host stores public keys and ciphertext, with additional data binding the nonce, kind and app; the receiving private key is nonextractable and stays in memory. Successful, expired, cancelled and invalid transfers are deleted. A session key is never written as plaintext unless the user explicitly selects Remember on this host. Encrypted leftovers after a crash cannot be recovered without the lost in-memory private key. OAuth PKCE callbacks use the same bounded encrypted handoff after scrubbing the callback URL. Keys never cross to an editor origin.
-
-This is a host UI adapter, not a new kit engine or a modification of pinned vendor bytes. Its MIT license is shipped as `LICENSE-fragment-kit`. Native Safari, GPU engines and untested providers remain unverified. Deployment evidence is recorded below.
-
-[Run 43349881620](https://github.com/curtcox/hashbin.org/actions/runs/43349881620) published commit `89551812964eb2b6ccd8200f5801ddf73802cd87`, Cloudflare version `927ef80d-7186-4fcc-950c-f8dd29e912f7`. All 282 served files match their recorded hashes. All 188 prior versioned assets (including response-policy files) remain unchanged. HTTPS redirects retain paths and queries; all entries send HSTS. Linux Chromium, Firefox and WebKit passed manual key handoff, OAuth PKCE, session-only storage, Forget and rejection of a stale remembered-key popup with synthetic keys and mocked providers. No paid calls ran in CI. [Machine-readable receipt](ai-fleet-host-acceptance.json).
-
-The `remaining-ai` option in the owned-app deployment workflow publishes only Gnuplot, Livelier, Audio, Pages, Manim, Apptron, Sheets, MODL and Gripeline. It excludes Python, R and helper sites. This host receipt does not claim those clients were already deployed.
+Machine-readable acceptance receipts: [ai-host-acceptance.json](ai-host-acceptance.json) (Python
+and R entries) and [ai-fleet-host-acceptance.json](ai-fleet-host-acceptance.json) (fleet entry).

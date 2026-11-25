@@ -12,7 +12,8 @@ comment says what it needs.
 | `check-deployment-secrets.mjs` | Validates required CI secrets and live key modes before Cloudflare writes; reports names only. |
 | `verify-deployment.sh` | Checks a deployment: home page, `/health` (config, Durable Objects, R2), the 256t.us content domain and API 404s. `npm run verify` checks `https://hashbin.org`; `npm run verify:workers-dev -- <subdomain>` checks `hashbin-worker-prod.<subdomain>.workers.dev`. |
 | `verify-hosted-run-origin.mjs` | Checks the live `hashbin.app` sandbox origin's headers (run by the deploy workflow). |
-| `deploy-owned-apps.mjs`, `install-owned-app-notices.mjs` | Stage/publish the nine first-party app origins and generate safe legacy draft-transfer notices. [Domain operations](../docs/owned-app-hosting.md). |
+| `deploy-owned-apps.mjs`, `install-owned-app-notices.mjs`, `owned-apps.mjs` | Stage/publish the first-party `*.hashbin.page` editors and `pages.hashbin.us`, generate legacy draft-transfer notices; `owned-apps.mjs` is the app registry. [Domain operations](../docs/owned-app-hosting.md). |
+| `deploy-ai-host.mjs`, `secure-ai-host.mjs`, `ai-host*.config.json` | Stage the immutable `ai.hashbin.page` credential host entries (one config per entry) and check its HTTPS redirect rule. Run by the `deploy-ai-host.yml` workflow ([AI host](../docs/ai-host.md)). |
 | `verify-owned-apps.mjs`, `test-owned-app-migration.mjs` | Anonymous live app/preview/offline checks and cross-origin fixture draft transfers. Never approve paid uploads. |
 | `generate-oauth-signing-key.sh` | Prints a random `OAUTH_SIGNING_KEY` and how to add it as a GitHub secret. Rotating it invalidates OAuth tokens and codes. |
 | `publish.mjs` | Publishes files through a scoped OAuth grant ([guide](../docs/publishing-from-the-command-line.md)). |
@@ -41,6 +42,7 @@ needs a running Worker or a browser.
 | `run-all-api-tests.sh` | `npm run test:api`: every suite in [`api-tests/`](api-tests/README.md) | `npm run dev:local` |
 | `run-funded-local-acceptance.mjs` | `npm run test:funded:local`: funded downloads across two isolated local Workers (gates deploys) | nothing |
 | `hosted-run-test-server.mjs`, `measure-hosted-run-origin.mjs` | Fixture server for `npm run test:hosted`, and `npm run test:hosted:measure` browser measurements | Playwright browsers |
+| `dom-sandbox-test-server.mjs` | Fixture server for `npm run test:dom` (opaque DOM sandbox and verified offline delivery) | Playwright browsers |
 | `validation/run-all-validations.sh` | Post-deploy validation of a live target ([README](validation/README.md)) | `TARGET_URL` |
 | `test-auth-system.sh` | `npm run test:auth`: sign-in, API keys and middleware against a local server | `npm run dev:local` |
 | `test-local-mode.sh` | Local sign-in and payments ([local development](../docs/local-development.md)) | `npm run dev:local` |

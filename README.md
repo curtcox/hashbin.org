@@ -20,6 +20,7 @@ HashBin.org is a content distribution platform built on Cloudflare's edge comput
 - **Browser Publishing**: Approve each save on HashBin without giving the client credentials, or opt into a capped DPoP allowance for silent saves
 - **Verified Browser SDK**: Verify retrieved bytes and returned CIDs; pin an immutable SDK release with SRI
 - **API Key Management**: Generate up to 25 scoped API keys for programmatic access
+- **Device-bound credentials**: Accepts [devicebasedauth.org](docs/devicebasedauth.md) credentials in place of API keys or as a device session
 - **Transparent Operation**: Public records and open source codebase
 - **Pay-per-Retention**: Sustainable model with $0.03/GB/month storage cost
 
@@ -73,11 +74,12 @@ instead only when you want real Clerk and Stripe test keys in `.dev.vars`.
 - `npm run dev` - Start local development server (needs Clerk/Stripe test keys in `.dev.vars`)
 - `npm run dev:local` - Start local development with local auth/payments
 - `npm run test:unit` - Unit tests (Vitest; no server needed)
-- `npm run lint` - ESLint for `src/`, `workers/`, `scripts/` and `frontend/`
+- `npm run lint` - ESLint for `src/`, `workers/`, `scripts/`, `frontend/js/` and `frontend/sdk/`
+- `npm run check:file-sizes` - Per-type file size limits (also run by the pre-push hook and CI)
 - `npm test` - Unit tests plus the shell checks (some need `npm run dev:local` running)
 - `npm run status` - One-screen summary of `STATUS.md`
 - `npm run deploy` - Deploy the main Worker by hand (CI deploys every push to `main`)
-- `npm run verify` - Verify the production deployment at `https://hashbin.org`
+- `npm run verify:production` - Strict post-deploy checks for all three production origins
 
 Working in this repo as an agent or new contributor? Start with [AGENTS.md](AGENTS.md).
 
@@ -110,9 +112,15 @@ Working in this repo as an agent or new contributor? Start with [AGENTS.md](AGEN
 | `256t-content-prod` | `workers/256t-content/` | `256t.us`: content downloads, isolated from sessions |
 | `hashbin-run-prod` | `workers/run-origin/` | `hashbin.app`: hosted sandbox origins for registered apps |
 
+The deploy workflow publishes these three on every push to `main`. Separately, manually
+dispatched workflows publish static first-party editors on `*.hashbin.page` and
+`pages.hashbin.us` ([owned-app hosting](docs/owned-app-hosting.md)) and the AI credential host
+`ai.hashbin.page` ([AI host](docs/ai-host.md)).
+
 ### Durable Objects
 
-State lives in 17 Durable Object classes in `src/durable-objects/`, bound in `wrangler.toml`.
+State lives in 21 Durable Object classes bound in `wrangler.toml`: 20 in `src/durable-objects/`
+and the vendored devicebasedauth.org replay cache.
 The central ones are **ContentMetadata** (per-CID records, retention, allowances),
 **UserProfile** (accounts, balances, API keys, OAuth grants), **ApplicationRegistry**
 (registered apps and DPoP replay receipts), **PaymentRecord**, **DisputeRecord**/**DisputeIndex**
@@ -132,6 +140,7 @@ The app receives a verified CID and never holds a credential. For autosave, use 
 | SDK app allowance | `Authorization: DPoP <access-token>` plus `DPoP: <proof>` | Approved scopes within the grant's caps and expiry |
 | API key | `Authorization: ApiKey hbk_…` or `X-API-Key: hbk_…` | Chosen scopes and caveats |
 | Raw unbound OAuth token | `Authorization: Bearer <access-token>` | Approved grant; no device binding |
+| devicebasedauth.org credential | `Authorization: DBA <credential>` plus `DPoP: <proof>` | Linked account's `hashbin:` scopes; `hashbin:session` makes it a device session ([guide](docs/devicebasedauth.md)) |
 
 Access tokens last 15 minutes. New refresh tokens have a seven-day idle timeout and a 90-day
 family maximum; every refresh requires `client_id`. Reusing a rotated refresh token revokes
@@ -199,7 +208,7 @@ Quick summary:
    (including `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `OAUTH_SIGNING_KEY`,
    `DOWNLOAD_TOKEN_SECRET`, Stripe keys)
 4. Push to `main` (or `npm run deploy` by hand)
-5. Verify: `npm run verify`
+5. Verify: `npm run verify:production`
 
 ## Testing
 
@@ -208,11 +217,13 @@ Quick summary:
 | `npm run test:unit` | Vitest unit tests (`**/*.test.js`) | nothing |
 | `npm run test:e2e` | Playwright browser tests (`frontend/tests/`) | starts `npm run dev:local` if needed |
 | `npm run test:hosted` | Hosted sandbox tests in Chromium/WebKit | Playwright browsers |
+| `npm run test:dom` | Opaque DOM sandbox and verified offline tests in Chromium/WebKit | Playwright browsers |
 | `npm run test:funded:local` | Native funded-download acceptance in two isolated local Workers | nothing |
 | `npm test` | Unit tests plus legacy grep-based shell checks | `npm run dev:local` for the supplier checks |
 | `npm run test:api` | Local API suites (`scripts/api-tests/`) | `npm run dev:local` |
 
-Deployment CI requires the unit, hosted-sandbox and funded-download checks. Cost history
+Deployment CI gates on the runtime dependency audit, lint, file sizes, unit, local API, browser,
+hosted-sandbox, DOM-sandbox and funded-download checks. Cost history
 export/invoice reconciliation: `npm run cost-safety:report -- ...`; see
 [the runbook](docs/cost-safety.md#export-and-invoice-reconciliation) and the separate
 [Cloudflare](todo/cost_safety_cloudflare.md) / [Stripe](todo/cost_safety_stripe.md) operator checklists.

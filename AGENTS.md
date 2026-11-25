@@ -27,10 +27,10 @@ src/                     Main Worker (hashbin.org): API, cron jobs, Durable Obje
   health.js              /health checks and /api/config
   api/                   One module per API area (content, oauth, payments, disputes, admin-*)
   auth/                  Authentication: middleware, scopes, OAuth, DPoP, admin, local auth
-  durable-objects/       18 DO classes (bound in wrangler.toml) plus their helpers
+  durable-objects/       20 DO classes (bound in wrangler.toml) plus their helpers
   services/ utils/       Shared logic: pricing, cost policy and monitoring, deletion, backups
   integration/           Multi-module tests
-  vendor/                Third-party code copied in unchanged (devicebasedauth.org verifier); refresh by copying, never edit
+  vendor/                Third-party code copied in unchanged (devicebasedauth.org verifier and its replay-cache DO); refresh by copying, never edit
 workers/
   256t-content/          256t.us download Worker (separate origin from sessions)
   run-origin/            hashbin.app hosted sandbox origin Worker
@@ -41,8 +41,10 @@ frontend/                Static site served by the main Worker; no build step
   docs/                  Public docs pages (API, SDK, security notes, Textpad walkthroughs)
   tests/                 Playwright tests
 examples/                Textpad sample apps for Expo and Flutter
-scripts/                 Test runners, report generators, operator CLIs (see scripts/README.md)
-test-utils/              Clerk, Stripe and Expo mocks for unit tests
+scripts/                 Test runners, report generators, operator CLIs, first-party app and AI host
+                         deploy tools (see scripts/README.md)
+tests/                   Browser acceptance for the ai.hashbin.page credential host
+test-utils/              Clerk, Stripe, Expo, alias and devicebasedauth.org fixtures for unit tests
 todo/ done/              Plans: open and finished (see "Plans and status" below)
 docs/                    Operator and developer guides; docs/business/ models costs and risks
 docs/video-series/       Explainer video scripts, narration and Manim scenes
@@ -68,9 +70,12 @@ Node 22+. Run `npm install` first.
 | `npm run verify:production` | Strict production post-deploy checks for all three origins | deployed site; optional `EXPECTED_GIT_SHA` |
 | `npm run status` | Open STATUS items | nothing |
 
-Deployment CI (`.github/workflows/deploy.yml`) gates on the runtime audit, lint, unit, local
-API, browser, hosted-sandbox and funded-download checks. Every push to `main` deploys
-production, the only environment, so don't push to `main` unless the owner asked you to.
+Deployment CI (`.github/workflows/deploy.yml`) gates on the runtime audit, lint, file-size,
+unit, local API, browser, hosted-sandbox, DOM-sandbox and funded-download checks. Every push to
+`main` deploys production, the only environment, so don't push to `main` unless the owner asked
+you to. The first-party editors (`deploy-owned-apps.yml`, [docs](docs/owned-app-hosting.md)) and
+the AI credential host (`deploy-ai-host.yml`, [docs](docs/ai-host.md)) deploy only when the
+owner dispatches their workflows.
 
 In local mode, authenticate API calls with `Authorization: LocalDev <user_id>`. New local
 users start with $10.00, and `POST /api/balance/dev-deposit` adds more
