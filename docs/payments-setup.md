@@ -13,7 +13,7 @@ limitation and verification; hosted Checkout acceptance still uses a browser.
 
 1. Cloudflare Workers account with Paid plan ($5/month minimum)
 2. Stripe account (test and live modes)
-3. Wrangler CLI installed (`npm install -g wrangler`)
+3. `npm install` (Wrangler is a dev dependency)
 
 ## Stripe Setup
 
@@ -94,24 +94,10 @@ stripe trigger checkout.session.completed
 
 ## Pricing Configuration
 
-Current pricing is configured in `src/utils/pricing.js`:
-
-```javascript
-// Base rate: $0.03 per GB per month
-const BASE_RATE_PER_GB_PER_MONTH = 0.03;
-
-// Stripe fees: 2.9% + $0.30
-const STRIPE_FEE_PERCENTAGE = 0.029;
-const STRIPE_FEE_FIXED_CENTS = 30;
-
-// Minimum deposit: $1.00
-const MINIMUM_DEPOSIT_CENTS = 100;
-
-// Minimum retention: 30 days (1 month)
-const MINIMUM_RETENTION_MONTHS = 1;
-```
-
-To change pricing, edit these constants and redeploy.
+Storage pricing is in `src/utils/pricing.js` ($0.03 per GB per month, a one-month minimum,
+a $1.00 minimum deposit). Stripe's fee rate (2.9% + $0.30), which deposits are grossed up by,
+is in `src/utils/cost-policy.js`. Change them there and redeploy; don't copy the values
+elsewhere.
 
 ## Troubleshooting
 
@@ -146,8 +132,7 @@ This is expected behavior! Users must deposit funds before uploading. The error 
 ⚠️ **Important Security Practices:**
 
 1. **Never commit secrets to git**
-   - Secrets are stored in Cloudflare Workers, not in code
-   - Use `wrangler secret put` to set secrets
+   - Secrets live in GitHub secrets and are pushed to the Worker by the deploy workflow
 
 2. **Use test keys in development**
    - Always use `sk_test_*` keys for development
@@ -182,19 +167,7 @@ This is expected behavior! Users must deposit funds before uploading. The error 
 - `POST /api/payments/calculate` - Calculate retention cost (public)
 - `POST /api/payments/webhook` - Stripe webhook handler (Stripe only)
 
-## Next Steps
+## More
 
-After completing environment setup:
-
-1. Test deposit flow with Stripe test cards
-2. Test content upload with balance deduction
-3. Test CID donation flow (anonymous and authenticated)
-4. Monitor webhook events in Stripe dashboard
-5. Review transaction logs in Cloudflare dashboard
-
-## Support
-
-For issues:
-- Check Cloudflare Worker logs: `wrangler tail`
-- Check Stripe webhook logs in dashboard
-- Review `done/payments.md` for implementation details
+- Stripe cost-safety checklist: [`todo/cost_safety_stripe.md`](../todo/cost_safety_stripe.md)
+- Logs: `npx wrangler tail` and the Stripe dashboard's webhook log
