@@ -435,79 +435,10 @@ See the public guide for [personal home-page publishing](../frontend/docs/aliase
 [a todo app and named backups](../frontend/docs/aliases.html#todo-app), and
 [page/app security implications](../frontend/docs/aliases.html#security).
 
-### Public Endpoints
+### Health
 
-These endpoints are accessible without authentication.
-
----
-
-#### GET /
-
-Returns service information and status.
-
-**Response:**
-```json
-{
-  "service": "HashBin.org API",
-  "version": "0.1.0",
-  "environment": "production",
-  "status": "operational",
-  "phase": "Phase 1 - Infrastructure Setup",
-  "endpoints": {
-    "health": "/health"
-  }
-}
-```
-
----
-
-#### GET /health
-
-Returns comprehensive health check with component status.
-
-**Response:**
-```json
-{
-  "status": "healthy",
-  "timestamp": "2026-01-14T03:00:00.000Z",
-  "environment": "production",
-  "checks": {
-    "worker": {
-      "status": "operational",
-      "message": "Worker is responding"
-    },
-    "environment": {
-      "status": "operational",
-      "message": "Environment configuration valid"
-    },
-    "durableObjects": {
-      "status": "operational",
-      "message": "All Durable Objects accessible",
-      "details": {
-        "CONTENT_METADATA": { "available": true, "accessible": true },
-        "USER_PROFILES": { "available": true, "accessible": true },
-        "KEY_REGISTRY": { "available": true, "accessible": true },
-        "PAYMENT_RECORDS": { "available": true, "accessible": true },
-        "CONTEST_RECORDS": { "available": true, "accessible": true },
-        "MESSAGE_THREADS": { "available": true, "accessible": true }
-      }
-    },
-    "r2": {
-      "status": "operational",
-      "message": "All R2 buckets accessible",
-      "details": {
-        "CONTENT_BUCKET": { "available": true, "accessible": true },
-        "BACKUP_BUCKET": { "available": true, "accessible": true }
-      }
-    }
-  }
-}
-```
-
-**Status Values:**
-- `healthy` - All systems operational
-- `degraded` - Some systems have issues but service is functional
-- `unhealthy` - Critical systems are down (returns HTTP 503)
+`GET /health` (public) reports each component's status and the deployed commit, with HTTP 503
+when a component is down. `/` is the static website, not an API. See [health.md](health.md).
 
 ---
 
@@ -882,27 +813,7 @@ curl -X GET https://hashbin.org/health
 
 ---
 
-## Changelog
-
-### Version 0.1.0 (2026-01-14)
-
-**Phase 3 Complete: Authentication & Authorization**
-- Clerk OAuth integration
-- API key management
-- Session management
-- Rate limiting
-- Account management
-- All 15 tests passing
-
----
-
-## Support
-
-- **Documentation**: [GitHub Repository](https://github.com/curtcox/hashbin.org)
-- **Issues**: [GitHub Issues](https://github.com/curtcox/hashbin.org/issues)
-
-
-### Cost safety and prepaid downloads
+## Cost safety and prepaid downloads
 
 Paid content includes a finite lifetime request allowance tied to its payments
 and reserved storage costs. Every 256t.us GET/HEAD, including a cache hit,
@@ -1011,3 +922,8 @@ $0.001 at the minimum price, more for large files). Returned remainders restore
 credit and applicable caps. At UTC month rollover, whole cents of unused credit
 return as `download_refund`; a fractional cent stays available as spending credit.
 Cap changes and revocations apply on the next lease, within 60 seconds.
+
+## Support
+
+- **Documentation**: [GitHub Repository](https://github.com/curtcox/hashbin.org)
+- **Issues**: [GitHub Issues](https://github.com/curtcox/hashbin.org/issues)
