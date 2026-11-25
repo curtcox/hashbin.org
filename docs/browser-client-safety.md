@@ -164,19 +164,22 @@ Prefer one origin per allowance app, run untrusted code with the SDK's `createSa
 and verify restored state and app-code caches. HashBin's hosted approval does not protect
 client drafts, settings or service-worker storage from a compromised sibling app.
 
-The self-contained release `/sdk/v0.3.0/hashbin.js` is immutable (v0.2.0 also remains). To
-enforce its integrity:
+Releases under `/sdk/vX.Y.Z/` are immutable; the newest is v0.6.0, and v0.2.0 through v0.5.0
+remain. To pin one and enforce its integrity:
 
 ```html
-<script type="module" src="https://hashbin.org/sdk/v0.3.0/hashbin.js"
-  integrity="sha384-OrIu52nODd4k+SsDRTZjfEQq7Nu4NO7x1AtXqngPk3r2Pm5eI2Afv7nu33exMJ+a"
+<script type="module" src="https://hashbin.org/sdk/v0.6.0/hashbin.js"
+  integrity="sha384-7D/4nLe9A/bjsg1SEKYmndlQBNPg1WLMZBwOyoMRZDRv92cOuz3PgZgdpH4DQACS"
   crossorigin="anonymous"></script>
 ```
 
-v0.3.0 adds `createSandbox()`, the service-worker helper `hashbin-cache.js`, `clientState` on
-publish errors, automatic redirect on cross-origin-isolated pages and a file handoff for redirect
-saves above 512 KiB. `integrity.json` lists SRI and SHA-256 hashes for both files; offline-first
-apps may vendor the exact files and check them against it.
+What each release added: v0.3.0 `createSandbox()`, the service-worker helper
+`hashbin-cache.js`, `clientState` on publish errors, automatic redirect on cross-origin-isolated
+pages and a file handoff for redirect saves above 512 KiB; v0.4.0 hosted sandbox storage
+(below); v0.5.0 alias resolution; v0.6.0 opt-in DOM execution in an opaque frame
+(`execution: 'frame'`). Each release's `integrity.json` lists SRI and SHA-256 hashes for its
+files; offline-first apps may vendor the exact files and check them against it. The
+[SDK guide](https://hashbin.org/docs/sdk) has the details.
 
 It exposes `window.hashbin`; use it from a subsequent module script after the SDK loads.
 A plain JavaScript `import` of a version URL pins the version but does not by itself enforce
@@ -196,7 +199,7 @@ see [SDK release instructions](../scripts/README.md#operator-and-release-tools).
 5. Review co-hosted apps and pin a reviewed SDK release where appropriate. Native and CLI
    clients need their own DPoP implementation; upgrading a web SDK cannot change their code.
 
-For implementation history and remaining real-provider browser acceptance, see
+Remaining real-provider browser acceptance is tracked in
 [the browser safety plan](../todo/browser_client_safety.md). Chromium and WebKit local-auth
 checks do not establish live Clerk/social sign-in behavior under Safari or Firefox tracking protection.
 
@@ -216,5 +219,4 @@ Browsers may evict this storage; it is not a backup. Hosted mode does not automa
 provide cross-origin isolation or SharedArrayBuffer.
 
 A disabled, suspended, blocked or unavailable hosted frame reports `sandbox_unavailable`;
-the SDK validates its origin and never silently switches storage modes. The previous
-v0.3.0 release and its opaque bootstrap remain immutable.
+the SDK validates its origin and never silently switches storage modes.
