@@ -2,7 +2,7 @@
 
 ## Overview
 
-The HashBin.org admin system provides comprehensive monitoring and management capabilities for platform administrators. The system includes statistics tracking, alerting, audit logging, and data export functionality.
+Admin access, scoped admin keys, the admin API (statistics, alerts, audit log, export, backups, costs) and the moderation runbook. The route table `API_ROUTES` in `src/api-routes.js` is authoritative for which scope each `/api/admin/*` route needs.
 
 ## Setup
 
@@ -12,7 +12,7 @@ Set `ADMIN_USER_ID` to the admin's Clerk user ID (shown as `user_id` by
 `GET /api/auth/session` while signed in):
 
 ```bash
-wrangler secret put ADMIN_USER_ID
+gh secret set ADMIN_USER_ID --repo curtcox/hashbin.org   # the deploy workflow pushes it to the Worker
 ```
 
 That account's own sign-in holds every admin scope. Its API keys and app tokens do not.
@@ -35,27 +35,11 @@ other admin keys, and stop working if `ADMIN_USER_ID` changes.
 | `admin:export` | `GET /api/admin/export` |
 | `admin:accounts` | `POST /api/admin/accounts/move` (see `todo/clerk_remaining.md` CL13) |
 
-### 3. Verify Durable Objects Migration
+### 3. Admin pages
 
-Ensure the new Durable Objects are deployed:
-
-```bash
-# Check wrangler.toml includes v3 migration
-grep -A 2 "tag = \"v3\"" wrangler.toml
-
-# Should show:
-# [[migrations]]
-# tag = "v3"
-# new_sqlite_classes = ["PlatformStats", "AlertStore", "AuditLog"]
-```
-
-### 4. Deploy
-
-Deploy the updated worker:
-
-```bash
-npm run deploy
-```
+Signed in as the admin: `/admin/keys.html` (admin keys), `/admin/disputes.html` (dispute
+review and takedowns) and `/admin/costs.html` (cost monitor, brake and hosted-run
+measurements). Everything else is the API below.
 
 ## API Endpoints
 
@@ -249,13 +233,11 @@ Export platform data in CSV format.
 - `type` - Export type (required): `audit`, `transactions`, `users`, `content`
 - `limit` - Max records to export (default: 1000)
 - `offset` - Offset for pagination (default: 0)
-- `start_date` - ISO 8601 date for range start (optional)
-- `end_date` - ISO 8601 date for range end (optional)
 
 **Response:**
 CSV file download with appropriate headers.
 
-**Rate Limit:** 1 export per minute (to be implemented)
+**Rate limit:** one export per minute (HTTP 429 otherwise).
 
 ## Alert Notifications
 
@@ -430,8 +412,7 @@ async function listAlerts() {
 1. **Least privilege**: Give each script an admin key with only the scopes it needs and a short
    expiry. Revoke it at `/admin/keys.html` when it is no longer needed or may be exposed.
 
-2. **No shared secret**: Admin access is the `ADMIN_USER_ID` sign-in or an admin key; there is
-   no shared admin token (retired 2026-10-27).
+2. **No shared secret**: Admin access is the `ADMIN_USER_ID` sign-in or an admin key.
 
 3. **Access Logging**: All admin actions are automatically logged in the audit log.
 
@@ -451,10 +432,6 @@ ADMIN_KEY="hba_..." \
   bash scripts/test-admin-endpoints.sh
 ```
 
-## Monitoring Dashboard (Future)
-
-A web-based admin dashboard UI is planned for future implementation. For now, use the API endpoints directly with curl, Postman, or custom scripts.
-
 ## Troubleshooting
 
 ### 401 Unauthorized
@@ -463,25 +440,13 @@ A web-based admin dashboard UI is planned for future implementation. For now, us
   at `/admin/keys.html` and holds the endpoint's scope
 - Check that `ADMIN_USER_ID` is set (`wrangler secret list`); admin keys stop working if it changes
 
-### Empty Statistics
+### Empty statistics
 
-- Statistics are tracked in real-time but start from zero after deployment
-- Upload content, make deposits, etc. to populate statistics
-- Scheduled snapshot jobs (not yet implemented) will compute historical aggregates
+Statistics count from zero when the PlatformStats object is first used; the scheduled
+`computePlatformSnapshot` job (`src/scheduled-jobs.js`) adds periodic snapshots.
 
-### Alerts Not Appearing
+### Alerts not appearing
 
-- Only dispute alerts are currently implemented
-- Health check and anomaly detection alerts are planned for future implementation
-- Check console logs for alert creation errors
-
-## Future Enhancements
-
-Planned features not yet implemented:
-
-1. **Anomaly Detection**: Automated alerts for unusual patterns
-2. **Scheduled Jobs**: Periodic snapshot computation and audit cleanup
-3. **Health Check Alerts**: Automated alerts when services degrade
-4. **Admin Dashboard UI**: Web interface for monitoring
-5. **Export Rate Limiting**: Enforce 1 export per minute limit
-6. **Full Export Types**: Complete implementation of transaction, user, and content exports
+Alerts come from `/health` failures, the scheduled anomaly, backup, repeat-infringer, NCII
+deadline and cost checks, and new disputes. If none appear, check `wrangler tail` for alert
+creation errors, and test webhook delivery with `POST /api/admin/alerts/test`.

@@ -1,6 +1,6 @@
 # Cost safety
 
-Implemented policy and operator runbook for `todo/cost_safety.md` (2026-10-24).
+Implemented policy and operator runbook for [`todo/cost_safety.md`](../todo/cost_safety.md).
 
 ## Policy
 
@@ -234,7 +234,7 @@ Account aggregates cannot establish per-action operation counts or heavy-tailed
 traffic/dispute distributions. Those still need CF10/ST5 observations before the
 calibration and simulation steps in the plan can be completed.
 
-## Sources reviewed 2026-10-24
+## Pricing sources
 
 - [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
 - [R2 pricing](https://developers.cloudflare.com/r2/pricing/)
@@ -250,9 +250,9 @@ calibration and simulation steps in the plan can be completed.
 
 Configure the same `DOWNLOAD_TOKEN_SECRET` on both Workers and share the existing
 `OAUTH_SIGNING_KEY` with the content Worker. CI requires the download secret and
-uploads both shared secrets. Deploy the main Worker first. The content Worker now
-binds `USER_PROFILES`, `KEY_REGISTRY` (legacy plain-path keys only), and
-`INFRASTRUCTURE_COST` as well as `CONTENT_METADATA`.
+uploads both shared secrets. Deploy the main Worker first. The content Worker binds
+`CONTENT_METADATA`, `USER_PROFILES`, `INFRASTRUCTURE_COST`, `APPLICATION_REGISTRY` and
+`ALIAS_RECORDS` from the main Worker (`workers/256t-content/wrangler.toml`).
 
 Set `COST_SAFETY_HARD_STOP=true` on the main Worker for emergency HTTP 503 on all
 content deliveries. The content Worker reads it through `/safety`, cached for at
