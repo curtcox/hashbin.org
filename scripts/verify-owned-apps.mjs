@@ -40,6 +40,10 @@ try {
         await page.waitForFunction(() => !document.getElementById('apptron').disabled, null, { timeout: 15000 });
         assert.equal(await page.locator('#apptron').isEnabled(), true);
         assert.equal(context.pages().length, 1);
+      } else if (slug === 'slides') {
+        await page.waitForSelector('body[data-editor-ready="true"]');
+        await page.locator('#preview iframe').first().waitFor();
+        assert.equal(await page.locator('meta[name="hashbin-client-id"]').getAttribute('content'), OWNED_APPS.slides.appId);
       } else if (slug === 'gnuplot') {
         await page.waitForFunction(() => /^Rendered in/.test(document.getElementById('status').textContent));
         assert.ok(await page.locator('#preview svg').count());

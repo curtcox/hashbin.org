@@ -13,7 +13,8 @@ export const OWNED_APPS = Object.freeze({
   r: { repo: 'R', appId: 'app_d38327d1-7d1a-40c0-925c-8b3deea6e51e', legacy: 'https://curtcox.github.io/R/' },
   livelier: { repo: 'livelier', appId: 'app_f044e0da-520a-4196-81f5-041c78f43c02', legacy: 'https://curtcox.github.io/livelier/' },
   apptron: { repo: 'apptron', appId: 'app_4988e882-b216-42ef-8d95-9f1747c6b55e', legacy: 'https://curtcox.github.io/apptron/' },
-  audio: { repo: 'AudioOnline', appId: 'app_da72a010-439f-4772-b664-791ed9333c29', legacy: 'https://curtcox.github.io/AudioOnline/' }
+  audio: { repo: 'AudioOnline', appId: 'app_da72a010-439f-4772-b664-791ed9333c29', legacy: 'https://curtcox.github.io/AudioOnline/' },
+  slides: { repo: 'slidev', appId: 'app_e9546b2e-a415-4ec5-be14-611ea0692f56', legacy: 'https://curtcox.github.io/slidev/' }
 });
 
 /** The approved canonical origin of a first-party editor or its preview host. */

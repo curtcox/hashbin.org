@@ -26,10 +26,15 @@ jobs:
           repository: curtcox/Tools-for-pages-with-state-in-URL-fragments
           ref: v0.4.0
           path: previous-kit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: curtcox/Tools-for-pages-with-state-in-URL-fragments
+          ref: v0.4.4
+          path: slides-kit
       - run: npm ci
       - run: npx vitest run scripts/deploy-ai-host.test.js scripts/secure-ai-host.test.js scripts/owned-apps/ai-host-handoff.test.js scripts/deploy-owned-apps.test.js
       - name: Verify published kit and stage exact versioned app allowlists
-        run: node scripts/deploy-ai-host.mjs kit previous-kit
+        run: node scripts/deploy-ai-host.mjs kit previous-kit slides-kit
       - name: Install the published kit’s pinned browser test tooling
         run: npm ci
         working-directory: kit

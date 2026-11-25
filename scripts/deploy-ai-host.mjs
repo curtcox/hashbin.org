@@ -9,19 +9,22 @@ export const AI_HOST = Object.freeze({origin:'https://ai.hashbin.page', version:
 
 export const FLEET_HOST=Object.freeze({path:'fleet-v0.4.3',kitVersion:'0.4.3',allowedOrigins:["https://gnuplot.hashbin.page", "https://livelier.hashbin.page", "https://audio.hashbin.page", "https://pages.hashbin.page", "https://manim.hashbin.page", "https://apptron.hashbin.page", "https://sheets.hashbin.page", "https://modl.hashbin.page", "https://gripeline.hashbin.page"]});
 
+/** Slidev Online uses the Fragment Kit v0.4.4 client, so it gets its own immutable v0.4.4 entry. */
+export const SLIDES_HOST=Object.freeze({path:'slides-v0.4.4',kitVersion:'0.4.4',allowedOrigins:['https://slides.hashbin.page']});
+
 /** Keep this credential origin separate from editors, previews, accounts and run origins. */
 export function validateAiHost(config, version) {
-  const origins=version===FLEET_HOST.path?FLEET_HOST.allowedOrigins:version==='0.4.0'?['https://python.hashbin.page']:version===AI_HOST.version?AI_HOST.allowedOrigins:null;
+  const origins=version===FLEET_HOST.path?FLEET_HOST.allowedOrigins:version===SLIDES_HOST.path?SLIDES_HOST.allowedOrigins:version==='0.4.0'?['https://python.hashbin.page']:version===AI_HOST.version?AI_HOST.allowedOrigins:null;
   if(!origins)throw new Error('AI host requires the registered exact kit version.');
   if(JSON.stringify(config.allowedOrigins)!==JSON.stringify(origins))throw new Error('AI host app origins require a registry review.');
 }
 
 /** Apply each origin policy only inside its immutable version directory. */
 export function aiHostVersionHeaders(version, source) {
-  if(!['0.4.0',AI_HOST.version,FLEET_HOST.path].includes(version))throw new Error('Unregistered host version.');
+  if(!['0.4.0',AI_HOST.version,FLEET_HOST.path,SLIDES_HOST.path].includes(version))throw new Error('Unregistered host version.');
   const csp=source.split('\n').find(line=>line.startsWith('  Content-Security-Policy:'));
   if(!csp)throw new Error('Staged host CSP is missing.');
-  return '/'+(version===FLEET_HOST.path?version:'v'+version)+'/*\n'+csp+'\n'+(version===FLEET_HOST.path?'  Cross-Origin-Opener-Policy: same-origin\n  Cross-Origin-Embedder-Policy: require-corp\n  Cross-Origin-Resource-Policy: cross-origin\n':'');
+  return '/'+([FLEET_HOST.path,SLIDES_HOST.path].includes(version)?version:'v'+version)+'/*\n'+csp+'\n'+(version===FLEET_HOST.path?'  Cross-Origin-Opener-Policy: same-origin\n  Cross-Origin-Embedder-Policy: require-corp\n  Cross-Origin-Resource-Policy: cross-origin\n':'');
 }
 
 /** Every previously published versioned byte must survive a later host deployment. */
@@ -46,15 +49,17 @@ export async function assertAiHostPreserved(assets,fetchSource=globalThis.fetch)
 }
 
 /** Stage a new version; preserve every existing version when assembling a later deployment. */
-export async function stageAiHostDeployment({kit, previousKit, output=join(root,'build-reports','ai-host'), published=true}={}) {
-  if(!kit||!previousKit)throw new Error('Exact current and previous Fragment Kit checkouts are required.');
+export async function stageAiHostDeployment({kit, previousKit, slidesKit, output=join(root,'build-reports','ai-host'), published=true}={}) {
+  if(!kit||!previousKit||!slidesKit)throw new Error('Exact current, previous and Slidev Fragment Kit checkouts are required.');
   kit=resolve(kit);output=resolve(output);
   const current=JSON.parse(await readFile(join(kit,'package.json'),'utf8'));
   if(current.version!==AI_HOST.version)throw new Error('Current AI host requires the registered exact kit version.');
   const previous=JSON.parse(await readFile(join(resolve(previousKit),'package.json'),'utf8'));
   if(previous.version!=='0.4.0')throw new Error('Retain the exact previously deployed kit version.');
+  const slides=JSON.parse(await readFile(join(resolve(slidesKit),'package.json'),'utf8'));
+  if(slides.version!==SLIDES_HOST.kitVersion)throw new Error('Slidev AI host requires the registered exact kit version.');
   const headers=['/*\n  Strict-Transport-Security: max-age=31536000\n  Referrer-Policy: no-referrer\n  X-Content-Type-Options: nosniff\n'];
-  for(const [source,file,entry] of [[resolve(previousKit),'ai-host.config.json','0.4.0'],[kit,'ai-host-r.config.json','0.4.3'],[kit,'ai-host-fleet.config.json',FLEET_HOST.path]]) {
+  for(const [source,file,entry] of [[resolve(previousKit),'ai-host.config.json','0.4.0'],[kit,'ai-host-r.config.json','0.4.3'],[kit,'ai-host-fleet.config.json',FLEET_HOST.path],[resolve(slidesKit),'ai-host-slides.config.json',SLIDES_HOST.path]]) {
     const pkg=JSON.parse(await readFile(join(source,'package.json'),'utf8'));
     const config=JSON.parse(await readFile(join(root,'scripts',file),'utf8'));
     validateAiHost(config,entry);
@@ -63,7 +68,7 @@ export async function stageAiHostDeployment({kit, previousKit, output=join(root,
     const {verifyManifest,sync}=await import(pathToFileURL(join(source,'tools','vendor-sync.mjs')));
     const pin=await sync({source,target:join(output,'.verified-kit')});
     await verifyManifest(pin,{published});
-    const destination=join(output,'public',entry===FLEET_HOST.path?entry:'v'+pkg.version);
+    const destination=join(output,'public',[FLEET_HOST.path,SLIDES_HOST.path].includes(entry)?entry:'v'+pkg.version);
     try {await access(destination);throw new Error('Version already staged; never overwrite an immutable AI host.');}catch(error){if(error.code!=='ENOENT')throw error;}
     await mkdir(dirname(destination),{recursive:true});
     // eslint-disable-next-line no-unsanitized/method, node/no-unsupported-features/es-syntax
@@ -84,8 +89,8 @@ export async function stageAiHostDeployment({kit, previousKit, output=join(root,
   await writeFile(join(output,'public','_headers'),headers.join('\n'));
   const assets=await assetInventory(join(output,'public'));
   const preservedAssets=published?await assertAiHostPreserved(assets):0;
-  await writeFile(join(output,'public','release.json'),JSON.stringify({origin:AI_HOST.origin,kitVersion:current.version,kitVersions:['0.4.0',current.version],hostEntries:['v0.4.0','v0.4.3',FLEET_HOST.path],publishedPinVerified:published,preservedAssets,assets},null,2)+'\n');
+  await writeFile(join(output,'public','release.json'),JSON.stringify({origin:AI_HOST.origin,kitVersion:current.version,kitVersions:['0.4.0',current.version,SLIDES_HOST.kitVersion],hostEntries:['v0.4.0','v0.4.3',FLEET_HOST.path,SLIDES_HOST.path],publishedPinVerified:published,preservedAssets,assets},null,2)+'\n');
   await writeFile(join(output,'wrangler.json'),JSON.stringify({name:'hashbin-ai-host',compatibility_date:'2026-11-08',workers_dev:false,preview_urls:false,routes:[{pattern:'ai.hashbin.page',custom_domain:true}],assets:{directory:'./public',not_found_handling:'none'}},null,2)+'\n');
   return output;
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))stageAiHostDeployment({kit:process.argv[2],previousKit:process.argv[3]}).then(console.log).catch(error=>{console.error(error.message);process.exitCode=1;});
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))stageAiHostDeployment({kit:process.argv[2],previousKit:process.argv[3],slidesKit:process.argv[4]}).then(console.log).catch(error=>{console.error(error.message);process.exitCode=1;});

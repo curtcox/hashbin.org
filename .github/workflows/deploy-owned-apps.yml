@@ -7,7 +7,7 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, remaining-ai, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio, r, livelier, apptron, gripeline]
+        options: [all, remaining-ai, pages-preview, pages, python, manim, gnuplot, sheets, modl, diagram, upload, textpad, audio, r, livelier, apptron, gripeline, slides]
 permissions:
   contents: read
 concurrency:
@@ -27,7 +27,7 @@ jobs:
           cache-dependency-path: hashbin.org/package-lock.json
       - name: Check out public client sources
         run: |
-          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl AudioOnline R livelier apptron gripeline; do
+          for repo in pages PythonOnline ManimOnline GnuplotOnline sheets modl AudioOnline R livelier apptron gripeline slidev; do
             folder="$repo"
             if [ "$repo" = GnuplotOnline ]; then folder=GnuPlotOnline; fi
             git clone --depth 1 "https://github.com/curtcox/$repo.git" "$folder"
@@ -40,6 +40,25 @@ jobs:
         if: inputs.app == 'gripeline' || inputs.app == 'all' || inputs.app == 'remaining-ai'
         working-directory: gripeline
         run: python3 site/build.py
+      - uses: actions/setup-node@v4
+        if: inputs.app == 'slides' || inputs.app == 'all'
+        with:
+          node-version: '24'
+      - name: Build Slidev Online release from its pinned pnpm workspace
+        if: inputs.app == 'slides' || inputs.app == 'all'
+        working-directory: slidev
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm build
+          pnpm -C online/runtime build
+          node online/scripts/build.mjs --release
+      - uses: actions/setup-node@v4
+        if: inputs.app == 'slides' || inputs.app == 'all'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: hashbin.org/package-lock.json
       - name: Prepare locked Apptron site
         if: inputs.app == 'apptron' || inputs.app == 'all' || inputs.app == 'remaining-ai'
         working-directory: apptron
