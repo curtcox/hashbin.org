@@ -79,8 +79,11 @@ export async function mountDbaLink() {
         ? `Linked to devicebasedauth.org account ${link.account} since ${new Date(link.linked_at).toLocaleDateString()}.`
         : 'Not linked. Credentials from devicebasedauth.org are refused until you link your account.';
       linkButton.hidden = !!deviceSession;
+      // The shared .btn display rule overrides the browser's default [hidden] style.
+      linkButton.style.display = deviceSession ? 'none' : '';
       linkButton.textContent = link.linked ? 'Link a different account' : 'Link devicebasedauth.org';
       unlinkButton.hidden = !!deviceSession || !link.linked;
+      unlinkButton.style.display = unlinkButton.hidden ? 'none' : '';
       if (deviceSession) status.textContent += ' Use regular account sign-in to change this link.';
       if (credentials) await showCredentials(credentials, link.linked);
     } catch (error) {

@@ -71,7 +71,12 @@ async function fixture(page, { revoked = false, nonce = false, enroll = false } 
     if (nonce && path === '/api/auth/session' && !payload.nonce) return route.fulfill({ status: 401, headers: { 'DPoP-Nonce': 'server-nonce' }, json: { code: 'use_dpop_nonce' } });
     if (nonce) expect(payload.nonce).toBe('server-nonce');
     if (revoked) return route.fulfill({ status: 401, json: { error: 'AUTH_KEY_REVOKED' } });
-    return route.fulfill({ json: path === '/api/auth/session' ? { user_id: 'verified_hashbin_user', auth_method: 'dba' } : { balance_cents: 1234, success: true } });
+    const bodies = {
+      '/api/auth/session': { user_id: 'verified_hashbin_user', auth_method: 'dba' },
+      '/api/auth/dba/link': { linked: true, account: 'acct_fixture', linked_at: Date.now() },
+      '/api/auth/dba/credentials': { credentials: [] }
+    };
+    return route.fulfill({ json: bodies[path] || { balance_cents: 1234, success: true } });
   });
   return { proofs, clerkRequests: () => clerkRequests };
 }
@@ -96,6 +101,10 @@ test('a restored device bypasses Clerk, signs each request and answers nonce cha
   await page.reload();
   await expect(page.locator('#balance-display')).toContainText('$12.34');
   expect(f.clerkRequests()).toBe(0);
+  await page.goto('/account');
+  await expect(page.locator('#dba-link-status')).toContainText('Use regular account sign-in');
+  await expect(page.locator('#dba-link')).toBeHidden();
+  await expect(page.locator('#dba-unlink')).toBeHidden();
 });
 
 test('a revoked device stays signed out instead of falling back to a Clerk session', async ({ page }) => {
