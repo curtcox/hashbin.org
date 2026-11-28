@@ -105,6 +105,11 @@ test('a restored device bypasses Clerk, signs each request and answers nonce cha
   await expect(page.locator('#dba-link-status')).toContainText('Use regular account sign-in');
   await expect(page.locator('#dba-link')).toBeHidden();
   await expect(page.locator('#dba-unlink')).toBeHidden();
+  await page.route('**/api/auth/dba/link', route => route.fulfill({ status: 503, json: { error: 'temporarily unavailable' } }));
+  await page.reload();
+  await expect(page.locator('#dba-link-status')).toContainText('Could not load');
+  await expect(page.locator('#dba-link')).toBeHidden();
+  await expect(page.locator('#dba-unlink')).toBeHidden();
 });
 
 test('a revoked device stays signed out instead of falling back to a Clerk session', async ({ page }) => {

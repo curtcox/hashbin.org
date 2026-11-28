@@ -68,6 +68,8 @@ export async function mountDbaLink() {
   const unlinkButton = document.getElementById('dba-unlink');
   const credentials = document.getElementById('dba-credentials');
   if (!status || !linkButton || !unlinkButton) return;
+  linkButton.style.display = 'none';
+  unlinkButton.style.display = 'none';
   const { deviceSession } = await getAuthState();
 
   async function refresh() {
