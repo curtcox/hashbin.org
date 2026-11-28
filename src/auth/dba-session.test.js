@@ -49,6 +49,36 @@ describe('device sessions (hashbin:session)', () => {
     resetDbaAuth(); // the status list cache would otherwise hold the old list for its TTL
     expect((await t.call(await t.dbaRequest(credential, { path: '/api/auth/apikeys' }))).status).toBe(401);
   });
+
+  it('publish approved bytes without replaying a proof against the internal upload URL', async () => {
+    t.env.OAUTH_SIGNING_KEY = 'local-device-publish-signing-key';
+    const binding = fetch => ({ idFromName: name => name, get: () => ({ fetch }) });
+    t.env.APPLICATION_REGISTRY = binding(async () => Response.json({ app_id: 'app_device', app_name: 'Device app', status: 'active', redirect_uris: ['https://client.example/callback'] }));
+    const stored = [];
+    t.env.CONTENT_METADATA = binding(async request => {
+      if (new URL(request.url).pathname === '/exists') return Response.json({ exists: false });
+      stored.push(await request.json());
+      return Response.json({ expires_at: new Date(Date.now() + 86400000).toISOString() });
+    });
+    t.env.CONTENT_BUCKET = { put: vi.fn(async () => {}) };
+    t.env.PLATFORM_STATS = binding(async () => Response.json({}));
+    const credential = await t.issue([{ actions: ['hashbin:session'] }]);
+    const body = 'Device approved document';
+    const path = '/api/publish?client_id=app_device&redirect_uri=https%3A%2F%2Fclient.example%2Fcallback&retention_months=1';
+    const quote = await t.call(await t.dbaRequest(credential, { method: 'POST', path, body, headers: { 'content-type': 'text/plain' } }));
+    expect(quote.status).toBe(200);
+    const approval = await quote.json();
+    const approve = () => t.dbaRequest(credential, { method: 'POST', path: '/api/publish', body, headers: { 'content-type': 'text/plain', 'x-hashbin-approval': approval.approval } });
+    const published = await t.call(await approve());
+    expect(published.status, await published.clone().text()).toBe(201);
+    expect((await published.json()).cid).toBe(approval.cid);
+    expect(stored).toHaveLength(1);
+    expect((await t.call(await approve())).status).toBe(409);
+    t.statusBytes[0] = 1 << 5;
+    resetDbaAuth();
+    expect((await t.call(await approve())).status).toBe(401);
+    expect(stored).toHaveLength(1);
+  });
 });
 
 describe('grants that need an online decision', () => {
