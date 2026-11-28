@@ -7,7 +7,8 @@ devicebasedauth.org) in `STATUS.md`. The user-facing reference is
 ## Status
 
 **Phase:** code complete on `main` (2026-11-22) and deployed. What remains is owner setup at
-devicebasedauth.org, a live check, and S25 Stage A (a Clerk dashboard setting).
+devicebasedauth.org, a live check, and live browser acceptance. The owner chose direct DBA sign-in alongside Clerk (2026-11-27);
+S25 Stage A is optional.
 
 [devicebasedauth.org](https://devicebasedauth.org) ("DBA", repo `curtcox/device-based-auth`)
 issues revocable, device-bound credentials: a device makes its own P-256 key, and DBA signs a
@@ -89,9 +90,9 @@ tested against the fake only.
 
 ### Owner (ops)
 
-- [ ] **Fund the operator account at devicebasedauth.org** that owns the `hashbin.org`
+- [x] **Fund the operator account at devicebasedauth.org** that owns the `hashbin.org`
   audience. DBA bills the audience operator for OIDC logins (linking) and online decisions.
-- [ ] **Register the revocation webhook** as the audience owner:
+- [x] **Register the revocation webhook** as the audience owner:
   `PATCH /api/v1/audiences/hashbin.org` with `{"revocation_webhook": "https://hashbin.org/api/dba/events"}`,
   then `POST /api/v1/audiences/hashbin.org/webhook-test` (expect status 204).
 - [ ] **Optional: `DBA_API_KEY`** GitHub secret (an API key of the audience owner with the
@@ -114,9 +115,11 @@ tested against the fake only.
   `http://localhost:8787`, HashBin's dev server's port too, so HashBin must run on another port,
   and DBA only accepts the redirect URIs registered for `hashbin.org`. A DBA-side change could
   register localhost callbacks for first-party audiences in local mode.
-- [ ] **HashBin's own pages on device credentials.** Device sessions work through the API;
-  the pages still sign in with Clerk. Using DBA's browser SDK for page API calls (and hiding
-  controls the device lacks grants for) is a frontend project of its own.
+- [x] **HashBin's own pages on device credentials.** `frontend/js/device-auth.js` restores and
+  enrolls non-extractable browser keys; `auth-loader.js` selects the device before initializing
+  Clerk. Page API calls, uploads and publishing use the SDK transport; device sessions cannot
+  change their account link. Browser tests cover real signed proofs, nonce retries, reloads,
+  rejected credentials, cross-origin refusal, enrollment with Clerk down and key deletion.
 - [ ] **Direct DBA auth on 256t.us** (downloads with `Authorization: DBA` instead of a signed
   link). Not needed while signed links cover it.
 - [ ] Refresh the vendored verifier when DBA ships fixes.

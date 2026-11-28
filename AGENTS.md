@@ -153,5 +153,10 @@ users start with $10.00, and `POST /api/balance/dev-deposit` adds more
 - `/` and other pages are the static frontend; only `/api/*`, `/oauth/*` and `/health` reach
   `API_ROUTES`. Unknown page paths redirect home, unknown API paths are JSON 404s.
 - Production sign-in offers Google and GitHub only (`todo/clerk_remaining.md` CL3).
-- `frontend/js/auth.js` initializes Clerk once, and `getSessionToken()` waits for it. Page
-  scripts that call the API on load must go through it (STATUS L18).
+- `frontend/js/auth-loader.js` restores a DBA browser device before loading Clerk. Page API calls
+  use `authenticatedFetch` from `utils.js` (or `authFetch` from `auth-loader.js`) so device requests
+  get a fresh URL/method-bound proof and nonce/gate retries. Raw `getAuthHeaders()` without a
+  method and URL returns no headers for devices; never treat a device credential as a bearer
+  session. `frontend/js/auth.js` initializes Clerk once; its `getSessionToken()` waits for it.
+- `frontend/js/dba-sdk.js` is pinned, minified third-party code; regenerate with
+  `node scripts/vendor-dba-sdk.mjs`, never edit it. `src/browser-dba-sdk.test.js` checks its hash.

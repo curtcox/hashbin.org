@@ -32,7 +32,7 @@ describe('device sessions (hashbin:session)', () => {
 
   it('reach session routes but never ones that mint credentials or end the account', async () => {
     const credential = await t.issue([{ actions: ['hashbin:session'] }]);
-    for (const path of ['/api/auth/apikeys', '/api/account/settings', '/api/account/authorizations', '/api/balance']) {
+    for (const path of ['/api/auth/session', '/api/auth/apikeys', '/api/account/settings', '/api/account/authorizations', '/api/balance']) {
       expect((await t.call(await t.dbaRequest(credential, { path }))).status, path).toBe(200);
     }
     for (const [method, path] of [['POST', '/api/auth/apikeys'], ['DELETE', '/api/auth/account'], ['POST', '/api/developers/apps'], ['POST', '/oauth/authorize'], ['POST', '/api/admin/keys']]) {

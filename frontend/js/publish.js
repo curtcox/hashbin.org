@@ -1,4 +1,4 @@
-import { initializeAuth, getAuthHeaders, signIn } from '/js/auth-loader.js';
+import { initializeAuth, getAuthState, authFetch, signIn } from '/js/auth-loader.js';
 import { verifyCID } from '/sdk/hashbin.js';
 
 const $ = id => document.getElementById(id);
@@ -85,12 +85,11 @@ $('review').addEventListener('click', async () => {
   $('retention').disabled = true;
   try {
     await initializeAuth();
-    let headers = await getAuthHeaders();
-    if (!headers) { await signIn(); headers = await getAuthHeaders(); }
-    if (!headers) throw new Error('Sign in to review this save.');
+    if (!(await getAuthState()).authenticated) await signIn();
+    if (!(await getAuthState()).authenticated) throw new Error('Sign in to review this save.');
     const url = new URL('/api/publish', location.origin);
     url.search = new URLSearchParams({ client_id: clientId, redirect_uri: redirectUri, retention_months: $('retention').value });
-    const response = await fetch(url, { method: 'POST', headers: { ...headers, 'content-type': contentType }, body: bytes });
+    const response = await authFetch(url, { method: 'POST', headers: { 'content-type': contentType }, body: bytes });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || data.error);
     if (!await verifyCID(data.cid, bytes)) throw new Error('Content ID mismatch');
@@ -110,8 +109,7 @@ $('approve').addEventListener('click', async () => {
   $('retention').disabled = true;
   $('cancel').disabled = true;
   try {
-    const headers = await getAuthHeaders();
-    const response = await fetch('/api/publish', { method: 'POST', headers: { ...headers, 'content-type': contentType, 'x-hashbin-approval': quote.approval }, body: bytes });
+    const response = await authFetch('/api/publish', { method: 'POST', headers: { 'content-type': contentType, 'x-hashbin-approval': quote.approval }, body: bytes });
     const result = await response.json();
     if (!response.ok) throw new Error(result.message || result.error);
     if (!await verifyCID(result.cid, bytes)) throw new Error('Returned content ID mismatch');

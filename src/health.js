@@ -21,6 +21,7 @@ export function handleConfig(env) {
     clerkPublishableKey: isLocalMode ? null : (env.CLERK_PUBLISHABLE_KEY || null),
     isLocalMode,
     authMode: isLocalMode ? 'local' : 'clerk',
+    dba_issuer: env.DBA_ISSUER || 'https://devicebasedauth.org',
     content_domain: getContentDomain(env),
     max_upload_bytes: MAX_UPLOAD_BYTES,
     api_key_scopes: USER_SCOPES

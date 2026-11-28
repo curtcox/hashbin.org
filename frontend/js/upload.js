@@ -4,7 +4,6 @@
  */
 import { generate256tHash, formatFileSize, isInlineContent } from './hash256t.js';
 import { authenticatedFetch } from './utils.js';
-import { getAuthHeaders } from './auth-loader.js';
 
 // Keep in sync with MAX_UPLOAD_BYTES in src/utils/upload-limits.js.
 const MAX_FILE_SIZE = 90 * 1024 * 1024;
@@ -292,14 +291,12 @@ async function handleUpload(event) {
       renderFiles();
       document.getElementById('upload-progress-text').textContent = `Uploading ${index + 1} of ${pending.length}: ${content.file.name}`;
       try {
-        const authHeaders = await getAuthHeaders();
-        if (!authHeaders) throw new Error('Not authenticated. Please sign in again.');
         if (controller.signal.aborted) break;
         const formData = new FormData();
         formData.append('content', content.file);
         formData.append('retention_months', months);
-        const response = await fetch('/api/content', {
-          method: 'POST', body: formData, headers: authHeaders, signal: controller.signal
+        const response = await authenticatedFetch('/api/content', {
+          method: 'POST', body: formData, signal: controller.signal
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || data.error || 'Upload failed');

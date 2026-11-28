@@ -68,6 +68,27 @@ them up within 30 seconds. If DBA's keys, status lists or catalog cannot be fetc
 verification fails closed with `503 AUTH_DBA_UNAVAILABLE`. DPoP proofs are accepted once across
 all isolates.
 
+## Signing in to HashBin pages with this browser
+
+First sign in with Clerk and link your DBA account in **Account Settings**. Then sign out and
+choose **Sign in with devicebasedauth.org** beside the regular sign-in button. Approve the
+browser at DBA for `hashbin:session`; the browser generates its own non-extractable WebCrypto
+key, stored in this origin's IndexedDB. The SDK is served from HashBin itself: official v1.4.0,
+source-integrity checked and minified by `scripts/vendor-dba-sdk.mjs`, with the resulting asset
+hash checked in tests. No SDK code is fetched from DBA at page runtime.
+
+Later visits restore the device and verify its session with HashBin before opening protected
+pages, without initializing Clerk. Requests get a fresh signed proof; the SDK handles DPoP
+nonce challenges and gates, and renews at two thirds of the credential's lifetime. Revocation
+or an unlinked account refuses the device, without silently using any existing Clerk session.
+A verification outage also fails closed. **Sign Out** deletes this browser slot's private key;
+it does not revoke other devices. Regular account sign-in remains available.
+
+Uploads, account pages and publishing use the device transport. Account-sensitive operations
+still need the regular account sign-in (see the device-session restrictions above); link and
+unlink controls are hidden for device sessions. Credentials and proofs go only to this HashBin origin,
+and authenticated device requests refuse redirects.
+
 ## Browser apps on any site
 
 API calls carrying `Authorization: DBA` get CORS from any origin (no cookies; the key cannot be
