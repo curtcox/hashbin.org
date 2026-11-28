@@ -7,6 +7,7 @@ import {
   initializeAuth, 
   getAuthState, 
   signIn, 
+  signInWithDevice,
   signOut, 
   onAuthStateChange,
   getProviderIcon
@@ -30,6 +31,7 @@ import {
 // App state
 let currentAuthState = null;
 let balanceCache = null;
+let signingInDevice = false;
 
 /**
  * Initialize the application
@@ -39,13 +41,19 @@ async function init() {
   console.log('Initializing HashBin.org application...');
 
   renderNavHeader();
+  const authSection = document.getElementById('auth-section');
+  if (authSection) {
+    // Keep direct device sign-in available while the regular sign-in service loads.
+    // eslint-disable-next-line no-unsanitized/property -- constant markup
+    authSection.innerHTML = createUnauthenticatedHTML();
+    setupUnauthenticatedHandlers();
+  }
   
   // Initialize Clerk
   const authInitialized = await initializeAuth();
   
   if (!authInitialized) {
-    showAuthError('Authentication service unavailable');
-    return;
+    showToast('Regular sign-in is unavailable. You can still use devicebasedauth.org.', 'error');
   }
 
   // Set up auth state listener
@@ -68,6 +76,7 @@ async function handleAuthChange() {
  * Update authentication UI based on current state
  */
 async function updateAuthUI() {
+  if (signingInDevice) return;
   const authSection = document.getElementById('auth-section');
   if (!authSection) return;
 
@@ -124,6 +133,8 @@ function createAuthLoadingHTML() {
 function createUnauthenticatedHTML() {
   return `
     <button class="btn-sign-in" id="sign-in-btn">Sign In</button>
+    <button class="btn-sign-in" id="device-sign-in-btn">Sign in with devicebasedauth.org</button>
+    <span id="device-sign-in-status" role="status"></span>
   `;
 }
 
@@ -140,6 +151,7 @@ function createAuthenticatedHTML(user, providerIcon) {
     <div class="user-info">
       <img class="avatar" src="${escapeHtml(user.imageUrl)}" alt="${escapeHtml(user.fullName)}">
       <span class="user-name">${escapeHtml(user.fullName)}</span>
+      ${user.provider === 'devicebasedauth.org' ? '<span class="user-name">devicebasedauth.org</span>' : ''}
       ${providerIconHTML}
     </div>
     <div class="balance" id="balance-display">
@@ -160,6 +172,17 @@ function createAuthenticatedHTML(user, providerIcon) {
  * Set up event handlers for unauthenticated state
  */
 function setupUnauthenticatedHandlers() {
+  const deviceButton = document.getElementById('device-sign-in-btn');
+  deviceButton?.addEventListener('click', async () => {
+    signingInDevice = true;
+    deviceButton.disabled = true;
+    const regularButton = document.getElementById('sign-in-btn');
+    regularButton.disabled = true;
+    const status = document.getElementById('device-sign-in-status');
+    status.textContent = 'Approve this browser at devicebasedauth.org. Link your account in Account Settings first.';
+    try { await signInWithDevice(); }
+    catch (error) { status.textContent = error.message; signingInDevice = false; deviceButton.disabled = false; regularButton.disabled = false; }
+  });
   const signInBtn = document.getElementById('sign-in-btn');
   if (signInBtn) {
     signInBtn.addEventListener('click', handleSignIn);
@@ -230,18 +253,6 @@ async function updateBalance() {
       <span class="balance-error" onclick="window.app.updateBalance()">
         Unable to load balance. Click to retry.
       </span>
-    `;
-  }
-}
-
-/**
- * Show authentication error
- */
-function showAuthError(message) {
-  const authSection = document.getElementById('auth-section');
-  if (authSection) {
-    authSection.innerHTML = `
-      <div class="auth-error">${escapeHtml(message)}</div>
     `;
   }
 }

@@ -6,6 +6,7 @@
 
 import { authenticatedFetch, handleApiError, showToast } from '/js/utils.js';
 import { downloadApi, mountCapForm } from '/js/download-budget-ui.js';
+import { getAuthState } from '/js/auth-loader.js';
 
 const dollars = cents => `$${(cents / 100).toFixed(2)}`;
 
@@ -67,6 +68,7 @@ export async function mountDbaLink() {
   const unlinkButton = document.getElementById('dba-unlink');
   const credentials = document.getElementById('dba-credentials');
   if (!status || !linkButton || !unlinkButton) return;
+  const { deviceSession } = await getAuthState();
 
   async function refresh() {
     try {
@@ -76,9 +78,10 @@ export async function mountDbaLink() {
       status.textContent = link.linked
         ? `Linked to devicebasedauth.org account ${link.account} since ${new Date(link.linked_at).toLocaleDateString()}.`
         : 'Not linked. Credentials from devicebasedauth.org are refused until you link your account.';
-      linkButton.hidden = false;
+      linkButton.hidden = !!deviceSession;
       linkButton.textContent = link.linked ? 'Link a different account' : 'Link devicebasedauth.org';
-      unlinkButton.hidden = !link.linked;
+      unlinkButton.hidden = !!deviceSession || !link.linked;
+      if (deviceSession) status.textContent += ' Use regular account sign-in to change this link.';
       if (credentials) await showCredentials(credentials, link.linked);
     } catch (error) {
       status.textContent = `Could not load the devicebasedauth.org link: ${error.message}`;
