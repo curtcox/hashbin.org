@@ -60,5 +60,5 @@ export async function handlePublish(request, env) {
   uploadUrl.searchParams.set('max_cost_cents', claims.cost_cents);
   const headers = new Headers(request.headers);
   headers.delete('x-hashbin-approval');
-  return handleUploadContent(new Request(uploadUrl, { method: 'POST', headers, body: bytes }), env, { appId: claims.app_id });
+  return handleUploadContent(new Request(uploadUrl, { method: 'POST', headers, body: bytes }), env, { appId: claims.app_id, verifiedAuth: auth });
 }

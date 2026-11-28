@@ -17,7 +17,9 @@ import { undoDebit, contentDeletedResponse } from './content.js';
  * Upload content with payment from balance
  */
 export async function handleUploadContent(request, env, publishContext = null) {
-  const authResult = await authenticate(request, env);
+  // Only the internal publish handler supplies this context, after verifying the original
+  // request and its approval. Its proof is bound to /api/publish, not this rewritten URL.
+  const authResult = publishContext?.verifiedAuth ?? await authenticate(request, env);
   
   if (!authResult.authenticated) {
     return new Response(
